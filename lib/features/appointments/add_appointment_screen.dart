@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/appointments_provider.dart';
 import '../../shared/providers/clients_provider.dart';
+import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/working_hours.dart';
 
 class AddAppointmentScreen extends ConsumerStatefulWidget {
   const AddAppointmentScreen({super.key});
@@ -249,7 +251,15 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   Widget build(BuildContext context) {
     final clients = ref.watch(clientsProvider);
     final services = ref.watch(servicesProvider);
+    final workspaceSettings = ref.watch(workspaceSettingsProvider);
 
+    final appointmentStart = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      _selectedHour,
+      _selectedMinute,
+    );
     final endTime = DateTime(
       _selectedDate.year,
       _selectedDate.month,
@@ -259,6 +269,23 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     ).add(Duration(minutes: _selectedDuration));
     final endStr =
         '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+    final workingHours = workspaceSettings.value?['working_hours'] is Map
+        ? Map<String, dynamic>.from(
+            workspaceSettings.value!['working_hours'] as Map,
+          )
+        : <String, dynamic>{};
+    final insideWorkingHours =
+        workingHours.isEmpty ||
+        isWithinWorkingHours(
+          hours: workingHours,
+          start: appointmentStart,
+          end: endTime,
+        );
+    final dayHoursLabel = workingHours.isEmpty
+        ? null
+        : formatWorkingHourValue(
+            workingHoursValueForDate(workingHours, appointmentStart),
+          );
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -597,6 +624,42 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
+
+                    if (!insideWorkingHours && dayHoursLabel != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.warningDim,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: AppColors.warning.withValues(alpha: 0.24),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              color: AppColors.warning,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '${weekdayName(appointmentStart)} hours are $dayHoursLabel. This booking falls outside your working blocks.',
+                                style: const TextStyle(
+                                  color: AppColors.t2,
+                                  fontSize: 13,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
 
                     // ── Repeat ───────────────────────────────────────
                     _label('REPEAT'),

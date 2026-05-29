@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/working_hours.dart';
 
 final publicProfileProvider = FutureProvider.family<PublicProfile?, String>((
   ref,
@@ -465,9 +466,7 @@ class _HoursRow extends StatelessWidget {
         ? Map<String, dynamic>.from(value as Map)
         : <String, dynamic>{};
     final enabled = map['enabled'] as bool? ?? false;
-    final label = enabled
-        ? '${map['start'] ?? ''} - ${map['end'] ?? ''}'
-        : 'Closed';
+    final label = enabled ? formatWorkingHourValue(map) : 'Closed';
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(

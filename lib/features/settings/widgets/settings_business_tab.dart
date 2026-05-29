@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/workspace_provider.dart';
 import '../../../shared/repositories/slate_repositories.dart';
+import '../../../shared/utils/working_hours.dart';
 import '../providers/settings_providers.dart';
 import 'settings_helpers.dart';
 import 'settings_services_section.dart';
@@ -13,6 +14,15 @@ class SettingsBusinessTab extends ConsumerStatefulWidget {
   @override
   ConsumerState<SettingsBusinessTab> createState() =>
       _SettingsBusinessTabState();
+}
+
+class _HoursBlockControllers {
+  final TextEditingController startController;
+  final TextEditingController endController;
+
+  _HoursBlockControllers({required String start, required String end})
+    : startController = TextEditingController(text: start),
+      endController = TextEditingController(text: end);
 }
 
 class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
@@ -109,33 +119,35 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   }
 
   void _showHoursSheet(Map<String, dynamic> settings) {
-    const days = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
     final rawHours = Map<String, dynamic>.from(
       settings['working_hours'] as Map? ?? {},
     );
     final enabled = <String, bool>{};
-    final startControllers = <String, TextEditingController>{};
-    final endControllers = <String, TextEditingController>{};
+    final blockControllers = <String, List<_HoursBlockControllers>>{};
 
-    for (final day in days) {
-      final value = rawHours[day] is Map
-          ? Map<String, dynamic>.from(rawHours[day] as Map)
+    for (final day in workingHourDays) {
+      final shortDay = shortToLongDay.entries
+          .firstWhere((entry) => entry.value == day)
+          .key;
+      final rawDay = rawHours[day] ?? rawHours[shortDay];
+      final value = rawDay is Map
+          ? Map<String, dynamic>.from(rawDay)
           : <String, dynamic>{};
-      enabled[day] = value['enabled'] as bool? ?? day != 'Sunday';
-      startControllers[day] = TextEditingController(
-        text: value['start'] as String? ?? '09:00',
+      final blocks = workingHourBlocks(
+        value.isEmpty ? defaultWorkingHours()[day] : value,
       );
-      endControllers[day] = TextEditingController(
-        text: value['end'] as String? ?? '17:00',
-      );
+      enabled[day] =
+          value['enabled'] as bool? ?? blocks.isNotEmpty && day != 'Sunday';
+      blockControllers[day] = blocks.isEmpty
+          ? [_HoursBlockControllers(start: '09:00', end: '17:00')]
+          : blocks
+                .map(
+                  (block) => _HoursBlockControllers(
+                    start: block.start,
+                    end: block.end,
+                  ),
+                )
+                .toList();
     }
 
     showModalBottomSheet(
@@ -171,7 +183,8 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                 style: TextStyle(color: AppColors.t3, fontSize: 13),
               ),
               const SizedBox(height: 18),
-              ...days.map((day) {
+              ...workingHourDays.map((day) {
+                final blocks = blockControllers[day]!;
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(12),
@@ -203,23 +216,81 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                       ),
                       if (enabled[day]!) ...[
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _timeField(
-                                label: 'Start',
-                                controller: startControllers[day]!,
+                        ...blocks.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final block = entry.value;
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              bottom: index == blocks.length - 1 ? 0 : 8,
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _timeField(
+                                    label: 'Start',
+                                    controller: block.startController,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _timeField(
+                                    label: 'End',
+                                    controller: block.endController,
+                                  ),
+                                ),
+                                if (blocks.length > 1) ...[
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () =>
+                                        setModal(() => blocks.removeAt(index)),
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      color: AppColors.t3,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 10),
+                        GestureDetector(
+                          onTap: () => setModal(
+                            () => blocks.add(
+                              _HoursBlockControllers(
+                                start: '16:00',
+                                end: '21:00',
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _timeField(
-                                label: 'End',
-                                controller: endControllers[day]!,
+                          ),
+                          child: Row(
+                            children: const [
+                              Icon(
+                                Icons.add_rounded,
+                                color: AppColors.green,
+                                size: 16,
                               ),
-                            ),
-                          ],
+                              SizedBox(width: 6),
+                              Text(
+                                'Add another block',
+                                style: TextStyle(
+                                  color: AppColors.green,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        if (blocks.length > 1) ...[
+                          const SizedBox(height: 8),
+                          const Text(
+                            'The gap between blocks is treated as a break.',
+                            style: TextStyle(color: AppColors.t3, fontSize: 12),
+                          ),
+                        ],
                       ],
                     ],
                   ),
@@ -234,11 +305,20 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                   );
                   if (workspaceId == null) return;
                   final nextHours = <String, dynamic>{};
-                  for (final day in days) {
+                  for (final day in workingHourDays) {
+                    final blocks = blockControllers[day]!
+                        .map(
+                          (block) => {
+                            'start': block.startController.text.trim(),
+                            'end': block.endController.text.trim(),
+                          },
+                        )
+                        .toList();
                     nextHours[day] = {
                       'enabled': enabled[day],
-                      'start': startControllers[day]!.text.trim(),
-                      'end': endControllers[day]!.text.trim(),
+                      'blocks': blocks,
+                      if (blocks.isNotEmpty) 'start': blocks.first['start'],
+                      if (blocks.isNotEmpty) 'end': blocks.last['end'],
                     };
                   }
                   await ref.read(workspaceSettingsRepositoryProvider).update(

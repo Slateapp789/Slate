@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slate/shared/models/slate_models.dart';
+import 'package:slate/shared/utils/working_hours.dart';
 
 void main() {
   group('Slate models', () {
@@ -143,5 +144,38 @@ void main() {
       expect(request.status, 'contacted');
       expect(request.toMap()['preferred_time_text'], 'Friday afternoon');
     });
+  });
+
+  test('working hours support split days with breaks', () {
+    final hours = {
+      'Monday': {
+        'enabled': true,
+        'blocks': [
+          {'start': '08:00', 'end': '14:00'},
+          {'start': '16:00', 'end': '21:00'},
+        ],
+      },
+    };
+
+    expect(
+      isWithinWorkingHours(
+        hours: hours,
+        start: DateTime(2026, 6, 1, 9),
+        end: DateTime(2026, 6, 1, 10),
+      ),
+      isTrue,
+    );
+    expect(
+      isWithinWorkingHours(
+        hours: hours,
+        start: DateTime(2026, 6, 1, 14, 30),
+        end: DateTime(2026, 6, 1, 15, 30),
+      ),
+      isFalse,
+    );
+    expect(
+      formatWorkingHourValue(hours['Monday']),
+      '08:00 - 14:00, 16:00 - 21:00',
+    );
   });
 }
