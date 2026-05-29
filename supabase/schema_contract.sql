@@ -45,10 +45,14 @@ create table if not exists booking_requests (
   name text not null,
   phone text not null,
   service_id uuid references services(id) on delete set null,
+  preferred_time_text text,
   message text,
   status text not null default 'pending',
   created_at timestamptz not null default now()
 );
+
+alter table if exists booking_requests
+  add column if not exists preferred_time_text text;
 
 create table if not exists notifications (
   id uuid primary key default gen_random_uuid(),

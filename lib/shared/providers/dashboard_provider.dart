@@ -32,6 +32,28 @@ class DashboardPulse {
   });
 }
 
+class DashboardFocus {
+  final Map<String, dynamic>? nextAppointment;
+  final int pendingBookingRequests;
+  final int overduePayments;
+  final double overdueTotal;
+  final bool calendarSyncEnabled;
+
+  const DashboardFocus({
+    required this.nextAppointment,
+    required this.pendingBookingRequests,
+    required this.overduePayments,
+    required this.overdueTotal,
+    required this.calendarSyncEnabled,
+  });
+
+  bool get hasAttention =>
+      pendingBookingRequests > 0 ||
+      overduePayments > 0 ||
+      nextAppointment != null ||
+      !calendarSyncEnabled;
+}
+
 double _sumTotals(List<Map<String, dynamic>> rows) {
   return rows.fold<double>(0, (sum, row) {
     final v = row['total'];
@@ -180,5 +202,53 @@ final dashboardPulseProvider = FutureProvider<DashboardPulse>((ref) async {
     overduePayments: List<Map<String, dynamic>>.from(overdueRows).length,
     repeatClients: contactCounts.values.where((count) => count > 1).length,
     busiestPeriod: busiestPeriod,
+  );
+});
+
+final dashboardFocusProvider = FutureProvider<DashboardFocus>((ref) async {
+  final workspaceId = await ref.watch(workspaceIdProvider.future);
+  if (workspaceId == null) {
+    return const DashboardFocus(
+      nextAppointment: null,
+      pendingBookingRequests: 0,
+      overduePayments: 0,
+      overdueTotal: 0,
+      calendarSyncEnabled: false,
+    );
+  }
+
+  final repository = ref.watch(dashboardRepositoryProvider);
+  final now = DateTime.now();
+
+  Map<String, dynamic>? nextAppointment;
+  var pendingRequests = 0;
+  var overdueRows = <Map<String, dynamic>>[];
+  var calendarSyncEnabled = false;
+
+  try {
+    nextAppointment = await repository.nextAppointment(
+      workspaceId: workspaceId,
+      from: now,
+    );
+  } catch (_) {}
+
+  try {
+    pendingRequests = await repository.pendingBookingRequests(workspaceId);
+  } catch (_) {}
+
+  try {
+    overdueRows = await repository.overduePayments(workspaceId);
+  } catch (_) {}
+
+  try {
+    calendarSyncEnabled = await repository.calendarSyncEnabled(workspaceId);
+  } catch (_) {}
+
+  return DashboardFocus(
+    nextAppointment: nextAppointment,
+    pendingBookingRequests: pendingRequests,
+    overduePayments: overdueRows.length,
+    overdueTotal: _sumTotals(overdueRows),
+    calendarSyncEnabled: calendarSyncEnabled,
   );
 });

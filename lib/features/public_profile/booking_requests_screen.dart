@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
@@ -117,17 +118,26 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
 
   Future<void> _setStatus(String status) async {
     setState(() => _saving = true);
-    await ref
-        .read(profileRepositoryProvider)
-        .updateBookingRequestStatus(widget.request.id, status);
-    ref.invalidate(bookingRequestsProvider);
-    if (mounted) setState(() => _saving = false);
+    try {
+      await ref
+          .read(profileRepositoryProvider)
+          .updateBookingRequestStatus(widget.request.id, status);
+      ref.invalidate(bookingRequestsProvider);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _call() async {
+    final phone = widget.request.phone.replaceAll(' ', '');
+    await launchUrl(Uri(scheme: 'tel', path: phone));
   }
 
   @override
   Widget build(BuildContext context) {
     final request = widget.request;
     final pending = request.status == 'pending';
+    final contacted = request.status == 'contacted';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -154,7 +164,64 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
             ],
           ),
           const SizedBox(height: 6),
-          Text(request.phone, style: const TextStyle(color: AppColors.t2)),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  request.phone,
+                  style: const TextStyle(color: AppColors.t2),
+                ),
+              ),
+              GestureDetector(
+                onTap: _call,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgInteract,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(LucideIcons.phone, size: 13, color: AppColors.t2),
+                      SizedBox(width: 5),
+                      Text(
+                        'Call',
+                        style: TextStyle(
+                          color: AppColors.t2,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (request.serviceName?.isNotEmpty == true ||
+              request.preferredTimeText?.isNotEmpty == true) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (request.serviceName?.isNotEmpty == true)
+                  _InfoChip(
+                    icon: LucideIcons.scissors,
+                    label: request.serviceName!,
+                  ),
+                if (request.preferredTimeText?.isNotEmpty == true)
+                  _InfoChip(
+                    icon: LucideIcons.clock3,
+                    label: request.preferredTimeText!,
+                  ),
+              ],
+            ),
+          ],
           if (request.message?.isNotEmpty == true) ...[
             const SizedBox(height: 10),
             Text(
@@ -162,30 +229,77 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
               style: const TextStyle(color: AppColors.t3, height: 1.35),
             ),
           ],
-          if (pending) ...[
+          if (pending || contacted) ...[
             const SizedBox(height: 14),
-            Row(
+            Column(
               children: [
-                Expanded(
-                  child: _ActionButton(
-                    label: 'Decline',
-                    color: AppColors.error,
+                if (pending) ...[
+                  _ActionButton(
+                    label: 'Mark contacted',
+                    color: AppColors.warning,
                     loading: _saving,
-                    onTap: () => _setStatus('declined'),
+                    onTap: () => _setStatus('contacted'),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _ActionButton(
-                    label: 'Confirm',
-                    color: AppColors.green,
-                    loading: _saving,
-                    onTap: () => _setStatus('confirmed'),
-                  ),
+                  const SizedBox(height: 10),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ActionButton(
+                        label: 'Decline',
+                        color: AppColors.error,
+                        loading: _saving,
+                        onTap: () => _setStatus('declined'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _ActionButton(
+                        label: 'Confirm',
+                        color: AppColors.green,
+                        loading: _saving,
+                        onTap: () => _setStatus('confirmed'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _InfoChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.bgInteract,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: AppColors.t3),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.t2,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
@@ -236,6 +350,7 @@ class _StatusBadge extends StatelessWidget {
     final color = switch (status) {
       'confirmed' => AppColors.success,
       'declined' => AppColors.error,
+      'contacted' => AppColors.green,
       _ => AppColors.warning,
     };
     return Container(

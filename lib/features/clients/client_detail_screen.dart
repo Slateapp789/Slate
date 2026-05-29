@@ -7,6 +7,7 @@ import '../../shared/providers/clients_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import 'providers/client_detail_providers.dart';
 import 'widgets/client_appointments_tab.dart';
+import 'widgets/client_overview_tab.dart';
 import 'widgets/client_payments_tab.dart';
 import 'widgets/client_tasks_tab.dart';
 
@@ -36,7 +37,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   void initState() {
     super.initState();
     _client = Map<String, dynamic>.from(widget.client);
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _nameController = TextEditingController(
       text: _client['name'] as String? ?? '',
     );
@@ -388,6 +389,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                     fontWeight: FontWeight.w700,
                   ),
                   tabs: [
+                    const Tab(text: 'Overview'),
                     Tab(
                       text: 'Appointments (${appointments.value?.length ?? 0})',
                     ),
@@ -404,6 +406,11 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
               child: TabBarView(
                 controller: _tabController,
                 children: [
+                  ClientOverviewTab(
+                    clientId: clientId,
+                    clientName: name,
+                    notes: _client['notes'] as String? ?? '',
+                  ),
                   ClientAppointmentsTab(clientId: clientId),
                   ClientPaymentsTab(clientId: clientId, clientName: name),
                   ClientTasksTab(clientId: clientId, clientName: name),

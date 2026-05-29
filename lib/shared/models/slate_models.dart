@@ -385,6 +385,8 @@ class BookingRequest {
   final String name;
   final String phone;
   final String? serviceId;
+  final String? serviceName;
+  final String? preferredTimeText;
   final String? message;
   final String status;
   final DateTime? createdAt;
@@ -395,23 +397,40 @@ class BookingRequest {
     required this.name,
     required this.phone,
     this.serviceId,
+    this.serviceName,
+    this.preferredTimeText,
     this.message,
     this.status = 'pending',
     this.createdAt,
   });
 
   factory BookingRequest.fromMap(Map<String, dynamic> map) {
+    final service = _nestedMap(map['services']);
     return BookingRequest(
       id: map['id'] as String,
       workspaceId: map['workspace_id'] as String? ?? '',
       name: map['name'] as String? ?? '',
       phone: map['phone'] as String? ?? '',
       serviceId: map['service_id'] as String?,
+      serviceName: service?['name'] as String?,
+      preferredTimeText: map['preferred_time_text'] as String?,
       message: map['message'] as String?,
       status: map['status'] as String? ?? 'pending',
       createdAt: _dateTimeFrom(map['created_at']),
     );
   }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'workspace_id': workspaceId,
+    'name': name,
+    'phone': phone,
+    'service_id': serviceId,
+    'preferred_time_text': preferredTimeText,
+    'message': message,
+    'status': status,
+    if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+  };
 }
 
 class SlateNotification {

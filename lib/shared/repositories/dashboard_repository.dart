@@ -57,6 +57,22 @@ class DashboardRepository {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  Future<Map<String, dynamic>?> nextAppointment({
+    required String workspaceId,
+    required DateTime from,
+  }) async {
+    final row = await _client
+        .from('appointments')
+        .select('*, contacts(name), services(name)')
+        .eq('workspace_id', workspaceId)
+        .gte('start_time', from.toUtc().toIso8601String())
+        .neq('status', 'cancelled')
+        .order('start_time', ascending: true)
+        .limit(1)
+        .maybeSingle();
+    return row == null ? null : Map<String, dynamic>.from(row);
+  }
+
   Future<List<Map<String, dynamic>>> upcomingAppointmentIds({
     required String workspaceId,
     required DateTime from,
@@ -79,6 +95,25 @@ class DashboardRepository {
         .eq('workspace_id', workspaceId)
         .eq('status', 'overdue');
     return List<Map<String, dynamic>>.from(rows);
+  }
+
+  Future<List<Map<String, dynamic>>> overduePayments(String workspaceId) async {
+    final rows = await _client
+        .from('invoices')
+        .select('id,total,contacts(name)')
+        .eq('workspace_id', workspaceId)
+        .eq('status', 'overdue')
+        .order('due_date', ascending: true);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  Future<bool> calendarSyncEnabled(String workspaceId) async {
+    final row = await _client
+        .from('workspace_settings')
+        .select('calendar_sync_enabled')
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+    return row?['calendar_sync_enabled'] as bool? ?? false;
   }
 
   Future<List<Map<String, dynamic>>> monthlyAppointmentSignals({

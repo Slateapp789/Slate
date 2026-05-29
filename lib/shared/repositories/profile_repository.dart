@@ -77,22 +77,53 @@ class ProfileRepository {
     required String name,
     required String phone,
     String? serviceId,
+    String? preferredTimeText,
     String? message,
   }) async {
-    await _client.from('booking_requests').insert({
+    final row = {
       'workspace_id': workspaceId,
       'name': name,
       'phone': phone,
       'service_id': serviceId,
+      'preferred_time_text': preferredTimeText,
       'message': message,
       'status': 'pending',
-    });
+    };
+
+    try {
+      await _client.from('booking_requests').insert(row);
+    } on PostgrestException catch (error) {
+      if (!error.message.contains('preferred_time_text')) rethrow;
+      final preferred = preferredTimeText == null || preferredTimeText.isEmpty
+          ? ''
+          : 'Preferred time: $preferredTimeText\n\n';
+      final fallbackRow = Map<String, dynamic>.from(row)
+        ..remove('preferred_time_text');
+      await _client.from('booking_requests').insert({
+        ...fallbackRow,
+        'message': '$preferred${message ?? ''}'.trim().isEmpty
+            ? null
+            : '$preferred${message ?? ''}'.trim(),
+      });
+    }
+
+    try {
+      await _client.from('notifications').insert({
+        'workspace_id': workspaceId,
+        'type': 'booking_request',
+        'title': 'New booking request',
+        'body': '$name requested a booking.',
+        'deep_link': '/booking-requests',
+      });
+    } catch (_) {
+      // Booking requests should still work in environments before notifications are migrated.
+    }
   }
 
   Future<List<BookingRequest>> bookingRequests(String workspaceId) async {
     final rows = await _client
         .from('booking_requests')
-        .select()
+        .select('*, services(name)')
         .eq('workspace_id', workspaceId)
         .order('created_at', ascending: false);
     return rows

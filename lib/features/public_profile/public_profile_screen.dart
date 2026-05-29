@@ -24,6 +24,7 @@ class PublicProfileScreen extends ConsumerStatefulWidget {
 class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _preferredTimeController = TextEditingController();
   final _messageController = TextEditingController();
   String? _selectedServiceId;
   bool _sending = false;
@@ -33,6 +34,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _preferredTimeController.dispose();
     _messageController.dispose();
     super.dispose();
   }
@@ -52,6 +54,9 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             name: _nameController.text.trim(),
             phone: _phoneController.text.trim(),
             serviceId: _selectedServiceId,
+            preferredTimeText: _preferredTimeController.text.trim().isEmpty
+                ? null
+                : _preferredTimeController.text.trim(),
             message: _messageController.text.trim().isEmpty
                 ? null
                 : _messageController.text.trim(),
@@ -105,6 +110,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             selectedServiceId: _selectedServiceId,
             nameController: _nameController,
             phoneController: _phoneController,
+            preferredTimeController: _preferredTimeController,
             messageController: _messageController,
             sending: _sending,
             sent: _sent,
@@ -122,6 +128,7 @@ class _ProfileContent extends StatelessWidget {
   final String? selectedServiceId;
   final TextEditingController nameController;
   final TextEditingController phoneController;
+  final TextEditingController preferredTimeController;
   final TextEditingController messageController;
   final bool sending;
   final bool sent;
@@ -133,6 +140,7 @@ class _ProfileContent extends StatelessWidget {
     required this.selectedServiceId,
     required this.nameController,
     required this.phoneController,
+    required this.preferredTimeController,
     required this.messageController,
     required this.sending,
     required this.sent,
@@ -166,6 +174,7 @@ class _ProfileContent extends StatelessWidget {
                             name: service.name,
                             duration: service.durationMins,
                             price: service.price,
+                            description: service.description,
                           ),
                         )
                         .toList(),
@@ -209,7 +218,8 @@ class _ProfileContent extends StatelessWidget {
                       DropdownButtonFormField<String?>(
                         initialValue: selectedServiceId,
                         dropdownColor: AppColors.bgCard,
-                        decoration: const InputDecoration(hintText: 'Service'),
+                        style: const TextStyle(color: AppColors.t1),
+                        decoration: _fieldDecoration('Service'),
                         items: [
                           const DropdownMenuItem<String?>(
                             value: null,
@@ -226,8 +236,13 @@ class _ProfileContent extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       _ProfileField(
+                        controller: preferredTimeController,
+                        hint: 'Preferred day or time',
+                      ),
+                      const SizedBox(height: 10),
+                      _ProfileField(
                         controller: messageController,
-                        hint: 'Message',
+                        hint: 'Anything we should know?',
                         maxLines: 3,
                       ),
                       const SizedBox(height: 14),
@@ -382,10 +397,12 @@ class _ServiceRow extends StatelessWidget {
   final String name;
   final int duration;
   final double price;
+  final String? description;
   const _ServiceRow({
     required this.name,
     required this.duration,
     required this.price,
+    this.description,
   });
 
   @override
@@ -410,6 +427,17 @@ class _ServiceRow extends StatelessWidget {
                   '$duration min',
                   style: const TextStyle(color: AppColors.t3, fontSize: 12),
                 ),
+                if (description?.isNotEmpty == true) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    description!,
+                    style: const TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 12,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -480,9 +508,30 @@ class _ProfileField extends StatelessWidget {
       maxLines: maxLines,
       keyboardType: keyboardType,
       style: const TextStyle(color: AppColors.t1),
-      decoration: InputDecoration(hintText: hint),
+      decoration: _fieldDecoration(hint),
     );
   }
+}
+
+InputDecoration _fieldDecoration(String hint) {
+  return InputDecoration(
+    hintText: hint,
+    hintStyle: const TextStyle(color: AppColors.t3),
+    filled: true,
+    fillColor: AppColors.bgInteract,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.green, width: 1.4),
+    ),
+  );
 }
 
 class _SentState extends StatelessWidget {

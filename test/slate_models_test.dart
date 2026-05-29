@@ -124,5 +124,24 @@ void main() {
       expect(profile.galleryEnabled, isFalse);
       expect(profile.payNowEnabled, isFalse);
     });
+
+    test('BookingRequest reads selected service and preferred timing', () {
+      final request = BookingRequest.fromMap({
+        'id': 'request-1',
+        'workspace_id': 'workspace-1',
+        'name': 'Nadia',
+        'phone': '07123 000000',
+        'service_id': 'service-1',
+        'preferred_time_text': 'Friday afternoon',
+        'message': 'First visit',
+        'status': 'contacted',
+        'services': {'name': 'Initial consultation'},
+      });
+
+      expect(request.serviceName, 'Initial consultation');
+      expect(request.preferredTimeText, 'Friday afternoon');
+      expect(request.status, 'contacted');
+      expect(request.toMap()['preferred_time_text'], 'Friday afternoon');
+    });
   });
 }
