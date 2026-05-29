@@ -1,16 +1,24 @@
-# slate
+# Slate
 
-A new Flutter project.
+Slate is a Flutter + Riverpod + Supabase app for solo appointment-based service businesses.
 
-## Getting Started
+## Local Setup
 
-This project is a starting point for a Flutter application.
+Create a local `.env` file from `.env.example`, then run:
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+flutter run --dart-define-from-file=.env
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Verification
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter analyze
+flutter test --dart-define-from-file=.env
+```
+
+## Notes
+
+- Do not commit `.env`.
+- Supabase table access should stay inside `lib/shared/repositories/`.
+- See `docs/foundation.md` and `docs/security.md` before adding major features.
