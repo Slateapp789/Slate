@@ -1,0 +1,13 @@
+export 'appointments_repository.dart';
+export 'auth_repository.dart';
+export 'clients_repository.dart';
+export 'dashboard_repository.dart';
+export 'notifications_repository.dart';
+export 'onboarding_repository.dart';
+export 'payments_repository.dart';
+export 'profile_repository.dart';
+export 'services_repository.dart';
+export 'supabase_client_provider.dart';
+export 'tasks_repository.dart';
+export 'workspace_repository.dart';
+export 'workspace_settings_repository.dart';

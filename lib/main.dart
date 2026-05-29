@@ -1,0 +1,592 @@
+import 'dart:ui';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'core/theme/app_theme.dart';
+import 'core/supabase/supabase_config.dart';
+import 'features/auth/auth_screen.dart';
+import 'features/dashboard/dashboard_screen.dart';
+import 'features/clients/clients_screen.dart';
+import 'features/clients/add_client_screen.dart';
+import 'features/appointments/appointments_screen.dart';
+import 'features/appointments/add_appointment_screen.dart';
+import 'features/finance/finance_screen.dart';
+import 'features/finance/add_payment_screen.dart';
+import 'features/tasks/tasks_screen.dart';
+import 'features/onboarding/onboarding_screen.dart';
+import 'features/calendar_sync/calendar_sync_screen.dart';
+import 'features/notifications/notifications_screen.dart';
+import 'features/public_profile/booking_requests_screen.dart';
+import 'features/public_profile/public_profile_screen.dart';
+import 'shared/providers/workspace_provider.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  SupabaseConfig.validate();
+  await Supabase.initialize(
+    url: SupabaseConfig.supabaseUrl,
+    anonKey: SupabaseConfig.supabaseAnonKey,
+  );
+  runApp(const ProviderScope(child: SlateApp()));
+}
+
+class SlateApp extends ConsumerWidget {
+  const SlateApp({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return MaterialApp.router(
+      title: 'Slate',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.dark,
+      routerConfig: _router,
+    );
+  }
+}
+
+final _router = GoRouter(
+  initialLocation: '/',
+  routes: [
+    GoRoute(path: '/', builder: (context, state) => const AuthGate()),
+    GoRoute(path: '/auth', builder: (context, state) => const AuthScreen()),
+    GoRoute(
+      path: '/onboarding',
+      builder: (context, state) => const OnboardingScreen(),
+    ),
+    GoRoute(path: '/home', builder: (context, state) => const MainShell()),
+    GoRoute(path: '/tasks', builder: (context, state) => const TasksScreen()),
+    GoRoute(
+      path: '/payments',
+      builder: (context, state) => const FinanceScreen(),
+    ),
+    GoRoute(
+      path: '/notifications',
+      builder: (context, state) => const NotificationsScreen(),
+    ),
+    GoRoute(
+      path: '/booking-requests',
+      builder: (context, state) => const BookingRequestsScreen(),
+    ),
+    GoRoute(
+      path: '/calendar-sync',
+      builder: (context, state) => const CalendarSyncScreen(),
+    ),
+    GoRoute(
+      path: '/p/:handle',
+      builder: (context, state) {
+        return PublicProfileScreen(
+          handle: state.pathParameters['handle'] ?? '',
+        );
+      },
+    ),
+  ],
+);
+
+class AuthGate extends ConsumerStatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  ConsumerState<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends ConsumerState<AuthGate> {
+  String? _lastUserId;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<AuthState>(
+      stream: Supabase.instance.client.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const _LoadingScreen();
+        }
+        final session = snapshot.data?.session;
+        final currentUserId = session?.user.id;
+        if (currentUserId != _lastUserId) {
+          _lastUserId = currentUserId;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref.invalidate(workspaceProvider);
+          });
+        }
+        if (session == null) return const AuthScreen();
+        return const WorkspaceGate();
+      },
+    );
+  }
+}
+
+class WorkspaceGate extends ConsumerWidget {
+  const WorkspaceGate({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final workspace = ref.watch(workspaceProvider);
+    return workspace.when(
+      loading: () => const _LoadingScreen(),
+      error: (e, _) => const AuthScreen(),
+      data: (ws) {
+        if (ws == null) return const OnboardingScreen();
+        return const MainShell();
+      },
+    );
+  }
+}
+
+class MainShell extends StatefulWidget {
+  const MainShell({super.key});
+
+  @override
+  State<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<MainShell> {
+  int _currentIndex = 0;
+
+  // Tabs: 0=Home, 1=Clients, 2=Work, 3=Money
+  // Tasks is no longer a root tab — accessed via Dashboard "See all"
+  Widget getScreen() {
+    switch (_currentIndex) {
+      case 0:
+        return DashboardScreen(
+          onNavigate: (i) {
+            // Index 4 = tasks — push as a stack route rather than switching tabs
+            if (i == 4) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TasksScreen()),
+              );
+            } else {
+              setState(() => _currentIndex = i);
+            }
+          },
+        );
+      case 1:
+        return const ClientsScreen();
+      case 2:
+        return const AppointmentsScreen();
+      case 3:
+        return const FinanceScreen();
+      default:
+        return DashboardScreen(
+          onNavigate: (i) {
+            if (i == 4) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TasksScreen()),
+              );
+            } else {
+              setState(() => _currentIndex = i);
+            }
+          },
+        );
+    }
+  }
+
+  void _showFabSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _fabOption(
+                  icon: LucideIcons.calendarPlus,
+                  label: 'New Appointment',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => AddAppointmentScreen()),
+                    ).then((_) {
+                      if (mounted) setState(() => _currentIndex = 2);
+                    });
+                  },
+                ),
+                const SizedBox(height: 10),
+                _fabOption(
+                  icon: LucideIcons.userPlus,
+                  label: 'New Client',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AddClientScreen(),
+                      ),
+                    ).then((_) {
+                      if (mounted) setState(() => _currentIndex = 1);
+                    });
+                  },
+                ),
+                const SizedBox(height: 10),
+                _fabOption(
+                  icon: LucideIcons.banknote,
+                  label: 'Record Payment',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AddPaymentScreen(),
+                      ),
+                    ).then((_) {
+                      if (mounted) setState(() => _currentIndex = 3);
+                    });
+                  },
+                ),
+                const SizedBox(height: 10),
+                _fabOption(
+                  icon: LucideIcons.checkSquare,
+                  label: 'New Task',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TasksScreen()),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _fabOption({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.bgInteract,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.bgRaised,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: AppColors.t2, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.t1,
+              ),
+            ),
+            const Spacer(),
+            const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: getScreen(),
+      bottomNavigationBar: _SlatePillNavBar(
+        currentIndex: _currentIndex,
+        onTap: (i) => setState(() => _currentIndex = i),
+        onAction: _showFabSheet,
+      ),
+    );
+  }
+}
+
+class _SlatePillNavBar extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  final VoidCallback onAction;
+
+  const _SlatePillNavBar({
+    required this.currentIndex,
+    required this.onTap,
+    required this.onAction,
+  });
+
+  static const _tabs = [
+    _NavItem(label: 'Home', icon: LucideIcons.home),
+    _NavItem(label: 'Clients', icon: LucideIcons.users),
+    _NavItem(label: 'Work', icon: LucideIcons.calendarDays),
+    _NavItem(label: 'Money', icon: LucideIcons.banknote),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
+    final tabCount = _tabs.length;
+    return SafeArea(
+      top: false,
+      minimum: EdgeInsets.fromLTRB(16, 0, 16, bottom > 0 ? 2 : 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                child: Container(
+                  height: 70,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.t1.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: AppColors.t1.withValues(alpha: 0.14),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.bg.withValues(alpha: 0.34),
+                        blurRadius: 34,
+                        offset: const Offset(0, 16),
+                      ),
+                      BoxShadow(
+                        color: AppColors.slateGlow.withValues(alpha: 0.12),
+                        blurRadius: 40,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onHorizontalDragEnd: (details) {
+                      final velocity = details.primaryVelocity ?? 0;
+                      if (velocity < -180 && currentIndex < tabCount - 1) {
+                        onTap(currentIndex + 1);
+                      } else if (velocity > 180 && currentIndex > 0) {
+                        onTap(currentIndex - 1);
+                      }
+                    },
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        const activeFlex = 16;
+                        const inactiveFlex = 10;
+                        final totalFlex =
+                            activeFlex + (tabCount - 1) * inactiveFlex;
+                        final leftFlex = currentIndex * inactiveFlex;
+                        final left =
+                            constraints.maxWidth * leftFlex / totalFlex;
+                        final width =
+                            constraints.maxWidth * activeFlex / totalFlex;
+
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            AnimatedPositioned(
+                              duration: const Duration(milliseconds: 360),
+                              curve: Curves.easeOutBack,
+                              left: left,
+                              top: 9,
+                              width: width,
+                              height: 52,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                ),
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: AppColors.t1.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: AppColors.t1.withValues(
+                                        alpha: 0.14,
+                                      ),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.t1.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                      BoxShadow(
+                                        color: AppColors.slateGlow.withValues(
+                                          alpha: 0.18,
+                                        ),
+                                        blurRadius: 26,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                _tabSlot(0),
+                                _tabSlot(1),
+                                _tabSlot(2),
+                                _tabSlot(3),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          ClipOval(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+              child: GestureDetector(
+                onTap: onAction,
+                child: Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: AppColors.t1.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.t1.withValues(alpha: 0.16),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.bg.withValues(alpha: 0.34),
+                        blurRadius: 28,
+                        offset: const Offset(0, 14),
+                      ),
+                      BoxShadow(
+                        color: AppColors.slateGlow.withValues(alpha: 0.22),
+                        blurRadius: 34,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    LucideIcons.plus,
+                    color: AppColors.t1,
+                    size: 28,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tabSlot(int index) {
+    return Expanded(
+      flex: index == currentIndex ? 16 : 10,
+      child: _buildTab(index),
+    );
+  }
+
+  Widget _buildTab(int index) {
+    final tab = _tabs[index];
+    final active = index == currentIndex;
+    return GestureDetector(
+      onTap: () => onTap(index),
+      child: Container(
+        height: 52,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            AnimatedScale(
+              scale: active ? 1.08 : 1,
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutCubic,
+              child: Icon(
+                tab.icon,
+                color: active ? AppColors.t1 : AppColors.t3,
+                size: 19,
+              ),
+            ),
+            Flexible(
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.centerLeft,
+                child: ClipRect(
+                  child: Align(
+                    widthFactor: active ? 1 : 0,
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: EdgeInsets.only(left: active ? 6 : 0),
+                      child: Text(
+                        active ? tab.label : '',
+                        maxLines: 1,
+                        overflow: TextOverflow.fade,
+                        softWrap: false,
+                        style: const TextStyle(
+                          color: AppColors.t1,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem {
+  final String label;
+  final IconData icon;
+
+  const _NavItem({required this.label, required this.icon});
+}
+
+class _LoadingScreen extends StatelessWidget {
+  const _LoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: AppColors.bg,
+      body: Center(child: CircularProgressIndicator(color: AppColors.green)),
+    );
+  }
+}
