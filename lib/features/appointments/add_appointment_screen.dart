@@ -17,11 +17,13 @@ class AddAppointmentScreen extends ConsumerStatefulWidget {
 class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   String? _selectedClientId;
   String? _selectedServiceId;
+  String? _selectedServiceName;
   double? _selectedPrice;
   DateTime _selectedDate = DateTime.now();
   int _selectedHour = 9;
   int _selectedMinute = 0;
   int _selectedDuration = 60;
+  String _repeatMode = 'none';
   final _notesController = TextEditingController();
   bool _saving = false;
 
@@ -210,6 +212,8 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         _selectedMinute,
       ).toUtc();
       final endTime = startTime.add(Duration(minutes: _selectedDuration));
+      final recurrenceRule = _recurrenceRuleFor(_repeatMode);
+      final repeatOccurrences = _repeatOccurrencesFor(_repeatMode);
 
       await ref
           .read(appointmentsRepositoryProvider)
@@ -217,10 +221,13 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
             workspaceId: workspaceId,
             contactId: _selectedClientId!,
             serviceId: _selectedServiceId!,
+            title: _selectedServiceName,
             startTime: startTime,
             endTime: endTime,
             price: _selectedPrice ?? 0,
             notes: _notesController.text,
+            recurrenceRule: recurrenceRule,
+            repeatOccurrences: repeatOccurrences,
           );
 
       ref.invalidate(appointmentsProvider);
@@ -322,7 +329,9 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                               ),
                             )
                           : Text(
-                              'Book',
+                              _repeatOccurrencesFor(_repeatMode) > 1
+                                  ? 'Book ${_repeatOccurrencesFor(_repeatMode)}'
+                                  : 'Book',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -480,6 +489,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                               );
                               setState(() {
                                 _selectedServiceId = v;
+                                _selectedServiceName = svc['name'] as String?;
                                 _selectedPrice = (svc['price'] as num?)
                                     ?.toDouble();
                                 _selectedDuration =
@@ -586,6 +596,99 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 20),
+
+                    // ── Repeat ───────────────────────────────────────
+                    _label('REPEAT'),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.bgCard,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _repeatMode,
+                          isExpanded: true,
+                          dropdownColor: AppColors.bgRaised,
+                          icon: const Padding(
+                            padding: EdgeInsets.only(right: 14),
+                            child: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: AppColors.t3,
+                            ),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'none',
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  "Doesn't repeat",
+                                  style: TextStyle(
+                                    color: AppColors.t1,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'weekly',
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  'Weekly · next 12 weeks',
+                                  style: TextStyle(
+                                    color: AppColors.t1,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'fortnightly',
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  'Fortnightly · next 12 weeks',
+                                  style: TextStyle(
+                                    color: AppColors.t1,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'monthly',
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  'Monthly · next 3 months',
+                                  style: TextStyle(
+                                    color: AppColors.t1,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _repeatMode = value ?? 'none'),
+                        ),
+                      ),
+                    ),
+                    if (_repeatMode != 'none') ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _repeatSummary,
+                        style: const TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 12,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 20),
 
                     // ── Price ─────────────────────────────────────────
@@ -713,5 +816,34 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       'Dec',
     ];
     return '${days[dt.weekday - 1]} ${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
+  String? _recurrenceRuleFor(String mode) {
+    return switch (mode) {
+      'weekly' => 'FREQ=WEEKLY;INTERVAL=1',
+      'fortnightly' => 'FREQ=WEEKLY;INTERVAL=2',
+      'monthly' => 'FREQ=MONTHLY;INTERVAL=1',
+      _ => null,
+    };
+  }
+
+  int _repeatOccurrencesFor(String mode) {
+    return switch (mode) {
+      'weekly' => 12,
+      'fortnightly' => 6,
+      'monthly' => 3,
+      _ => 1,
+    };
+  }
+
+  String get _repeatSummary {
+    final count = _repeatOccurrencesFor(_repeatMode);
+    final label = switch (_repeatMode) {
+      'weekly' => 'weekly',
+      'fortnightly' => 'every 2 weeks',
+      'monthly' => 'monthly',
+      _ => '',
+    };
+    return 'Creates $count appointments $label from the selected date.';
   }
 }

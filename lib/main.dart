@@ -21,6 +21,7 @@ import 'features/calendar_sync/calendar_sync_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/public_profile/booking_requests_screen.dart';
 import 'features/public_profile/public_profile_screen.dart';
+import 'shared/providers/debug_demo_data_provider.dart';
 import 'shared/providers/workspace_provider.dart';
 
 void main() async {
@@ -129,6 +130,10 @@ class WorkspaceGate extends ConsumerWidget {
       error: (e, _) => const AuthScreen(),
       data: (ws) {
         if (ws == null) return const OnboardingScreen();
+        const seedDemoData = bool.fromEnvironment('SEED_DEMO_DATA');
+        if (seedDemoData) {
+          ref.watch(debugDemoSeedProvider);
+        }
         return const MainShell();
       },
     );

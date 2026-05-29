@@ -104,6 +104,7 @@ class OnboardingRepository {
       'workspace_id': workspaceId,
       'contact_id': contactId,
       if (serviceId != null) 'service_id': serviceId,
+      'title': serviceName ?? 'Appointment',
       'start_time': startTime.toUtc().toIso8601String(),
       'end_time': endTime.toUtc().toIso8601String(),
       'price': price,

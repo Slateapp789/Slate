@@ -2,6 +2,7 @@ export 'appointments_repository.dart';
 export 'auth_repository.dart';
 export 'clients_repository.dart';
 export 'dashboard_repository.dart';
+export 'debug_demo_data_repository.dart';
 export 'notifications_repository.dart';
 export 'onboarding_repository.dart';
 export 'payments_repository.dart';

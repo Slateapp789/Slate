@@ -202,6 +202,7 @@ class _AppointmentCard extends StatelessWidget {
     )?.toLocal();
     final price = appt['price'];
     final notes = appt['notes'] as String? ?? '';
+    final recurrenceRule = appt['recurrence_rule'] as String?;
 
     final isScheduled = status == 'scheduled';
     final isCompleted = status == 'completed';
@@ -335,31 +336,66 @@ class _AppointmentCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.bgInteract,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    LucideIcons.clock,
-                    size: 12,
-                    color: isScheduled ? AppColors.green : AppColors.t3,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    timeStr,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: isScheduled ? AppColors.green : AppColors.t3,
+                  decoration: BoxDecoration(
+                    color: AppColors.bgInteract,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        LucideIcons.clock,
+                        size: 12,
+                        color: isScheduled ? AppColors.green : AppColors.t3,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        timeStr,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isScheduled ? AppColors.green : AppColors.t3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (recurrenceRule != null && recurrenceRule.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgInteract,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(LucideIcons.repeat, size: 12, color: AppColors.t3),
+                        SizedBox(width: 6),
+                        Text(
+                          'Repeats',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.t3,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
             if ((isCancelled || isNoShow) && notes.isNotEmpty) ...[
               const SizedBox(height: 8),

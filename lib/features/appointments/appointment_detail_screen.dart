@@ -494,6 +494,7 @@ class _AppointmentDetailScreenState
     )?.toLocal();
     final notes = _appt['notes'] as String? ?? '';
     final price = _appt['price'];
+    final recurrenceRule = _appt['recurrence_rule'] as String?;
     final clients = ref.watch(clientsProvider);
     final statusColor = status == 'completed'
         ? AppColors.success
@@ -648,6 +649,37 @@ class _AppointmentDetailScreenState
               ),
               const SizedBox(height: 12),
 
+              if (recurrenceRule != null && recurrenceRule.isNotEmpty) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgCard,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        LucideIcons.repeat,
+                        color: AppColors.t3,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        _repeatLabel(recurrenceRule),
+                        style: const TextStyle(
+                          color: AppColors.t2,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
               // ── Notes ─────────────────────────────────────────────────────
               Container(
                 width: double.infinity,
@@ -740,5 +772,12 @@ class _AppointmentDetailScreenState
         ),
       ),
     );
+  }
+
+  String _repeatLabel(String rule) {
+    if (rule.contains('FREQ=MONTHLY')) return 'Repeats monthly';
+    if (rule.contains('INTERVAL=2')) return 'Repeats fortnightly';
+    if (rule.contains('FREQ=WEEKLY')) return 'Repeats weekly';
+    return 'Repeating appointment';
   }
 }

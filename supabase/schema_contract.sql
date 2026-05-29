@@ -8,7 +8,7 @@
 -- workspace_settings(id, workspace_id, working_hours jsonb, revenue_target numeric, created_at, updated_at)
 -- contacts(id, workspace_id, name, phone, email, notes, status, created_at)
 -- services(id, workspace_id, name, duration_mins, price, description, show_on_profile, created_at)
--- appointments(id, workspace_id, contact_id, service_id, start_time, end_time, price, status, notes, created_at)
+-- appointments(id, workspace_id, contact_id, service_id, title, start_time, end_time, price, status, notes, created_at)
 -- invoices(id, workspace_id, contact_id, invoice_number, type, status, issue_date, due_date, subtotal, tax_rate, tax_amount, discount_value, total, amount_paid, notes, created_at)
 -- tasks(id, workspace_id, contact_id, title, priority, due_date, status, created_at)
 -- business_profiles(id, workspace_id, handle, created_at)

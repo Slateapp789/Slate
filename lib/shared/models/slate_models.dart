@@ -143,6 +143,7 @@ class Appointment {
   final String workspaceId;
   final String? contactId;
   final String? serviceId;
+  final String? title;
   final DateTime startTime;
   final DateTime? endTime;
   final String status;
@@ -158,6 +159,7 @@ class Appointment {
     required this.workspaceId,
     this.contactId,
     this.serviceId,
+    this.title,
     required this.startTime,
     this.endTime,
     this.status = 'scheduled',
@@ -177,6 +179,7 @@ class Appointment {
       workspaceId: map['workspace_id'] as String? ?? '',
       contactId: map['contact_id'] as String?,
       serviceId: map['service_id'] as String?,
+      title: map['title'] as String?,
       startTime:
           _dateTimeFrom(map['start_time']) ??
           DateTime.fromMillisecondsSinceEpoch(0),
@@ -196,6 +199,7 @@ class Appointment {
     'workspace_id': workspaceId,
     'contact_id': contactId,
     'service_id': serviceId,
+    'title': title,
     'start_time': startTime.toIso8601String(),
     if (endTime != null) 'end_time': endTime!.toIso8601String(),
     'status': status,

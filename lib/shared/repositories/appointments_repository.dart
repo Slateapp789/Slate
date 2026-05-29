@@ -69,18 +69,48 @@ class AppointmentsRepository {
     required DateTime startTime,
     required DateTime endTime,
     required double price,
+    String? title,
     String? notes,
+    String? recurrenceRule,
+    int repeatOccurrences = 1,
   }) async {
-    await _client.from('appointments').insert({
-      'workspace_id': workspaceId,
-      'contact_id': contactId,
-      'service_id': serviceId,
-      'start_time': startTime.toIso8601String(),
-      'end_time': endTime.toIso8601String(),
-      'price': price,
-      'status': 'scheduled',
-      'notes': notes?.trim().isEmpty ?? true ? null : notes!.trim(),
+    final duration = endTime.difference(startTime);
+    final safeTitle = title?.trim().isEmpty ?? true
+        ? 'Appointment'
+        : title!.trim();
+    final rows = List.generate(repeatOccurrences.clamp(1, 24), (index) {
+      final occurrenceStart = _occurrenceStart(
+        startTime,
+        recurrenceRule,
+        index,
+      );
+      return {
+        'workspace_id': workspaceId,
+        'contact_id': contactId,
+        'service_id': serviceId,
+        'title': safeTitle,
+        'start_time': occurrenceStart.toIso8601String(),
+        'end_time': occurrenceStart.add(duration).toIso8601String(),
+        'price': price,
+        'status': 'scheduled',
+        'notes': notes?.trim().isEmpty ?? true ? null : notes!.trim(),
+        if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
+      };
     });
+
+    try {
+      await _client.from('appointments').insert(rows);
+    } catch (_) {
+      final fallbackRows = rows
+          .map(
+            (row) => Map<String, dynamic>.from(row)
+              ..remove('recurrence_rule')
+              ..remove('recurrence_parent_id')
+              ..remove('location'),
+          )
+          .toList();
+      await _client.from('appointments').insert(fallbackRows);
+    }
   }
 
   Future<void> update(String appointmentId, Map<String, dynamic> values) async {
@@ -96,5 +126,23 @@ class AppointmentsRepository {
       'status': status,
       if (notes != null) 'notes': notes,
     });
+  }
+
+  DateTime _occurrenceStart(DateTime startTime, String? rule, int index) {
+    if (index == 0 || rule == null) return startTime;
+    if (rule.contains('FREQ=MONTHLY')) {
+      return DateTime.utc(
+        startTime.year,
+        startTime.month + index,
+        startTime.day,
+        startTime.hour,
+        startTime.minute,
+        startTime.second,
+        startTime.millisecond,
+        startTime.microsecond,
+      );
+    }
+    final interval = rule.contains('INTERVAL=2') ? 2 : 1;
+    return startTime.add(Duration(days: 7 * interval * index));
   }
 }
