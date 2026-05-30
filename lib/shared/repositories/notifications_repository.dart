@@ -64,6 +64,14 @@ class NotificationsRepository {
         .eq('id', notificationId);
   }
 
+  Future<void> markAllRead(String workspaceId) async {
+    await _client
+        .from('notifications')
+        .update({'read': true})
+        .eq('workspace_id', workspaceId)
+        .eq('read', false);
+  }
+
   Future<void> create({
     required String workspaceId,
     required String type,

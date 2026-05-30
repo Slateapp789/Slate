@@ -9,11 +9,19 @@ import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 
-class NotificationsScreen extends ConsumerWidget {
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  bool _unreadOnly = false;
+
+  @override
+  Widget build(BuildContext context) {
     final notifications = ref.watch(notificationsProvider);
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -52,8 +60,73 @@ class NotificationsScreen extends ConsumerWidget {
                       letterSpacing: 0,
                     ),
                   ),
+                  const Spacer(),
+                  notifications.maybeWhen(
+                    data: (items) {
+                      final unread = items.where((item) => !item.read).length;
+                      if (unread == 0) return const SizedBox.shrink();
+                      return GestureDetector(
+                        onTap: () async {
+                          final workspaceId = await ref.read(
+                            workspaceIdProvider.future,
+                          );
+                          if (workspaceId == null) return;
+                          await ref
+                              .read(notificationsRepositoryProvider)
+                              .markAllRead(workspaceId);
+                          ref.invalidate(notificationsProvider);
+                          ref.invalidate(unreadNotificationsProvider);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.bgCard,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: const Text(
+                            'Clear',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.t2,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    orElse: () => const SizedBox.shrink(),
+                  ),
                 ],
               ),
+            ),
+            notifications.maybeWhen(
+              data: (items) {
+                if (items.isEmpty) return const SizedBox.shrink();
+                final unread = items.where((item) => !item.read).length;
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+                  child: Row(
+                    children: [
+                      _NotificationFilterChip(
+                        label: 'All',
+                        active: !_unreadOnly,
+                        onTap: () => setState(() => _unreadOnly = false),
+                      ),
+                      const SizedBox(width: 8),
+                      _NotificationFilterChip(
+                        label: unread == 0 ? 'Unread' : 'Unread $unread',
+                        active: _unreadOnly,
+                        onTap: () => setState(() => _unreadOnly = true),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              orElse: () => const SizedBox.shrink(),
             ),
             Expanded(
               child: notifications.when(
@@ -65,10 +138,19 @@ class NotificationsScreen extends ConsumerWidget {
                   subtitle: 'Try again in a moment.',
                 ),
                 data: (items) {
+                  final visible = _unreadOnly
+                      ? items.where((item) => !item.read).toList()
+                      : items;
                   if (items.isEmpty) {
                     return const _EmptyNotifications(
                       title: 'No notifications',
                       subtitle: 'Important updates will appear here.',
+                    );
+                  }
+                  if (visible.isEmpty) {
+                    return const _EmptyNotifications(
+                      title: 'Nothing unread',
+                      subtitle: 'You are caught up for now.',
                     );
                   }
                   return RefreshIndicator(
@@ -77,13 +159,56 @@ class NotificationsScreen extends ConsumerWidget {
                         ref.invalidate(notificationsProvider),
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-                      children: _groupedNotificationChildren(items),
+                      children: _groupedNotificationChildren(visible),
                     ),
                   );
                 },
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationFilterChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _NotificationFilterChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: AppMotion.fast,
+        curve: AppMotion.curve,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+        decoration: BoxDecoration(
+          color: active
+              ? AppColors.t1.withValues(alpha: 0.10)
+              : AppColors.bgCard,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(
+            color: active
+                ? AppColors.t1.withValues(alpha: 0.15)
+                : AppColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: active ? AppColors.t1 : AppColors.t3,
+          ),
         ),
       ),
     );
