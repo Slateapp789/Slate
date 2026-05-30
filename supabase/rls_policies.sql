@@ -16,6 +16,10 @@ as $$
   );
 $$;
 
+revoke execute on function public.is_workspace_member(uuid) from public;
+revoke execute on function public.is_workspace_member(uuid) from anon;
+revoke execute on function public.is_workspace_member(uuid) from authenticated;
+
 alter table if exists workspaces enable row level security;
 alter table if exists workspace_members enable row level security;
 alter table if exists workspace_settings enable row level security;
@@ -48,7 +52,7 @@ drop policy if exists "Authenticated users can create workspaces" on workspaces;
 create policy "Authenticated users can create workspaces"
 on workspaces for insert
 to authenticated
-with check (true);
+with check (auth.uid() is not null);
 
 drop policy if exists "Members can read workspace members" on workspace_members;
 create policy "Members can read workspace members"
