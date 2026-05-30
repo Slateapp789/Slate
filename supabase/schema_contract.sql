@@ -122,3 +122,4 @@ create table if not exists account_deletion_requests (
 -- Every workspace-owned table must enforce access through workspace_members.
 -- Public profile reads should be limited to business_profiles + services intended for public display.
 -- Account deletion should be completed by a trusted server/edge-function path with service-role permissions.
+-- See supabase/rls_policies.sql for the concrete V1 policy contract.
