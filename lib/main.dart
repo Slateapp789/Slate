@@ -472,10 +472,10 @@ class _SlatePillNavBar extends StatelessWidget {
       child: Container(
         height: 52,
         margin: const EdgeInsets.symmetric(horizontal: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: Row(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.max,
+          mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedScale(
               scale: active ? 1.08 : 1,
@@ -487,32 +487,30 @@ class _SlatePillNavBar extends StatelessWidget {
                 size: 19,
               ),
             ),
-            Flexible(
-              child: AnimatedSize(
-                duration: AppMotion.standard,
-                curve: AppMotion.curve,
-                alignment: Alignment.centerLeft,
-                child: ClipRect(
-                  child: Align(
-                    widthFactor: active ? 1 : 0,
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: EdgeInsets.only(left: active ? 6 : 0),
-                      child: Text(
-                        active ? tab.label : '',
-                        maxLines: 1,
-                        overflow: TextOverflow.fade,
-                        softWrap: false,
-                        style: TextStyle(
-                          color: active ? tab.color : AppColors.t3,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
+            AnimatedSize(
+              duration: AppMotion.standard,
+              curve: AppMotion.curve,
+              alignment: Alignment.topCenter,
+              child: active
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          tab.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.fade,
+                          softWrap: false,
+                          style: TextStyle(
+                            color: tab.color,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            height: 1,
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-              ),
+                    )
+                  : const SizedBox.shrink(),
             ),
           ],
         ),
