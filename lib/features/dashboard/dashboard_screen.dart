@@ -64,37 +64,44 @@ class DashboardScreen extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _greeting,
-                        style: const TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.t1,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                      workspace.when(
-                        data: (ws) => Text(
-                          ws?['name'] ?? 'Your Business',
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _greeting,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 14,
-                            color: AppColors.t3,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.t1,
+                            letterSpacing: 0,
                           ),
                         ),
-                        loading: () => const Text(
-                          '...',
-                          style: TextStyle(color: AppColors.t3),
+                        workspace.when(
+                          data: (ws) => Text(
+                            ws?['name'] ?? 'Your Business',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.t3,
+                            ),
+                          ),
+                          loading: () => const Text(
+                            '...',
+                            style: TextStyle(color: AppColors.t3),
+                          ),
+                          error: (_, __) => const Text(
+                            'Slate',
+                            style: TextStyle(color: AppColors.t3),
+                          ),
                         ),
-                        error: (_, __) => const Text(
-                          'Slate',
-                          style: TextStyle(color: AppColors.t3),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 16),
                   Row(
                     children: [
                       SlateIconButton(
@@ -153,13 +160,6 @@ class DashboardScreen extends ConsumerWidget {
                     ],
                   ),
                 ],
-              ),
-              const SizedBox(height: 24),
-
-              focus.when(
-                data: (f) => _FocusPanel(focus: f, onNavigate: onNavigate),
-                loading: () => _skeletonBox(height: 154, radius: AppRadius.lg),
-                error: (_, __) => _errorCard('Could not load priorities'),
               ),
               const SizedBox(height: 24),
 
@@ -299,213 +299,6 @@ class DashboardScreen extends ConsumerWidget {
 
   Widget _emptyCard(IconData icon, String title, String subtitle) =>
       SlateEmptyState(icon: icon, title: title, subtitle: subtitle);
-}
-
-class _FocusPanel extends StatelessWidget {
-  final DashboardFocus focus;
-  final void Function(int) onNavigate;
-
-  const _FocusPanel({required this.focus, required this.onNavigate});
-
-  @override
-  Widget build(BuildContext context) {
-    final next = focus.nextAppointment;
-    final startTime = next == null
-        ? null
-        : DateTime.tryParse(next['start_time']?.toString() ?? '')?.toLocal();
-    final clientName = next?['contacts']?['name'] as String? ?? 'Walk-in';
-    final serviceName = next?['services']?['name'] as String? ?? 'Appointment';
-
-    return SlateSurface(
-      padding: const EdgeInsets.all(18),
-      radius: AppRadius.lg,
-      elevated: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'NEEDS ATTENTION',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: AppColors.t3,
-              letterSpacing: 0,
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (!focus.hasAttention)
-            const _FocusEmpty()
-          else ...[
-            if (focus.pendingBookingRequests > 0)
-              _FocusRow(
-                icon: LucideIcons.inbox,
-                color: AppColors.warning,
-                title:
-                    '${focus.pendingBookingRequests} booking request${focus.pendingBookingRequests == 1 ? '' : 's'}',
-                subtitle: 'Review requests from your public profile',
-                onTap: () => context.push('/booking-requests'),
-              ),
-            if (focus.overduePayments > 0)
-              _FocusRow(
-                icon: LucideIcons.banknote,
-                color: AppColors.error,
-                title: '£${focus.overdueTotal.toStringAsFixed(0)} overdue',
-                subtitle:
-                    '${focus.overduePayments} payment${focus.overduePayments == 1 ? '' : 's'} need attention',
-                onTap: () => onNavigate(3),
-              ),
-            if (next != null)
-              _FocusRow(
-                icon: LucideIcons.calendarClock,
-                color: AppColors.green,
-                title: startTime == null
-                    ? 'Next appointment'
-                    : 'Next: ${_formatFocusTime(startTime)}',
-                subtitle: '$clientName · $serviceName',
-                onTap: () => onNavigate(2),
-              ),
-            if (!focus.calendarSyncEnabled)
-              _FocusRow(
-                icon: LucideIcons.calendarDays,
-                color: AppColors.t3,
-                title: 'Calendar sync off',
-                subtitle: 'Connect a calendar when you are ready',
-                onTap: () => context.push('/calendar-sync'),
-                isLast: true,
-              ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  static String _formatFocusTime(DateTime dt) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final date = DateTime(dt.year, dt.month, dt.day);
-    final time =
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    if (date == today) return 'today at $time';
-    if (date == today.add(const Duration(days: 1))) return 'tomorrow at $time';
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${dt.day} ${months[dt.month - 1]} at $time';
-  }
-}
-
-class _FocusEmpty extends StatelessWidget {
-  const _FocusEmpty();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        Icon(LucideIcons.checkCircle2, color: AppColors.success, size: 18),
-        SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            'Nothing urgent right now.',
-            style: TextStyle(color: AppColors.t2, fontWeight: FontWeight.w700),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FocusRow extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final bool isLast;
-
-  const _FocusRow({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.isLast = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(11),
-                    ),
-                    child: Icon(icon, color: color, size: 17),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            color: AppColors.t1,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.t3,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Icon(
-                    LucideIcons.chevronRight,
-                    color: AppColors.t3,
-                    size: 15,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        if (!isLast)
-          Divider(height: 1, color: AppColors.t1.withValues(alpha: 0.06)),
-      ],
-    );
-  }
 }
 
 class _TodayPulsePanel extends StatelessWidget {
