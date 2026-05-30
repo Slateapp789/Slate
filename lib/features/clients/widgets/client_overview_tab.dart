@@ -4,6 +4,10 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/slate_models.dart';
+import '../../../shared/providers/notifications_provider.dart';
+import '../../../shared/providers/tasks_provider.dart';
+import '../../../shared/providers/workspace_provider.dart';
+import '../../../shared/repositories/slate_repositories.dart';
 import '../providers/client_detail_providers.dart';
 
 class ClientOverviewTab extends ConsumerWidget {
@@ -41,6 +45,8 @@ class ClientOverviewTab extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           _NotesSection(notes: notes, clientName: clientName),
+          const SizedBox(height: 12),
+          _FollowUpSection(clientId: clientId, clientName: clientName),
           const SizedBox(height: 12),
           _TimelineSection(
             appointments: appointments.value ?? const [],
@@ -247,6 +253,208 @@ class _NotesSection extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FollowUpSection extends ConsumerStatefulWidget {
+  final String clientId;
+  final String clientName;
+
+  const _FollowUpSection({required this.clientId, required this.clientName});
+
+  @override
+  ConsumerState<_FollowUpSection> createState() => _FollowUpSectionState();
+}
+
+class _FollowUpSectionState extends ConsumerState<_FollowUpSection> {
+  bool _saving = false;
+
+  Future<void> _createFollowUp(DateTime dueDate) async {
+    setState(() => _saving = true);
+    try {
+      final workspaceId = await ref.read(workspaceIdProvider.future);
+      if (workspaceId == null) return;
+      await ref
+          .read(tasksRepositoryProvider)
+          .create(
+            workspaceId: workspaceId,
+            title: 'Follow up with ${widget.clientName}',
+            priority: 'medium',
+            dueDate: dueDate,
+            contactId: widget.clientId,
+          );
+      await ref
+          .read(notificationsRepositoryProvider)
+          .create(
+            workspaceId: workspaceId,
+            type: 'lead_followup',
+            title: 'Follow-up scheduled',
+            body:
+                '${widget.clientName} has a follow-up due ${_formatShortDate(dueDate)}.',
+            deepLink: '/tasks',
+          );
+      ref.invalidate(clientTasksProvider(widget.clientId));
+      ref.invalidate(allTasksProvider);
+      ref.invalidate(tasksProvider);
+      ref.invalidate(notificationsProvider);
+      ref.invalidate(unreadNotificationsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Follow-up added'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not add follow-up: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _pickCustomDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now.add(const Duration(days: 14)),
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 1),
+    );
+    if (picked != null) await _createFollowUp(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final nextWeek = DateTime.now().add(const Duration(days: 7));
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppColors.bgInteract,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  LucideIcons.calendarPlus,
+                  color: AppColors.t2,
+                  size: 17,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Next follow-up',
+                      style: TextStyle(
+                        color: AppColors.t1,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'Create the next client nudge as a task.',
+                      style: TextStyle(color: AppColors.t3, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              if (_saving)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: AppColors.green,
+                    strokeWidth: 2,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _FollowUpButton(
+                  label: 'Tomorrow',
+                  onTap: _saving ? null : () => _createFollowUp(tomorrow),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _FollowUpButton(
+                  label: 'Next week',
+                  onTap: _saving ? null : () => _createFollowUp(nextWeek),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _FollowUpButton(
+                  label: 'Pick date',
+                  onTap: _saving ? null : _pickCustomDate,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FollowUpButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onTap;
+
+  const _FollowUpButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        opacity: onTap == null ? 0.55 : 1,
+        child: Container(
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.bgInteract,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.t2,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
       ),
     );
   }
