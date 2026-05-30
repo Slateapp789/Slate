@@ -151,12 +151,29 @@ class _ProfileContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bookingClosed = profile.profile.bookingMode == 'closed';
+    final enabledBadges = <_ProfileBadgeData>[
+      if (profile.profile.reviewsEnabled)
+        const _ProfileBadgeData(LucideIcons.star, 'Reviews enabled'),
+      if (profile.profile.galleryEnabled)
+        const _ProfileBadgeData(
+          LucideIcons.galleryThumbnails,
+          'Gallery enabled',
+        ),
+      if (profile.profile.payNowEnabled)
+        const _ProfileBadgeData(LucideIcons.creditCard, 'Pay now available'),
+    ];
+
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
         children: [
           _Hero(profile: profile),
           const SizedBox(height: 24),
+          if (enabledBadges.isNotEmpty) ...[
+            _ProfileBadges(items: enabledBadges),
+            const SizedBox(height: 16),
+          ],
           if (profile.profile.noticeText?.isNotEmpty == true) ...[
             _Notice(text: profile.profile.noticeText!),
             const SizedBox(height: 16),
@@ -201,7 +218,9 @@ class _ProfileContent extends StatelessWidget {
           const SizedBox(height: 16),
           _Section(
             title: 'Request a booking',
-            child: sent
+            child: bookingClosed
+                ? const _ClosedBookingState()
+                : sent
                 ? const _SentState()
                 : Column(
                     children: [
@@ -356,6 +375,54 @@ class _Notice extends StatelessWidget {
         text,
         style: const TextStyle(color: AppColors.t1, fontSize: 13),
       ),
+    );
+  }
+}
+
+class _ProfileBadgeData {
+  final IconData icon;
+  final String label;
+
+  const _ProfileBadgeData(this.icon, this.label);
+}
+
+class _ProfileBadges extends StatelessWidget {
+  final List<_ProfileBadgeData> items;
+
+  const _ProfileBadges({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: items
+          .map(
+            (item) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: AppColors.bgCard,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(item.icon, color: AppColors.green, size: 15),
+                  const SizedBox(width: 7),
+                  Text(
+                    item.label,
+                    style: const TextStyle(
+                      color: AppColors.t2,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 }
@@ -557,6 +624,43 @@ class _SentState extends StatelessWidget {
           style: TextStyle(color: AppColors.t3, fontSize: 13),
         ),
       ],
+    );
+  }
+}
+
+class _ClosedBookingState extends StatelessWidget {
+  const _ClosedBookingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgInteract,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(LucideIcons.lock, color: AppColors.t3, size: 22),
+          SizedBox(height: 12),
+          Text(
+            'Booking requests are closed',
+            style: TextStyle(
+              color: AppColors.t1,
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'This business is not accepting new booking requests right now.',
+            style: TextStyle(color: AppColors.t3, height: 1.45),
+          ),
+        ],
+      ),
     );
   }
 }

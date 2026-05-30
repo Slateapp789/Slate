@@ -28,6 +28,11 @@ class _HoursBlockControllers {
 class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   bool _editingInfo = false;
   bool _saving = false;
+  bool _profileHydrated = false;
+  String _bookingMode = 'manual';
+  bool _reviewsEnabled = false;
+  bool _galleryEnabled = false;
+  bool _payNowEnabled = false;
   late TextEditingController _nameController;
   late TextEditingController _industryController;
   late TextEditingController _handleController;
@@ -107,10 +112,17 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
               'notice_text': _noticeController.text.trim().isEmpty
                   ? null
                   : _noticeController.text.trim(),
+              'booking_mode': _bookingMode,
+              'reviews_enabled': _reviewsEnabled,
+              'gallery_enabled': _galleryEnabled,
+              'pay_now_enabled': _payNowEnabled,
             },
           );
       ref.invalidate(settingsBusinessProfileProvider);
-      setState(() => _saving = false);
+      setState(() {
+        _profileHydrated = false;
+        _saving = false;
+      });
       if (mounted) _snack('Profile updated', AppColors.green);
     } catch (e) {
       setState(() => _saving = false);
@@ -894,9 +906,16 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
               loading: () => skeletonBox(140),
               error: (_, __) => errorBox('Could not load public profile'),
               data: (bp) {
-                _handleController.text = bp?.handle ?? '';
-                _bioController.text = bp?.bio ?? '';
-                _noticeController.text = bp?.noticeText ?? '';
+                if (!_profileHydrated) {
+                  _handleController.text = bp?.handle ?? '';
+                  _bioController.text = bp?.bio ?? '';
+                  _noticeController.text = bp?.noticeText ?? '';
+                  _bookingMode = bp?.bookingMode ?? 'manual';
+                  _reviewsEnabled = bp?.reviewsEnabled ?? false;
+                  _galleryEnabled = bp?.galleryEnabled ?? false;
+                  _payNowEnabled = bp?.payNowEnabled ?? false;
+                  _profileHydrated = true;
+                }
                 return Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -924,6 +943,36 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                         controller: _noticeController,
                         hint: 'Optional seasonal notice',
                         maxLines: 2,
+                      ),
+                      const SizedBox(height: 16),
+                      _BookingModeControl(
+                        value: _bookingMode,
+                        onChanged: (value) =>
+                            setState(() => _bookingMode = value),
+                      ),
+                      const SizedBox(height: 14),
+                      _ProfileToggleRow(
+                        title: 'Reviews',
+                        subtitle: 'Show review sections on the public profile',
+                        value: _reviewsEnabled,
+                        onChanged: (value) =>
+                            setState(() => _reviewsEnabled = value),
+                      ),
+                      _ProfileToggleRow(
+                        title: 'Gallery',
+                        subtitle:
+                            'Show visual work samples when media is added',
+                        value: _galleryEnabled,
+                        onChanged: (value) =>
+                            setState(() => _galleryEnabled = value),
+                      ),
+                      _ProfileToggleRow(
+                        title: 'Pay now',
+                        subtitle:
+                            'Mark the profile as ready for online payments',
+                        value: _payNowEnabled,
+                        onChanged: (value) =>
+                            setState(() => _payNowEnabled = value),
                       ),
                       const SizedBox(height: 14),
                       Row(
@@ -960,6 +1009,152 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
             services: services,
             onAdd: _showAddServiceSheet,
             onEdit: _showEditServiceSheet,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BookingModeControl extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const _BookingModeControl({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'BOOKING MODE',
+          style: TextStyle(
+            color: AppColors.t3,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _BookingModeChip(
+                label: 'Accept requests',
+                selected: value == 'manual',
+                onTap: () => onChanged('manual'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _BookingModeChip(
+                label: 'Closed',
+                selected: value == 'closed',
+                onTap: () => onChanged('closed'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _BookingModeChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _BookingModeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.green.withValues(alpha: 0.16)
+              : AppColors.bgInteract,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? AppColors.green : AppColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? AppColors.green : AppColors.t2,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileToggleRow extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _ProfileToggleRow({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.bgInteract,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.t1,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: AppColors.t3, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            activeThumbColor: AppColors.green,
+            activeTrackColor: AppColors.green.withValues(alpha: 0.24),
+            inactiveThumbColor: AppColors.t3,
+            inactiveTrackColor: AppColors.bgRaised,
+            onChanged: onChanged,
           ),
         ],
       ),
