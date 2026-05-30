@@ -8,9 +8,7 @@ import '../../shared/widgets/slate_ui.dart';
 import 'add_client_screen.dart';
 import 'client_detail_screen.dart';
 
-enum _ClientView { all, attention, leads, regulars, dormant }
-
-enum _ClientSort { priority, recent, value, name }
+enum _ClientView { all, leads, followUps }
 
 class ClientsScreen extends ConsumerStatefulWidget {
   const ClientsScreen({super.key});
@@ -23,7 +21,6 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   _ClientView _view = _ClientView.all;
-  _ClientSort _sort = _ClientSort.priority;
 
   @override
   void dispose() {
@@ -81,24 +78,10 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                           AppSpacing.pageX,
                           0,
                         ),
-                        child: _CrmCommandBar(records: data),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.pageX,
-                          AppSpacing.md,
-                          AppSpacing.pageX,
-                          0,
-                        ),
                         child: _SearchAndSort(
                           controller: _searchController,
-                          sort: _sort,
                           onQueryChanged: (value) =>
                               setState(() => _query = value.trim()),
-                          onSortChanged: (value) =>
-                              setState(() => _sort = value),
                         ),
                       ),
                     ),
@@ -133,11 +116,11 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                         return Padding(
                           padding: EdgeInsets.fromLTRB(
                             AppSpacing.pageX,
-                            index == 0 ? AppSpacing.md : 0,
+                            index == 0 ? AppSpacing.sm : 0,
                             AppSpacing.pageX,
                             index == filtered.length - 1 ? 132 : 0,
                           ),
-                          child: _ClientCrmRow(
+                          child: _ClientRow(
                             record: record,
                             onTap: () => _openClient(record),
                           ),
@@ -166,30 +149,24 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
 
       final matchesView = switch (_view) {
         _ClientView.all => true,
-        _ClientView.attention => record.needsAttention,
         _ClientView.leads => record.isLead,
-        _ClientView.regulars => record.completedBookingCount >= 3,
-        _ClientView.dormant => record.isDormant,
+        _ClientView.followUps => record.openTaskCount > 0,
       };
       return matchesQuery && matchesView;
     }).toList();
 
     filtered.sort((a, b) {
-      return switch (_sort) {
-        _ClientSort.priority => b.attentionScore.compareTo(a.attentionScore),
-        _ClientSort.recent => _activityDate(b).compareTo(_activityDate(a)),
-        _ClientSort.value => b.lifetimeValue.compareTo(a.lifetimeValue),
-        _ClientSort.name => a.client.name.compareTo(b.client.name),
-      };
+      final nextComparison = _nextDate(a).compareTo(_nextDate(b));
+      if (nextComparison != 0) return nextComparison;
+      final taskComparison = b.openTaskCount.compareTo(a.openTaskCount);
+      if (taskComparison != 0) return taskComparison;
+      return a.client.name.compareTo(b.client.name);
     });
     return filtered;
   }
 
-  DateTime _activityDate(ClientCrmRecord record) {
-    return record.client.lastActivityAt ??
-        record.lastBooking?.startTime ??
-        record.client.createdAt ??
-        DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _nextDate(ClientCrmRecord record) {
+    return record.nextBooking?.startTime ?? DateTime(9999);
   }
 
   Future<void> _openAddClient() async {
@@ -248,7 +225,7 @@ class _Header extends StatelessWidget {
               Text(
                 total == 0
                     ? 'Build your client base'
-                    : '$total contacts · $leads leads · $attention need attention',
+                    : '$total clients · $leads leads · $attention follow-ups',
                 style: const TextStyle(color: AppColors.t3, fontSize: 13),
               ),
             ],
@@ -285,218 +262,47 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _CrmCommandBar extends StatelessWidget {
-  final List<ClientCrmRecord> records;
-
-  const _CrmCommandBar({required this.records});
-
-  @override
-  Widget build(BuildContext context) {
-    final outstanding = records.fold<double>(
-      0,
-      (sum, item) => sum + item.outstandingBalance,
-    );
-    final nextBookingCount = records
-        .where((item) => item.nextBooking != null)
-        .length;
-    final overdueFollowUps = records.fold<int>(
-      0,
-      (sum, item) => sum + item.overdueTaskCount,
-    );
-
-    return SlateSurface(
-      radius: AppRadius.xl,
-      color: AppColors.panelSoft,
-      borderColor: AppColors.panelSoftRaised,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        children: [
-          Expanded(
-            child: _CommandMetric(
-              label: 'Follow-ups',
-              value: overdueFollowUps == 0 ? 'Clear' : '$overdueFollowUps due',
-              icon: LucideIcons.bell,
-              urgent: overdueFollowUps > 0,
-            ),
-          ),
-          _Divider(),
-          Expanded(
-            child: _CommandMetric(
-              label: 'Unpaid',
-              value: outstanding == 0
-                  ? '£0'
-                  : '£${outstanding.toStringAsFixed(0)}',
-              icon: LucideIcons.walletCards,
-              urgent: outstanding > 0,
-            ),
-          ),
-          _Divider(),
-          Expanded(
-            child: _CommandMetric(
-              label: 'Booked',
-              value: '$nextBookingCount',
-              icon: LucideIcons.calendarCheck,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CommandMetric extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final bool urgent;
-
-  const _CommandMetric({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.urgent = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = urgent ? AppColors.error : AppColors.t2;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: color, size: 17),
-        const SizedBox(height: 10),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: color,
-            fontSize: 17,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label.toUpperCase(),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppColors.t3,
-            fontSize: 9,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Divider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 46,
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-      color: AppColors.t1.withValues(alpha: 0.10),
-    );
-  }
-}
-
 class _SearchAndSort extends StatelessWidget {
   final TextEditingController controller;
-  final _ClientSort sort;
   final ValueChanged<String> onQueryChanged;
-  final ValueChanged<_ClientSort> onSortChanged;
 
   const _SearchAndSort({
     required this.controller,
-    required this.sort,
     required this.onQueryChanged,
-    required this.onSortChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: controller,
-            onChanged: onQueryChanged,
-            style: const TextStyle(color: AppColors.t1, fontSize: 14),
-            decoration: InputDecoration(
-              hintText: 'Search name, phone, email, tag',
-              prefixIcon: const Icon(
-                LucideIcons.search,
-                color: AppColors.t3,
-                size: 16,
-              ),
-              filled: true,
-              fillColor: AppColors.bgCard,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                borderSide: const BorderSide(
-                  color: AppColors.green,
-                  width: 1.5,
-                ),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-            ),
-          ),
+    return TextField(
+      controller: controller,
+      onChanged: onQueryChanged,
+      style: const TextStyle(color: AppColors.t1, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: 'Search clients or tags',
+        prefixIcon: const Icon(
+          LucideIcons.search,
+          color: AppColors.t3,
+          size: 16,
         ),
-        const SizedBox(width: AppSpacing.sm),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<_ClientSort>(
-              value: sort,
-              icon: const Icon(
-                LucideIcons.chevronDown,
-                color: AppColors.t3,
-                size: 16,
-              ),
-              dropdownColor: AppColors.bgRaised,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              onChanged: (value) {
-                if (value != null) onSortChanged(value);
-              },
-              items: const [
-                DropdownMenuItem(
-                  value: _ClientSort.priority,
-                  child: Text('Priority'),
-                ),
-                DropdownMenuItem(
-                  value: _ClientSort.recent,
-                  child: Text('Recent'),
-                ),
-                DropdownMenuItem(
-                  value: _ClientSort.value,
-                  child: Text('Value'),
-                ),
-                DropdownMenuItem(value: _ClientSort.name, child: Text('Name')),
-              ],
-            ),
-          ),
+        filled: true,
+        fillColor: AppColors.bgCard,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderSide: const BorderSide(color: AppColors.border),
         ),
-      ],
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+      ),
     );
   }
 }
@@ -522,24 +328,14 @@ class _ViewRail extends StatelessWidget {
         children: [
           _chip(_ClientView.all, 'All', records.length),
           _chip(
-            _ClientView.attention,
-            'Attention',
-            records.where((item) => item.needsAttention).length,
-          ),
-          _chip(
             _ClientView.leads,
             'Leads',
             records.where((item) => item.isLead).length,
           ),
           _chip(
-            _ClientView.regulars,
-            'Regulars',
-            records.where((item) => item.completedBookingCount >= 3).length,
-          ),
-          _chip(
-            _ClientView.dormant,
-            'Dormant',
-            records.where((item) => item.isDormant).length,
+            _ClientView.followUps,
+            'Follow-ups',
+            records.where((item) => item.openTaskCount > 0).length,
           ),
         ],
       ),
@@ -582,11 +378,11 @@ class _ViewRail extends StatelessWidget {
   }
 }
 
-class _ClientCrmRow extends StatelessWidget {
+class _ClientRow extends StatelessWidget {
   final ClientCrmRecord record;
   final VoidCallback onTap;
 
-  const _ClientCrmRow({required this.record, required this.onTap});
+  const _ClientRow({required this.record, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -600,18 +396,19 @@ class _ClientCrmRow extends StatelessWidget {
         .toUpperCase();
     final next = record.nextBooking;
     final nextText = next == null
-        ? 'No booking set'
-        : 'Next ${_friendlyDate(next.startTime)}';
-    final meta = [
-      if ((client.phone ?? '').isNotEmpty) client.phone!,
-      if ((client.source ?? '').isNotEmpty) client.source!,
-    ].join(' · ');
+        ? null
+        : 'Next booking ${_friendlyDate(next.startTime)}';
+    final taskText = record.openTaskCount == 0
+        ? null
+        : record.overdueTaskCount > 0
+        ? '${record.overdueTaskCount} overdue task${record.overdueTaskCount == 1 ? '' : 's'}'
+        : '${record.openTaskCount} open task${record.openTaskCount == 1 ? '' : 's'}';
 
     return SlateSurface(
       onTap: onTap,
       radius: AppRadius.xl,
       color: AppColors.bgCard,
-      borderColor: record.needsAttention
+      borderColor: record.overdueTaskCount > 0
           ? AppColors.error.withValues(alpha: 0.20)
           : AppColors.border,
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -657,16 +454,21 @@ class _ClientCrmRow extends StatelessWidget {
                             ),
                           ),
                         ),
-                        _SegmentPill(record: record),
+                        if (record.isLead) const _StatusPill(label: 'Lead'),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      meta.isEmpty ? nextText : '$meta · $nextText',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.t3, fontSize: 12),
-                    ),
+                    if (client.tags.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        client.tags.take(2).join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -678,61 +480,30 @@ class _ClientCrmRow extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              _MiniSignal(
-                label: 'Value',
-                value: '£${record.lifetimeValue.toStringAsFixed(0)}',
-                icon: LucideIcons.banknote,
-              ),
-              _MiniSignal(
-                label: 'Bookings',
-                value: '${record.bookingCount}',
-                icon: LucideIcons.calendarDays,
-              ),
-              _MiniSignal(
-                label: 'Tasks',
-                value: record.openTaskCount == 0
-                    ? 'Clear'
-                    : '${record.openTaskCount}',
-                icon: LucideIcons.listChecks,
-                urgent: record.overdueTaskCount > 0,
-              ),
-              if (record.outstandingBalance > 0)
-                _MiniSignal(
-                  label: 'Owes',
-                  value: '£${record.outstandingBalance.toStringAsFixed(0)}',
-                  icon: LucideIcons.walletCards,
-                  urgent: true,
-                ),
-            ],
-          ),
-          if (client.tags.isNotEmpty) ...[
+          if (nextText != null ||
+              taskText != null ||
+              record.outstandingBalance > 0) ...[
             const SizedBox(height: AppSpacing.sm),
             Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: client.tags.take(4).map((tag) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 5,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (nextText != null)
+                  _InfoChip(icon: LucideIcons.calendarDays, label: nextText),
+                if (taskText != null)
+                  _InfoChip(
+                    icon: LucideIcons.listChecks,
+                    label: taskText,
+                    urgent: record.overdueTaskCount > 0,
                   ),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgInteract,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                if (record.outstandingBalance > 0)
+                  _InfoChip(
+                    icon: LucideIcons.walletCards,
+                    label:
+                        '£${record.outstandingBalance.toStringAsFixed(0)} unpaid',
+                    urgent: true,
                   ),
-                  child: Text(
-                    tag,
-                    style: const TextStyle(
-                      color: AppColors.t3,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                );
-              }).toList(),
+              ],
             ),
           ],
         ],
@@ -741,29 +512,23 @@ class _ClientCrmRow extends StatelessWidget {
   }
 }
 
-class _SegmentPill extends StatelessWidget {
-  final ClientCrmRecord record;
+class _StatusPill extends StatelessWidget {
+  final String label;
 
-  const _SegmentPill({required this.record});
+  const _StatusPill({required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (record.segment) {
-      'Attention' => AppColors.error,
-      'Lead' => AppColors.warning,
-      'Dormant' => AppColors.t3,
-      _ => AppColors.green,
-    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.11),
+        color: AppColors.warning.withValues(alpha: 0.11),
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Text(
-        record.segment,
-        style: TextStyle(
-          color: color,
+        label,
+        style: const TextStyle(
+          color: AppColors.warning,
           fontSize: 10,
           fontWeight: FontWeight.w900,
         ),
@@ -772,37 +537,37 @@ class _SegmentPill extends StatelessWidget {
   }
 }
 
-class _MiniSignal extends StatelessWidget {
-  final String label;
-  final String value;
+class _InfoChip extends StatelessWidget {
   final IconData icon;
+  final String label;
   final bool urgent;
 
-  const _MiniSignal({
-    required this.label,
-    required this.value,
+  const _InfoChip({
     required this.icon,
+    required this.label,
     this.urgent = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final color = urgent ? AppColors.error : AppColors.t2;
-    return Expanded(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: color, size: 14),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(
-              '$label $value',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-              ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
