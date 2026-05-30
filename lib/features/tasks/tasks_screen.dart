@@ -473,10 +473,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   void _showTaskEditor(BuildContext context, {SlateTask? task}) {
     final titleController = TextEditingController(text: task?.title ?? '');
+    final checklistController = TextEditingController();
     String priority = task?.priority ?? 'medium';
     DateTime? dueDate = task?.dueDate;
     String? selectedClientId = task?.contactId;
     String reminderTiming = task?.reminderTiming ?? 'none';
+    final draftChecklist = <String>[];
     var saving = false;
 
     showModalBottomSheet(
@@ -494,144 +496,173 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               AppSpacing.lg,
               MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xl,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task == null ? 'New task' : 'Edit task',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.t1,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: titleController,
-                  autofocus: task == null,
-                  minLines: 1,
-                  maxLines: 3,
-                  textInputAction: TextInputAction.done,
-                  style: const TextStyle(color: AppColors.t1),
-                  decoration: const InputDecoration(
-                    hintText: 'What needs doing?',
-                  ),
-                ),
-                const SizedBox(height: 14),
-                if (task == null) ...[
-                  _TaskTemplatePicker(
-                    onSelect: (template) {
-                      setModal(() {
-                        if (titleController.text.trim().isEmpty) {
-                          titleController.text = template.title;
-                        }
-                        priority = template.priority;
-                        if (template.dueInDays != null) {
-                          dueDate = _dateOnly(
-                            DateTime.now().add(
-                              Duration(days: template.dueInDays!),
-                            ),
-                          );
-                          reminderTiming = template.dueInDays == 0
-                              ? 'today'
-                              : 'day_before';
-                        }
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                ],
-                clients.when(
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
-                  data: (data) => _ClientPicker(
-                    clients: data,
-                    selectedClientId: selectedClientId,
-                    onChanged: (value) =>
-                        setModal(() => selectedClientId = value),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Priority',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.t3,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.78,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _PriorityChoice(
-                      value: 'high',
-                      label: 'High',
-                      selected: priority,
-                      color: AppColors.error,
-                      onTap: (value) => setModal(() => priority = value),
+                    Text(
+                      task == null ? 'New task' : 'Edit task',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.t1,
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    _PriorityChoice(
-                      value: 'medium',
-                      label: 'Medium',
-                      selected: priority,
-                      color: AppColors.warning,
-                      onTap: (value) => setModal(() => priority = value),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: titleController,
+                      autofocus: task == null,
+                      minLines: 1,
+                      maxLines: 3,
+                      textInputAction: TextInputAction.done,
+                      style: const TextStyle(color: AppColors.t1),
+                      decoration: const InputDecoration(
+                        hintText: 'What needs doing?',
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    _PriorityChoice(
-                      value: 'low',
-                      label: 'Low',
-                      selected: priority,
-                      color: AppColors.t3,
-                      onTap: (value) => setModal(() => priority = value),
+                    const SizedBox(height: 14),
+                    if (task == null) ...[
+                      _TaskTemplatePicker(
+                        onSelect: (template) {
+                          setModal(() {
+                            if (titleController.text.trim().isEmpty) {
+                              titleController.text = template.title;
+                            }
+                            priority = template.priority;
+                            if (template.dueInDays != null) {
+                              dueDate = _dateOnly(
+                                DateTime.now().add(
+                                  Duration(days: template.dueInDays!),
+                                ),
+                              );
+                              reminderTiming = template.dueInDays == 0
+                                  ? 'today'
+                                  : 'day_before';
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    clients.when(
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, __) => const SizedBox.shrink(),
+                      data: (data) => _ClientPicker(
+                        clients: data,
+                        selectedClientId: selectedClientId,
+                        onChanged: (value) =>
+                            setModal(() => selectedClientId = value),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Priority',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.t3,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _PriorityChoice(
+                          value: 'high',
+                          label: 'High',
+                          selected: priority,
+                          color: AppColors.error,
+                          onTap: (value) => setModal(() => priority = value),
+                        ),
+                        const SizedBox(width: 8),
+                        _PriorityChoice(
+                          value: 'medium',
+                          label: 'Medium',
+                          selected: priority,
+                          color: AppColors.warning,
+                          onTap: (value) => setModal(() => priority = value),
+                        ),
+                        const SizedBox(width: 8),
+                        _PriorityChoice(
+                          value: 'low',
+                          label: 'Low',
+                          selected: priority,
+                          color: AppColors.t3,
+                          onTap: (value) => setModal(() => priority = value),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _DueDatePicker(
+                      dueDate: dueDate,
+                      onChanged: (value) => setModal(() => dueDate = value),
+                    ),
+                    const SizedBox(height: 16),
+                    _ReminderPicker(
+                      value: reminderTiming,
+                      enabled: dueDate != null,
+                      onChanged: (value) =>
+                          setModal(() => reminderTiming = value),
+                    ),
+                    if (task == null) ...[
+                      const SizedBox(height: 16),
+                      _DraftChecklistEditor(
+                        controller: checklistController,
+                        items: draftChecklist,
+                        onAdd: () {
+                          final title = checklistController.text.trim();
+                          if (title.isEmpty) return;
+                          setModal(() {
+                            draftChecklist.add(title);
+                            checklistController.clear();
+                          });
+                        },
+                        onRemove: (index) =>
+                            setModal(() => draftChecklist.removeAt(index)),
+                      ),
+                    ],
+                    const SizedBox(height: 22),
+                    SlateButton(
+                      label: saving
+                          ? 'Saving...'
+                          : task == null
+                          ? 'Add Task'
+                          : 'Save Changes',
+                      icon: task == null ? LucideIcons.plus : LucideIcons.check,
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              setModal(() => saving = true);
+                              final saved = await _saveTask(
+                                ctx,
+                                task: task,
+                                title: titleController.text,
+                                priority: priority,
+                                dueDate: dueDate,
+                                clientId: selectedClientId,
+                                reminderTiming: reminderTiming,
+                                checklistTitles: draftChecklist,
+                              );
+                              if (!saved && ctx.mounted) {
+                                setModal(() => saving = false);
+                              }
+                            },
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                _DueDatePicker(
-                  dueDate: dueDate,
-                  onChanged: (value) => setModal(() => dueDate = value),
-                ),
-                const SizedBox(height: 16),
-                _ReminderPicker(
-                  value: reminderTiming,
-                  enabled: dueDate != null,
-                  onChanged: (value) => setModal(() => reminderTiming = value),
-                ),
-                const SizedBox(height: 22),
-                SlateButton(
-                  label: saving
-                      ? 'Saving...'
-                      : task == null
-                      ? 'Add Task'
-                      : 'Save Changes',
-                  icon: task == null ? LucideIcons.plus : LucideIcons.check,
-                  onPressed: saving
-                      ? null
-                      : () async {
-                          setModal(() => saving = true);
-                          final saved = await _saveTask(
-                            ctx,
-                            task: task,
-                            title: titleController.text,
-                            priority: priority,
-                            dueDate: dueDate,
-                            clientId: selectedClientId,
-                            reminderTiming: reminderTiming,
-                          );
-                          if (!saved && ctx.mounted) {
-                            setModal(() => saving = false);
-                          }
-                        },
-                ),
-              ],
+              ),
             ),
           );
         },
       ),
-    ).whenComplete(() => _disposeControllerAfterSheetClose(titleController));
+    ).whenComplete(() {
+      _disposeControllerAfterSheetClose(titleController);
+      _disposeControllerAfterSheetClose(checklistController);
+    });
   }
 
   Future<bool> _saveTask(
@@ -642,13 +673,14 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     required DateTime? dueDate,
     required String? clientId,
     required String reminderTiming,
+    required List<String> checklistTitles,
   }) async {
     if (title.trim().isEmpty) return false;
     final workspaceId = await ref.read(workspaceIdProvider.future);
     if (workspaceId == null) return false;
     FocusManager.instance.primaryFocus?.unfocus();
     if (task == null) {
-      await ref
+      final taskId = await ref
           .read(tasksRepositoryProvider)
           .create(
             workspaceId: workspaceId,
@@ -657,6 +689,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             dueDate: dueDate,
             contactId: clientId,
             reminderTiming: dueDate == null ? 'none' : reminderTiming,
+          );
+      await ref
+          .read(tasksRepositoryProvider)
+          .addChecklistItems(
+            workspaceId: workspaceId,
+            taskId: taskId,
+            titles: checklistTitles,
           );
     } else {
       await ref
@@ -1342,6 +1381,136 @@ class _TaskTemplatePicker extends StatelessWidget {
               .toList(),
         ),
       ],
+    );
+  }
+}
+
+class _DraftChecklistEditor extends StatelessWidget {
+  final TextEditingController controller;
+  final List<String> items;
+  final VoidCallback onAdd;
+  final ValueChanged<int> onRemove;
+
+  const _DraftChecklistEditor({
+    required this.controller,
+    required this.items,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateSurface(
+      color: AppColors.t1.withValues(alpha: 0.035),
+      borderColor: AppColors.t1.withValues(alpha: 0.05),
+      radius: AppRadius.lg,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(LucideIcons.listChecks, size: 15, color: AppColors.t3),
+              SizedBox(width: 8),
+              Text(
+                'Checklist',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.t1,
+                ),
+              ),
+              Spacer(),
+              Text(
+                'Saved with task',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.t3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => onAdd(),
+                  style: const TextStyle(color: AppColors.t1),
+                  decoration: const InputDecoration(
+                    hintText: 'Add a step',
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onAdd,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.slateLight,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: const Icon(
+                    LucideIcons.plus,
+                    size: 18,
+                    color: AppColors.panelInk,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (items.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...items.asMap().entries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    const Icon(
+                      LucideIcons.circle,
+                      size: 16,
+                      color: AppColors.t3,
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        entry.value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.t2,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => onRemove(entry.key),
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(
+                          LucideIcons.x,
+                          size: 14,
+                          color: AppColors.t3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -55,7 +55,7 @@ class TasksRepository {
     return rows.map<SlateTask>((row) => SlateTask.fromMap(row)).toList();
   }
 
-  Future<void> create({
+  Future<String> create({
     required String workspaceId,
     required String title,
     required String priority,
@@ -63,15 +63,20 @@ class TasksRepository {
     DateTime? dueDate,
     String? contactId,
   }) async {
-    await _client.from('tasks').insert({
-      'workspace_id': workspaceId,
-      'title': title.trim(),
-      'priority': priority,
-      'reminder_timing': reminderTiming,
-      'due_date': dueDate?.toIso8601String().split('T').first,
-      'status': 'open',
-      'contact_id': contactId,
-    });
+    final row = await _client
+        .from('tasks')
+        .insert({
+          'workspace_id': workspaceId,
+          'title': title.trim(),
+          'priority': priority,
+          'reminder_timing': reminderTiming,
+          'due_date': dueDate?.toIso8601String().split('T').first,
+          'status': 'open',
+          'contact_id': contactId,
+        })
+        .select('id')
+        .single();
+    return row['id'] as String;
   }
 
   Future<void> updateStatus(String taskId, String status) async {
@@ -135,6 +140,31 @@ class TasksRepository {
       'title': title.trim(),
       'position': position,
     });
+  }
+
+  Future<void> addChecklistItems({
+    required String workspaceId,
+    required String taskId,
+    required List<String> titles,
+  }) async {
+    final cleaned = titles
+        .map((title) => title.trim())
+        .where((title) => title.isNotEmpty)
+        .toList();
+    if (cleaned.isEmpty) return;
+
+    await _client
+        .from('task_checklist_items')
+        .insert(
+          List.generate(cleaned.length, (index) {
+            return {
+              'workspace_id': workspaceId,
+              'task_id': taskId,
+              'title': cleaned[index],
+              'position': index,
+            };
+          }),
+        );
   }
 
   Future<void> updateChecklistItem({
