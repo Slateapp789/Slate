@@ -18,6 +18,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
   bool _changingPassword = false;
   bool _savingPassword = false;
   bool _exporting = false;
+  bool _requestingDeletion = false;
   final _newPasswordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   bool _obscureNew = true;
@@ -211,53 +212,79 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              settingsHandle(),
-              const SizedBox(height: 22),
-              const Icon(
-                LucideIcons.shieldAlert,
-                color: AppColors.warning,
-                size: 28,
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Account deletion needs a server workflow',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.t1,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                settingsHandle(),
+                const SizedBox(height: 22),
+                const Icon(
+                  LucideIcons.shieldAlert,
+                  color: AppColors.warning,
+                  size: 28,
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'The app can export your data now. Full account deletion should run through a verified backend path so auth, storage, and workspace rows are removed together.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.t3, height: 1.4),
-              ),
-              const SizedBox(height: 22),
-              saveBtn(
-                label: 'Copy support note',
-                color: AppColors.warning,
-                onTap: () async {
-                  await Clipboard.setData(
-                    const ClipboardData(
-                      text:
-                          'Please delete my Slate account and all workspace data.',
-                    ),
-                  );
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) _snack('Deletion note copied', AppColors.green);
-                },
-              ),
-              const SizedBox(height: 10),
-              cancelBtn(ctx),
-            ],
+                const SizedBox(height: 14),
+                const Text(
+                  'Request account deletion',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.t1,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'This creates an auditable deletion request. A trusted backend process should then remove auth, storage, and workspace rows together.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.t3, height: 1.4),
+                ),
+                const SizedBox(height: 22),
+                saveBtn(
+                  label: 'Request deletion',
+                  color: AppColors.warning,
+                  loading: _requestingDeletion,
+                  onTap: () async {
+                    setSheetState(() => _requestingDeletion = true);
+                    setState(() => _requestingDeletion = true);
+                    try {
+                      final workspaceId = await ref.read(
+                        workspaceIdProvider.future,
+                      );
+                      if (workspaceId == null) return;
+                      await ref
+                          .read(privacyRepositoryProvider)
+                          .requestAccountDeletion(
+                            workspaceId: workspaceId,
+                            email: ref
+                                .read(authRepositoryProvider)
+                                .currentEmail,
+                          );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (mounted) {
+                        _snack('Deletion request created', AppColors.green);
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        _snack(
+                          'Could not create deletion request: $e',
+                          AppColors.error,
+                        );
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() => _requestingDeletion = false);
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                cancelBtn(ctx),
+              ],
+            ),
           ),
         ),
       ),
@@ -410,7 +437,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
               Divider(height: 1, color: AppColors.border),
               tappableRow(
                 label: 'Delete account',
-                value: 'Backend required',
+                value: 'Request',
                 onTap: _showDeleteAccountSheet,
                 valueColor: AppColors.warning,
               ),

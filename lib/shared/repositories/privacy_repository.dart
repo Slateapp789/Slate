@@ -49,6 +49,20 @@ class PrivacyRepository {
     return const JsonEncoder.withIndent('  ').convert(data);
   }
 
+  Future<void> requestAccountDeletion({
+    required String workspaceId,
+    required String email,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    await _client.from('account_deletion_requests').insert({
+      'workspace_id': workspaceId,
+      'user_id': userId,
+      'email': email,
+      'status': 'requested',
+      'requested_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
   Future<Map<String, dynamic>?> _maybeSingle(
     String table,
     String column,

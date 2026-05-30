@@ -105,6 +105,18 @@ create table if not exists calendar_sync_accounts (
   created_at timestamptz not null default now()
 );
 
+create table if not exists account_deletion_requests (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  user_id uuid,
+  email text not null,
+  status text not null default 'requested',
+  requested_at timestamptz not null default now(),
+  completed_at timestamptz,
+  notes text
+);
+
 -- RLS expectation:
 -- Every workspace-owned table must enforce access through workspace_members.
 -- Public profile reads should be limited to business_profiles + services intended for public display.
+-- Account deletion should be completed by a trusted server/edge-function path with service-role permissions.
