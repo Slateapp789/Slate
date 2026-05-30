@@ -13,6 +13,7 @@ class PaymentsRepository {
   const PaymentsRepository(this._client);
 
   Future<List<Payment>> list(String workspaceId) async {
+    await refreshOverdue(workspaceId);
     final rows = await _client
         .from('invoices')
         .select('*, contacts(name)')
@@ -54,6 +55,7 @@ class PaymentsRepository {
     required double amount,
     required String status,
     required DateTime date,
+    DateTime? dueDate,
     String? contactId,
     String? notes,
   }) async {
@@ -64,6 +66,7 @@ class PaymentsRepository {
     final count = List<dynamic>.from(existing).length + 1;
     final paymentNumber = 'PAY-${count.toString().padLeft(3, '0')}';
     final dateString = date.toIso8601String().split('T').first;
+    final dueDateString = (dueDate ?? date).toIso8601String().split('T').first;
 
     await _client.from('invoices').insert({
       'workspace_id': workspaceId,
@@ -72,7 +75,7 @@ class PaymentsRepository {
       'type': 'invoice',
       'status': status,
       'issue_date': dateString,
-      'due_date': dateString,
+      'due_date': dueDateString,
       'subtotal': amount,
       'tax_rate': 0,
       'tax_amount': 0,
@@ -92,5 +95,15 @@ class PaymentsRepository {
 
   Future<void> delete(String paymentId) async {
     await _client.from('invoices').delete().eq('id', paymentId);
+  }
+
+  Future<void> refreshOverdue(String workspaceId) async {
+    final today = DateTime.now().toIso8601String().split('T').first;
+    await _client
+        .from('invoices')
+        .update({'status': 'overdue'})
+        .eq('workspace_id', workspaceId)
+        .inFilter('status', ['sent', 'pending'])
+        .lt('due_date', today);
   }
 }

@@ -12,15 +12,23 @@ class PaymentSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     double received = 0;
     double outstanding = 0;
+    double overdue = 0;
+    double thisMonth = 0;
     int overdueCount = 0;
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
 
     for (final payment in payments) {
       if (payment.status == 'paid') {
         received += payment.total;
-      } else if (payment.status == 'sent') {
+        if (!payment.issueDate.isBefore(monthStart)) {
+          thisMonth += payment.total;
+        }
+      } else if (payment.status == 'sent' || payment.status == 'pending') {
         outstanding += payment.total;
       } else if (payment.status == 'overdue') {
         outstanding += payment.total;
+        overdue += payment.total;
         overdueCount++;
       }
     }
@@ -107,6 +115,74 @@ class PaymentSummaryCard extends StatelessWidget {
                 ),
             ],
           ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _MiniPaymentMetric(
+                  label: 'This month',
+                  value: thisMonth,
+                  muted: thisMonth == 0,
+                ),
+              ),
+              Container(width: 1, height: 34, color: AppColors.panelFaint),
+              Expanded(
+                child: _MiniPaymentMetric(
+                  label: 'Overdue',
+                  value: overdue,
+                  muted: overdue == 0,
+                  danger: overdue > 0,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniPaymentMetric extends StatelessWidget {
+  final String label;
+  final double value;
+  final bool muted;
+  final bool danger;
+
+  const _MiniPaymentMetric({
+    required this.label,
+    required this.value,
+    this.muted = false,
+    this.danger = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: AppColors.panelMuted,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '£${value.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: danger
+                  ? AppColors.error
+                  : muted
+                  ? AppColors.panelInk.withValues(alpha: 0.28)
+                  : AppColors.panelInk,
+            ),
+          ),
         ],
       ),
     );
@@ -130,7 +206,7 @@ class PaymentCard extends StatelessWidget {
     final clientName = payment.clientName ?? 'Unknown';
     final description = payment.notes ?? '';
     final isOverdue = payment.status == 'overdue';
-    final isPending = payment.status == 'sent';
+    final isPending = payment.status == 'sent' || payment.status == 'pending';
     final isPaid = payment.status == 'paid';
 
     final statusColor = isPaid
@@ -218,7 +294,7 @@ class PaymentCard extends StatelessWidget {
                   if (payment.issueDate.millisecondsSinceEpoch > 0) ...[
                     const SizedBox(height: 2),
                     Text(
-                      _formatDate(payment.issueDate),
+                      _dateSubtitle(payment),
                       style: const TextStyle(fontSize: 12, color: AppColors.t3),
                     ),
                   ],
@@ -288,5 +364,23 @@ class PaymentCard extends StatelessWidget {
       'Dec',
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
+  String _dateSubtitle(Payment payment) {
+    if (payment.status == 'paid') {
+      return 'Received ${_formatDate(payment.issueDate)}';
+    }
+    final dueDate = payment.dueDate;
+    if (dueDate == null || dueDate.millisecondsSinceEpoch == 0) {
+      return 'Created ${_formatDate(payment.issueDate)}';
+    }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final diff = due.difference(today).inDays;
+    if (diff < 0) return 'Due ${_formatDate(dueDate)} · ${diff.abs()}d late';
+    if (diff == 0) return 'Due today';
+    if (diff == 1) return 'Due tomorrow';
+    return 'Due ${_formatDate(dueDate)} · ${diff}d';
   }
 }

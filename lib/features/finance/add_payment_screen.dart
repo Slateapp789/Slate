@@ -22,6 +22,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
   String? _selectedClientId;
   String _status = 'paid';
   DateTime _date = DateTime.now();
+  DateTime _dueDate = DateTime.now().add(const Duration(days: 7));
   bool _saving = false;
 
   @override
@@ -58,6 +59,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
             amount: amount,
             status: _status,
             date: _date,
+            dueDate: _status == 'paid' ? _date : _dueDate,
             contactId: _selectedClientId,
             notes: description,
           );
@@ -107,6 +109,26 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
       ),
     );
     if (picked != null) setState(() => _date = picked);
+  }
+
+  Future<void> _pickDueDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.dark(
+            primary: AppColors.green,
+            surface: AppColors.bgCard,
+            onSurface: AppColors.t1,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _dueDate = picked);
   }
 
   String _formatDate(DateTime dt) {
@@ -436,6 +458,54 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                   ),
                 ),
               ),
+              if (_status != 'paid') ...[
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: _pickDueDate,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgCard,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          LucideIcons.alarmClock,
+                          color: AppColors.t3,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'DUE DATE',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                            color: AppColors.t3,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          _formatDate(_dueDate),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.warning,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(
+                          LucideIcons.chevronRight,
+                          color: AppColors.t3,
+                          size: 14,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 32),
 
               // Save button

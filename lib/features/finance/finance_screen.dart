@@ -189,7 +189,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                   final filtered = data.where((p) {
                     switch (_filter) {
                       case 'Outstanding':
-                        return p.status == 'sent';
+                        return p.status == 'sent' || p.status == 'pending';
                       case 'Received':
                         return p.status == 'paid';
                       case 'Overdue':
