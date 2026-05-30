@@ -162,7 +162,7 @@ class _MainShellState extends State<MainShell> {
     _currentIndex = widget.initialIndex;
   }
 
-  // Tabs: 0=Home, 1=Clients, 2=Work, 3=Money, 4=Tasks
+  // Tabs: 0=Home, 1=Clients, 2=Bookings, 3=Money, 4=Tasks
   Widget getScreen() {
     switch (_currentIndex) {
       case 0:
@@ -196,7 +196,7 @@ class _MainShellState extends State<MainShell> {
             children: [
               _fabOption(
                 icon: LucideIcons.calendarPlus,
-                label: 'New Appointment',
+                label: 'New Booking',
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -322,7 +322,7 @@ class _SlatePillNavBar extends StatelessWidget {
       color: AppColors.violet,
     ),
     _NavItem(
-      label: 'Work',
+      label: 'Bookings',
       icon: LucideIcons.calendarDays,
       color: AppColors.slate,
     ),

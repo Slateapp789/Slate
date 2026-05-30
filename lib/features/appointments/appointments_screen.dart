@@ -19,11 +19,12 @@ class AppointmentsScreen extends ConsumerStatefulWidget {
 class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  DateTime _selectedCalendarDate = _dateOnly(DateTime.now());
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -71,7 +72,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Work',
+                    'Bookings',
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
@@ -120,32 +121,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
 
             appointments.when(
               data: (data) {
-                final now = DateTime.now();
-                final todayStart = DateTime(now.year, now.month, now.day);
-                final todayEnd = todayStart.add(const Duration(days: 1));
-                final todayAll = data.where((a) {
-                  final dt = DateTime.tryParse(
-                    a['start_time'] as String? ?? '',
-                  )?.toLocal();
-                  return dt != null &&
-                      dt.isAfter(todayStart) &&
-                      dt.isBefore(todayEnd) &&
-                      a['status'] != 'cancelled';
-                }).toList();
-                final completed = todayAll
-                    .where((a) => a['status'] == 'completed')
-                    .length;
-                final remaining = todayAll
-                    .where((a) => a['status'] == 'scheduled')
-                    .length;
-                final todayRevenue = todayAll
-                    .where((a) => a['status'] == 'completed')
-                    .fold<double>(
-                      0,
-                      (sum, a) => sum + ((a['price'] as num?)?.toDouble() ?? 0),
-                    );
-
-                if (todayAll.isEmpty) return const SizedBox.shrink();
+                final stats = _BookingStats.from(data);
 
                 return Padding(
                   padding: const EdgeInsets.fromLTRB(
@@ -154,44 +130,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                     AppSpacing.pageX,
                     AppSpacing.md,
                   ),
-                  child: SlateSurface(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    radius: AppRadius.md,
-                    color: AppColors.greenDim,
-                    borderColor: AppColors.green.withValues(alpha: 0.25),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          LucideIcons.sun,
-                          color: AppColors.green,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Today — $completed done, $remaining to go',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.green,
-                            ),
-                          ),
-                        ),
-                        if (todayRevenue > 0)
-                          Text(
-                            '£${todayRevenue.toStringAsFixed(0)} earned',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.green.withValues(alpha: 0.8),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+                  child: _BookingCommandPanel(stats: stats),
                 );
               },
               loading: () => const SizedBox.shrink(),
@@ -228,6 +167,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                   ),
                   tabs: const [
                     Tab(text: 'Today'),
+                    Tab(text: 'Calendar'),
                     Tab(text: 'Upcoming'),
                     Tab(text: 'Past'),
                   ],
@@ -246,15 +186,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                   final todayStart = DateTime(now.year, now.month, now.day);
                   final todayEnd = todayStart.add(const Duration(days: 1));
 
-                  final today = data.where((a) {
-                    final dt = DateTime.tryParse(
-                      a['start_time'] as String? ?? '',
-                    )?.toLocal();
-                    return dt != null &&
-                        dt.isAfter(todayStart) &&
-                        dt.isBefore(todayEnd) &&
-                        a['status'] != 'cancelled';
-                  }).toList();
+                  final today = _appointmentsForDay(data, todayStart);
 
                   final upcoming = data.where((a) {
                     final dt = DateTime.tryParse(
@@ -284,6 +216,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                         if (dtA == null || dtB == null) return 0;
                         return dtB.compareTo(dtA);
                       });
+                  final selectedDayAppointments = _appointmentsForDay(
+                    data,
+                    _selectedCalendarDate,
+                  );
 
                   return TabBarView(
                     controller: _tabController,
@@ -292,16 +228,27 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                         appointments: today,
                         emptyIcon: LucideIcons.calendarDays,
                         emptyTitle: 'Nothing scheduled today',
-                        emptySubtitle: 'Tap New to add an appointment',
+                        emptySubtitle: 'Tap New to add a booking',
                         onTap: _openDetail,
                         onRefresh: () => ref.invalidate(appointmentsProvider),
                         onEmptyAction: _addAppointment,
                         groupByDate: false,
                       ),
+                      _BookingCalendarView(
+                        appointments: data,
+                        selectedDate: _selectedCalendarDate,
+                        selectedDayAppointments: selectedDayAppointments,
+                        onDateSelected: (date) {
+                          setState(() => _selectedCalendarDate = date);
+                        },
+                        onTap: _openDetail,
+                        onRefresh: () => ref.invalidate(appointmentsProvider),
+                        onEmptyAction: _addAppointment,
+                      ),
                       _AppointmentListView(
                         appointments: upcoming,
                         emptyIcon: LucideIcons.calendarClock,
-                        emptyTitle: 'No upcoming appointments',
+                        emptyTitle: 'No upcoming bookings',
                         emptySubtitle: 'Your future schedule is clear',
                         onTap: _openDetail,
                         onRefresh: () => ref.invalidate(appointmentsProvider),
@@ -310,8 +257,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                       _AppointmentListView(
                         appointments: past,
                         emptyIcon: LucideIcons.history,
-                        emptyTitle: 'No past appointments',
-                        emptySubtitle: 'Completed sessions will appear here',
+                        emptyTitle: 'No past bookings',
+                        emptySubtitle: 'Completed work will appear here',
                         onTap: _openDetail,
                         onRefresh: () => ref.invalidate(appointmentsProvider),
                         groupByDate: true,
@@ -346,7 +293,273 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
   Widget _errorState(VoidCallback onRetry) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
-      child: SlateErrorState(message: 'Could not load appointments'),
+      child: SlateErrorState(message: 'Could not load bookings'),
+    );
+  }
+
+  List<Map<String, dynamic>> _appointmentsForDay(
+    List<Map<String, dynamic>> appointments,
+    DateTime day,
+  ) {
+    final start = _dateOnly(day);
+    final end = start.add(const Duration(days: 1));
+    return appointments.where((a) {
+      final dt = DateTime.tryParse(a['start_time'] as String? ?? '')?.toLocal();
+      return dt != null &&
+          !dt.isBefore(start) &&
+          dt.isBefore(end) &&
+          a['status'] != 'cancelled';
+    }).toList();
+  }
+}
+
+class _BookingStats {
+  final int todayTotal;
+  final int todayCompleted;
+  final int todayRemaining;
+  final int overdueUnfinished;
+  final int weekBookings;
+  final double todayRevenue;
+  final double weekValue;
+  final Map<String, dynamic>? nextBooking;
+
+  const _BookingStats({
+    required this.todayTotal,
+    required this.todayCompleted,
+    required this.todayRemaining,
+    required this.overdueUnfinished,
+    required this.weekBookings,
+    required this.todayRevenue,
+    required this.weekValue,
+    required this.nextBooking,
+  });
+
+  factory _BookingStats.from(List<Map<String, dynamic>> appointments) {
+    final now = DateTime.now();
+    final today = _dateOnly(now);
+    final tomorrow = today.add(const Duration(days: 1));
+    final weekEnd = today.add(const Duration(days: 7));
+
+    final todayAppointments = appointments.where((appt) {
+      final dt = _start(appt);
+      return dt != null &&
+          !dt.isBefore(today) &&
+          dt.isBefore(tomorrow) &&
+          appt['status'] != 'cancelled';
+    }).toList();
+
+    final upcoming = appointments.where((appt) {
+      final dt = _start(appt);
+      return dt != null && dt.isAfter(now) && appt['status'] != 'cancelled';
+    }).toList()..sort((a, b) => _start(a)!.compareTo(_start(b)!));
+
+    final weekAppointments = appointments.where((appt) {
+      final dt = _start(appt);
+      return dt != null &&
+          !dt.isBefore(today) &&
+          dt.isBefore(weekEnd) &&
+          appt['status'] != 'cancelled';
+    }).toList();
+
+    final overdue = appointments.where((appt) {
+      final dt = _end(appt) ?? _start(appt);
+      final status = appt['status'] as String? ?? 'scheduled';
+      return dt != null && dt.isBefore(now) && status == 'scheduled';
+    }).length;
+
+    return _BookingStats(
+      todayTotal: todayAppointments.length,
+      todayCompleted: todayAppointments
+          .where((appt) => appt['status'] == 'completed')
+          .length,
+      todayRemaining: todayAppointments
+          .where((appt) => appt['status'] == 'scheduled')
+          .length,
+      overdueUnfinished: overdue,
+      weekBookings: weekAppointments.length,
+      todayRevenue: todayAppointments
+          .where((appt) => appt['status'] == 'completed')
+          .fold<double>(0, (sum, appt) => sum + _price(appt)),
+      weekValue: weekAppointments.fold<double>(
+        0,
+        (sum, appt) => sum + _price(appt),
+      ),
+      nextBooking: upcoming.isEmpty ? null : upcoming.first,
     );
   }
 }
+
+class _BookingCommandPanel extends StatelessWidget {
+  final _BookingStats stats;
+
+  const _BookingCommandPanel({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final next = stats.nextBooking;
+    final nextLabel = next == null ? 'Schedule clear' : _nextBookingLabel(next);
+
+    return SlateSurface(
+      radius: AppRadius.xl,
+      color: AppColors.panelSoft,
+      borderColor: AppColors.t1.withValues(alpha: 0.06),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                LucideIcons.calendarCheck,
+                size: 17,
+                color: AppColors.t2,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'BOOKING CONTROL',
+                  style: TextStyle(
+                    color: AppColors.t3,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              if (stats.overdueUnfinished > 0)
+                _CommandBadge(
+                  label: '${stats.overdueUnfinished} need closing',
+                  color: AppColors.error,
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            nextLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.t1,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _BookingMetric(
+                label: 'Today',
+                value: '${stats.todayRemaining}/${stats.todayTotal}',
+                detail: '${stats.todayCompleted} done',
+              ),
+              _BookingMetric(
+                label: 'Week',
+                value: '${stats.weekBookings}',
+                detail: '£${stats.weekValue.toStringAsFixed(0)} booked',
+              ),
+              _BookingMetric(
+                label: 'Earned',
+                value: '£${stats.todayRevenue.toStringAsFixed(0)}',
+                detail: 'today',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BookingMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final String detail;
+
+  const _BookingMetric({
+    required this.label,
+    required this.value,
+    required this.detail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              color: AppColors.t3,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.t1,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            detail,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppColors.t3, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommandBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _CommandBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+DateTime _dateOnly(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
+
+DateTime? _start(Map<String, dynamic> appt) =>
+    DateTime.tryParse(appt['start_time'] as String? ?? '')?.toLocal();
+
+DateTime? _end(Map<String, dynamic> appt) =>
+    DateTime.tryParse(appt['end_time'] as String? ?? '')?.toLocal();
+
+double _price(Map<String, dynamic> appt) =>
+    (appt['price'] as num?)?.toDouble() ?? 0;
+
+String _nextBookingLabel(Map<String, dynamic> appt) {
+  final client = appt['contacts']?['name'] as String? ?? 'Walk-in';
+  final service = appt['services']?['name'] as String? ?? 'booking';
+  final start = _start(appt);
+  if (start == null) return '$client next';
+  return 'Next: ${_shortTime(start)} $client, $service';
+}
+
+String _shortTime(DateTime dt) =>
+    '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';

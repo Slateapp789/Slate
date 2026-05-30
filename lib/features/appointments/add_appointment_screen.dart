@@ -347,7 +347,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                   const SizedBox(width: 16),
                   const Expanded(
                     child: Text(
-                      'New Appointment',
+                      'New Booking',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
@@ -713,7 +713,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'This overlaps ${conflicts.length} existing appointment${conflicts.length == 1 ? '' : 's'}. You can still book it, but it may create a clash.',
+                                'This overlaps ${conflicts.length} existing booking${conflicts.length == 1 ? '' : 's'}. You can still book it, but it may create a clash.',
                                 style: const TextStyle(
                                   color: AppColors.t2,
                                   fontSize: 13,
@@ -973,6 +973,6 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       'monthly' => 'monthly',
       _ => '',
     };
-    return 'Creates $count appointments $label from the selected date.';
+    return 'Creates $count bookings $label from the selected date.';
   }
 }

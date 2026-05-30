@@ -45,7 +45,7 @@ class _AppointmentListView extends StatelessWidget {
                     onPressed: onEmptyAction,
                     icon: const Icon(LucideIcons.calendarPlus, size: 17),
                     label: const Text(
-                      'Add Appointment',
+                      'Add Booking',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -168,6 +168,259 @@ class _AppointmentListView extends StatelessWidget {
       'DEC',
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+}
+
+class _BookingCalendarView extends StatelessWidget {
+  final List<Map<String, dynamic>> appointments;
+  final DateTime selectedDate;
+  final List<Map<String, dynamic>> selectedDayAppointments;
+  final ValueChanged<DateTime> onDateSelected;
+  final Function(Map<String, dynamic>) onTap;
+  final VoidCallback onRefresh;
+  final VoidCallback onEmptyAction;
+
+  const _BookingCalendarView({
+    required this.appointments,
+    required this.selectedDate,
+    required this.selectedDayAppointments,
+    required this.onDateSelected,
+    required this.onTap,
+    required this.onRefresh,
+    required this.onEmptyAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final today = _dateOnly(DateTime.now());
+    final days = List.generate(21, (index) {
+      return today.add(Duration(days: index - 3));
+    });
+
+    return RefreshIndicator(
+      onRefresh: () async => onRefresh(),
+      color: AppColors.green,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.pageX,
+          0,
+          AppSpacing.pageX,
+          112,
+        ),
+        children: [
+          SizedBox(
+            height: 92,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: days.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final day = days[index];
+                final selected = _dateOnly(day) == _dateOnly(selectedDate);
+                final count = _countForDay(day);
+                final value = _valueForDay(day);
+                return _CalendarDayChip(
+                  date: day,
+                  selected: selected,
+                  count: count,
+                  value: value,
+                  onTap: () => onDateSelected(_dateOnly(day)),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          _DayPlanHeader(
+            date: selectedDate,
+            appointments: selectedDayAppointments,
+          ),
+          const SizedBox(height: 12),
+          if (selectedDayAppointments.isEmpty)
+            SlateEmptyState(
+              icon: LucideIcons.calendarPlus,
+              title: 'No bookings this day',
+              subtitle: 'Use the gap for admin, follow-ups, or add a booking.',
+            )
+          else
+            ...selectedDayAppointments.map(
+              (appt) => _AppointmentCard(
+                appt: appt,
+                onTap: () => onTap(appt),
+                showStatusBadge: true,
+              ),
+            ),
+          if (selectedDayAppointments.isEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: onEmptyAction,
+                icon: const Icon(LucideIcons.calendarPlus, size: 17),
+                label: const Text(
+                  'Add Booking',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  int _countForDay(DateTime day) {
+    final start = _dateOnly(day);
+    final end = start.add(const Duration(days: 1));
+    return appointments.where((appt) {
+      final dt = _start(appt);
+      return dt != null &&
+          !dt.isBefore(start) &&
+          dt.isBefore(end) &&
+          appt['status'] != 'cancelled';
+    }).length;
+  }
+
+  double _valueForDay(DateTime day) {
+    final start = _dateOnly(day);
+    final end = start.add(const Duration(days: 1));
+    return appointments
+        .where((appt) {
+          final dt = _start(appt);
+          return dt != null &&
+              !dt.isBefore(start) &&
+              dt.isBefore(end) &&
+              appt['status'] != 'cancelled';
+        })
+        .fold<double>(0, (sum, appt) => sum + _price(appt));
+  }
+}
+
+class _CalendarDayChip extends StatelessWidget {
+  final DateTime date;
+  final bool selected;
+  final int count;
+  final double value;
+  final VoidCallback onTap;
+
+  const _CalendarDayChip({
+    required this.date,
+    required this.selected,
+    required this.count,
+    required this.value,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: AppMotion.standard,
+        curve: AppMotion.curve,
+        width: 68,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.slateLight
+              : AppColors.t1.withValues(alpha: 0.045),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(
+            color: selected
+                ? AppColors.borderStrong
+                : AppColors.t1.withValues(alpha: 0.06),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              days[date.weekday - 1],
+              style: TextStyle(
+                color: selected ? AppColors.panelInk : AppColors.t3,
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              '${date.day}',
+              style: TextStyle(
+                color: selected ? AppColors.panelInk : AppColors.t1,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                height: 1,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              count == 0 ? 'clear' : '$count · £${value.toStringAsFixed(0)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: selected ? AppColors.panelInk : AppColors.t3,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DayPlanHeader extends StatelessWidget {
+  final DateTime date;
+  final List<Map<String, dynamic>> appointments;
+
+  const _DayPlanHeader({required this.date, required this.appointments});
+
+  @override
+  Widget build(BuildContext context) {
+    final value = appointments.fold<double>(
+      0,
+      (sum, appt) => sum + _price(appt),
+    );
+    final scheduled = appointments
+        .where((appt) => appt['status'] == 'scheduled')
+        .length;
+    final completed = appointments
+        .where((appt) => appt['status'] == 'completed')
+        .length;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _friendlyDate(date),
+                style: const TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                appointments.isEmpty
+                    ? 'No scheduled work'
+                    : '$scheduled to go, $completed done',
+                style: const TextStyle(color: AppColors.t3, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        if (appointments.isNotEmpty)
+          _AppointmentPill(
+            label: '£${value.toStringAsFixed(0)}',
+            icon: LucideIcons.banknote,
+            color: AppColors.slate,
+          ),
+      ],
+    );
   }
 }
 
@@ -430,4 +683,35 @@ class _AppointmentPill extends StatelessWidget {
       ),
     );
   }
+}
+
+String _friendlyDate(DateTime date) {
+  final today = _dateOnly(DateTime.now());
+  final day = _dateOnly(date);
+  if (day == today) return 'Today';
+  if (day == today.add(const Duration(days: 1))) return 'Tomorrow';
+  const weekdays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
 }
