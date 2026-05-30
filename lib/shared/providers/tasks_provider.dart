@@ -18,3 +18,8 @@ final allTasksProvider = FutureProvider<List<SlateTask>>((ref) async {
 
   return ref.watch(tasksRepositoryProvider).list(workspaceId);
 });
+
+final taskChecklistProvider =
+    FutureProvider.family<List<TaskChecklistItem>, String>((ref, taskId) {
+      return ref.watch(tasksRepositoryProvider).checklistItems(taskId);
+    });

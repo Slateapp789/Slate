@@ -7,6 +7,7 @@ import '../../../shared/providers/notifications_provider.dart';
 import '../../../shared/providers/tasks_provider.dart';
 import '../../../shared/providers/workspace_provider.dart';
 import '../../../shared/repositories/slate_repositories.dart';
+import '../../../shared/widgets/slate_ui.dart';
 import '../providers/client_detail_providers.dart';
 
 class ClientTasksTab extends ConsumerStatefulWidget {
@@ -315,6 +316,62 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
     );
   }
 
+  void _showTaskActions(SlateTask task) {
+    final isDone = task.status == 'done';
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (ctx) => SlateSheetFrame(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              task.title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: isDone ? AppColors.t3 : AppColors.t1,
+                decoration: isDone ? TextDecoration.lineThrough : null,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              task.dueDate == null ? 'No due date' : _formatDue(task.dueDate!),
+              style: const TextStyle(fontSize: 13, color: AppColors.t3),
+            ),
+            const SizedBox(height: 20),
+            SlateButton(
+              label: isDone ? 'Reopen Task' : 'Mark Complete',
+              icon: isDone ? LucideIcons.rotateCcw : LucideIcons.checkCircle,
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await ref
+                    .read(tasksRepositoryProvider)
+                    .updateStatus(task.id, isDone ? 'open' : 'done');
+                ref.invalidate(clientTasksProvider(widget.clientId));
+                ref.invalidate(allTasksProvider);
+                ref.invalidate(tasksProvider);
+              },
+            ),
+            const SizedBox(height: 10),
+            SlateButton(
+              label: 'Delete Task',
+              destructive: true,
+              onPressed: () {
+                Navigator.pop(ctx);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) _confirmDeleteTask(task);
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tasks = ref.watch(clientTasksProvider(widget.clientId));
@@ -387,15 +444,7 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                         : AppColors.t3;
 
                     return GestureDetector(
-                      onTap: () async {
-                        final newStatus = isDone ? 'open' : 'done';
-                        await ref
-                            .read(tasksRepositoryProvider)
-                            .updateStatus(task.id, newStatus);
-                        ref.invalidate(clientTasksProvider(widget.clientId));
-                        ref.invalidate(allTasksProvider);
-                        ref.invalidate(tasksProvider);
-                      },
+                      onTap: () => _showTaskActions(task),
                       onLongPress: () => _confirmDeleteTask(task),
                       child: Container(
                         padding: const EdgeInsets.all(14),

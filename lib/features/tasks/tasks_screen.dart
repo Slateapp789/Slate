@@ -48,6 +48,47 @@ class _TaskCounts {
   int get total => open + done;
 }
 
+class _TaskTemplate {
+  final String label;
+  final String title;
+  final String priority;
+  final int? dueInDays;
+
+  const _TaskTemplate({
+    required this.label,
+    required this.title,
+    required this.priority,
+    this.dueInDays,
+  });
+}
+
+const _taskTemplates = [
+  _TaskTemplate(
+    label: 'Follow up',
+    title: 'Follow up with client',
+    priority: 'medium',
+    dueInDays: 1,
+  ),
+  _TaskTemplate(
+    label: 'Chase payment',
+    title: 'Chase outstanding payment',
+    priority: 'high',
+    dueInDays: 0,
+  ),
+  _TaskTemplate(
+    label: 'Prep job',
+    title: 'Prep for appointment',
+    priority: 'medium',
+    dueInDays: 0,
+  ),
+  _TaskTemplate(
+    label: 'Book again',
+    title: 'Ask client to book again',
+    priority: 'low',
+    dueInDays: 7,
+  ),
+];
+
 class TasksScreen extends ConsumerStatefulWidget {
   const TasksScreen({super.key});
 
@@ -290,96 +331,142 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   void _showTaskDetails(SlateTask task) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => SlateSheetFrame(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    task.title,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: task.status == 'done'
-                          ? AppColors.t3
-                          : AppColors.t1,
-                      decoration: task.status == 'done'
-                          ? TextDecoration.lineThrough
-                          : null,
+      builder: (ctx) => Consumer(
+        builder: (context, ref, _) {
+          final checklist = ref.watch(taskChecklistProvider(task.id));
+
+          return SlateSheetFrame(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.lg,
+              MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xl,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.78,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            task.title,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: task.status == 'done'
+                                  ? AppColors.t3
+                                  : AppColors.t1,
+                              decoration: task.status == 'done'
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        _PriorityBadge(priority: task.priority),
+                      ],
                     ),
-                  ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _TaskDetailChip(
+                          icon: LucideIcons.circleDot,
+                          label: task.status == 'done' ? 'Done' : 'Open',
+                        ),
+                        if (task.dueDate != null)
+                          _TaskDetailChip(
+                            icon: LucideIcons.calendar,
+                            label: _formatDue(task.dueDate!),
+                          ),
+                        if (task.clientName != null)
+                          _TaskDetailChip(
+                            icon: LucideIcons.user,
+                            label: task.clientName!,
+                          ),
+                        _TaskDetailChip(
+                          icon: LucideIcons.bell,
+                          label: _reminderLabel(task.reminderTiming),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    _TaskContextPanel(task: task),
+                    const SizedBox(height: 18),
+                    _TaskChecklistPanel(
+                      items: checklist,
+                      onAdd: () => _showChecklistEditor(task),
+                      onToggle: (item) => _toggleChecklistItem(task, item),
+                      onEdit: (item) => _showChecklistEditor(task, item: item),
+                      onDelete: (item) => _deleteChecklistItem(task, item),
+                    ),
+                    const SizedBox(height: 22),
+                    SlateButton(
+                      label: task.status == 'done'
+                          ? 'Reopen Task'
+                          : 'Mark Complete',
+                      icon: task.status == 'done'
+                          ? LucideIcons.rotateCcw
+                          : LucideIcons.checkCircle,
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        if (task.status == 'done') {
+                          _reopenTask(task);
+                        } else {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) _confirmComplete(task);
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SlateButton(
+                            label: 'Edit',
+                            icon: LucideIcons.pencil,
+                            secondary: true,
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) {
+                                  _showTaskEditor(context, task: task);
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: SlateButton(
+                            label: 'Delete',
+                            destructive: true,
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) _confirmDelete(task);
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                _PriorityBadge(priority: task.priority),
-              ],
+              ),
             ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _TaskDetailChip(
-                  icon: LucideIcons.circleDot,
-                  label: task.status == 'done' ? 'Done' : 'Open',
-                ),
-                if (task.dueDate != null)
-                  _TaskDetailChip(
-                    icon: LucideIcons.calendar,
-                    label: _formatDue(task.dueDate!),
-                  ),
-                if (task.clientName != null)
-                  _TaskDetailChip(
-                    icon: LucideIcons.user,
-                    label: task.clientName!,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 22),
-            SlateButton(
-              label: task.status == 'done' ? 'Reopen Task' : 'Mark Complete',
-              icon: task.status == 'done'
-                  ? LucideIcons.rotateCcw
-                  : LucideIcons.checkCircle,
-              onPressed: () {
-                Navigator.pop(ctx);
-                if (task.status == 'done') {
-                  _reopenTask(task);
-                } else {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) _confirmComplete(task);
-                  });
-                }
-              },
-            ),
-            const SizedBox(height: 10),
-            SlateButton(
-              label: 'Edit Task',
-              icon: LucideIcons.pencil,
-              secondary: true,
-              onPressed: () {
-                Navigator.pop(ctx);
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) _showTaskEditor(context, task: task);
-                });
-              },
-            ),
-            const SizedBox(height: 10),
-            SlateButton(
-              label: 'Delete Task',
-              destructive: true,
-              onPressed: () {
-                Navigator.pop(ctx);
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) _confirmDelete(task);
-                });
-              },
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -389,6 +476,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     String priority = task?.priority ?? 'medium';
     DateTime? dueDate = task?.dueDate;
     String? selectedClientId = task?.contactId;
+    String reminderTiming = task?.reminderTiming ?? 'none';
     var saving = false;
 
     showModalBottomSheet(
@@ -431,6 +519,29 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
+                if (task == null) ...[
+                  _TaskTemplatePicker(
+                    onSelect: (template) {
+                      setModal(() {
+                        if (titleController.text.trim().isEmpty) {
+                          titleController.text = template.title;
+                        }
+                        priority = template.priority;
+                        if (template.dueInDays != null) {
+                          dueDate = _dateOnly(
+                            DateTime.now().add(
+                              Duration(days: template.dueInDays!),
+                            ),
+                          );
+                          reminderTiming = template.dueInDays == 0
+                              ? 'today'
+                              : 'day_before';
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 clients.when(
                   loading: () => const SizedBox.shrink(),
                   error: (_, __) => const SizedBox.shrink(),
@@ -483,6 +594,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   dueDate: dueDate,
                   onChanged: (value) => setModal(() => dueDate = value),
                 ),
+                const SizedBox(height: 16),
+                _ReminderPicker(
+                  value: reminderTiming,
+                  enabled: dueDate != null,
+                  onChanged: (value) => setModal(() => reminderTiming = value),
+                ),
                 const SizedBox(height: 22),
                 SlateButton(
                   label: saving
@@ -502,6 +619,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                             priority: priority,
                             dueDate: dueDate,
                             clientId: selectedClientId,
+                            reminderTiming: reminderTiming,
                           );
                           if (!saved && ctx.mounted) {
                             setModal(() => saving = false);
@@ -523,6 +641,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     required String priority,
     required DateTime? dueDate,
     required String? clientId,
+    required String reminderTiming,
   }) async {
     if (title.trim().isEmpty) return false;
     final workspaceId = await ref.read(workspaceIdProvider.future);
@@ -537,6 +656,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             priority: priority,
             dueDate: dueDate,
             contactId: clientId,
+            reminderTiming: dueDate == null ? 'none' : reminderTiming,
           );
     } else {
       await ref
@@ -547,9 +667,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             priority: priority,
             dueDate: dueDate,
             contactId: clientId,
+            reminderTiming: dueDate == null ? 'none' : reminderTiming,
           );
     }
-    await _maybeCreateDueNotification(workspaceId, title, dueDate);
+    await _maybeCreateDueNotification(
+      workspaceId,
+      title,
+      dueDate,
+      dueDate == null ? 'none' : reminderTiming,
+    );
     if (ctx.mounted) Navigator.pop(ctx);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -563,12 +689,23 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     String workspaceId,
     String title,
     DateTime? dueDate,
+    String reminderTiming,
   ) async {
-    if (dueDate == null) return;
+    if (dueDate == null || reminderTiming == 'none') return;
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
     final dueDateOnly = DateTime(dueDate.year, dueDate.month, dueDate.day);
-    if (!dueDateOnly.isAfter(todayDate.add(const Duration(days: 1)))) {
+    final shouldCreateNow = switch (reminderTiming) {
+      'today' => dueDateOnly == todayDate,
+      'day_before' => !dueDateOnly.isAfter(
+        todayDate.add(const Duration(days: 1)),
+      ),
+      'week_before' => !dueDateOnly.isAfter(
+        todayDate.add(const Duration(days: 7)),
+      ),
+      _ => false,
+    };
+    if (shouldCreateNow) {
       await ref
           .read(notificationsRepositoryProvider)
           .create(
@@ -579,6 +716,110 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             deepLink: '/tasks',
           );
     }
+  }
+
+  void _showChecklistEditor(SlateTask task, {TaskChecklistItem? item}) {
+    final controller = TextEditingController(text: item?.title ?? '');
+    var saving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) {
+          return SlateSheetFrame(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.lg,
+              MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xl,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item == null ? 'Add checklist item' : 'Edit checklist item',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.t1,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  style: const TextStyle(color: AppColors.t1),
+                  decoration: const InputDecoration(
+                    hintText: 'What needs checking off?',
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SlateButton(
+                  label: saving
+                      ? 'Saving...'
+                      : item == null
+                      ? 'Add Item'
+                      : 'Save Item',
+                  icon: item == null ? LucideIcons.plus : LucideIcons.check,
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          final title = controller.text.trim();
+                          if (title.isEmpty) return;
+                          setModal(() => saving = true);
+                          if (item == null) {
+                            final existing = await ref.read(
+                              taskChecklistProvider(task.id).future,
+                            );
+                            await ref
+                                .read(tasksRepositoryProvider)
+                                .addChecklistItem(
+                                  workspaceId: task.workspaceId,
+                                  taskId: task.id,
+                                  title: title,
+                                  position: existing.length,
+                                );
+                          } else {
+                            await ref
+                                .read(tasksRepositoryProvider)
+                                .updateChecklistItem(
+                                  itemId: item.id,
+                                  title: title,
+                                );
+                          }
+                          ref.invalidate(taskChecklistProvider(task.id));
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    ).whenComplete(controller.dispose);
+  }
+
+  Future<void> _toggleChecklistItem(
+    SlateTask task,
+    TaskChecklistItem item,
+  ) async {
+    await ref
+        .read(tasksRepositoryProvider)
+        .updateChecklistItemStatus(itemId: item.id, completed: !item.completed);
+    ref.invalidate(taskChecklistProvider(task.id));
+  }
+
+  Future<void> _deleteChecklistItem(
+    SlateTask task,
+    TaskChecklistItem item,
+  ) async {
+    await ref.read(tasksRepositoryProvider).deleteChecklistItem(item.id);
+    ref.invalidate(taskChecklistProvider(task.id));
   }
 
   void _confirmComplete(SlateTask task) {
@@ -804,6 +1045,303 @@ class _TaskSectionView extends StatelessWidget {
   }
 }
 
+class _TaskContextPanel extends StatelessWidget {
+  final SlateTask task;
+
+  const _TaskContextPanel({required this.task});
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateSurface(
+      color: AppColors.t1.withValues(alpha: 0.035),
+      borderColor: AppColors.t1.withValues(alpha: 0.05),
+      radius: AppRadius.lg,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        children: [
+          _TaskContextRow(
+            icon: LucideIcons.calendarClock,
+            label: 'Timing',
+            value: task.dueDate == null
+                ? 'No due date'
+                : _formatDue(task.dueDate!),
+          ),
+          const SizedBox(height: 12),
+          _TaskContextRow(
+            icon: LucideIcons.user,
+            label: 'Client',
+            value: task.clientName ?? 'Not linked',
+          ),
+          const SizedBox(height: 12),
+          _TaskContextRow(
+            icon: LucideIcons.bell,
+            label: 'Reminder',
+            value: _reminderLabel(task.reminderTiming),
+          ),
+          if (task.updatedAt != null || task.createdAt != null) ...[
+            const SizedBox(height: 12),
+            _TaskContextRow(
+              icon: LucideIcons.history,
+              label: task.updatedAt != null ? 'Updated' : 'Created',
+              value: _formatDate(task.updatedAt ?? task.createdAt!),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TaskContextRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _TaskContextRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: AppColors.t3),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppColors.t3,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const Spacer(),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.t2,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TaskChecklistPanel extends StatelessWidget {
+  final AsyncValue<List<TaskChecklistItem>> items;
+  final VoidCallback onAdd;
+  final ValueChanged<TaskChecklistItem> onToggle;
+  final ValueChanged<TaskChecklistItem> onEdit;
+  final ValueChanged<TaskChecklistItem> onDelete;
+
+  const _TaskChecklistPanel({
+    required this.items,
+    required this.onAdd,
+    required this.onToggle,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateSurface(
+      color: AppColors.bgRaised.withValues(alpha: 0.52),
+      borderColor: AppColors.t1.withValues(alpha: 0.06),
+      radius: AppRadius.lg,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(LucideIcons.listChecks, size: 16, color: AppColors.t3),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Checklist',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.t1,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: onAdd,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.slateLight,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                  child: const Text(
+                    'Add',
+                    style: TextStyle(
+                      color: AppColors.panelInk,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          items.when(
+            loading: () =>
+                const SlateLoadingBlock(height: 48, radius: AppRadius.md),
+            error: (_, __) => const Text(
+              'Checklist could not load',
+              style: TextStyle(color: AppColors.error, fontSize: 12),
+            ),
+            data: (data) {
+              if (data.isEmpty) {
+                return const Text(
+                  'Break this task into smaller steps.',
+                  style: TextStyle(color: AppColors.t3, fontSize: 13),
+                );
+              }
+              return Column(
+                children: data
+                    .map(
+                      (item) => _ChecklistRow(
+                        item: item,
+                        onToggle: () => onToggle(item),
+                        onEdit: () => onEdit(item),
+                        onDelete: () => onDelete(item),
+                      ),
+                    )
+                    .toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChecklistRow extends StatelessWidget {
+  final TaskChecklistItem item;
+  final VoidCallback onToggle;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _ChecklistRow({
+    required this.item,
+    required this.onToggle,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: onToggle,
+            child: AnimatedContainer(
+              duration: AppMotion.standard,
+              curve: AppMotion.curve,
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: item.completed ? AppColors.green : Colors.transparent,
+                border: Border.all(
+                  color: item.completed ? AppColors.green : AppColors.border,
+                  width: 2,
+                ),
+              ),
+              child: item.completed
+                  ? const Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 13,
+                    )
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: GestureDetector(
+              onTap: onEdit,
+              child: Text(
+                item.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: item.completed ? AppColors.t3 : AppColors.t1,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  decoration: item.completed
+                      ? TextDecoration.lineThrough
+                      : null,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: onDelete,
+            icon: const Icon(LucideIcons.x, size: 15, color: AppColors.t3),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TaskTemplatePicker extends StatelessWidget {
+  final ValueChanged<_TaskTemplate> onSelect;
+
+  const _TaskTemplatePicker({required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Start with',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: AppColors.t3,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _taskTemplates
+              .map(
+                (template) => _DateChoice(
+                  label: template.label,
+                  onTap: () => onSelect(template),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+}
+
 class _ClientPicker extends StatelessWidget {
   final List<dynamic> clients;
   final String? selectedClientId;
@@ -977,6 +1515,94 @@ class _DueDatePicker extends StatelessWidget {
   }
 }
 
+class _ReminderPicker extends StatelessWidget {
+  final String value;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  const _ReminderPicker({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const options = [
+      ('none', 'No reminder'),
+      ('today', 'On due day'),
+      ('day_before', 'Day before'),
+      ('week_before', 'Week before'),
+    ];
+
+    return AnimatedOpacity(
+      opacity: enabled ? 1 : 0.45,
+      duration: AppMotion.fast,
+      child: IgnorePointer(
+        ignoring: !enabled,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Reminder',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.t3,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: options.map((option) {
+                final active = value == option.$1;
+                return GestureDetector(
+                  onTap: () => onChanged(option.$1),
+                  child: AnimatedContainer(
+                    duration: AppMotion.standard,
+                    curve: AppMotion.curve,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? AppColors.slateLight
+                          : AppColors.t1.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      border: Border.all(
+                        color: active
+                            ? AppColors.borderStrong
+                            : Colors.transparent,
+                      ),
+                    ),
+                    child: Text(
+                      option.$2,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: active ? AppColors.panelInk : AppColors.t2,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            if (!enabled) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Choose a due date before adding a reminder.',
+                style: TextStyle(fontSize: 12, color: AppColors.t3),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DateChoice extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
@@ -1143,6 +1769,15 @@ String _priorityLabel(String priority) {
     'high' => 'High',
     'medium' => 'Medium',
     _ => 'Low',
+  };
+}
+
+String _reminderLabel(String reminderTiming) {
+  return switch (reminderTiming) {
+    'today' => 'On due day',
+    'day_before' => 'Day before',
+    'week_before' => 'Week before',
+    _ => 'No reminder',
   };
 }
 

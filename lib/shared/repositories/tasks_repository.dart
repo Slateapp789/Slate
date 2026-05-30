@@ -59,6 +59,7 @@ class TasksRepository {
     required String workspaceId,
     required String title,
     required String priority,
+    String reminderTiming = 'none',
     DateTime? dueDate,
     String? contactId,
   }) async {
@@ -66,6 +67,7 @@ class TasksRepository {
       'workspace_id': workspaceId,
       'title': title.trim(),
       'priority': priority,
+      'reminder_timing': reminderTiming,
       'due_date': dueDate?.toIso8601String().split('T').first,
       'status': 'open',
       'contact_id': contactId,
@@ -73,13 +75,20 @@ class TasksRepository {
   }
 
   Future<void> updateStatus(String taskId, String status) async {
-    await _client.from('tasks').update({'status': status}).eq('id', taskId);
+    await _client
+        .from('tasks')
+        .update({
+          'status': status,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', taskId);
   }
 
   Future<void> update({
     required String taskId,
     required String title,
     required String priority,
+    String reminderTiming = 'none',
     DateTime? dueDate,
     String? contactId,
   }) async {
@@ -88,13 +97,73 @@ class TasksRepository {
         .update({
           'title': title.trim(),
           'priority': priority,
+          'reminder_timing': reminderTiming,
           'due_date': dueDate?.toIso8601String().split('T').first,
           'contact_id': contactId,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', taskId);
   }
 
   Future<void> delete(String taskId) async {
     await _client.from('tasks').delete().eq('id', taskId);
+  }
+
+  Future<List<TaskChecklistItem>> checklistItems(String taskId) async {
+    final rows = await _client
+        .from('task_checklist_items')
+        .select()
+        .eq('task_id', taskId)
+        .order('position', ascending: true)
+        .order('created_at', ascending: true);
+    return rows
+        .map<TaskChecklistItem>(
+          (row) => TaskChecklistItem.fromMap(Map<String, dynamic>.from(row)),
+        )
+        .toList();
+  }
+
+  Future<void> addChecklistItem({
+    required String workspaceId,
+    required String taskId,
+    required String title,
+    required int position,
+  }) async {
+    await _client.from('task_checklist_items').insert({
+      'workspace_id': workspaceId,
+      'task_id': taskId,
+      'title': title.trim(),
+      'position': position,
+    });
+  }
+
+  Future<void> updateChecklistItem({
+    required String itemId,
+    required String title,
+  }) async {
+    await _client
+        .from('task_checklist_items')
+        .update({
+          'title': title.trim(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', itemId);
+  }
+
+  Future<void> updateChecklistItemStatus({
+    required String itemId,
+    required bool completed,
+  }) async {
+    await _client
+        .from('task_checklist_items')
+        .update({
+          'completed': completed,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', itemId);
+  }
+
+  Future<void> deleteChecklistItem(String itemId) async {
+    await _client.from('task_checklist_items').delete().eq('id', itemId);
   }
 }

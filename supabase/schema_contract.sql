@@ -10,7 +10,7 @@
 -- services(id, workspace_id, name, duration_mins, price, description, show_on_profile, created_at)
 -- appointments(id, workspace_id, contact_id, service_id, title, start_time, end_time, price, status, notes, created_at)
 -- invoices(id, workspace_id, contact_id, invoice_number, type, status, issue_date, due_date, subtotal, tax_rate, tax_amount, discount_value, total, amount_paid, notes, created_at)
--- tasks(id, workspace_id, contact_id, title, priority, due_date, status, created_at)
+-- tasks(id, workspace_id, contact_id, title, priority, due_date, status, reminder_timing, created_at, updated_at)
 -- business_profiles(id, workspace_id, handle, created_at)
 
 -- V1 extension fields.
@@ -40,6 +40,26 @@ alter table if exists workspace_settings
   add column if not exists min_booking_notice_hours integer not null default 2,
   add column if not exists max_booking_window_weeks integer not null default 12,
   add column if not exists calendar_sync_enabled boolean not null default false;
+
+alter table if exists tasks
+  add column if not exists reminder_timing text not null default 'none',
+  add column if not exists updated_at timestamptz not null default now();
+
+create table if not exists task_checklist_items (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  task_id uuid not null references tasks(id) on delete cascade,
+  title text not null,
+  completed boolean not null default false,
+  position integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists task_checklist_items_workspace_id_idx
+  on task_checklist_items(workspace_id);
+create index if not exists task_checklist_items_task_id_position_idx
+  on task_checklist_items(task_id, position);
 
 create table if not exists booking_requests (
   id uuid primary key default gen_random_uuid(),

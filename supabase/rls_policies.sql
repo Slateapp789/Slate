@@ -29,6 +29,7 @@ alter table if exists appointments enable row level security;
 alter table if exists invoices enable row level security;
 alter table if exists invoice_line_items enable row level security;
 alter table if exists tasks enable row level security;
+alter table if exists task_checklist_items enable row level security;
 alter table if exists business_profiles enable row level security;
 alter table if exists booking_requests enable row level security;
 alter table if exists notifications enable row level security;
@@ -129,6 +130,12 @@ with check (public.is_workspace_member(workspace_id));
 drop policy if exists "Members can manage tasks" on tasks;
 create policy "Members can manage tasks"
 on tasks for all
+using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+drop policy if exists "Members can manage task checklist items" on task_checklist_items;
+create policy "Members can manage task checklist items"
+on task_checklist_items for all
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 

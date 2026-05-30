@@ -87,14 +87,34 @@ void main() {
         'title': 'Follow up about package',
         'status': 'open',
         'priority': 'high',
+        'reminder_timing': 'day_before',
         'due_date': '2026-06-02',
+        'created_at': '2026-05-30T09:00:00Z',
         'contact_id': 'client-1',
         'contacts': {'name': 'Maya'},
       });
 
       expect(task.clientName, 'Maya');
+      expect(task.reminderTiming, 'day_before');
       expect(task.dueDate, DateTime(2026, 6, 2));
       expect(task.toMap()['due_date'], '2026-06-02');
+      expect(task.toMap()['reminder_timing'], 'day_before');
+    });
+
+    test('TaskChecklistItem preserves task step state', () {
+      final item = TaskChecklistItem.fromMap({
+        'id': 'item-1',
+        'workspace_id': 'workspace-1',
+        'task_id': 'task-1',
+        'title': 'Send reminder text',
+        'completed': true,
+        'position': 2,
+      });
+
+      expect(item.taskId, 'task-1');
+      expect(item.completed, isTrue);
+      expect(item.position, 2);
+      expect(item.toMap()['title'], 'Send reminder text');
     });
 
     test('Service preserves public profile visibility fields', () {

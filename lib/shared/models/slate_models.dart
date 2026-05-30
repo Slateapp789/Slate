@@ -290,7 +290,10 @@ class SlateTask {
   final String title;
   final String status;
   final String priority;
+  final String reminderTiming;
   final DateTime? dueDate;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
   final String? contactId;
   final String? clientName;
 
@@ -300,7 +303,10 @@ class SlateTask {
     required this.title,
     this.status = 'open',
     this.priority = 'medium',
+    this.reminderTiming = 'none',
     this.dueDate,
+    this.createdAt,
+    this.updatedAt,
     this.contactId,
     this.clientName,
   });
@@ -313,7 +319,10 @@ class SlateTask {
       title: map['title'] as String? ?? '',
       status: map['status'] as String? ?? 'open',
       priority: map['priority'] as String? ?? 'medium',
+      reminderTiming: map['reminder_timing'] as String? ?? 'none',
       dueDate: _dateTimeFrom(map['due_date']),
+      createdAt: _dateTimeFrom(map['created_at']),
+      updatedAt: _dateTimeFrom(map['updated_at']),
       contactId: map['contact_id'] as String?,
       clientName: contact?['name'] as String?,
     );
@@ -325,9 +334,58 @@ class SlateTask {
     'title': title,
     'status': status,
     'priority': priority,
+    'reminder_timing': reminderTiming,
     if (dueDate != null)
       'due_date': dueDate!.toIso8601String().split('T').first,
+    if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+    if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     'contact_id': contactId,
+  };
+}
+
+class TaskChecklistItem {
+  final String id;
+  final String workspaceId;
+  final String taskId;
+  final String title;
+  final bool completed;
+  final int position;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  const TaskChecklistItem({
+    required this.id,
+    required this.workspaceId,
+    required this.taskId,
+    required this.title,
+    this.completed = false,
+    this.position = 0,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory TaskChecklistItem.fromMap(Map<String, dynamic> map) {
+    return TaskChecklistItem(
+      id: map['id'] as String,
+      workspaceId: map['workspace_id'] as String? ?? '',
+      taskId: map['task_id'] as String? ?? '',
+      title: map['title'] as String? ?? '',
+      completed: map['completed'] as bool? ?? false,
+      position: _intFrom(map['position']),
+      createdAt: _dateTimeFrom(map['created_at']),
+      updatedAt: _dateTimeFrom(map['updated_at']),
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'workspace_id': workspaceId,
+    'task_id': taskId,
+    'title': title,
+    'completed': completed,
+    'position': position,
+    if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+    if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
   };
 }
 
