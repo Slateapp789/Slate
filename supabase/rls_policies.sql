@@ -23,6 +23,7 @@ alter table if exists contacts enable row level security;
 alter table if exists services enable row level security;
 alter table if exists appointments enable row level security;
 alter table if exists invoices enable row level security;
+alter table if exists invoice_line_items enable row level security;
 alter table if exists tasks enable row level security;
 alter table if exists business_profiles enable row level security;
 alter table if exists booking_requests enable row level security;
@@ -43,10 +44,32 @@ on workspaces for update
 using (public.is_workspace_member(id))
 with check (public.is_workspace_member(id));
 
+drop policy if exists "Authenticated users can create workspaces" on workspaces;
+create policy "Authenticated users can create workspaces"
+on workspaces for insert
+to authenticated
+with check (true);
+
 drop policy if exists "Members can read workspace members" on workspace_members;
 create policy "Members can read workspace members"
 on workspace_members for select
 using (public.is_workspace_member(workspace_id));
+
+drop policy if exists "Users can create their first workspace membership" on workspace_members;
+create policy "Users can create their first workspace membership"
+on workspace_members for insert
+to authenticated
+with check (
+  user_id = auth.uid()
+  and (
+    public.is_workspace_member(workspace_id)
+    or not exists (
+      select 1
+      from workspace_members existing_members
+      where existing_members.workspace_id = workspace_members.workspace_id
+    )
+  )
+);
 
 drop policy if exists "Members can manage workspace settings" on workspace_settings;
 create policy "Members can manage workspace settings"
@@ -88,6 +111,12 @@ with check (public.is_workspace_member(workspace_id));
 drop policy if exists "Members can manage invoices" on invoices;
 create policy "Members can manage invoices"
 on invoices for all
+using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+drop policy if exists "Members can manage invoice line items" on invoice_line_items;
+create policy "Members can manage invoice line items"
+on invoice_line_items for all
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
