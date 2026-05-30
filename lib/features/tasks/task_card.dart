@@ -1,193 +1,259 @@
 part of 'tasks_screen.dart';
 
-class _TaskCard extends StatefulWidget {
+class _TaskCard extends StatelessWidget {
   final SlateTask task;
-  final VoidCallback onToggle;
+  final VoidCallback onOpen;
+  final VoidCallback onCompleteRequest;
+  final VoidCallback onReopen;
   final VoidCallback onDelete;
 
   const _TaskCard({
     required this.task,
-    required this.onToggle,
+    required this.onOpen,
+    required this.onCompleteRequest,
+    required this.onReopen,
     required this.onDelete,
   });
 
   @override
-  State<_TaskCard> createState() => _TaskCardState();
-}
-
-class _TaskCardState extends State<_TaskCard> {
-  bool _toggling = false;
-
-  @override
   Widget build(BuildContext context) {
-    final task = widget.task;
     final isDone = task.status == 'done';
-    final priority = task.priority;
-    final dueDate = task.dueDate;
-    final clientName = task.clientName;
+    final priorityColor = _priorityColor(task.priority);
 
-    final priorityColor = priority == 'high'
-        ? AppColors.error
-        : priority == 'medium'
-        ? AppColors.warning
-        : AppColors.t3;
-
-    return GestureDetector(
-      onLongPress: widget.onDelete,
-      child: AnimatedScale(
-        scale: _toggling ? 0.985 : 1,
-        duration: AppMotion.fast,
-        curve: AppMotion.curve,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          onTap: _toggling
-              ? null
-              : () async {
-                  setState(() => _toggling = true);
-                  await Future.delayed(const Duration(milliseconds: 80));
-                  widget.onToggle();
-                  if (mounted) setState(() => _toggling = false);
-                },
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: AppColors.t1.withValues(alpha: 0.06)),
-              ),
+    return Dismissible(
+      key: ValueKey(task.id),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          if (isDone) {
+            onReopen();
+          } else {
+            onCompleteRequest();
+          }
+        } else {
+          onDelete();
+        }
+        return false;
+      },
+      background: _SwipeBackground(
+        alignment: Alignment.centerLeft,
+        icon: isDone ? LucideIcons.rotateCcw : LucideIcons.checkCircle,
+        label: isDone ? 'Reopen' : 'Complete',
+        color: AppColors.green,
+      ),
+      secondaryBackground: const _SwipeBackground(
+        alignment: Alignment.centerRight,
+        icon: LucideIcons.trash2,
+        label: 'Delete',
+        color: AppColors.error,
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: onOpen,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: AppColors.t1.withValues(alpha: 0.06)),
             ),
-            child: Row(
-              children: [
-                AnimatedContainer(
-                  duration: AppMotion.standard,
-                  curve: AppMotion.curve,
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isDone ? AppColors.green : Colors.transparent,
-                    border: Border.all(
-                      color: isDone ? AppColors.green : AppColors.border,
-                      width: 2,
-                    ),
-                  ),
-                  child: isDone
-                      ? const Icon(
-                          Icons.check_rounded,
-                          color: Colors.white,
-                          size: 13,
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        task.title,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: isDone ? AppColors.t3 : AppColors.t1,
-                          decoration: isDone
-                              ? TextDecoration.lineThrough
-                              : null,
-                        ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: isDone ? onReopen : onCompleteRequest,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2, right: 12, bottom: 18),
+                  child: AnimatedContainer(
+                    duration: AppMotion.standard,
+                    curve: AppMotion.curve,
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDone ? AppColors.green : Colors.transparent,
+                      border: Border.all(
+                        color: isDone ? AppColors.green : AppColors.border,
+                        width: 2,
                       ),
-                      if (clientName != null || dueDate != null) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            if (clientName != null) ...[
-                              const Icon(
-                                LucideIcons.user,
-                                size: 11,
-                                color: AppColors.t3,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                clientName,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.t3,
-                                ),
-                              ),
-                              if (dueDate != null)
-                                const Text(
-                                  '  ·  ',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.t3,
-                                  ),
-                                ),
-                            ],
-                            if (dueDate != null)
-                              Text(
-                                _formatDue(dueDate),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: _isOverdue(dueDate) && !isDone
-                                      ? AppColors.error
-                                      : _isDueToday(dueDate) && !isDone
-                                      ? AppColors.warning
-                                      : AppColors.t3,
-                                ),
-                              ),
-                          ],
+                    ),
+                    child: isDone
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          )
+                        : null,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            task.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: isDone ? AppColors.t3 : AppColors.t1,
+                              decoration: isDone
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _PriorityDot(
+                          color: isDone ? AppColors.t3 : priorityColor,
                         ),
                       ],
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 7),
+                    Wrap(
+                      spacing: 7,
+                      runSpacing: 7,
+                      children: [
+                        _MetaPill(
+                          icon: LucideIcons.flag,
+                          label: _priorityLabel(task.priority),
+                          color: isDone ? AppColors.t3 : priorityColor,
+                        ),
+                        if (task.dueDate != null)
+                          _MetaPill(
+                            icon: LucideIcons.calendar,
+                            label: _formatDue(task.dueDate!),
+                            color: !isDone && _isOverdue(task.dueDate!)
+                                ? AppColors.error
+                                : !isDone && _isDueToday(task.dueDate!)
+                                ? AppColors.warning
+                                : AppColors.t3,
+                          ),
+                        if (task.clientName != null)
+                          _MetaPill(
+                            icon: LucideIcons.user,
+                            label: task.clientName!,
+                            color: AppColors.t3,
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: isDone ? AppColors.t3 : priorityColor,
-                    shape: BoxShape.circle,
-                  ),
+              ),
+              const SizedBox(width: 10),
+              const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Icon(
+                  LucideIcons.chevronRight,
+                  color: AppColors.t3,
+                  size: 16,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  bool _isDueToday(DateTime dt) {
-    final now = DateTime.now();
-    return dt.year == now.year && dt.month == now.month && dt.day == now.day;
+class _SwipeBackground extends StatelessWidget {
+  final Alignment alignment;
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _SwipeBackground({
+    required this.alignment,
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      color: color.withValues(alpha: 0.1),
+      child: Row(
+        mainAxisAlignment: alignment == Alignment.centerLeft
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.end,
+        children: [
+          Icon(icon, size: 17, color: color),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
   }
+}
 
-  bool _isOverdue(DateTime dt) {
-    final today = DateTime.now();
-    return dt.isBefore(DateTime(today.year, today.month, today.day));
+class _MetaPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _MetaPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
+}
 
-  String _formatDue(DateTime dt) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final d = DateTime(dt.year, dt.month, dt.day);
-    final diff = d.difference(today).inDays;
-    if (diff == 0) return 'Due today';
-    if (diff == 1) return 'Due tomorrow';
-    if (diff == -1) return 'Due yesterday';
-    if (diff < 0) return 'Overdue ${-diff}d';
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${dt.day} ${months[dt.month - 1]}';
+class _PriorityDot extends StatelessWidget {
+  final Color color;
+  const _PriorityDot({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
   }
 }

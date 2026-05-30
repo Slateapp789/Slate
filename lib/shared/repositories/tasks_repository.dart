@@ -76,6 +76,24 @@ class TasksRepository {
     await _client.from('tasks').update({'status': status}).eq('id', taskId);
   }
 
+  Future<void> update({
+    required String taskId,
+    required String title,
+    required String priority,
+    DateTime? dueDate,
+    String? contactId,
+  }) async {
+    await _client
+        .from('tasks')
+        .update({
+          'title': title.trim(),
+          'priority': priority,
+          'due_date': dueDate?.toIso8601String().split('T').first,
+          'contact_id': contactId,
+        })
+        .eq('id', taskId);
+  }
+
   Future<void> delete(String taskId) async {
     await _client.from('tasks').delete().eq('id', taskId);
   }

@@ -9,7 +9,6 @@ import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
-import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../settings/settings_screen.dart';
 import '../appointments/appointment_detail_screen.dart';
@@ -267,16 +266,7 @@ class DashboardScreen extends ConsumerWidget {
                         return _DashboardTaskRow(
                           task: t,
                           isLast: i == open.length - 1,
-                          onToggle: () async {
-                            final newStatus = t.status == 'done'
-                                ? 'open'
-                                : 'done';
-                            await ref
-                                .read(tasksRepositoryProvider)
-                                .updateStatus(t.id, newStatus);
-                            ref.invalidate(allTasksProvider);
-                            ref.invalidate(tasksProvider);
-                          },
+                          onOpen: () => onNavigate(4),
                         );
                       }).toList(),
                     ),
@@ -613,12 +603,12 @@ class _DashboardTimelineRow extends StatelessWidget {
 class _DashboardTaskRow extends StatefulWidget {
   final SlateTask task;
   final bool isLast;
-  final VoidCallback onToggle;
+  final VoidCallback onOpen;
 
   const _DashboardTaskRow({
     required this.task,
     required this.isLast,
-    required this.onToggle,
+    required this.onOpen,
   });
 
   @override
@@ -626,8 +616,6 @@ class _DashboardTaskRow extends StatefulWidget {
 }
 
 class _DashboardTaskRowState extends State<_DashboardTaskRow> {
-  bool _toggling = false;
-
   @override
   Widget build(BuildContext context) {
     final t = widget.task;
@@ -648,14 +636,7 @@ class _DashboardTaskRowState extends State<_DashboardTaskRow> {
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(widget.isLast ? 16 : 0),
-            onTap: _toggling
-                ? null
-                : () async {
-                    setState(() => _toggling = true);
-                    await Future.delayed(const Duration(milliseconds: 80));
-                    widget.onToggle();
-                    if (mounted) setState(() => _toggling = false);
-                  },
+            onTap: widget.onOpen,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
