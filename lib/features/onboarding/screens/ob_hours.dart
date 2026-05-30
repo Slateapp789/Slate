@@ -213,7 +213,7 @@ class _ObHoursState extends ConsumerState<ObHours> {
               fontSize: 32,
               fontWeight: FontWeight.w900,
               color: AppColors.t1,
-              letterSpacing: -1.0,
+              letterSpacing: 0,
             ),
           ),
           const SizedBox(height: 8),

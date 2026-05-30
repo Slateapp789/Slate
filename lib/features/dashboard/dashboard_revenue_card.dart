@@ -89,7 +89,7 @@ class _RevenueCardState extends State<_RevenueCard> {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
+                      letterSpacing: 0,
                       color: AppColors.panelMuted,
                     ),
                   ),
@@ -143,7 +143,7 @@ class _RevenueCardState extends State<_RevenueCard> {
                   fontSize: 52,
                   fontWeight: FontWeight.w900,
                   color: AppColors.panelInk,
-                  letterSpacing: -2.5,
+                  letterSpacing: 0,
                   height: 1,
                 ),
               ),

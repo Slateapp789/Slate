@@ -254,7 +254,7 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
               fontSize: 32,
               fontWeight: FontWeight.w900,
               color: AppColors.t1,
-              letterSpacing: -1.0,
+              letterSpacing: 0,
               height: 1.1,
             ),
           ),
@@ -461,7 +461,7 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
         fontSize: 13,
         fontWeight: FontWeight.w600,
         color: AppColors.t2,
-        letterSpacing: 0.2,
+        letterSpacing: 0,
       ),
     );
   }

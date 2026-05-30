@@ -511,7 +511,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
           style: const TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w700,
-            letterSpacing: 1.2,
+            letterSpacing: 0,
             color: AppColors.t3,
           ),
         ),

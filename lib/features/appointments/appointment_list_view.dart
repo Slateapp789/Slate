@@ -27,52 +27,35 @@ class _AppointmentListView extends StatelessWidget {
   Widget build(BuildContext context) {
     if (appointments.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(emptyIcon, color: AppColors.t3, size: 36),
-            const SizedBox(height: 12),
-            Text(
-              emptyTitle,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.t2,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SlateEmptyState(
+                icon: emptyIcon,
+                title: emptyTitle,
+                subtitle: emptySubtitle,
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              emptySubtitle,
-              style: const TextStyle(fontSize: 13, color: AppColors.t3),
-            ),
-            if (onEmptyAction != null) ...[
-              const SizedBox(height: 20),
-              GestureDetector(
-                onTap: onEmptyAction,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.slateLight.withValues(alpha: 0.82),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.t1.withValues(alpha: 0.14),
-                    ),
-                  ),
-                  child: const Text(
-                    '+ Add Appointment',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.panelInk,
+              if (onEmptyAction != null) ...[
+                const SizedBox(height: AppSpacing.lg),
+                SizedBox(
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: onEmptyAction,
+                    icon: const Icon(LucideIcons.calendarPlus, size: 17),
+                    label: const Text(
+                      'Add Appointment',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       );
     }
@@ -82,7 +65,12 @@ class _AppointmentListView extends StatelessWidget {
         onRefresh: () async => onRefresh(),
         color: AppColors.green,
         child: ListView.separated(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.pageX,
+            0,
+            AppSpacing.pageX,
+            100,
+          ),
           itemCount: appointments.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (_, i) => _AppointmentCard(
@@ -109,7 +97,12 @@ class _AppointmentListView extends StatelessWidget {
       onRefresh: () async => onRefresh(),
       color: AppColors.green,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.pageX,
+          0,
+          AppSpacing.pageX,
+          100,
+        ),
         itemCount: keys.length,
         itemBuilder: (_, i) {
           final key = keys[i];
@@ -124,7 +117,7 @@ class _AppointmentListView extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
+                    letterSpacing: 0,
                     color: AppColors.t3,
                   ),
                 ),
@@ -231,195 +224,182 @@ class _AppointmentCard extends StatelessWidget {
               : _time(startDt)
         : '-';
 
-    return GestureDetector(
+    return SlateSurface(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isScheduled
-                ? AppColors.green.withValues(alpha: 0.3)
-                : AppColors.border,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: isScheduled
-                        ? AppColors.greenDim
-                        : AppColors.bgInteract,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Text(
-                      initials,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: isScheduled ? AppColors.green : AppColors.t3,
-                      ),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      radius: AppRadius.md,
+      borderColor: isScheduled
+          ? AppColors.green.withValues(alpha: 0.26)
+          : AppColors.t1.withValues(alpha: 0.07),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isScheduled
+                      ? AppColors.greenDim
+                      : AppColors.t1.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                child: Center(
+                  child: Text(
+                    initials,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: isScheduled ? AppColors.green : AppColors.t3,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        clientName,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.t1,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        serviceName,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.t3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (price != null)
-                      Text(
-                        '£${(price as num).toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.t1,
-                        ),
+                    Text(
+                      clientName,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.t1,
                       ),
-                    const SizedBox(height: 4),
-                    if (showStatusBadge)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          status.replaceAll('_', ' '),
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: statusColor,
-                          ),
-                        ),
-                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      serviceName,
+                      style: const TextStyle(fontSize: 12, color: AppColors.t3),
+                    ),
                   ],
                 ),
-                const SizedBox(width: 8),
-                const Icon(
-                  LucideIcons.chevronRight,
-                  color: AppColors.t3,
-                  size: 16,
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (price != null)
+                    Text(
+                      '£${(price as num).toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.t1,
+                      ),
+                    ),
+                  const SizedBox(height: 4),
+                  if (showStatusBadge)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Text(
+                        status.replaceAll('_', ' '),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                LucideIcons.chevronRight,
+                color: AppColors.t3,
+                size: 16,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
+                decoration: BoxDecoration(
+                  color: AppColors.t1.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      LucideIcons.clock,
+                      size: 12,
+                      color: isScheduled ? AppColors.green : AppColors.t3,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      timeStr,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isScheduled ? AppColors.green : AppColors.t3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (recurrenceRule != null && recurrenceRule.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.bgInteract,
-                    borderRadius: BorderRadius.circular(8),
+                    color: AppColors.t1.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        LucideIcons.clock,
-                        size: 12,
-                        color: isScheduled ? AppColors.green : AppColors.t3,
-                      ),
-                      const SizedBox(width: 6),
+                      Icon(LucideIcons.repeat, size: 12, color: AppColors.t3),
+                      SizedBox(width: 6),
                       Text(
-                        timeStr,
+                        'Repeats',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: isScheduled ? AppColors.green : AppColors.t3,
+                          color: AppColors.t3,
                         ),
                       ),
                     ],
                   ),
                 ),
-                if (recurrenceRule != null && recurrenceRule.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgInteract,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(LucideIcons.repeat, size: 12, color: AppColors.t3),
-                        SizedBox(width: 6),
-                        Text(
-                          'Repeats',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.t3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            if ((isCancelled || isNoShow) && notes.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.errorDim,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  isCancelled ? 'Cancelled: $notes' : 'No show: $notes',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.error.withValues(alpha: 0.8),
-                  ),
+            ],
+          ),
+          if ((isCancelled || isNoShow) && notes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.errorDim,
+                borderRadius: BorderRadius.circular(AppRadius.xs),
+              ),
+              child: Text(
+                isCancelled ? 'Cancelled: $notes' : 'No show: $notes',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.error.withValues(alpha: 0.8),
                 ),
               ),
-            ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

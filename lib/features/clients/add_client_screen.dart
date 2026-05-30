@@ -113,7 +113,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                         color: AppColors.t1,
-                        letterSpacing: -0.5,
+                        letterSpacing: 0,
                       ),
                     ),
                   ),
@@ -232,7 +232,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
             style: const TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
+              letterSpacing: 0,
               color: AppColors.t3,
             ),
           ),
@@ -274,7 +274,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
+              letterSpacing: 0,
               color: AppColors.t3,
             ),
           ),

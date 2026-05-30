@@ -72,7 +72,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
                       color: AppColors.t1,
-                      letterSpacing: -0.8,
+                      letterSpacing: 0,
                     ),
                   ),
                 ],

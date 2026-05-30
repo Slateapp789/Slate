@@ -568,7 +568,7 @@ class _AppointmentDetailScreenState
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                         color: AppColors.t1,
-                        letterSpacing: -0.5,
+                        letterSpacing: 0,
                       ),
                     ),
                   ),

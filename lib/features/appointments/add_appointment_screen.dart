@@ -352,7 +352,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                         color: AppColors.t1,
-                        letterSpacing: -0.5,
+                        letterSpacing: 0,
                       ),
                     ),
                   ),
@@ -902,7 +902,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     style: const TextStyle(
       fontSize: 10,
       fontWeight: FontWeight.w700,
-      letterSpacing: 1.2,
+      letterSpacing: 0,
       color: AppColors.t3,
     ),
   );

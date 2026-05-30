@@ -56,6 +56,59 @@ class AppColors {
   static const panelFaint = Color(0x26252A2F);
 }
 
+class AppSpacing {
+  static const double xxs = 4;
+  static const double xs = 8;
+  static const double sm = 12;
+  static const double md = 16;
+  static const double lg = 20;
+  static const double xl = 24;
+  static const double xxl = 32;
+  static const double pageX = 24;
+  static const double pageTop = 60;
+  static const double minTouch = 44;
+}
+
+class AppRadius {
+  static const double xs = 8;
+  static const double sm = 12;
+  static const double md = 16;
+  static const double lg = 20;
+  static const double xl = 24;
+  static const double pill = 999;
+}
+
+class AppMotion {
+  static const fast = Duration(milliseconds: 160);
+  static const standard = Duration(milliseconds: 240);
+  static const deliberate = Duration(milliseconds: 360);
+  static const curve = Curves.easeOutCubic;
+  static const emphasized = Curves.easeOutBack;
+}
+
+class AppShadows {
+  static List<BoxShadow> get soft => [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.16),
+      blurRadius: 24,
+      offset: const Offset(0, 14),
+    ),
+  ];
+
+  static List<BoxShadow> get glass => [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.22),
+      blurRadius: 34,
+      offset: const Offset(0, 16),
+    ),
+    BoxShadow(
+      color: AppColors.slateGlow.withValues(alpha: 0.10),
+      blurRadius: 36,
+      offset: const Offset(0, 5),
+    ),
+  ];
+}
+
 class AppTheme {
   static ThemeData get dark {
     return ThemeData(
@@ -71,25 +124,25 @@ class AppTheme {
           displayLarge: TextStyle(
             fontSize: 52,
             fontWeight: FontWeight.w900,
-            letterSpacing: -3.0,
+            letterSpacing: 0,
             color: AppColors.t1,
           ),
           displayMedium: TextStyle(
             fontSize: 36,
             fontWeight: FontWeight.w900,
-            letterSpacing: -1.5,
+            letterSpacing: 0,
             color: AppColors.t1,
           ),
           headlineLarge: TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.w900,
-            letterSpacing: -0.8,
+            letterSpacing: 0,
             color: AppColors.t1,
           ),
           headlineMedium: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w700,
-            letterSpacing: -0.5,
+            letterSpacing: 0,
             color: AppColors.t1,
           ),
           titleLarge: TextStyle(
@@ -120,7 +173,7 @@ class AppTheme {
           labelSmall: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w700,
-            letterSpacing: 1.0,
+            letterSpacing: 0,
             color: AppColors.t3,
           ),
         ),
@@ -130,15 +183,15 @@ class AppTheme {
         fillColor: AppColors.bgInteract,
         hintStyle: const TextStyle(color: AppColors.t3),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(color: AppColors.green, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(
@@ -152,7 +205,7 @@ class AppTheme {
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),

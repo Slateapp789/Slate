@@ -1085,7 +1085,7 @@ class _BookingModeControl extends StatelessWidget {
             color: AppColors.t3,
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            letterSpacing: 0.8,
+            letterSpacing: 0,
           ),
         ),
         const SizedBox(height: 10),

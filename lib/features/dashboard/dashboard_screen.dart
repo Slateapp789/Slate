@@ -10,6 +10,7 @@ import '../../shared/providers/workspace_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/widgets/slate_ui.dart';
 import '../settings/settings_screen.dart';
 import '../appointments/appointment_detail_screen.dart';
 
@@ -52,7 +53,12 @@ class DashboardScreen extends ConsumerWidget {
         color: AppColors.green,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(24, 60, 24, 40),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.pageX,
+            AppSpacing.pageTop,
+            AppSpacing.pageX,
+            40,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -69,7 +75,7 @@ class DashboardScreen extends ConsumerWidget {
                           fontSize: 26,
                           fontWeight: FontWeight.w900,
                           color: AppColors.t1,
-                          letterSpacing: -0.8,
+                          letterSpacing: 0,
                         ),
                       ),
                       workspace.when(
@@ -93,85 +99,56 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                   Row(
                     children: [
-                      GestureDetector(
+                      SlateIconButton(
+                        icon: LucideIcons.bell,
                         onTap: () => context.push('/notifications'),
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppColors.bgCard,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: const Icon(
-                                LucideIcons.bell,
-                                color: AppColors.t2,
-                                size: 20,
-                              ),
-                            ),
-                            unreadNotifications.when(
-                              data: (count) => count == 0
-                                  ? const SizedBox.shrink()
-                                  : Positioned(
-                                      right: -4,
-                                      top: -4,
-                                      child: Container(
-                                        constraints: const BoxConstraints(
-                                          minWidth: 18,
-                                          minHeight: 18,
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 5,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.error,
-                                          borderRadius: BorderRadius.circular(
-                                            999,
-                                          ),
-                                          border: Border.all(
-                                            color: AppColors.bg,
-                                            width: 2,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          count > 9 ? '9+' : '$count',
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
+                        badge: unreadNotifications.when(
+                          data: (count) => count == 0
+                              ? null
+                              : Positioned(
+                                  right: -4,
+                                  top: -4,
+                                  child: Container(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 18,
+                                      minHeight: 18,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.error,
+                                      borderRadius: BorderRadius.circular(
+                                        AppRadius.pill,
+                                      ),
+                                      border: Border.all(
+                                        color: AppColors.bg,
+                                        width: 2,
                                       ),
                                     ),
-                              loading: () => const SizedBox.shrink(),
-                              error: (_, __) => const SizedBox.shrink(),
-                            ),
-                          ],
+                                    child: Text(
+                                      count > 9 ? '9+' : '$count',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                          loading: () => null,
+                          error: (_, __) => null,
                         ),
                       ),
                       const SizedBox(width: 10),
-                      GestureDetector(
+                      SlateIconButton(
+                        icon: Icons.settings_rounded,
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => const SettingsScreen(),
-                          ),
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.bgCard,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: const Icon(
-                            Icons.settings_rounded,
-                            color: AppColors.t2,
-                            size: 20,
                           ),
                         ),
                       ),
@@ -183,7 +160,7 @@ class DashboardScreen extends ConsumerWidget {
 
               focus.when(
                 data: (f) => _FocusPanel(focus: f, onNavigate: onNavigate),
-                loading: () => _skeletonBox(height: 154, radius: 20),
+                loading: () => _skeletonBox(height: 154, radius: AppRadius.lg),
                 error: (_, __) => _errorCard('Could not load priorities'),
               ),
               const SizedBox(height: 24),
@@ -209,7 +186,7 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: 24),
 
               // ── Today's schedule ─────────────────────────────────────
-              _SectionHeader(
+              SlateSectionHeader(
                 label: "TODAY'S SCHEDULE",
                 actionLabel: todayAppts.value?.isNotEmpty == true
                     ? 'See all'
@@ -255,7 +232,7 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: 24),
 
               // ── Tasks ────────────────────────────────────────────────
-              _SectionHeader(
+              SlateSectionHeader(
                 label: 'TASKS',
                 actionLabel: 'See all',
                 onAction: () => onNavigate(4),
@@ -274,12 +251,9 @@ class DashboardScreen extends ConsumerWidget {
                       'Tap + to add one',
                     );
                   }
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.bgCard,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
-                    ),
+                  return SlateSurface(
+                    padding: EdgeInsets.zero,
+                    radius: AppRadius.lg,
                     child: Column(
                       children: open.asMap().entries.map((e) {
                         final i = e.key;
@@ -312,47 +286,13 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _skeletonBox({double height = 80, double radius = 16}) => Container(
-    width: double.infinity,
-    height: height,
-    decoration: BoxDecoration(
-      color: AppColors.bgCard,
-      borderRadius: BorderRadius.circular(radius),
-    ),
-  );
+  Widget _skeletonBox({double height = 80, double radius = AppRadius.md}) =>
+      SlateLoadingBlock(height: height, radius: radius);
 
-  Widget _errorCard(String message) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: AppColors.bgCard,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.border),
-    ),
-    child: Text(message, style: const TextStyle(color: AppColors.t3)),
-  );
+  Widget _errorCard(String message) => SlateErrorState(message: message);
 
-  Widget _emptyCard(IconData icon, String title, String subtitle) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(vertical: 24),
-    decoration: BoxDecoration(
-      color: AppColors.bgCard,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.border),
-    ),
-    child: Column(
-      children: [
-        Icon(icon, color: AppColors.t3, size: 26),
-        const SizedBox(height: 8),
-        Text(title, style: const TextStyle(fontSize: 14, color: AppColors.t2)),
-        const SizedBox(height: 2),
-        Text(
-          subtitle,
-          style: const TextStyle(fontSize: 12, color: AppColors.t3),
-        ),
-      ],
-    ),
-  );
+  Widget _emptyCard(IconData icon, String title, String subtitle) =>
+      SlateEmptyState(icon: icon, title: title, subtitle: subtitle);
 }
 
 class _FocusPanel extends StatelessWidget {
@@ -370,14 +310,10 @@ class _FocusPanel extends StatelessWidget {
     final clientName = next?['contacts']?['name'] as String? ?? 'Walk-in';
     final serviceName = next?['services']?['name'] as String? ?? 'Appointment';
 
-    return Container(
-      width: double.infinity,
+    return SlateSurface(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
+      radius: AppRadius.lg,
+      elevated: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -387,7 +323,7 @@ class _FocusPanel extends StatelessWidget {
               fontSize: 10,
               fontWeight: FontWeight.w800,
               color: AppColors.t3,
-              letterSpacing: 1.1,
+              letterSpacing: 0,
             ),
           ),
           const SizedBox(height: 14),
@@ -559,7 +495,8 @@ class _FocusRow extends StatelessWidget {
             ),
           ),
         ),
-        if (!isLast) Divider(height: 1, color: AppColors.border),
+        if (!isLast)
+          Divider(height: 1, color: AppColors.t1.withValues(alpha: 0.06)),
       ],
     );
   }
@@ -627,17 +564,16 @@ class _PulseTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = highlight ? AppColors.green : AppColors.t2;
-    return GestureDetector(
+    return SlateSurface(
       onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      radius: AppRadius.md,
+      color: highlight ? AppColors.greenDim : AppColors.bgCard,
+      borderColor: highlight
+          ? AppColors.green.withValues(alpha: 0.44)
+          : AppColors.t1.withValues(alpha: 0.07),
       child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: highlight ? AppColors.greenDim : AppColors.bgCard,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: highlight ? AppColors.green : AppColors.border,
-          ),
-        ),
+        constraints: const BoxConstraints(minHeight: 74),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -662,7 +598,7 @@ class _PulseTile extends StatelessWidget {
                 color: AppColors.t1,
                 fontSize: compact ? 17 : 24,
                 fontWeight: FontWeight.w900,
-                letterSpacing: -0.5,
+                letterSpacing: 0,
               ),
             ),
             const SizedBox(height: 2),
@@ -672,51 +608,12 @@ class _PulseTile extends StatelessWidget {
                 color: AppColors.t3,
                 fontSize: 9,
                 fontWeight: FontWeight.w800,
-                letterSpacing: 0.8,
+                letterSpacing: 0,
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── Section header ────────────────────────────────────────────────────────────
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-
-  const _SectionHeader({required this.label, this.actionLabel, this.onAction});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.2,
-            color: AppColors.t3,
-          ),
-        ),
-        if (actionLabel != null)
-          GestureDetector(
-            onTap: onAction,
-            child: Text(
-              actionLabel!,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.green,
-              ),
-            ),
-          ),
-      ],
     );
   }
 }

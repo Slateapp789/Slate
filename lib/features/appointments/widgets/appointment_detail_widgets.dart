@@ -111,7 +111,7 @@ class AppointmentHeroCard extends StatelessWidget {
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: AppColors.t1,
-                        letterSpacing: -0.3,
+                        letterSpacing: 0,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -205,7 +205,7 @@ class AppointmentHeroCard extends StatelessWidget {
     style: const TextStyle(
       fontSize: 10,
       fontWeight: FontWeight.w700,
-      letterSpacing: 1.0,
+      letterSpacing: 0,
       color: AppColors.t3,
     ),
   );

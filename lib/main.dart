@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +21,7 @@ import 'features/public_profile/booking_requests_screen.dart';
 import 'features/public_profile/public_profile_screen.dart';
 import 'shared/providers/debug_demo_data_provider.dart';
 import 'shared/providers/workspace_provider.dart';
+import 'shared/widgets/slate_ui.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -197,14 +196,17 @@ class _MainShellState extends State<MainShell> {
   void _showFabSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (context) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.lg,
+              AppSpacing.xl,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -212,11 +214,11 @@ class _MainShellState extends State<MainShell> {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2),
+                    color: AppColors.t1.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.lg),
                 _fabOption(
                   icon: LucideIcons.calendarPlus,
                   label: 'New Appointment',
@@ -230,7 +232,7 @@ class _MainShellState extends State<MainShell> {
                     });
                   },
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.xs),
                 _fabOption(
                   icon: LucideIcons.userPlus,
                   label: 'New Client',
@@ -246,7 +248,7 @@ class _MainShellState extends State<MainShell> {
                     });
                   },
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.xs),
                 _fabOption(
                   icon: LucideIcons.banknote,
                   label: 'Record Payment',
@@ -262,7 +264,7 @@ class _MainShellState extends State<MainShell> {
                     });
                   },
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.xs),
                 _fabOption(
                   icon: LucideIcons.checkSquare,
                   label: 'New Task',
@@ -287,40 +289,35 @@ class _MainShellState extends State<MainShell> {
     required String label,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return SlateSurface(
       onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.bgInteract,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: AppColors.bgRaised,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: AppColors.t2, size: 20),
+      color: AppColors.t1.withValues(alpha: 0.06),
+      borderColor: AppColors.t1.withValues(alpha: 0.08),
+      radius: AppRadius.lg,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.t1.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
-            const SizedBox(width: 16),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.t1,
-              ),
+            child: Icon(icon, color: AppColors.t2, size: 20),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppColors.t1,
             ),
-            const Spacer(),
-            const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
-          ],
-        ),
+          ),
+          const Spacer(),
+          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
+        ],
       ),
     );
   }
@@ -363,152 +360,109 @@ class _SlatePillNavBar extends StatelessWidget {
     final tabCount = _tabs.length;
     return SafeArea(
       top: false,
-      minimum: EdgeInsets.fromLTRB(16, 0, 16, bottom > 0 ? 2 : 12),
+      minimum: EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        bottom > 0 ? 2 : AppSpacing.sm,
+      ),
       child: Row(
         children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                child: Container(
-                  height: 70,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.t1.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: AppColors.t1.withValues(alpha: 0.14),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.bg.withValues(alpha: 0.34),
-                        blurRadius: 34,
-                        offset: const Offset(0, 16),
-                      ),
-                      BoxShadow(
-                        color: AppColors.slateGlow.withValues(alpha: 0.12),
-                        blurRadius: 40,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onHorizontalDragEnd: (details) {
-                      final velocity = details.primaryVelocity ?? 0;
-                      if (velocity < -180 && currentIndex < tabCount - 1) {
-                        onTap(currentIndex + 1);
-                      } else if (velocity > 180 && currentIndex > 0) {
-                        onTap(currentIndex - 1);
-                      }
-                    },
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        const activeFlex = 16;
-                        const inactiveFlex = 10;
-                        final totalFlex =
-                            activeFlex + (tabCount - 1) * inactiveFlex;
-                        final leftFlex = currentIndex * inactiveFlex;
-                        final left =
-                            constraints.maxWidth * leftFlex / totalFlex;
-                        final width =
-                            constraints.maxWidth * activeFlex / totalFlex;
+            child: SlateGlassSurface(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: SizedBox(
+                height: 70,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onHorizontalDragEnd: (details) {
+                    final velocity = details.primaryVelocity ?? 0;
+                    if (velocity < -180 && currentIndex < tabCount - 1) {
+                      onTap(currentIndex + 1);
+                    } else if (velocity > 180 && currentIndex > 0) {
+                      onTap(currentIndex - 1);
+                    }
+                  },
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      const activeFlex = 16;
+                      const inactiveFlex = 10;
+                      final totalFlex =
+                          activeFlex + (tabCount - 1) * inactiveFlex;
+                      final leftFlex = currentIndex * inactiveFlex;
+                      final left = constraints.maxWidth * leftFlex / totalFlex;
+                      final width =
+                          constraints.maxWidth * activeFlex / totalFlex;
 
-                        return Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            AnimatedPositioned(
-                              duration: const Duration(milliseconds: 360),
-                              curve: Curves.easeOutBack,
-                              left: left,
-                              top: 9,
-                              width: width,
-                              height: 52,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 2,
-                                ),
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: AppColors.t1.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(
-                                      color: AppColors.t1.withValues(
-                                        alpha: 0.14,
-                                      ),
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColors.t1.withValues(
-                                          alpha: 0.08,
-                                        ),
-                                        blurRadius: 20,
-                                        offset: const Offset(0, 6),
-                                      ),
-                                      BoxShadow(
-                                        color: AppColors.slateGlow.withValues(
-                                          alpha: 0.18,
-                                        ),
-                                        blurRadius: 26,
-                                        offset: const Offset(0, 3),
-                                      ),
-                                    ],
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          AnimatedPositioned(
+                            duration: AppMotion.deliberate,
+                            curve: AppMotion.emphasized,
+                            left: left,
+                            top: 9,
+                            width: width,
+                            height: 52,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                              ),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: AppColors.t1.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.pill,
                                   ),
+                                  border: Border.all(
+                                    color: AppColors.t1.withValues(alpha: 0.14),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.t1.withValues(
+                                        alpha: 0.07,
+                                      ),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                    BoxShadow(
+                                      color: AppColors.slateGlow.withValues(
+                                        alpha: 0.18,
+                                      ),
+                                      blurRadius: 26,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                            Row(
-                              children: [
-                                _tabSlot(0),
-                                _tabSlot(1),
-                                _tabSlot(2),
-                                _tabSlot(3),
-                              ],
-                            ),
-                          ],
-                        );
-                      },
-                    ),
+                          ),
+                          Row(
+                            children: [
+                              _tabSlot(0),
+                              _tabSlot(1),
+                              _tabSlot(2),
+                              _tabSlot(3),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 12),
-          ClipOval(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-              child: GestureDetector(
-                onTap: onAction,
-                child: Container(
-                  width: 68,
-                  height: 68,
-                  decoration: BoxDecoration(
-                    color: AppColors.t1.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.t1.withValues(alpha: 0.16),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.bg.withValues(alpha: 0.34),
-                        blurRadius: 28,
-                        offset: const Offset(0, 14),
-                      ),
-                      BoxShadow(
-                        color: AppColors.slateGlow.withValues(alpha: 0.22),
-                        blurRadius: 34,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    LucideIcons.plus,
-                    color: AppColors.t1,
-                    size: 28,
-                  ),
-                ),
+          SlateGlassSurface(
+            radius: AppRadius.pill,
+            color: AppColors.t1.withValues(alpha: 0.11),
+            child: GestureDetector(
+              onTap: onAction,
+              child: const SizedBox(
+                width: 68,
+                height: 68,
+                child: Icon(LucideIcons.plus, color: AppColors.t1, size: 28),
               ),
             ),
           ),
@@ -539,8 +493,8 @@ class _SlatePillNavBar extends StatelessWidget {
           children: [
             AnimatedScale(
               scale: active ? 1.08 : 1,
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic,
+              duration: AppMotion.standard,
+              curve: AppMotion.curve,
               child: Icon(
                 tab.icon,
                 color: active ? AppColors.t1 : AppColors.t3,
@@ -549,8 +503,8 @@ class _SlatePillNavBar extends StatelessWidget {
             ),
             Flexible(
               child: AnimatedSize(
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeOutCubic,
+                duration: AppMotion.standard,
+                curve: AppMotion.curve,
                 alignment: Alignment.centerLeft,
                 child: ClipRect(
                   child: Align(
@@ -593,9 +547,42 @@ class _LoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.bg,
-      body: Center(child: CircularProgressIndicator(color: AppColors.green)),
+      body: Center(
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.92, end: 1),
+          duration: AppMotion.deliberate,
+          curve: AppMotion.curve,
+          builder: (context, value, child) {
+            return Opacity(
+              opacity: value,
+              child: Transform.scale(scale: value, child: child),
+            );
+          },
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 30,
+                height: 30,
+                child: CircularProgressIndicator(
+                  color: AppColors.slateLight,
+                  strokeWidth: 2.4,
+                ),
+              ),
+              SizedBox(height: AppSpacing.md),
+              Text(
+                'Opening Slate',
+                style: TextStyle(
+                  color: AppColors.t3,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

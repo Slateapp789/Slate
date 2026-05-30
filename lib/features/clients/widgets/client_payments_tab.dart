@@ -140,7 +140,7 @@ class _Metric extends StatelessWidget {
             color: AppColors.t3,
             fontSize: 9,
             fontWeight: FontWeight.w800,
-            letterSpacing: 0.8,
+            letterSpacing: 0,
           ),
         ),
       ],

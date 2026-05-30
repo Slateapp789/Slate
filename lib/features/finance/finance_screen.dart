@@ -7,6 +7,7 @@ import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/widgets/slate_ui.dart';
 import 'add_payment_screen.dart';
 import 'widgets/payment_cards.dart';
 
@@ -31,7 +32,12 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                AppSpacing.lg,
+                AppSpacing.pageX,
+                0,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -41,7 +47,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
                       color: AppColors.t1,
-                      letterSpacing: -0.8,
+                      letterSpacing: 0,
                     ),
                   ),
                   GestureDetector(
@@ -61,8 +67,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.slateLight.withValues(alpha: 0.82),
-                        borderRadius: BorderRadius.circular(14),
+                        color: AppColors.slateLight,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                         border: Border.all(
                           color: AppColors.t1.withValues(alpha: 0.16),
                         ),
@@ -95,18 +101,16 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             // Summary card
             invoices.when(
               data: (data) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.pageX,
+                ),
                 child: PaymentSummaryCard(payments: data),
               ),
               loading: () => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  height: 130,
-                  decoration: BoxDecoration(
-                    color: AppColors.bgCard,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.pageX,
                 ),
+                child: const SlateLoadingBlock(height: 130, radius: 20),
               ),
               error: (_, __) => const SizedBox.shrink(),
             ),
@@ -115,7 +119,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             // Filter chips
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
               child: Row(
                 children: ['All', 'Outstanding', 'Received', 'Overdue'].map((
                   f,
@@ -132,10 +136,12 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                       decoration: BoxDecoration(
                         color: active
                             ? AppColors.t1.withValues(alpha: 0.12)
-                            : AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(999),
+                            : AppColors.t1.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                         border: Border.all(
-                          color: active ? AppColors.t2 : AppColors.border,
+                          color: active
+                              ? AppColors.t1.withValues(alpha: 0.18)
+                              : AppColors.t1.withValues(alpha: 0.07),
                         ),
                       ),
                       child: Text(
@@ -157,32 +163,12 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             Expanded(
               child: invoices.when(
                 loading: () => _skeletonList(),
-                error: (e, _) => Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        LucideIcons.alertCircle,
-                        color: AppColors.error,
-                        size: 32,
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Could not load payments',
-                        style: TextStyle(color: AppColors.t2),
-                      ),
-                      const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: () => ref.invalidate(invoicesProvider),
-                        child: const Text(
-                          'Retry',
-                          style: TextStyle(
-                            color: AppColors.green,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
+                error: (e, _) => Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.pageX,
+                  ),
+                  child: const SlateErrorState(
+                    message: 'Could not load payments',
                   ),
                 ),
                 data: (data) {
@@ -226,7 +212,12 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     onRefresh: () async => ref.invalidate(invoicesProvider),
                     color: AppColors.green,
                     child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.pageX,
+                        0,
+                        AppSpacing.pageX,
+                        100,
+                      ),
                       itemCount: sorted.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, i) {
@@ -254,16 +245,16 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 
   Widget _skeletonList() {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pageX,
+        0,
+        AppSpacing.pageX,
+        40,
+      ),
       itemCount: 4,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (_, __) => Container(
-        height: 76,
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
+      itemBuilder: (_, __) =>
+          const SlateLoadingBlock(height: 76, radius: AppRadius.md),
     );
   }
 
@@ -274,60 +265,26 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.bgCard,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: const Icon(
-                LucideIcons.banknote,
-                color: AppColors.t3,
-                size: 28,
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'No payments yet',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.t1,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Record your first payment to get started',
-              style: TextStyle(fontSize: 14, color: AppColors.t3),
-              textAlign: TextAlign.center,
+            const SlateEmptyState(
+              icon: LucideIcons.banknote,
+              title: 'No payments yet',
+              subtitle: 'Record your first payment to get started',
             ),
             const SizedBox(height: 24),
-            GestureDetector(
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AddPaymentScreen()),
-                );
-                ref.invalidate(invoicesProvider);
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.green,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Text(
-                  '+ Record Payment',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AddPaymentScreen()),
+                  );
+                  ref.invalidate(invoicesProvider);
+                },
+                icon: const Icon(LucideIcons.plus, size: 17),
+                label: const Text(
+                  'Record Payment',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
               ),
             ),
@@ -401,7 +358,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                         fontSize: 36,
                         fontWeight: FontWeight.w900,
                         color: AppColors.green,
-                        letterSpacing: -1.5,
+                        letterSpacing: 0,
                       ),
                     ),
                   ],

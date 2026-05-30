@@ -18,7 +18,7 @@ Widget sectionLabel(String text) => Text(
   style: const TextStyle(
     fontSize: 10,
     fontWeight: FontWeight.w700,
-    letterSpacing: 1.2,
+    letterSpacing: 0,
     color: AppColors.t3,
   ),
 );
@@ -161,7 +161,7 @@ Widget settingsField({
       style: const TextStyle(
         fontSize: 10,
         fontWeight: FontWeight.w700,
-        letterSpacing: 1.2,
+        letterSpacing: 0,
         color: AppColors.t3,
       ),
     ),

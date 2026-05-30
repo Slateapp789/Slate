@@ -51,7 +51,7 @@ class CalendarSyncScreen extends ConsumerWidget {
                     color: AppColors.t1,
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: -0.8,
+                    letterSpacing: 0,
                   ),
                 ),
               ],

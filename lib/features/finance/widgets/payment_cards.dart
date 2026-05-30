@@ -3,6 +3,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/slate_models.dart';
+import '../../../shared/widgets/slate_ui.dart';
 
 class PaymentSummaryCard extends StatelessWidget {
   final List<Payment> payments;
@@ -33,14 +34,11 @@ class PaymentSummaryCard extends StatelessWidget {
       }
     }
 
-    return Container(
-      width: double.infinity,
+    return SlateSurface(
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.panelSoft,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.panelSoftRaised),
-      ),
+      color: AppColors.panelSoft,
+      borderColor: AppColors.panelSoftRaised,
+      radius: AppRadius.lg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -49,7 +47,7 @@ class PaymentSummaryCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
+              letterSpacing: 0,
               color: AppColors.panelMuted,
             ),
           ),
@@ -60,7 +58,7 @@ class PaymentSummaryCard extends StatelessWidget {
               fontSize: 44,
               fontWeight: FontWeight.w900,
               color: AppColors.panelInk,
-              letterSpacing: -2.0,
+              letterSpacing: 0,
               height: 1,
             ),
           ),
@@ -102,7 +100,7 @@ class PaymentSummaryCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
                   child: Text(
                     '$overdueCount overdue',
@@ -236,19 +234,14 @@ class PaymentCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       onLongPress: onDelete,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isOverdue
-                ? AppColors.error.withValues(alpha: 0.3)
-                : isPending
-                ? AppColors.warning.withValues(alpha: 0.2)
-                : AppColors.border,
-          ),
-        ),
+      child: SlateSurface(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        radius: AppRadius.md,
+        borderColor: isOverdue
+            ? AppColors.error.withValues(alpha: 0.3)
+            : isPending
+            ? AppColors.warning.withValues(alpha: 0.2)
+            : AppColors.t1.withValues(alpha: 0.07),
         child: Row(
           children: [
             Container(
@@ -256,7 +249,7 @@ class PaymentCard extends StatelessWidget {
               height: 44,
               decoration: BoxDecoration(
                 color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: Center(
                 child: Text(
@@ -321,7 +314,7 @@ class PaymentCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
                   child: Text(
                     statusLabel,

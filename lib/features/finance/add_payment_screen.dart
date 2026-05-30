@@ -189,7 +189,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                         color: AppColors.t1,
-                        letterSpacing: -0.5,
+                        letterSpacing: 0,
                       ),
                     ),
                   ),
@@ -212,7 +212,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
+                        letterSpacing: 0,
                         color: Colors.black45,
                       ),
                     ),
@@ -240,7 +240,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                               fontSize: 44,
                               fontWeight: FontWeight.w900,
                               color: Colors.black,
-                              letterSpacing: -2,
+                              letterSpacing: 0,
                             ),
                             decoration: const InputDecoration(
                               hintText: '0',
@@ -278,7 +278,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
+                        letterSpacing: 0,
                         color: AppColors.t3,
                       ),
                     ),
@@ -313,7 +313,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
+                        letterSpacing: 0,
                         color: AppColors.t3,
                       ),
                     ),
@@ -390,7 +390,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
+                        letterSpacing: 0,
                         color: AppColors.t3,
                       ),
                     ),
@@ -435,7 +435,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
+                          letterSpacing: 0,
                           color: AppColors.t3,
                         ),
                       ),
@@ -482,7 +482,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
-                            letterSpacing: 1.2,
+                            letterSpacing: 0,
                             color: AppColors.t3,
                           ),
                         ),

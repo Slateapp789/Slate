@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
+import '../../shared/widgets/slate_ui.dart';
 import 'add_client_screen.dart';
 import 'client_detail_screen.dart';
 
@@ -34,7 +35,12 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                AppSpacing.lg,
+                AppSpacing.pageX,
+                0,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -44,10 +50,11 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
                       color: AppColors.t1,
-                      letterSpacing: -0.8,
+                      letterSpacing: 0,
                     ),
                   ),
-                  GestureDetector(
+                  SlateIconButton(
+                    icon: LucideIcons.userPlus,
                     onTap: () async {
                       await Navigator.push(
                         context,
@@ -57,29 +64,13 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                       );
                       ref.invalidate(clientsProvider);
                     },
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppColors.t1.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: AppColors.t1.withValues(alpha: 0.16),
-                        ),
-                      ),
-                      child: const Icon(
-                        LucideIcons.userPlus,
-                        color: AppColors.t2,
-                        size: 16,
-                      ),
-                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
               child: TextField(
                 controller: _searchController,
                 onChanged: (v) => setState(() => _query = v.toLowerCase()),
@@ -93,17 +84,21 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                     size: 16,
                   ),
                   filled: true,
-                  fillColor: AppColors.bgCard,
+                  fillColor: AppColors.t1.withValues(alpha: 0.06),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderSide: BorderSide(
+                      color: AppColors.t1.withValues(alpha: 0.08),
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderSide: BorderSide(
+                      color: AppColors.t1.withValues(alpha: 0.08),
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: const BorderSide(
                       color: AppColors.green,
                       width: 1.5,
@@ -119,36 +114,21 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
             const SizedBox(height: 16),
             Expanded(
               child: clients.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(color: AppColors.green),
-                ),
-                error: (e, _) => Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        LucideIcons.alertCircle,
-                        color: AppColors.error,
-                        size: 32,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Error loading clients',
-                        style: const TextStyle(color: AppColors.t2),
-                      ),
-                      const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: () => ref.invalidate(clientsProvider),
-                        child: const Text(
-                          'Retry',
-                          style: TextStyle(
-                            color: AppColors.green,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
+                loading: () => ListView.separated(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.pageX,
                   ),
+                  itemCount: 6,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: AppSpacing.xs),
+                  itemBuilder: (_, __) =>
+                      const SlateLoadingBlock(height: 74, radius: AppRadius.lg),
+                ),
+                error: (e, _) => Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.pageX,
+                  ),
+                  child: SlateErrorState(message: 'Error loading clients'),
                 ),
                 data: (data) {
                   final filtered = _query.isEmpty
@@ -195,7 +175,9 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                     onRefresh: () async => ref.invalidate(clientsProvider),
                     color: AppColors.green,
                     child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.pageX,
+                      ),
                       itemCount: filtered.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, i) {
@@ -207,7 +189,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                             ? AppColors.warning
                             : AppColors.t3;
 
-                        return GestureDetector(
+                        return SlateSurface(
                           onTap: () async {
                             await Navigator.push(
                               context,
@@ -218,86 +200,83 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                             );
                             ref.invalidate(clientsProvider);
                           },
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppColors.bgCard,
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.bgInteract,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      client.name.isNotEmpty
-                                          ? client.name[0].toUpperCase()
-                                          : '?',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppColors.t2,
-                                      ),
-                                    ),
+                          radius: AppRadius.lg,
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppColors.t1.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.sm,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        client.name,
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.t1,
-                                        ),
-                                      ),
-                                      if ((client.phone ?? '').isNotEmpty)
-                                        Text(
-                                          client.phone!,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.t3,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: statusColor.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
+                                child: Center(
                                   child: Text(
-                                    status,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: statusColor,
+                                    client.name.isNotEmpty
+                                        ? client.name[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.t2,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                const Icon(
-                                  LucideIcons.chevronRight,
-                                  color: AppColors.t3,
-                                  size: 16,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      client.name,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.t1,
+                                      ),
+                                    ),
+                                    if ((client.phone ?? '').isNotEmpty)
+                                      Text(
+                                        client.phone!,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.t3,
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.pill,
+                                  ),
+                                ),
+                                child: Text(
+                                  status,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: statusColor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(
+                                LucideIcons.chevronRight,
+                                color: AppColors.t3,
+                                size: 16,
+                              ),
+                            ],
                           ),
                         );
                       },
@@ -325,54 +304,20 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.bgCard,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: const Icon(
-                LucideIcons.users,
-                color: AppColors.t3,
-                size: 28,
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'No clients yet',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.t1,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Add your first client to get started',
-              style: TextStyle(fontSize: 14, color: AppColors.t3),
-              textAlign: TextAlign.center,
+            const SlateEmptyState(
+              icon: LucideIcons.users,
+              title: 'No clients yet',
+              subtitle: 'Add your first client to get started',
             ),
             const SizedBox(height: 24),
-            GestureDetector(
-              onTap: onAdd,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.green,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Text(
-                  '+ Add Client',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(LucideIcons.userPlus, size: 17),
+                label: const Text(
+                  'Add Client',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
               ),
             ),

@@ -8,6 +8,7 @@ import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/widgets/slate_ui.dart';
 
 part 'task_card.dart';
 
@@ -32,7 +33,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                AppSpacing.lg,
+                AppSpacing.pageX,
+                0,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -42,7 +48,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
                       color: AppColors.t1,
-                      letterSpacing: -0.8,
+                      letterSpacing: 0,
                     ),
                   ),
                   GestureDetector(
@@ -53,19 +59,23 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.green,
-                        borderRadius: BorderRadius.circular(10),
+                        color: AppColors.slateLight,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
                       child: const Row(
                         children: [
-                          Icon(LucideIcons.plus, color: Colors.white, size: 14),
+                          Icon(
+                            LucideIcons.plus,
+                            color: AppColors.panelInk,
+                            size: 14,
+                          ),
                           SizedBox(width: 6),
                           Text(
                             'New',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                              color: AppColors.panelInk,
                             ),
                           ),
                         ],
@@ -78,7 +88,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             const SizedBox(height: 16),
 
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
               child: Row(
                 children: ['Open', 'Done', 'All'].map((f) {
                   final active = _filter == f;
@@ -91,10 +101,14 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: active ? AppColors.green : AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(999),
+                        color: active
+                            ? AppColors.t1.withValues(alpha: 0.12)
+                            : AppColors.t1.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                         border: Border.all(
-                          color: active ? AppColors.green : AppColors.border,
+                          color: active
+                              ? AppColors.t1.withValues(alpha: 0.18)
+                              : AppColors.t1.withValues(alpha: 0.07),
                         ),
                       ),
                       child: Text(
@@ -102,7 +116,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: active ? Colors.white : AppColors.t2,
+                          color: active ? AppColors.t1 : AppColors.t2,
                         ),
                       ),
                     ),
@@ -115,11 +129,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             Expanded(
               child: tasks.when(
                 loading: () => _skeletonList(),
-                error: (e, _) => Center(
-                  child: Text(
-                    'Error: $e',
-                    style: const TextStyle(color: AppColors.error),
+                error: (e, _) => Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.pageX,
                   ),
+                  child: SlateErrorState(message: 'Could not load tasks'),
                 ),
                 data: (data) {
                   final filtered = data.where((t) {
@@ -129,34 +143,18 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   }).toList();
 
                   if (filtered.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.check_circle_outline_rounded,
-                            color: AppColors.t3,
-                            size: 40,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _filter == 'Open'
-                                ? 'No open tasks'
-                                : _filter == 'Done'
-                                ? 'No completed tasks'
-                                : 'No tasks yet',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.t2,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Tap New to add one',
-                            style: TextStyle(fontSize: 13, color: AppColors.t3),
-                          ),
-                        ],
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.pageX,
+                      ),
+                      child: SlateEmptyState(
+                        icon: Icons.check_circle_outline_rounded,
+                        title: _filter == 'Open'
+                            ? 'No open tasks'
+                            : _filter == 'Done'
+                            ? 'No completed tasks'
+                            : 'No tasks yet',
+                        subtitle: 'Tap New to add one',
                       ),
                     );
                   }
@@ -165,7 +163,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                     onRefresh: () async => ref.invalidate(allTasksProvider),
                     color: AppColors.green,
                     child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.pageX,
+                        0,
+                        AppSpacing.pageX,
+                        100,
+                      ),
                       itemCount: filtered.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, i) {
@@ -189,16 +192,16 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   Widget _skeletonList() {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pageX,
+        0,
+        AppSpacing.pageX,
+        40,
+      ),
       itemCount: 5,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (_, __) => Container(
-        height: 72,
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(14),
-        ),
-      ),
+      itemBuilder: (_, __) =>
+          const SlateLoadingBlock(height: 72, radius: AppRadius.md),
     );
   }
 

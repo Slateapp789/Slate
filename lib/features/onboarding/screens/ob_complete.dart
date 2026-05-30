@@ -100,7 +100,7 @@ class _ObCompleteState extends ConsumerState<ObComplete>
                 fontSize: 36,
                 fontWeight: FontWeight.w900,
                 color: AppColors.t1,
-                letterSpacing: -1.2,
+                letterSpacing: 0,
                 height: 1.1,
               ),
             ),

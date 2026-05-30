@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/appointments_provider.dart';
+import '../../shared/widgets/slate_ui.dart';
 import 'add_appointment_screen.dart';
 import 'appointment_detail_screen.dart';
 
@@ -60,7 +61,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                AppSpacing.lg,
+                AppSpacing.pageX,
+                0,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -70,7 +76,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
                       color: AppColors.t1,
-                      letterSpacing: -0.8,
+                      letterSpacing: 0,
                     ),
                   ),
                   GestureDetector(
@@ -81,8 +87,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.slateLight.withValues(alpha: 0.82),
-                        borderRadius: BorderRadius.circular(14),
+                        color: AppColors.slateLight,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                         border: Border.all(
                           color: AppColors.t1.withValues(alpha: 0.16),
                         ),
@@ -142,19 +148,20 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                 if (todayAll.isEmpty) return const SizedBox.shrink();
 
                 return Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                  child: Container(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    0,
+                    AppSpacing.pageX,
+                    AppSpacing.md,
+                  ),
+                  child: SlateSurface(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 12,
                     ),
-                    decoration: BoxDecoration(
-                      color: AppColors.greenDim,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: AppColors.green.withValues(alpha: 0.25),
-                      ),
-                    ),
+                    radius: AppRadius.md,
+                    color: AppColors.greenDim,
+                    borderColor: AppColors.green.withValues(alpha: 0.25),
                     child: Row(
                       children: [
                         const Icon(
@@ -192,12 +199,14 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
             ),
 
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.bgCard.withValues(alpha: 0.78),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppColors.border),
+                  color: AppColors.t1.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  border: Border.all(
+                    color: AppColors.t1.withValues(alpha: 0.08),
+                  ),
                 ),
                 child: TabBar(
                   controller: _tabController,
@@ -321,43 +330,23 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
 
   Widget _skeletonList() {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pageX,
+        0,
+        AppSpacing.pageX,
+        40,
+      ),
       itemCount: 4,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (_, __) => Container(
-        height: 80,
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
+      itemBuilder: (_, __) =>
+          const SlateLoadingBlock(height: 80, radius: AppRadius.md),
     );
   }
 
   Widget _errorState(VoidCallback onRetry) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(LucideIcons.alertCircle, color: AppColors.error, size: 32),
-          const SizedBox(height: 12),
-          const Text(
-            'Could not load appointments',
-            style: TextStyle(color: AppColors.t2),
-          ),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: onRetry,
-            child: const Text(
-              'Retry',
-              style: TextStyle(
-                color: AppColors.green,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
+      child: SlateErrorState(message: 'Could not load appointments'),
     );
   }
 }
