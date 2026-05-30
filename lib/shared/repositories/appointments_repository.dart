@@ -34,6 +34,22 @@ class AppointmentsRepository {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  Future<List<Map<String, dynamic>>> conflicts({
+    required String workspaceId,
+    required DateTime startTime,
+    required DateTime endTime,
+  }) async {
+    final rows = await _client
+        .from('appointments')
+        .select('*, contacts(name), services(name)')
+        .eq('workspace_id', workspaceId)
+        .neq('status', 'cancelled')
+        .lt('start_time', endTime.toUtc().toIso8601String())
+        .gt('end_time', startTime.toUtc().toIso8601String())
+        .order('start_time', ascending: true);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
   Future<List<Map<String, dynamic>>> forClientRows(String clientId) async {
     final rows = await _client
         .from('appointments')

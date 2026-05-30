@@ -268,6 +268,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     final clients = ref.watch(clientsProvider);
     final services = ref.watch(servicesProvider);
     final workspaceSettings = ref.watch(workspaceSettingsProvider);
+    final existingAppointments = ref.watch(appointmentsProvider);
 
     final appointmentStart = DateTime(
       _selectedDate.year,
@@ -302,6 +303,19 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         : formatWorkingHourValue(
             workingHoursValueForDate(workingHours, appointmentStart),
           );
+    final conflicts = (existingAppointments.value ?? const []).where((
+      appointment,
+    ) {
+      if (appointment['status'] == 'cancelled') return false;
+      final start = DateTime.tryParse(
+        appointment['start_time']?.toString() ?? '',
+      )?.toLocal();
+      final end = DateTime.tryParse(
+        appointment['end_time']?.toString() ?? '',
+      )?.toLocal();
+      if (start == null || end == null) return false;
+      return start.isBefore(endTime) && end.isAfter(appointmentStart);
+    }).toList();
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -664,6 +678,42 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                             Expanded(
                               child: Text(
                                 '${weekdayName(appointmentStart)} hours are $dayHoursLabel. This booking falls outside your working blocks.',
+                                style: const TextStyle(
+                                  color: AppColors.t2,
+                                  fontSize: 13,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    if (conflicts.isNotEmpty) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.errorDim,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: AppColors.error.withValues(alpha: 0.24),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.event_busy_rounded,
+                              color: AppColors.error,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'This overlaps ${conflicts.length} existing appointment${conflicts.length == 1 ? '' : 's'}. You can still book it, but it may create a clash.',
                                 style: const TextStyle(
                                   color: AppColors.t2,
                                   fontSize: 13,

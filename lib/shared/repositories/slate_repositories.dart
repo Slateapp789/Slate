@@ -1,5 +1,6 @@
 export 'appointments_repository.dart';
 export 'auth_repository.dart';
+export 'calendar_sync_repository.dart';
 export 'clients_repository.dart';
 export 'dashboard_repository.dart';
 export 'debug_demo_data_repository.dart';
