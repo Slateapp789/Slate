@@ -324,3 +324,160 @@ class SlateErrorState extends StatelessWidget {
     );
   }
 }
+
+class SlateButton extends StatefulWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final bool destructive;
+  final bool secondary;
+
+  const SlateButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.destructive = false,
+    this.secondary = false,
+  });
+
+  @override
+  State<SlateButton> createState() => _SlateButtonState();
+}
+
+class _SlateButtonState extends State<SlateButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onPressed != null;
+    final bg = widget.destructive
+        ? AppColors.error
+        : widget.secondary
+        ? AppColors.t1.withValues(alpha: 0.06)
+        : AppColors.slateLight;
+    final fg = widget.destructive
+        ? Colors.white
+        : widget.secondary
+        ? AppColors.t2
+        : AppColors.panelInk;
+
+    return GestureDetector(
+      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+      onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
+      onTap: widget.onPressed,
+      child: AnimatedScale(
+        scale: _pressed ? 0.985 : 1,
+        duration: AppMotion.fast,
+        curve: AppMotion.curve,
+        child: AnimatedOpacity(
+          opacity: enabled ? 1 : 0.48,
+          duration: AppMotion.fast,
+          child: Container(
+            width: double.infinity,
+            height: 52,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(
+                color: widget.secondary
+                    ? AppColors.t1.withValues(alpha: 0.08)
+                    : Colors.transparent,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.icon != null) ...[
+                  Icon(widget.icon, color: fg, size: 18),
+                  const SizedBox(width: AppSpacing.xs),
+                ],
+                Flexible(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class SlateSheetFrame extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  const SlateSheetFrame({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.fromLTRB(
+      AppSpacing.lg,
+      AppSpacing.sm,
+      AppSpacing.lg,
+      AppSpacing.xl,
+    ),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: padding,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.96, end: 1),
+          duration: AppMotion.standard,
+          curve: AppMotion.curve,
+          builder: (context, value, sheet) {
+            return Opacity(
+              opacity: value.clamp(0.0, 1.0),
+              child: Transform.scale(
+                scale: value,
+                alignment: Alignment.bottomCenter,
+                child: sheet,
+              ),
+            );
+          },
+          child: SlateSurface(
+            color: AppColors.bgCard.withValues(alpha: 0.96),
+            borderColor: AppColors.t1.withValues(alpha: 0.08),
+            radius: AppRadius.xl,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.lg,
+              AppSpacing.lg,
+            ),
+            elevated: true,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.t1.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                child,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

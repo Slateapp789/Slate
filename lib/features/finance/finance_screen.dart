@@ -301,125 +301,86 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.greenDim,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.green.withValues(alpha: 0.25),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      clientName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.t1,
-                      ),
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (ctx) => SlateSheetFrame(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SlateSurface(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              radius: AppRadius.lg,
+              color: AppColors.greenDim,
+              borderColor: AppColors.green.withValues(alpha: 0.25),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    clientName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.t1,
                     ),
-                    if (description.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        description,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.t3,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 10),
+                  ),
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 2),
                     Text(
-                      '£${amount.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.green,
-                        letterSpacing: 0,
-                      ),
+                      description,
+                      style: const TextStyle(fontSize: 13, color: AppColors.t3),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    await ref
-                        .read(paymentsRepositoryProvider)
-                        .markPaid(payment);
-                    await ref
-                        .read(notificationsRepositoryProvider)
-                        .create(
-                          workspaceId: payment.workspaceId,
-                          type: 'payment_received',
-                          title: 'Payment received',
-                          body:
-                              '£${amount.toStringAsFixed(0)} from ${payment.clientName ?? 'a client'} is now paid.',
-                          deepLink: '/payments',
-                        );
-                    ref.invalidate(invoicesProvider);
-                    ref.invalidate(dashboardRevenueProvider);
-                    ref.invalidate(notificationsProvider);
-                    ref.invalidate(unreadNotificationsProvider);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '£${amount.toStringAsFixed(0)} marked as paid',
-                          ),
-                          backgroundColor: AppColors.green,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.green,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                  const SizedBox(height: 10),
+                  Text(
+                    '£${amount.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.green,
+                      letterSpacing: 0,
                     ),
-                    elevation: 0,
                   ),
-                  icon: const Icon(LucideIcons.checkCircle, size: 18),
-                  label: const Text(
-                    'Mark as Paid',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                  ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            SlateButton(
+              label: 'Mark as Paid',
+              icon: LucideIcons.checkCircle,
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await ref.read(paymentsRepositoryProvider).markPaid(payment);
+                await ref
+                    .read(notificationsRepositoryProvider)
+                    .create(
+                      workspaceId: payment.workspaceId,
+                      type: 'payment_received',
+                      title: 'Payment received',
+                      body:
+                          '£${amount.toStringAsFixed(0)} from ${payment.clientName ?? 'a client'} is now paid.',
+                      deepLink: '/payments',
+                    );
+                ref.invalidate(invoicesProvider);
+                ref.invalidate(dashboardRevenueProvider);
+                ref.invalidate(notificationsProvider);
+                ref.invalidate(unreadNotificationsProvider);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        '£${amount.toStringAsFixed(0)} marked as paid',
+                      ),
+                      backgroundColor: AppColors.green,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -431,84 +392,44 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (ctx) => SlateSheetFrame(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Delete payment?',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.t1,
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Delete payment?',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t1,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '$clientName · £${amount.toStringAsFixed(0)}',
-                style: const TextStyle(fontSize: 14, color: AppColors.t3),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    await ref
-                        .read(paymentsRepositoryProvider)
-                        .delete(payment.id);
-                    ref.invalidate(invoicesProvider);
-                    ref.invalidate(dashboardRevenueProvider);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.error,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Delete Payment',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.t3,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$clientName · £${amount.toStringAsFixed(0)}',
+              style: const TextStyle(fontSize: 14, color: AppColors.t3),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SlateButton(
+              label: 'Delete Payment',
+              destructive: true,
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await ref.read(paymentsRepositoryProvider).delete(payment.id);
+                ref.invalidate(invoicesProvider);
+                ref.invalidate(dashboardRevenueProvider);
+              },
+            ),
+            const SizedBox(height: 10),
+            SlateButton(
+              label: 'Cancel',
+              secondary: true,
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
         ),
       ),
     );

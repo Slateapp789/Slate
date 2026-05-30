@@ -199,85 +199,64 @@ class _MainShellState extends State<MainShell> {
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              AppSpacing.xl,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.t1.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                _fabOption(
-                  icon: LucideIcons.calendarPlus,
-                  label: 'New Appointment',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => AddAppointmentScreen()),
-                    ).then((_) {
-                      if (mounted) setState(() => _currentIndex = 2);
-                    });
-                  },
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                _fabOption(
-                  icon: LucideIcons.userPlus,
-                  label: 'New Client',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AddClientScreen(),
-                      ),
-                    ).then((_) {
-                      if (mounted) setState(() => _currentIndex = 1);
-                    });
-                  },
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                _fabOption(
-                  icon: LucideIcons.banknote,
-                  label: 'Record Payment',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AddPaymentScreen(),
-                      ),
-                    ).then((_) {
-                      if (mounted) setState(() => _currentIndex = 3);
-                    });
-                  },
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                _fabOption(
-                  icon: LucideIcons.checkSquare,
-                  label: 'New Task',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const TasksScreen()),
-                    );
-                  },
-                ),
-              ],
-            ),
+        return SlateSheetFrame(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _fabOption(
+                icon: LucideIcons.calendarPlus,
+                label: 'New Appointment',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => AddAppointmentScreen()),
+                  ).then((_) {
+                    if (mounted) setState(() => _currentIndex = 2);
+                  });
+                },
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              _fabOption(
+                icon: LucideIcons.userPlus,
+                label: 'New Client',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AddClientScreen()),
+                  ).then((_) {
+                    if (mounted) setState(() => _currentIndex = 1);
+                  });
+                },
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              _fabOption(
+                icon: LucideIcons.banknote,
+                label: 'Record Payment',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AddPaymentScreen()),
+                  ).then((_) {
+                    if (mounted) setState(() => _currentIndex = 3);
+                  });
+                },
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              _fabOption(
+                icon: LucideIcons.checkSquare,
+                label: 'New Task',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TasksScreen()),
+                  );
+                },
+              ),
+            ],
           ),
         );
       },

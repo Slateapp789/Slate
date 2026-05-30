@@ -215,84 +215,44 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   void _confirmDelete(BuildContext context, SlateTask task) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (ctx) => SlateSheetFrame(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Delete task?',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.t1,
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Delete task?',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t1,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                task.title,
-                style: const TextStyle(fontSize: 14, color: AppColors.t3),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(ctx);
-                    await ref.read(tasksRepositoryProvider).delete(task.id);
-                    ref.invalidate(allTasksProvider);
-                    ref.invalidate(tasksProvider);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.error,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Delete Task',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.t3,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              task.title,
+              style: const TextStyle(fontSize: 14, color: AppColors.t3),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SlateButton(
+              label: 'Delete Task',
+              destructive: true,
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await ref.read(tasksRepositoryProvider).delete(task.id);
+                ref.invalidate(allTasksProvider);
+                ref.invalidate(tasksProvider);
+              },
+            ),
+            const SizedBox(height: 10),
+            SlateButton(
+              label: 'Cancel',
+              secondary: true,
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
         ),
       ),
     );
@@ -307,35 +267,22 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModal) {
           final clients = ref.watch(clientsProvider);
-          return Padding(
+          return SlateSheetFrame(
             padding: EdgeInsets.fromLTRB(
-              24,
-              20,
-              24,
-              MediaQuery.of(ctx).viewInsets.bottom + 24,
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.lg,
+              MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xl,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.border,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
                 const Text(
                   'New Task',
                   style: TextStyle(
@@ -349,20 +296,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   controller: titleController,
                   autofocus: true,
                   style: const TextStyle(color: AppColors.t1),
-                  decoration: InputDecoration(
-                    hintText: 'Task title',
-                    hintStyle: const TextStyle(color: AppColors.t3),
-                    filled: true,
-                    fillColor: AppColors.bgInteract,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                  ),
+                  decoration: const InputDecoration(hintText: 'Task title'),
                 ),
                 const SizedBox(height: 12),
                 clients.when(
@@ -372,7 +306,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(
                       color: AppColors.bgInteract,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String?>(
@@ -482,7 +416,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.bgInteract,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: Row(
                       children: [
@@ -521,32 +455,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () => _saveTask(
-                      ctx,
-                      titleController.text,
-                      priority,
-                      dueDate,
-                      selectedClientId,
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      'Add Task',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                SlateButton(
+                  label: 'Add Task',
+                  icon: LucideIcons.plus,
+                  onPressed: () => _saveTask(
+                    ctx,
+                    titleController.text,
+                    priority,
+                    dueDate,
+                    selectedClientId,
                   ),
                 ),
               ],
@@ -571,7 +488,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: active ? color.withValues(alpha: 0.15) : AppColors.bgInteract,
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(color: active ? color : Colors.transparent),
         ),
         child: Text(
