@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
+import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
@@ -222,13 +223,9 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                       separatorBuilder: (_, __) => const SizedBox(height: 2),
                       itemBuilder: (context, i) {
                         final p = sorted[i];
-                        final isActionable =
-                            p.status == 'sent' || p.status == 'overdue';
                         return PaymentCard(
                           payment: p,
-                          onTap: isActionable
-                              ? () => _showMarkPaidSheet(context, p)
-                              : null,
+                          onTap: () => _showPaymentActionsSheet(context, p),
                           onDelete: () => _confirmDeletePayment(context, p),
                         );
                       },
@@ -280,6 +277,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     MaterialPageRoute(builder: (_) => const AddPaymentScreen()),
                   );
                   ref.invalidate(invoicesProvider);
+                  ref.invalidate(dashboardRevenueProvider);
+                  ref.invalidate(clientCrmRecordsProvider);
                 },
                 icon: const Icon(LucideIcons.plus, size: 17),
                 label: const Text(
@@ -294,10 +293,13 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     );
   }
 
-  void _showMarkPaidSheet(BuildContext context, Payment payment) {
+  void _showPaymentActionsSheet(BuildContext context, Payment payment) {
     final clientName = payment.clientName ?? 'Unknown client';
     final amount = payment.total;
     final description = payment.notes ?? '';
+    final canMarkPaid = payment.status == 'sent' ||
+        payment.status == 'pending' ||
+        payment.status == 'overdue';
 
     showModalBottomSheet(
       context: context,
@@ -311,10 +313,19 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               padding: const EdgeInsets.all(AppSpacing.lg),
               radius: AppRadius.lg,
               color: AppColors.greenDim,
-              borderColor: AppColors.green.withValues(alpha: 0.25),
+              borderColor: AppColors.t1.withValues(alpha: 0.08),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(
+                    payment.status == 'paid' ? 'PAYMENT RECEIVED' : 'PAYMENT',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.t3,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Text(
                     clientName,
                     style: const TextStyle(
@@ -323,8 +334,13 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                       color: AppColors.t1,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _paymentTiming(payment),
+                    style: const TextStyle(fontSize: 13, color: AppColors.t3),
+                  ),
                   if (description.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 8),
                     Text(
                       description,
                       style: const TextStyle(fontSize: 13, color: AppColors.t3),
@@ -336,7 +352,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     style: const TextStyle(
                       fontSize: 36,
                       fontWeight: FontWeight.w900,
-                      color: AppColors.green,
+                      color: AppColors.t1,
                       letterSpacing: 0,
                     ),
                   ),
@@ -344,46 +360,68 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            if (canMarkPaid) ...[
+              SlateButton(
+                label: 'Mark as Received',
+                icon: LucideIcons.checkCircle,
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await _markPaymentPaid(context, payment);
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
             SlateButton(
-              label: 'Mark as Paid',
-              icon: LucideIcons.checkCircle,
-              onPressed: () async {
+              label: 'Delete Payment',
+              icon: LucideIcons.trash2,
+              destructive: true,
+              onPressed: () {
                 Navigator.pop(ctx);
-                await ref.read(paymentsRepositoryProvider).markPaid(payment);
-                await ref
-                    .read(notificationsRepositoryProvider)
-                    .create(
-                      workspaceId: payment.workspaceId,
-                      type: 'payment_received',
-                      title: 'Payment received',
-                      body:
-                          '£${amount.toStringAsFixed(0)} from ${payment.clientName ?? 'a client'} is now paid.',
-                      deepLink: '/payments',
-                    );
-                ref.invalidate(invoicesProvider);
-                ref.invalidate(dashboardRevenueProvider);
-                ref.invalidate(notificationsProvider);
-                ref.invalidate(unreadNotificationsProvider);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '£${amount.toStringAsFixed(0)} marked as paid',
-                      ),
-                      backgroundColor: AppColors.green,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                      ),
-                    ),
-                  );
-                }
+                _confirmDeletePayment(context, payment);
               },
+            ),
+            const SizedBox(height: 10),
+            SlateButton(
+              label: 'Close',
+              secondary: true,
+              onPressed: () => Navigator.pop(ctx),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _markPaymentPaid(BuildContext context, Payment payment) async {
+    final amount = payment.total;
+    await ref.read(paymentsRepositoryProvider).markPaid(payment);
+    await ref
+        .read(notificationsRepositoryProvider)
+        .create(
+          workspaceId: payment.workspaceId,
+          type: 'payment_received',
+          title: 'Payment received',
+          body:
+              '£${amount.toStringAsFixed(0)} from ${payment.clientName ?? 'a client'} is now paid.',
+          deepLink: '/payments',
+        );
+    ref.invalidate(invoicesProvider);
+    ref.invalidate(dashboardRevenueProvider);
+    ref.invalidate(clientCrmRecordsProvider);
+    ref.invalidate(notificationsProvider);
+    ref.invalidate(unreadNotificationsProvider);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('£${amount.toStringAsFixed(0)} marked as received'),
+          backgroundColor: AppColors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+        ),
+      );
+    }
   }
 
   void _confirmDeletePayment(BuildContext context, Payment payment) {
@@ -421,6 +459,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 await ref.read(paymentsRepositoryProvider).delete(payment.id);
                 ref.invalidate(invoicesProvider);
                 ref.invalidate(dashboardRevenueProvider);
+                ref.invalidate(clientCrmRecordsProvider);
               },
             ),
             const SizedBox(height: 10),
@@ -433,5 +472,41 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         ),
       ),
     );
+  }
+
+  String _paymentTiming(Payment payment) {
+    if (payment.status == 'paid') {
+      return 'Received ${_formatDate(payment.issueDate)}';
+    }
+    final dueDate = payment.dueDate;
+    if (dueDate == null || dueDate.millisecondsSinceEpoch == 0) {
+      return 'Created ${_formatDate(payment.issueDate)}';
+    }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final diff = due.difference(today).inDays;
+    if (diff < 0) return 'Due ${_formatDate(dueDate)} · ${diff.abs()}d late';
+    if (diff == 0) return 'Due today';
+    if (diff == 1) return 'Due tomorrow';
+    return 'Due ${_formatDate(dueDate)} · ${diff}d';
+  }
+
+  String _formatDate(DateTime dt) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
 }

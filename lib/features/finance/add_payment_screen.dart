@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/providers/clients_provider.dart';
+import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
@@ -75,6 +76,8 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
           );
 
       ref.invalidate(invoicesProvider);
+      ref.invalidate(dashboardRevenueProvider);
+      ref.invalidate(clientCrmRecordsProvider);
       ref.invalidate(notificationsProvider);
       ref.invalidate(unreadNotificationsProvider);
       if (mounted) Navigator.pop(context);
@@ -201,8 +204,9 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.panelSoft,
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.panelSoftRaised),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -213,7 +217,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0,
-                        color: Colors.black45,
+                        color: AppColors.panelMuted,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -225,7 +229,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                           style: TextStyle(
                             fontSize: 36,
                             fontWeight: FontWeight.w900,
-                            color: Colors.black45,
+                            color: AppColors.panelMuted,
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -239,7 +243,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                             style: const TextStyle(
                               fontSize: 44,
                               fontWeight: FontWeight.w900,
-                              color: Colors.black,
+                              color: AppColors.panelInk,
                               letterSpacing: 0,
                             ),
                             decoration: const InputDecoration(
@@ -247,7 +251,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                               hintStyle: TextStyle(
                                 fontSize: 44,
                                 fontWeight: FontWeight.w900,
-                                color: Colors.black26,
+                                color: AppColors.panelMuted,
                               ),
                               border: InputBorder.none,
                               filled: false,
