@@ -48,8 +48,8 @@ class ClientAppointmentsTab extends ConsumerWidget {
       data: (appts) => appts.isEmpty
           ? _EmptyStateWithAction(
               icon: LucideIcons.calendar,
-              message: 'No appointments yet',
-              actionLabel: '+ Add Appointment',
+              message: 'No bookings yet',
+              actionLabel: '+ Add Booking',
               onAction: () async {
                 await Navigator.push(
                   context,
@@ -114,7 +114,7 @@ class ClientAppointmentsTab extends ConsumerWidget {
                               children: [
                                 Text(
                                   appt['services']?['name'] as String? ??
-                                      'Appointment',
+                                      'Booking',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,

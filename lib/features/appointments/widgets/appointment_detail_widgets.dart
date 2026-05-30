@@ -21,6 +21,8 @@ class AppointmentHeroCard extends StatelessWidget {
   final String? selectedClientId;
   final String? selectedServiceId;
   final TextEditingController priceController;
+  final TextEditingController serviceTitleController;
+  final TextEditingController durationController;
   final ValueChanged<String?> onClientChanged;
   final ValueChanged<String?> onServiceChanged;
 
@@ -38,6 +40,8 @@ class AppointmentHeroCard extends StatelessWidget {
     this.selectedClientId,
     this.selectedServiceId,
     required this.priceController,
+    required this.serviceTitleController,
+    required this.durationController,
     required this.onClientChanged,
     required this.onServiceChanged,
   });
@@ -145,6 +149,14 @@ class AppointmentHeroCard extends StatelessWidget {
   }
 
   Widget _buildEditMode() {
+    final serviceValues = {
+      ...services.map((service) => service['id'] as String),
+      '__custom__',
+    };
+    final serviceValue = serviceValues.contains(selectedServiceId)
+        ? selectedServiceId
+        : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -175,17 +187,35 @@ class AppointmentHeroCard extends StatelessWidget {
         _fieldLabel('SERVICE'),
         const SizedBox(height: 8),
         _dropdown<String>(
-          value: selectedServiceId,
+          value: serviceValue,
           hint: 'Select service',
-          items: services
-              .map(
-                (s) => DropdownMenuItem(
-                  value: s['id'] as String,
-                  child: _dropdownText(s['name'] as String),
+          items: [
+            ...services.map(
+              (s) => DropdownMenuItem(
+                value: s['id'] as String,
+                child: _dropdownText(s['name'] as String),
+              ),
+            ),
+            const DropdownMenuItem(
+              value: '__custom__',
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14),
+                child: Text(
+                  'Custom service',
+                  style: TextStyle(color: AppColors.t1, fontSize: 14),
                 ),
-              )
-              .toList(),
+              ),
+            ),
+          ],
           onChanged: onServiceChanged,
+        ),
+        const SizedBox(height: 12),
+        _fieldLabel('SERVICE NAME'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: serviceTitleController,
+          style: const TextStyle(color: AppColors.t1),
+          decoration: _inputDecoration('Service name'),
         ),
         const SizedBox(height: 12),
         _fieldLabel('PRICE (£)'),
@@ -195,6 +225,15 @@ class AppointmentHeroCard extends StatelessWidget {
           keyboardType: TextInputType.number,
           style: const TextStyle(color: AppColors.t1),
           decoration: _inputDecoration('0'),
+        ),
+        const SizedBox(height: 12),
+        _fieldLabel('DURATION (MIN)'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: durationController,
+          keyboardType: TextInputType.number,
+          style: const TextStyle(color: AppColors.t1),
+          decoration: _inputDecoration('60'),
         ),
       ],
     );
@@ -498,7 +537,7 @@ class AppointmentActionSection extends StatelessWidget {
               ),
               icon: const Icon(LucideIcons.x, size: 18),
               label: const Text(
-                'Cancel Appointment',
+                'Cancel Booking',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
               ),
             ),
@@ -521,7 +560,7 @@ class AppointmentActionSection extends StatelessWidget {
             Icon(LucideIcons.checkCircle, color: AppColors.success, size: 18),
             SizedBox(width: 12),
             Text(
-              'This appointment is complete',
+              'This booking is complete',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -552,7 +591,7 @@ class AppointmentActionSection extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Appointment cancelled',
+                    'Booking cancelled',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,

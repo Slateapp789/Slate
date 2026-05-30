@@ -390,9 +390,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                   ),
                   tabs: [
                     const Tab(text: 'Overview'),
-                    Tab(
-                      text: 'Appointments (${appointments.value?.length ?? 0})',
-                    ),
+                    Tab(text: 'Bookings (${appointments.value?.length ?? 0})'),
                     Tab(text: 'Payments (${payments.value?.length ?? 0})'),
                     Tab(text: 'Tasks (${tasks.value?.length ?? 0})'),
                   ],

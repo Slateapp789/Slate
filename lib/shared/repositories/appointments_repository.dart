@@ -81,19 +81,18 @@ class AppointmentsRepository {
   Future<void> create({
     required String workspaceId,
     required String contactId,
-    required String serviceId,
+    String? serviceId,
     required DateTime startTime,
     required DateTime endTime,
     required double price,
     String? title,
     String? notes,
+    String? location,
     String? recurrenceRule,
     int repeatOccurrences = 1,
   }) async {
     final duration = endTime.difference(startTime);
-    final safeTitle = title?.trim().isEmpty ?? true
-        ? 'Appointment'
-        : title!.trim();
+    final safeTitle = title?.trim().isEmpty ?? true ? 'Booking' : title!.trim();
     final rows = List.generate(repeatOccurrences.clamp(1, 24), (index) {
       final occurrenceStart = _occurrenceStart(
         startTime,
@@ -110,6 +109,7 @@ class AppointmentsRepository {
         'price': price,
         'status': 'scheduled',
         'notes': notes?.trim().isEmpty ?? true ? null : notes!.trim(),
+        'location': location?.trim().isEmpty ?? true ? null : location!.trim(),
         if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
       };
     });

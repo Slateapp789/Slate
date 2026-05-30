@@ -33,7 +33,7 @@ class ClientsRepository {
     return Client.fromMap(Map<String, dynamic>.from(row));
   }
 
-  Future<void> create({
+  Future<String> create({
     required String workspaceId,
     required String name,
     String? phone,
@@ -41,14 +41,19 @@ class ClientsRepository {
     String? notes,
     String status = 'active',
   }) async {
-    await _client.from('contacts').insert({
-      'workspace_id': workspaceId,
-      'name': name.trim(),
-      'phone': phone?.trim().isEmpty ?? true ? null : phone!.trim(),
-      'email': email?.trim().isEmpty ?? true ? null : email!.trim(),
-      'notes': notes?.trim().isEmpty ?? true ? null : notes!.trim(),
-      'status': status,
-    });
+    final row = await _client
+        .from('contacts')
+        .insert({
+          'workspace_id': workspaceId,
+          'name': name.trim(),
+          'phone': phone?.trim().isEmpty ?? true ? null : phone!.trim(),
+          'email': email?.trim().isEmpty ?? true ? null : email!.trim(),
+          'notes': notes?.trim().isEmpty ?? true ? null : notes!.trim(),
+          'status': status,
+        })
+        .select('id')
+        .single();
+    return row['id'] as String;
   }
 
   Future<void> update(String clientId, Map<String, dynamic> values) async {

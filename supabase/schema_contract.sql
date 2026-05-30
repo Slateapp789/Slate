@@ -10,7 +10,7 @@
 -- services(id, workspace_id, name, duration_mins, price, description, show_on_profile, created_at)
 -- appointments(id, workspace_id, contact_id, service_id, title, start_time, end_time, price, status, notes, created_at)
 -- invoices(id, workspace_id, contact_id, invoice_number, type, status, issue_date, due_date, subtotal, tax_rate, tax_amount, discount_value, total, amount_paid, notes, created_at)
--- tasks(id, workspace_id, contact_id, title, priority, due_date, status, reminder_timing, created_at, updated_at)
+-- tasks(id, workspace_id, contact_id, appointment_id, title, priority, due_date, status, reminder_timing, created_at, updated_at)
 -- business_profiles(id, workspace_id, handle, created_at)
 
 -- V1 extension fields.
@@ -43,6 +43,7 @@ alter table if exists workspace_settings
 
 alter table if exists tasks
   add column if not exists reminder_timing text not null default 'none',
+  add column if not exists appointment_id uuid references appointments(id) on delete set null,
   add column if not exists updated_at timestamptz not null default now();
 
 create table if not exists task_checklist_items (

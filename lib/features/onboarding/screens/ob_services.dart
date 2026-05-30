@@ -33,7 +33,7 @@ const Map<String, List<Map<String, dynamic>>> industryServices = {
   ],
   'Mobile Trades': [
     {'name': 'Callout & Assessment', 'duration': 60, 'price': 60.0},
-    {'name': 'Standard Job', 'duration': 120, 'price': 120.0},
+    {'name': 'Standard Booking', 'duration': 120, 'price': 120.0},
   ],
   'Tutoring & Coaching': [
     {'name': '1-to-1 Session', 'duration': 60, 'price': 45.0},

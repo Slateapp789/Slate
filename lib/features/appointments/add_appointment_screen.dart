@@ -18,20 +18,38 @@ class AddAppointmentScreen extends ConsumerStatefulWidget {
 }
 
 class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
+  static const _customServiceId = '__custom_service__';
+
   String? _selectedClientId;
   String? _selectedServiceId;
   String? _selectedServiceName;
-  double? _selectedPrice;
+  bool _creatingClient = false;
+  bool _customService = false;
   DateTime _selectedDate = DateTime.now();
   int _selectedHour = 9;
   int _selectedMinute = 0;
   int _selectedDuration = 60;
+  String _locationMode = 'business';
   String _repeatMode = 'none';
+  final _newClientNameController = TextEditingController();
+  final _newClientPhoneController = TextEditingController();
+  final _newClientEmailController = TextEditingController();
+  final _customServiceController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _durationController = TextEditingController(text: '60');
+  final _locationController = TextEditingController();
   final _notesController = TextEditingController();
   bool _saving = false;
 
   @override
   void dispose() {
+    _newClientNameController.dispose();
+    _newClientPhoneController.dispose();
+    _newClientEmailController.dispose();
+    _customServiceController.dispose();
+    _priceController.dispose();
+    _durationController.dispose();
+    _locationController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -201,11 +219,24 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   }
 
   Future<void> _save() async {
-    if (_selectedClientId == null || _selectedServiceId == null) return;
+    if (!_canSave) return;
     setState(() => _saving = true);
     try {
       final workspaceId = await ref.read(workspaceIdProvider.future);
       if (workspaceId == null) return;
+
+      var contactId = _selectedClientId;
+      if (_creatingClient) {
+        contactId = await ref
+            .read(clientsRepositoryProvider)
+            .create(
+              workspaceId: workspaceId,
+              name: _newClientNameController.text,
+              phone: _newClientPhoneController.text,
+              email: _newClientEmailController.text,
+              status: 'active',
+            );
+      }
 
       final startTime = DateTime(
         _selectedDate.year,
@@ -214,21 +245,35 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         _selectedHour,
         _selectedMinute,
       ).toUtc();
-      final endTime = startTime.add(Duration(minutes: _selectedDuration));
+      final duration =
+          int.tryParse(_durationController.text.trim()) ?? _selectedDuration;
+      final price = double.tryParse(_priceController.text.trim()) ?? 0;
+      final endTime = startTime.add(Duration(minutes: duration));
       final recurrenceRule = _recurrenceRuleFor(_repeatMode);
       final repeatOccurrences = _repeatOccurrencesFor(_repeatMode);
+      final serviceName = _customService
+          ? _customServiceController.text.trim()
+          : _selectedServiceName;
+      final serviceLabel = serviceName?.isNotEmpty == true
+          ? serviceName!
+          : 'Booking';
+      final settings = await ref.read(workspaceSettingsProvider.future);
+      final location = _locationTextWithDefault(
+        settings?['business_address'] as String?,
+      );
 
       await ref
           .read(appointmentsRepositoryProvider)
           .create(
             workspaceId: workspaceId,
-            contactId: _selectedClientId!,
-            serviceId: _selectedServiceId!,
-            title: _selectedServiceName,
+            contactId: contactId!,
+            serviceId: _customService ? null : _selectedServiceId,
+            title: serviceName,
             startTime: startTime,
             endTime: endTime,
-            price: _selectedPrice ?? 0,
+            price: price,
             notes: _notesController.text,
+            location: location,
             recurrenceRule: recurrenceRule,
             repeatOccurrences: repeatOccurrences,
           );
@@ -241,12 +286,13 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                 ? 'Repeating booking created'
                 : 'New booking created',
             body: repeatOccurrences > 1
-                ? 'Created $repeatOccurrences appointments for ${_selectedServiceName ?? 'this service'}.'
-                : '${_selectedServiceName ?? 'Appointment'} booked for ${_formatDate(_selectedDate)}.',
+                ? 'Created $repeatOccurrences bookings for $serviceLabel.'
+                : '$serviceLabel booked for ${_formatDate(_selectedDate)}.',
             deepLink: '/work',
           );
 
       ref.invalidate(appointmentsProvider);
+      ref.invalidate(clientsProvider);
       ref.invalidate(notificationsProvider);
       ref.invalidate(unreadNotificationsProvider);
       if (mounted) Navigator.pop(context);
@@ -261,6 +307,39 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         );
       }
     }
+  }
+
+  bool get _canSave {
+    final hasClient =
+        _selectedClientId != null ||
+        (_creatingClient && _newClientNameController.text.trim().isNotEmpty);
+    final hasService =
+        (_selectedServiceId != null && !_customService) ||
+        (_customService && _customServiceController.text.trim().isNotEmpty);
+    final price = double.tryParse(_priceController.text.trim());
+    final duration = int.tryParse(_durationController.text.trim());
+    return hasClient &&
+        hasService &&
+        price != null &&
+        price >= 0 &&
+        duration != null &&
+        duration > 0;
+  }
+
+  String? _locationTextWithDefault(String? businessAddress) {
+    final custom = _locationController.text.trim();
+    if (_locationMode == 'business') {
+      if (custom.isNotEmpty) return custom;
+      final address = businessAddress?.trim();
+      return address?.isNotEmpty == true ? address : 'Business location';
+    }
+    if (_locationMode == 'client') {
+      return custom.isEmpty ? 'Client location' : custom;
+    }
+    if (_locationMode == 'online') {
+      return custom.isEmpty ? 'Online / phone' : custom;
+    }
+    return custom.isEmpty ? null : custom;
   }
 
   @override
@@ -357,21 +436,14 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap:
-                        (_selectedClientId != null &&
-                            _selectedServiceId != null &&
-                            !_saving)
-                        ? _save
-                        : null,
+                    onTap: _canSave && !_saving ? _save : null,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color:
-                            (_selectedClientId != null &&
-                                _selectedServiceId != null)
+                        color: _canSave
                             ? AppColors.green
                             : AppColors.bgInteract,
                         borderRadius: BorderRadius.circular(10),
@@ -392,11 +464,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color:
-                                    (_selectedClientId != null &&
-                                        _selectedServiceId != null)
-                                    ? Colors.white
-                                    : AppColors.t3,
+                                color: _canSave ? Colors.white : AppColors.t3,
                               ),
                             ),
                     ),
@@ -418,57 +486,116 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                     clients.when(
                       loading: () => _skeleton(54),
                       error: (_, __) => _errorBox('Error loading clients'),
-                      data: (data) => Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedClientId,
-                            isExpanded: true,
-                            dropdownColor: AppColors.bgRaised,
-                            icon: const Padding(
-                              padding: EdgeInsets.only(right: 14),
-                              child: Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                color: AppColors.t3,
+                      data: (data) => Column(
+                        children: [
+                          if (!_creatingClient)
+                            Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.bgCard,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppColors.border),
                               ),
-                            ),
-                            hint: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16),
-                              child: Text(
-                                'Select client',
-                                style: TextStyle(
-                                  color: AppColors.t3,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                            items: data
-                                .map(
-                                  (c) => DropdownMenuItem(
-                                    value: c.id,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                      ),
-                                      child: Text(
-                                        c.name,
-                                        style: const TextStyle(
-                                          color: AppColors.t1,
-                                          fontSize: 15,
-                                        ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _selectedClientId,
+                                  isExpanded: true,
+                                  dropdownColor: AppColors.bgRaised,
+                                  icon: const Padding(
+                                    padding: EdgeInsets.only(right: 14),
+                                    child: Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      color: AppColors.t3,
+                                    ),
+                                  ),
+                                  hint: const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    child: Text(
+                                      'Select client',
+                                      style: TextStyle(
+                                        color: AppColors.t3,
+                                        fontSize: 15,
                                       ),
                                     ),
                                   ),
-                                )
-                                .toList(),
-                            onChanged: (v) =>
-                                setState(() => _selectedClientId = v),
+                                  items: data
+                                      .map(
+                                        (c) => DropdownMenuItem(
+                                          value: c.id,
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                            ),
+                                            child: Text(
+                                              c.name,
+                                              style: const TextStyle(
+                                                color: AppColors.t1,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) =>
+                                      setState(() => _selectedClientId = v),
+                                ),
+                              ),
+                            ),
+                          if (_creatingClient) ...[
+                            _textInput(
+                              controller: _newClientNameController,
+                              hint: 'Client name',
+                              onChanged: (_) => setState(() {}),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _textInput(
+                                    controller: _newClientPhoneController,
+                                    hint: 'Phone',
+                                    keyboardType: TextInputType.phone,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _textInput(
+                                    controller: _newClientEmailController,
+                                    hint: 'Email',
+                                    keyboardType: TextInputType.emailAddress,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _creatingClient = !_creatingClient;
+                                  if (_creatingClient) {
+                                    _selectedClientId = null;
+                                  }
+                                });
+                              },
+                              icon: Icon(
+                                _creatingClient
+                                    ? Icons.person_search_rounded
+                                    : Icons.person_add_alt_rounded,
+                                size: 16,
+                              ),
+                              label: Text(
+                                _creatingClient
+                                    ? 'Choose existing client'
+                                    : 'Add new client',
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -479,82 +606,169 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                     services.when(
                       loading: () => _skeleton(54),
                       error: (_, __) => _errorBox('Error loading services'),
-                      data: (data) => Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedServiceId,
-                            isExpanded: true,
-                            dropdownColor: AppColors.bgRaised,
-                            icon: const Padding(
-                              padding: EdgeInsets.only(right: 14),
-                              child: Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                color: AppColors.t3,
-                              ),
+                      data: (data) => Column(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.bgCard,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.border),
                             ),
-                            hint: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16),
-                              child: Text(
-                                'Select service',
-                                style: TextStyle(
-                                  color: AppColors.t3,
-                                  fontSize: 15,
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _selectedServiceId,
+                                isExpanded: true,
+                                dropdownColor: AppColors.bgRaised,
+                                icon: const Padding(
+                                  padding: EdgeInsets.only(right: 14),
+                                  child: Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    color: AppColors.t3,
+                                  ),
                                 ),
-                              ),
-                            ),
-                            items: data
-                                .map(
-                                  (s) => DropdownMenuItem(
-                                    value: s['id'] as String,
+                                hint: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 16),
+                                  child: Text(
+                                    'Select service',
+                                    style: TextStyle(
+                                      color: AppColors.t3,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
+                                items: [
+                                  ...data.map(
+                                    (s) => DropdownMenuItem(
+                                      value: s['id'] as String,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                s['name'] as String,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: AppColors.t1,
+                                                  fontSize: 15,
+                                                ),
+                                              ),
+                                            ),
+                                            Text(
+                                              '£${(s['price'] as num).toStringAsFixed(0)} · ${s['duration_mins']}min',
+                                              style: const TextStyle(
+                                                color: AppColors.t3,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const DropdownMenuItem(
+                                    value: _customServiceId,
                                     child: Padding(
-                                      padding: const EdgeInsets.symmetric(
+                                      padding: EdgeInsets.symmetric(
                                         horizontal: 16,
                                       ),
                                       child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
                                         children: [
+                                          Icon(
+                                            Icons.edit_note_rounded,
+                                            color: AppColors.t3,
+                                            size: 17,
+                                          ),
+                                          SizedBox(width: 10),
                                           Text(
-                                            s['name'] as String,
-                                            style: const TextStyle(
+                                            'Custom service',
+                                            style: TextStyle(
                                               color: AppColors.t1,
                                               fontSize: 15,
-                                            ),
-                                          ),
-                                          Text(
-                                            '£${(s['price'] as num).toStringAsFixed(0)} · ${s['duration_mins']}min',
-                                            style: const TextStyle(
-                                              color: AppColors.t3,
-                                              fontSize: 12,
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
                                   ),
-                                )
-                                .toList(),
-                            onChanged: (v) {
-                              final svc = data.firstWhere(
-                                (s) => s['id'] == v,
-                                orElse: () => {},
-                              );
-                              setState(() {
-                                _selectedServiceId = v;
-                                _selectedServiceName = svc['name'] as String?;
-                                _selectedPrice = (svc['price'] as num?)
-                                    ?.toDouble();
-                                _selectedDuration =
-                                    svc['duration_mins'] as int? ?? 60;
-                              });
-                            },
+                                ],
+                                onChanged: (v) {
+                                  if (v == _customServiceId) {
+                                    setState(() {
+                                      _selectedServiceId = v;
+                                      _customService = true;
+                                      _selectedServiceName = null;
+                                      _priceController.clear();
+                                      _durationController.text = '60';
+                                      _selectedDuration = 60;
+                                    });
+                                    return;
+                                  }
+                                  final svc = data.firstWhere(
+                                    (s) => s['id'] == v,
+                                    orElse: () => {},
+                                  );
+                                  final price = (svc['price'] as num?)
+                                      ?.toDouble();
+                                  final duration =
+                                      svc['duration_mins'] as int? ?? 60;
+                                  setState(() {
+                                    _selectedServiceId = v;
+                                    _customService = false;
+                                    _selectedServiceName =
+                                        svc['name'] as String?;
+                                    _selectedDuration = duration;
+                                    _priceController.text = price == null
+                                        ? ''
+                                        : price.toStringAsFixed(0);
+                                    _durationController.text = '$duration';
+                                  });
+                                },
+                              ),
+                            ),
                           ),
-                        ),
+                          if (_customService) ...[
+                            const SizedBox(height: 10),
+                            _textInput(
+                              controller: _customServiceController,
+                              hint: 'Service name',
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ],
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _textInput(
+                                  controller: _priceController,
+                                  hint: 'Price',
+                                  prefix: '£',
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _textInput(
+                                  controller: _durationController,
+                                  hint: 'Duration',
+                                  suffix: 'min',
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedDuration =
+                                          int.tryParse(value) ?? 60;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -652,6 +866,70 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                           ],
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Location ─────────────────────────────────────
+                    _label('LOCATION'),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children:
+                          const [
+                            _LocationChoice(
+                              value: 'business',
+                              label: 'Business',
+                            ),
+                            _LocationChoice(value: 'client', label: 'Client'),
+                            _LocationChoice(value: 'custom', label: 'Custom'),
+                            _LocationChoice(value: 'online', label: 'Online'),
+                          ].map((choice) {
+                            final selected = _locationMode == choice.value;
+                            return GestureDetector(
+                              onTap: () =>
+                                  setState(() => _locationMode = choice.value),
+                              child: AnimatedContainer(
+                                duration: AppMotion.fast,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 13,
+                                  vertical: 9,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? AppColors.slateLight
+                                      : AppColors.bgCard,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: selected
+                                        ? AppColors.borderStrong
+                                        : AppColors.border,
+                                  ),
+                                ),
+                                child: Text(
+                                  choice.label,
+                                  style: TextStyle(
+                                    color: selected
+                                        ? AppColors.panelInk
+                                        : AppColors.t2,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 10),
+                    _textInput(
+                      controller: _locationController,
+                      hint: _locationMode == 'business'
+                          ? 'Business address or room'
+                          : _locationMode == 'client'
+                          ? 'Client address'
+                          : _locationMode == 'online'
+                          ? 'Call link or phone note'
+                          : 'Custom location',
                     ),
                     const SizedBox(height: 20),
 
@@ -820,42 +1098,6 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                     ],
                     const SizedBox(height: 20),
 
-                    // ── Price ─────────────────────────────────────────
-                    if (_selectedPrice != null) ...[
-                      _label('PRICE'),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.attach_money_rounded,
-                              color: AppColors.t3,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              '£${_selectedPrice!.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.t1,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-
                     // ── Notes ─────────────────────────────────────────
                     _label('NOTES (OPTIONAL)'),
                     const SizedBox(height: 8),
@@ -928,6 +1170,48 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     ),
   );
 
+  Widget _textInput({
+    required TextEditingController controller,
+    required String hint,
+    String? prefix,
+    String? suffix,
+    TextInputType? keyboardType,
+    ValueChanged<String>? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      onChanged: onChanged,
+      style: const TextStyle(color: AppColors.t1, fontSize: 15),
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixText: prefix,
+        suffixText: suffix,
+        prefixStyle: const TextStyle(color: AppColors.t2),
+        suffixStyle: const TextStyle(color: AppColors.t3),
+        hintStyle: const TextStyle(color: AppColors.t3),
+        filled: true,
+        fillColor: AppColors.bgCard,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+      ),
+    );
+  }
+
   String _formatDate(DateTime dt) {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const months = [
@@ -975,4 +1259,11 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     };
     return 'Creates $count bookings $label from the selected date.';
   }
+}
+
+class _LocationChoice {
+  final String value;
+  final String label;
+
+  const _LocationChoice({required this.value, required this.label});
 }

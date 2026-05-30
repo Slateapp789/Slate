@@ -192,11 +192,6 @@ class _BookingCalendarView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final today = _dateOnly(DateTime.now());
-    final days = List.generate(21, (index) {
-      return today.add(Duration(days: index - 3));
-    });
-
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
       color: AppColors.green,
@@ -208,26 +203,11 @@ class _BookingCalendarView extends StatelessWidget {
           112,
         ),
         children: [
-          SizedBox(
-            height: 92,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: days.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final day = days[index];
-                final selected = _dateOnly(day) == _dateOnly(selectedDate);
-                final count = _countForDay(day);
-                final value = _valueForDay(day);
-                return _CalendarDayChip(
-                  date: day,
-                  selected: selected,
-                  count: count,
-                  value: value,
-                  onTap: () => onDateSelected(_dateOnly(day)),
-                );
-              },
-            ),
+          _MonthCalendar(
+            selectedDate: selectedDate,
+            countForDay: _countForDay,
+            valueForDay: _valueForDay,
+            onDateSelected: onDateSelected,
           ),
           const SizedBox(height: 16),
           _DayPlanHeader(
@@ -295,79 +275,184 @@ class _BookingCalendarView extends StatelessWidget {
   }
 }
 
-class _CalendarDayChip extends StatelessWidget {
-  final DateTime date;
-  final bool selected;
-  final int count;
-  final double value;
-  final VoidCallback onTap;
+class _MonthCalendar extends StatelessWidget {
+  final DateTime selectedDate;
+  final int Function(DateTime day) countForDay;
+  final double Function(DateTime day) valueForDay;
+  final ValueChanged<DateTime> onDateSelected;
 
-  const _CalendarDayChip({
-    required this.date,
-    required this.selected,
-    required this.count,
-    required this.value,
-    required this.onTap,
+  const _MonthCalendar({
+    required this.selectedDate,
+    required this.countForDay,
+    required this.valueForDay,
+    required this.onDateSelected,
   });
 
   @override
   Widget build(BuildContext context) {
-    const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppMotion.standard,
-        curve: AppMotion.curve,
-        width: 68,
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.slateLight
-              : AppColors.t1.withValues(alpha: 0.045),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: selected
-                ? AppColors.borderStrong
-                : AppColors.t1.withValues(alpha: 0.06),
+    final month = DateTime(selectedDate.year, selectedDate.month);
+    final firstGridDay = month.subtract(Duration(days: month.weekday - 1));
+    final days = List.generate(42, (index) {
+      return firstGridDay.add(Duration(days: index));
+    });
+    const weekdayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+    return SlateSurface(
+      radius: AppRadius.xl,
+      color: AppColors.panelSoft,
+      borderColor: AppColors.t1.withValues(alpha: 0.06),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              IconButton(
+                onPressed: () => onDateSelected(
+                  DateTime(selectedDate.year, selectedDate.month - 1, 1),
+                ),
+                icon: const Icon(LucideIcons.chevronLeft, size: 18),
+              ),
+              Expanded(
+                child: Text(
+                  _monthLabel(month),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.t1,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => onDateSelected(
+                  DateTime(selectedDate.year, selectedDate.month + 1, 1),
+                ),
+                icon: const Icon(LucideIcons.chevronRight, size: 18),
+              ),
+            ],
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              days[date.weekday - 1],
-              style: TextStyle(
-                color: selected ? AppColors.panelInk : AppColors.t3,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
+          const SizedBox(height: 8),
+          Row(
+            children: weekdayLabels
+                .map(
+                  (label) => Expanded(
+                    child: Center(
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+          GridView.builder(
+            itemCount: days.length,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+              childAspectRatio: 0.82,
             ),
-            const SizedBox(height: 5),
-            Text(
-              '${date.day}',
-              style: TextStyle(
-                color: selected ? AppColors.panelInk : AppColors.t1,
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                height: 1,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              count == 0 ? 'clear' : '$count · £${value.toStringAsFixed(0)}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: selected ? AppColors.panelInk : AppColors.t3,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
+            itemBuilder: (context, index) {
+              final date = days[index];
+              final selected = _dateOnly(date) == _dateOnly(selectedDate);
+              final inMonth = date.month == month.month;
+              final count = countForDay(date);
+              final value = valueForDay(date);
+              return GestureDetector(
+                onTap: () => onDateSelected(_dateOnly(date)),
+                child: AnimatedContainer(
+                  duration: AppMotion.fast,
+                  curve: AppMotion.curve,
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.slateLight
+                        : count > 0
+                        ? AppColors.greenDim
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(
+                      color: selected
+                          ? AppColors.borderStrong
+                          : AppColors.t1.withValues(alpha: 0.05),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '${date.day}',
+                        style: TextStyle(
+                          color: selected
+                              ? AppColors.panelInk
+                              : inMonth
+                              ? AppColors.t1
+                              : AppColors.t3.withValues(alpha: 0.42),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (count > 0)
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? AppColors.panelInk
+                                : AppColors.green,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      if (count > 0 && value > 0) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '£${value.toStringAsFixed(0)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.fade,
+                          style: TextStyle(
+                            color: selected ? AppColors.panelInk : AppColors.t3,
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
+}
+
+String _monthLabel(DateTime month) {
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  return '${months[month.month - 1]} ${month.year}';
 }
 
 class _DayPlanHeader extends StatelessWidget {
@@ -439,7 +524,10 @@ class _AppointmentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = appt['status'] as String? ?? 'scheduled';
     final clientName = appt['contacts']?['name'] as String? ?? 'Walk-in';
-    final serviceName = appt['services']?['name'] as String? ?? 'Appointment';
+    final serviceName =
+        appt['services']?['name'] as String? ??
+        appt['title'] as String? ??
+        'Booking';
     final startDt = DateTime.tryParse(
       appt['start_time'] as String? ?? '',
     )?.toLocal();

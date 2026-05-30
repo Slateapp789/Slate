@@ -146,7 +146,7 @@ class NotificationSettingsView extends ConsumerWidget {
               _PreferenceItem(
                 'no_show',
                 'No-show check',
-                'Appointment has not been completed.',
+                'Booking has not been completed.',
               ),
               _PreferenceItem(
                 'lead_followup',
@@ -155,7 +155,7 @@ class NotificationSettingsView extends ConsumerWidget {
               ),
               _PreferenceItem(
                 'appointment_reminder_15',
-                '15 min appointment reminder',
+                '15 min booking reminder',
                 'Optional owner reminder.',
               ),
               _PreferenceItem(
@@ -173,7 +173,7 @@ class NotificationSettingsView extends ConsumerWidget {
               _PreferenceItem(
                 'morning_digest',
                 'Morning digest',
-                'Appointments, tasks and outstanding money.',
+                'Bookings, tasks and outstanding money.',
               ),
               _PreferenceItem(
                 'weekly_summary',

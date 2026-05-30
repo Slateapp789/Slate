@@ -23,3 +23,9 @@ final taskChecklistProvider =
     FutureProvider.family<List<TaskChecklistItem>, String>((ref, taskId) {
       return ref.watch(tasksRepositoryProvider).checklistItems(taskId);
     });
+
+final appointmentTasksProvider = FutureProvider.family<List<SlateTask>, String>(
+  (ref, appointmentId) {
+    return ref.watch(tasksRepositoryProvider).forAppointment(appointmentId);
+  },
+);

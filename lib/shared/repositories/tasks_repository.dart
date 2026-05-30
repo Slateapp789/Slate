@@ -50,6 +50,20 @@ class TasksRepository {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  Future<List<SlateTask>> forAppointment(String appointmentId) async {
+    final rows = await _client
+        .from('tasks')
+        .select('*, contacts(name)')
+        .eq('appointment_id', appointmentId)
+        .order('due_date', ascending: true)
+        .order('created_at', ascending: true);
+    return rows
+        .map<SlateTask>(
+          (row) => SlateTask.fromMap(Map<String, dynamic>.from(row)),
+        )
+        .toList();
+  }
+
   Future<List<SlateTask>> forClient(String clientId) async {
     final rows = await forClientRows(clientId);
     return rows.map<SlateTask>((row) => SlateTask.fromMap(row)).toList();
@@ -62,6 +76,7 @@ class TasksRepository {
     String reminderTiming = 'none',
     DateTime? dueDate,
     String? contactId,
+    String? appointmentId,
   }) async {
     final row = await _client
         .from('tasks')
@@ -73,6 +88,7 @@ class TasksRepository {
           'due_date': dueDate?.toIso8601String().split('T').first,
           'status': 'open',
           'contact_id': contactId,
+          'appointment_id': appointmentId,
         })
         .select('id')
         .single();
@@ -96,6 +112,7 @@ class TasksRepository {
     String reminderTiming = 'none',
     DateTime? dueDate,
     String? contactId,
+    String? appointmentId,
   }) async {
     await _client
         .from('tasks')
@@ -105,6 +122,7 @@ class TasksRepository {
           'reminder_timing': reminderTiming,
           'due_date': dueDate?.toIso8601String().split('T').first,
           'contact_id': contactId,
+          'appointment_id': appointmentId,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', taskId);

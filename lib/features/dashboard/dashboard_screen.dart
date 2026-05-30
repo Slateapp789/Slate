@@ -201,7 +201,7 @@ class DashboardScreen extends ConsumerWidget {
                 data: (appts) => appts.isEmpty
                     ? _emptyCard(
                         LucideIcons.calendar,
-                        'No appointments today',
+                        'No bookings today',
                         'Tap + to add one',
                       )
                     : SlateSurface(
@@ -232,7 +232,7 @@ class DashboardScreen extends ConsumerWidget {
                         ),
                       ),
                 loading: () => _skeletonBox(height: 118),
-                error: (_, __) => _errorCard('Could not load appointments'),
+                error: (_, __) => _errorCard('Could not load bookings'),
               ),
               const SizedBox(height: 24),
 
@@ -524,7 +524,10 @@ class _DashboardTimelineRow extends StatelessWidget {
         ? null
         : '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
     final clientName = appt['contacts']?['name'] as String? ?? 'Walk-in';
-    final serviceName = appt['services']?['name'] as String? ?? 'Appointment';
+    final serviceName =
+        appt['services']?['name'] as String? ??
+        appt['title'] as String? ??
+        'Booking';
 
     return InkWell(
       borderRadius: BorderRadius.circular(AppRadius.md),

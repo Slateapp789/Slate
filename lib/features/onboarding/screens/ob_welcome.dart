@@ -42,7 +42,7 @@ class ObWelcome extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Your appointments, clients, and payments — one app built for people who work for themselves.',
+            'Your bookings, clients, and payments — one app built for people who work for themselves.',
             style: TextStyle(fontSize: 16, color: AppColors.t3, height: 1.5),
           ),
           const SizedBox(height: 40),

@@ -76,8 +76,8 @@ const _taskTemplates = [
     dueInDays: 0,
   ),
   _TaskTemplate(
-    label: 'Prep job',
-    title: 'Prep for appointment',
+    label: 'Prep booking',
+    title: 'Prep for booking',
     priority: 'medium',
     dueInDays: 0,
   ),

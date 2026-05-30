@@ -588,7 +588,7 @@ class _EmptyTimeline extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: const Text(
-        'Appointments, payments, and tasks will appear here as the relationship builds.',
+        'Bookings, payments, and tasks will appear here as the relationship builds.',
         textAlign: TextAlign.center,
         style: TextStyle(color: AppColors.t3, fontSize: 13, height: 1.35),
       ),
@@ -615,7 +615,10 @@ class _TimelineItem {
     final date =
         _appointmentDate(row) ?? DateTime.fromMillisecondsSinceEpoch(0);
     final status = row['status'] as String? ?? 'scheduled';
-    final service = row['services']?['name'] as String? ?? 'Appointment';
+    final service =
+        row['services']?['name'] as String? ??
+        row['title'] as String? ??
+        'Booking';
     final price = row['price'] is num
         ? ' · £${(row['price'] as num).toStringAsFixed(0)}'
         : '';

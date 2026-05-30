@@ -5,7 +5,9 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/providers/appointments_provider.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
+import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
+import '../../shared/models/slate_models.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import 'widgets/appointment_detail_widgets.dart';
 
@@ -38,6 +40,9 @@ class _AppointmentDetailScreenState
   DateTime _selectedDate = DateTime.now();
   int _selectedHour = 9;
   int _selectedMinute = 0;
+  late TextEditingController _serviceTitleController;
+  late TextEditingController _durationController;
+  late TextEditingController _locationController;
   late TextEditingController _notesController;
   late TextEditingController _priceController;
   List<Map<String, dynamic>> _services = [];
@@ -49,24 +54,44 @@ class _AppointmentDetailScreenState
     _notesController = TextEditingController(
       text: _appt['notes'] as String? ?? '',
     );
+    _serviceTitleController = TextEditingController(
+      text:
+          _appt['services']?['name'] as String? ??
+          _appt['title'] as String? ??
+          '',
+    );
     _priceController = TextEditingController(
       text: _appt['price']?.toString() ?? '',
     );
+    _locationController = TextEditingController(
+      text: _appt['location'] as String? ?? '',
+    );
     final startTime = DateTime.tryParse(
       _appt['start_time'] as String? ?? '',
+    )?.toLocal();
+    final endTime = DateTime.tryParse(
+      _appt['end_time'] as String? ?? '',
     )?.toLocal();
     if (startTime != null) {
       _selectedDate = startTime;
       _selectedHour = startTime.hour;
       _selectedMinute = startTime.minute;
     }
+    _durationController = TextEditingController(
+      text: startTime != null && endTime != null
+          ? '${endTime.difference(startTime).inMinutes}'
+          : '60',
+    );
     _selectedClientId = _appt['contact_id'] as String?;
-    _selectedServiceId = _appt['service_id'] as String?;
+    _selectedServiceId = _appt['service_id'] as String? ?? '__custom__';
     _loadServices();
   }
 
   @override
   void dispose() {
+    _serviceTitleController.dispose();
+    _durationController.dispose();
+    _locationController.dispose();
     _notesController.dispose();
     _priceController.dispose();
     super.dispose();
@@ -103,11 +128,11 @@ class _AppointmentDetailScreenState
               workspaceId: workspaceId,
               type: status == 'no_show' ? 'no_show' : 'booking',
               title: status == 'no_show'
-                  ? 'Appointment no-show'
-                  : 'Appointment cancelled',
+                  ? 'Booking no-show'
+                  : 'Booking cancelled',
               body: cancelReason?.isNotEmpty == true
                   ? '$name: $cancelReason'
-                  : '$name appointment was updated.',
+                  : '$name booking was updated.',
               deepLink: '/work',
             );
       }
@@ -135,20 +160,30 @@ class _AppointmentDetailScreenState
         _selectedHour,
         _selectedMinute,
       ).toUtc();
-      int durationMins = 60;
-      if (_selectedServiceId != null) {
+      int durationMins = int.tryParse(_durationController.text.trim()) ?? 60;
+      if (_selectedServiceId != null && _selectedServiceId != '__custom__') {
         final svc = _services.firstWhere(
           (s) => s['id'] == _selectedServiceId,
           orElse: () => {},
         );
-        durationMins = svc['duration_mins'] as int? ?? 60;
+        durationMins =
+            int.tryParse(_durationController.text.trim()) ??
+            (svc['duration_mins'] as int? ?? 60);
       }
       final endTime = startTime.add(Duration(minutes: durationMins));
       final updates = {
         'contact_id': _selectedClientId,
-        'service_id': _selectedServiceId,
+        'service_id': _selectedServiceId == '__custom__'
+            ? null
+            : _selectedServiceId,
+        'title': _serviceTitleController.text.trim().isEmpty
+            ? 'Booking'
+            : _serviceTitleController.text.trim(),
         'start_time': startTime.toIso8601String(),
         'end_time': endTime.toIso8601String(),
+        'location': _locationController.text.trim().isEmpty
+            ? null
+            : _locationController.text.trim(),
         'notes': _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
@@ -177,6 +212,96 @@ class _AppointmentDetailScreenState
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: AppColors.error),
+    );
+  }
+
+  Future<void> _addLinkedTask(String title) async {
+    final cleaned = title.trim();
+    if (cleaned.isEmpty) return;
+    final workspaceId = await ref.read(workspaceIdProvider.future);
+    if (workspaceId == null) return;
+    await ref
+        .read(tasksRepositoryProvider)
+        .create(
+          workspaceId: workspaceId,
+          title: cleaned,
+          priority: 'medium',
+          dueDate: _selectedDate,
+          contactId: _appt['contact_id'] as String?,
+          appointmentId: _appt['id'] as String,
+        );
+    ref.invalidate(appointmentTasksProvider(_appt['id'] as String));
+    ref.invalidate(tasksProvider);
+    ref.invalidate(allTasksProvider);
+  }
+
+  void _showAddTaskSheet() {
+    final controller = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Add booking task',
+              style: TextStyle(
+                color: AppColors.t1,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              style: const TextStyle(color: AppColors.t1),
+              decoration: InputDecoration(
+                hintText: 'e.g. Confirm address',
+                hintStyle: const TextStyle(color: AppColors.t3),
+                filled: true,
+                fillColor: AppColors.bgInteract,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.green),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () async {
+                  await _addLinkedTask(controller.text);
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: const Text('Add Task'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -380,7 +505,7 @@ class _AppointmentDetailScreenState
               ),
               const SizedBox(height: 20),
               const Text(
-                'Cancel Appointment',
+                'Cancel Booking',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -488,7 +613,7 @@ class _AppointmentDetailScreenState
                     elevation: 0,
                   ),
                   child: const Text(
-                    'Cancel Appointment',
+                    'Cancel Booking',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -506,7 +631,10 @@ class _AppointmentDetailScreenState
   Widget build(BuildContext context) {
     final status = _appt['status'] as String? ?? 'scheduled';
     final clientName = _appt['contacts']?['name'] as String? ?? 'Walk-in';
-    final serviceName = _appt['services']?['name'] as String? ?? 'Appointment';
+    final serviceName =
+        _appt['services']?['name'] as String? ??
+        _appt['title'] as String? ??
+        'Booking';
     final startTime = DateTime.tryParse(
       _appt['start_time'] as String? ?? '',
     )?.toLocal();
@@ -517,6 +645,9 @@ class _AppointmentDetailScreenState
     final price = _appt['price'];
     final recurrenceRule = _appt['recurrence_rule'] as String?;
     final clients = ref.watch(clientsProvider);
+    final linkedTasks = ref.watch(
+      appointmentTasksProvider(_appt['id'] as String),
+    );
     final statusColor = status == 'completed'
         ? AppColors.success
         : status == 'cancelled'
@@ -563,7 +694,7 @@ class _AppointmentDetailScreenState
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
-                      'Appointment',
+                      'Booking',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
@@ -652,8 +783,33 @@ class _AppointmentDetailScreenState
                 selectedClientId: _selectedClientId,
                 selectedServiceId: _selectedServiceId,
                 priceController: _priceController,
+                serviceTitleController: _serviceTitleController,
+                durationController: _durationController,
                 onClientChanged: (v) => setState(() => _selectedClientId = v),
-                onServiceChanged: (v) => setState(() => _selectedServiceId = v),
+                onServiceChanged: (v) {
+                  if (v == null) return;
+                  if (v == '__custom__') {
+                    setState(() => _selectedServiceId = v);
+                    return;
+                  }
+                  final service = _services.firstWhere(
+                    (s) => s['id'] == v,
+                    orElse: () => {},
+                  );
+                  setState(() {
+                    _selectedServiceId = v;
+                    _serviceTitleController.text =
+                        service['name'] as String? ?? '';
+                    final price = (service['price'] as num?)?.toDouble();
+                    if (price != null) {
+                      _priceController.text = price.toStringAsFixed(0);
+                    }
+                    final duration = service['duration_mins'] as int?;
+                    if (duration != null) {
+                      _durationController.text = '$duration';
+                    }
+                  });
+                },
               ),
               const SizedBox(height: 12),
 
@@ -667,6 +823,78 @@ class _AppointmentDetailScreenState
                 selectedMinute: _selectedMinute,
                 onPickDate: _pickDate,
                 onPickTime: _pickTime,
+              ),
+              const SizedBox(height: 12),
+
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.bgCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: _editing
+                    ? TextField(
+                        controller: _locationController,
+                        style: const TextStyle(color: AppColors.t1),
+                        decoration: InputDecoration(
+                          labelText: 'Location',
+                          labelStyle: const TextStyle(
+                            color: AppColors.t3,
+                            fontSize: 13,
+                          ),
+                          filled: true,
+                          fillColor: AppColors.bgInteract,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: AppColors.green,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Row(
+                        children: [
+                          const Icon(
+                            LucideIcons.mapPin,
+                            color: AppColors.t3,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Location',
+                            style: TextStyle(fontSize: 13, color: AppColors.t3),
+                          ),
+                          const Spacer(),
+                          Flexible(
+                            child: Text(
+                              (_appt['location'] as String?)?.isNotEmpty == true
+                                  ? _appt['location'] as String
+                                  : 'Not set',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.t1,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
               ),
               const SizedBox(height: 12),
 
@@ -779,6 +1007,23 @@ class _AppointmentDetailScreenState
               ),
               const SizedBox(height: 32),
 
+              _BookingTasksCard(
+                tasks: linkedTasks,
+                onAddTask: _showAddTaskSheet,
+                onToggle: (task) async {
+                  final done = task.status == 'done';
+                  await ref
+                      .read(tasksRepositoryProvider)
+                      .updateStatus(task.id, done ? 'open' : 'done');
+                  ref.invalidate(
+                    appointmentTasksProvider(_appt['id'] as String),
+                  );
+                  ref.invalidate(tasksProvider);
+                  ref.invalidate(allTasksProvider);
+                },
+              ),
+              const SizedBox(height: 24),
+
               // ── Actions ───────────────────────────────────────────────────
               AppointmentActionSection(
                 status: status,
@@ -799,6 +1044,98 @@ class _AppointmentDetailScreenState
     if (rule.contains('FREQ=MONTHLY')) return 'Repeats monthly';
     if (rule.contains('INTERVAL=2')) return 'Repeats fortnightly';
     if (rule.contains('FREQ=WEEKLY')) return 'Repeats weekly';
-    return 'Repeating appointment';
+    return 'Repeating booking';
+  }
+}
+
+class _BookingTasksCard extends StatelessWidget {
+  final AsyncValue<List<SlateTask>> tasks;
+  final VoidCallback onAddTask;
+  final ValueChanged<SlateTask> onToggle;
+
+  const _BookingTasksCard({
+    required this.tasks,
+    required this.onAddTask,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(LucideIcons.listChecks, color: AppColors.t3, size: 16),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Booking tasks',
+                  style: TextStyle(
+                    color: AppColors.t1,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onAddTask,
+                icon: const Icon(LucideIcons.plus, size: 15),
+                label: const Text('Add'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          tasks.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
+            error: (_, __) => const Text(
+              'Could not load booking tasks',
+              style: TextStyle(color: AppColors.error, fontSize: 13),
+            ),
+            data: (items) {
+              if (items.isEmpty) {
+                return const Text(
+                  'Add prep, follow-up, or payment tasks for this booking.',
+                  style: TextStyle(color: AppColors.t3, fontSize: 13),
+                );
+              }
+              return Column(
+                children: items.map((task) {
+                  final done = task.status == 'done';
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () => onToggle(task),
+                    leading: Icon(
+                      done ? LucideIcons.checkCircle2 : LucideIcons.circle,
+                      color: done ? AppColors.success : AppColors.t3,
+                      size: 19,
+                    ),
+                    title: Text(
+                      task.title,
+                      style: TextStyle(
+                        color: done ? AppColors.t3 : AppColors.t1,
+                        decoration: done ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
   }
 }

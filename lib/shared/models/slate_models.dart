@@ -295,6 +295,7 @@ class SlateTask {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final String? contactId;
+  final String? appointmentId;
   final String? clientName;
 
   const SlateTask({
@@ -308,6 +309,7 @@ class SlateTask {
     this.createdAt,
     this.updatedAt,
     this.contactId,
+    this.appointmentId,
     this.clientName,
   });
 
@@ -324,6 +326,7 @@ class SlateTask {
       createdAt: _dateTimeFrom(map['created_at']),
       updatedAt: _dateTimeFrom(map['updated_at']),
       contactId: map['contact_id'] as String?,
+      appointmentId: map['appointment_id'] as String?,
       clientName: contact?['name'] as String?,
     );
   }
@@ -340,6 +343,7 @@ class SlateTask {
     if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
     if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     'contact_id': contactId,
+    'appointment_id': appointmentId,
   };
 }
 

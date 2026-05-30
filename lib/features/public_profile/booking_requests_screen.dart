@@ -199,7 +199,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Create an appointment for ${widget.request.name}.',
+                      'Create a booking for ${widget.request.name}.',
                       style: const TextStyle(color: AppColors.t3),
                     ),
                     const SizedBox(height: 18),
@@ -248,7 +248,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                       height: 50,
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Create appointment'),
+                        child: const Text('Create booking'),
                       ),
                     ),
                   ],

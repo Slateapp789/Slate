@@ -20,11 +20,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   DateTime _selectedCalendarDate = _dateOnly(DateTime.now());
+  bool _calendarMode = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -80,39 +81,70 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                       letterSpacing: 0,
                     ),
                   ),
-                  GestureDetector(
-                    onTap: _addAppointment,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.slateLight,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                        border: Border.all(
-                          color: AppColors.t1.withValues(alpha: 0.16),
-                        ),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(
-                            LucideIcons.plus,
-                            color: AppColors.panelInk,
-                            size: 14,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'New',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.panelInk,
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () =>
+                            setState(() => _calendarMode = !_calendarMode),
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: _calendarMode
+                                ? AppColors.slateLight
+                                : AppColors.bgCard,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            border: Border.all(
+                              color: AppColors.t1.withValues(alpha: 0.12),
                             ),
                           ),
-                        ],
+                          child: Icon(
+                            _calendarMode
+                                ? LucideIcons.list
+                                : LucideIcons.calendarDays,
+                            color: _calendarMode
+                                ? AppColors.panelInk
+                                : AppColors.t2,
+                            size: 17,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: _addAppointment,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.slateLight,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            border: Border.all(
+                              color: AppColors.t1.withValues(alpha: 0.16),
+                            ),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(
+                                LucideIcons.plus,
+                                color: AppColors.panelInk,
+                                size: 14,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'New',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.panelInk,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -137,44 +169,47 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
               error: (_, __) => const SizedBox.shrink(),
             ),
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.t1.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(
-                    color: AppColors.t1.withValues(alpha: 0.08),
-                  ),
+            if (!_calendarMode) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.pageX,
                 ),
-                child: TabBar(
-                  controller: _tabController,
-                  indicator: BoxDecoration(
-                    color: AppColors.t1.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.t1.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
                     border: Border.all(
-                      color: AppColors.t1.withValues(alpha: 0.14),
+                      color: AppColors.t1.withValues(alpha: 0.08),
                     ),
                   ),
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  indicatorPadding: const EdgeInsets.all(3),
-                  dividerColor: Colors.transparent,
-                  labelColor: AppColors.t1,
-                  unselectedLabelColor: AppColors.t3,
-                  labelStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                  child: TabBar(
+                    controller: _tabController,
+                    indicator: BoxDecoration(
+                      color: AppColors.t1.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: AppColors.t1.withValues(alpha: 0.14),
+                      ),
+                    ),
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicatorPadding: const EdgeInsets.all(3),
+                    dividerColor: Colors.transparent,
+                    labelColor: AppColors.t1,
+                    unselectedLabelColor: AppColors.t3,
+                    labelStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    tabs: const [
+                      Tab(text: 'Today'),
+                      Tab(text: 'Upcoming'),
+                      Tab(text: 'Past'),
+                    ],
                   ),
-                  tabs: const [
-                    Tab(text: 'Today'),
-                    Tab(text: 'Calendar'),
-                    Tab(text: 'Upcoming'),
-                    Tab(text: 'Past'),
-                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
 
             Expanded(
               child: appointments.when(
@@ -221,6 +256,20 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                     _selectedCalendarDate,
                   );
 
+                  if (_calendarMode) {
+                    return _BookingCalendarView(
+                      appointments: data,
+                      selectedDate: _selectedCalendarDate,
+                      selectedDayAppointments: selectedDayAppointments,
+                      onDateSelected: (date) {
+                        setState(() => _selectedCalendarDate = date);
+                      },
+                      onTap: _openDetail,
+                      onRefresh: () => ref.invalidate(appointmentsProvider),
+                      onEmptyAction: _addAppointment,
+                    );
+                  }
+
                   return TabBarView(
                     controller: _tabController,
                     children: [
@@ -233,17 +282,6 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                         onRefresh: () => ref.invalidate(appointmentsProvider),
                         onEmptyAction: _addAppointment,
                         groupByDate: false,
-                      ),
-                      _BookingCalendarView(
-                        appointments: data,
-                        selectedDate: _selectedCalendarDate,
-                        selectedDayAppointments: selectedDayAppointments,
-                        onDateSelected: (date) {
-                          setState(() => _selectedCalendarDate = date);
-                        },
-                        onTap: _openDetail,
-                        onRefresh: () => ref.invalidate(appointmentsProvider),
-                        onEmptyAction: _addAppointment,
                       ),
                       _AppointmentListView(
                         appointments: upcoming,
@@ -417,7 +455,7 @@ class _BookingCommandPanel extends StatelessWidget {
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
-                  'BOOKING CONTROL',
+                  "TODAY'S PLAN",
                   style: TextStyle(
                     color: AppColors.t3,
                     fontSize: 11,
@@ -427,7 +465,7 @@ class _BookingCommandPanel extends StatelessWidget {
               ),
               if (stats.overdueUnfinished > 0)
                 _CommandBadge(
-                  label: '${stats.overdueUnfinished} need closing',
+                  label: 'Review ${stats.overdueUnfinished} past',
                   color: AppColors.error,
                 ),
             ],
@@ -452,9 +490,9 @@ class _BookingCommandPanel extends StatelessWidget {
                 detail: '${stats.todayCompleted} done',
               ),
               _BookingMetric(
-                label: 'Week',
+                label: 'Next 7 days',
                 value: '${stats.weekBookings}',
-                detail: '£${stats.weekValue.toStringAsFixed(0)} booked',
+                detail: 'bookings · £${stats.weekValue.toStringAsFixed(0)}',
               ),
               _BookingMetric(
                 label: 'Earned',
