@@ -136,10 +136,16 @@ void main() {
         'preferred_time_text': 'Friday afternoon',
         'message': 'First visit',
         'status': 'contacted',
-        'services': {'name': 'Initial consultation'},
+        'services': {
+          'name': 'Initial consultation',
+          'duration_mins': 75,
+          'price': 80,
+        },
       });
 
       expect(request.serviceName, 'Initial consultation');
+      expect(request.serviceDurationMins, 75);
+      expect(request.servicePrice, 80);
       expect(request.preferredTimeText, 'Friday afternoon');
       expect(request.status, 'contacted');
       expect(request.toMap()['preferred_time_text'], 'Friday afternoon');

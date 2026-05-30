@@ -390,6 +390,8 @@ class BookingRequest {
   final String phone;
   final String? serviceId;
   final String? serviceName;
+  final int? serviceDurationMins;
+  final double? servicePrice;
   final String? preferredTimeText;
   final String? message;
   final String status;
@@ -402,6 +404,8 @@ class BookingRequest {
     required this.phone,
     this.serviceId,
     this.serviceName,
+    this.serviceDurationMins,
+    this.servicePrice,
     this.preferredTimeText,
     this.message,
     this.status = 'pending',
@@ -417,6 +421,12 @@ class BookingRequest {
       phone: map['phone'] as String? ?? '',
       serviceId: map['service_id'] as String?,
       serviceName: service?['name'] as String?,
+      serviceDurationMins: _intFrom(service?['duration_mins'], 0) == 0
+          ? null
+          : _intFrom(service?['duration_mins']),
+      servicePrice: service?['price'] == null
+          ? null
+          : _doubleFrom(service?['price']),
       preferredTimeText: map['preferred_time_text'] as String?,
       message: map['message'] as String?,
       status: map['status'] as String? ?? 'pending',

@@ -123,7 +123,7 @@ class ProfileRepository {
   Future<List<BookingRequest>> bookingRequests(String workspaceId) async {
     final rows = await _client
         .from('booking_requests')
-        .select('*, services(name)')
+        .select('*, services(name, duration_mins, price)')
         .eq('workspace_id', workspaceId)
         .order('created_at', ascending: false);
     return rows
@@ -141,6 +141,80 @@ class ProfileRepository {
         .from('booking_requests')
         .update({'status': status})
         .eq('id', requestId);
+  }
+
+  Future<void> confirmBookingRequest({
+    required BookingRequest request,
+    required DateTime startTime,
+    required int durationMins,
+    required double price,
+  }) async {
+    final contactId = await _findOrCreateRequestContact(request);
+    final endTime = startTime.add(Duration(minutes: durationMins));
+    final title = request.serviceName?.trim().isNotEmpty == true
+        ? request.serviceName!.trim()
+        : 'Booking request';
+    final notes = [
+      if (request.preferredTimeText?.trim().isNotEmpty == true)
+        'Requested time: ${request.preferredTimeText!.trim()}',
+      if (request.message?.trim().isNotEmpty == true) request.message!.trim(),
+    ].join('\n\n');
+
+    await _client.from('appointments').insert({
+      'workspace_id': request.workspaceId,
+      'contact_id': contactId,
+      if (request.serviceId != null) 'service_id': request.serviceId,
+      'title': title,
+      'start_time': startTime.toUtc().toIso8601String(),
+      'end_time': endTime.toUtc().toIso8601String(),
+      'price': price,
+      'status': 'scheduled',
+      'notes': notes.isEmpty ? null : notes,
+    });
+
+    await updateBookingRequestStatus(request.id, 'confirmed');
+
+    try {
+      await _client.from('notifications').insert({
+        'workspace_id': request.workspaceId,
+        'type': 'new_booking',
+        'title': 'Booking request confirmed',
+        'body': '${request.name} has been added to your calendar.',
+        'deep_link': '/work',
+      });
+    } catch (_) {
+      // Confirmation should still succeed before notification tables exist.
+    }
+  }
+
+  Future<String> _findOrCreateRequestContact(BookingRequest request) async {
+    final existing = await _client
+        .from('contacts')
+        .select('id')
+        .eq('workspace_id', request.workspaceId)
+        .eq('phone', request.phone)
+        .maybeSingle();
+    if (existing != null) return existing['id'] as String;
+
+    final notes = [
+      'Created from public booking request.',
+      if (request.preferredTimeText?.trim().isNotEmpty == true)
+        'Requested time: ${request.preferredTimeText!.trim()}',
+      if (request.message?.trim().isNotEmpty == true) request.message!.trim(),
+    ].join('\n\n');
+
+    final inserted = await _client
+        .from('contacts')
+        .insert({
+          'workspace_id': request.workspaceId,
+          'name': request.name.trim().isEmpty ? 'New client' : request.name,
+          'phone': request.phone.trim(),
+          'notes': notes,
+          'status': 'active',
+        })
+        .select('id')
+        .single();
+    return inserted['id'] as String;
   }
 }
 
