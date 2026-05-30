@@ -5,7 +5,7 @@ create or replace function public.is_workspace_member(target_workspace_id uuid)
 returns boolean
 language sql
 stable
-security definer
+security invoker
 set search_path = public
 as $$
   select exists (
@@ -18,7 +18,7 @@ $$;
 
 revoke execute on function public.is_workspace_member(uuid) from public;
 revoke execute on function public.is_workspace_member(uuid) from anon;
-revoke execute on function public.is_workspace_member(uuid) from authenticated;
+grant execute on function public.is_workspace_member(uuid) to authenticated;
 
 alter table if exists workspaces enable row level security;
 alter table if exists workspace_members enable row level security;
@@ -55,9 +55,11 @@ to authenticated
 with check (auth.uid() is not null);
 
 drop policy if exists "Members can read workspace members" on workspace_members;
-create policy "Members can read workspace members"
+drop policy if exists "Users can read their own workspace membership" on workspace_members;
+create policy "Users can read their own workspace membership"
 on workspace_members for select
-using (public.is_workspace_member(workspace_id));
+to authenticated
+using (user_id = auth.uid());
 
 drop policy if exists "Users can create their first workspace membership" on workspace_members;
 create policy "Users can create their first workspace membership"
