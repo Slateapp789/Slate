@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
+import '../../shared/providers/notifications_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import 'add_payment_screen.dart';
 import 'widgets/payment_cards.dart';
@@ -416,8 +417,20 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     await ref
                         .read(paymentsRepositoryProvider)
                         .markPaid(payment);
+                    await ref
+                        .read(notificationsRepositoryProvider)
+                        .create(
+                          workspaceId: payment.workspaceId,
+                          type: 'payment_received',
+                          title: 'Payment received',
+                          body:
+                              '£${amount.toStringAsFixed(0)} from ${payment.clientName ?? 'a client'} is now paid.',
+                          deepLink: '/payments',
+                        );
                     ref.invalidate(invoicesProvider);
                     ref.invalidate(dashboardRevenueProvider);
+                    ref.invalidate(notificationsProvider);
+                    ref.invalidate(unreadNotificationsProvider);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(

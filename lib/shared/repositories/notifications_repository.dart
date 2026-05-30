@@ -28,6 +28,15 @@ class NotificationsRepository {
         .toList();
   }
 
+  Future<int> unreadCount(String workspaceId) async {
+    final rows = await _client
+        .from('notifications')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .eq('read', false);
+    return List<Map<String, dynamic>>.from(rows).length;
+  }
+
   Future<Map<String, dynamic>?> preferences(String workspaceId) async {
     final prefs = await _client
         .from('notification_preferences')
@@ -53,5 +62,45 @@ class NotificationsRepository {
         .from('notifications')
         .update({'read': true})
         .eq('id', notificationId);
+  }
+
+  Future<void> create({
+    required String workspaceId,
+    required String type,
+    required String title,
+    required String body,
+    String? deepLink,
+  }) async {
+    final prefs = await preferences(workspaceId);
+    if (!_allowedByPreferences(type, prefs)) return;
+
+    try {
+      await _client.from('notifications').insert({
+        'workspace_id': workspaceId,
+        'type': type,
+        'title': title,
+        'body': body,
+        'deep_link': deepLink,
+      });
+    } catch (_) {
+      // Notification support is additive; primary workflows should continue.
+    }
+  }
+
+  bool _allowedByPreferences(String type, Map<String, dynamic>? prefs) {
+    if (prefs == null) return true;
+    if (prefs['all_notifications'] == false) return false;
+    final key = switch (type) {
+      'payment_received' || 'payment' => 'payment_received',
+      'new_booking' || 'booking' => 'new_booking',
+      'booking_request' => 'booking_request',
+      'invoice_overdue' => 'invoice_overdue',
+      'no_show' => 'no_show',
+      'task_due' || 'task' => 'task_due_morning',
+      'lead_followup' => 'lead_followup',
+      _ => null,
+    };
+    if (key == null) return true;
+    return prefs[key] as bool? ?? true;
   }
 }

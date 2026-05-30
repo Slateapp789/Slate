@@ -60,6 +60,10 @@ final _router = GoRouter(
     GoRoute(path: '/home', builder: (context, state) => const MainShell()),
     GoRoute(path: '/tasks', builder: (context, state) => const TasksScreen()),
     GoRoute(
+      path: '/work',
+      builder: (context, state) => const AppointmentsScreen(),
+    ),
+    GoRoute(
       path: '/payments',
       builder: (context, state) => const FinanceScreen(),
     ),

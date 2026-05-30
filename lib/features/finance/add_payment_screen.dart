@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/finance_provider.dart';
+import '../../shared/providers/notifications_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 
 class AddPaymentScreen extends ConsumerStatefulWidget {
@@ -60,8 +61,20 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
             contactId: _selectedClientId,
             notes: description,
           );
+      await ref
+          .read(notificationsRepositoryProvider)
+          .create(
+            workspaceId: workspaceId,
+            type: _status == 'paid' ? 'payment_received' : 'invoice_overdue',
+            title: _status == 'paid' ? 'Payment recorded' : 'Payment pending',
+            body:
+                '£${amount.toStringAsFixed(0)} ${_status == 'paid' ? 'was recorded' : 'needs follow-up'}.',
+            deepLink: '/payments',
+          );
 
       ref.invalidate(invoicesProvider);
+      ref.invalidate(notificationsProvider);
+      ref.invalidate(unreadNotificationsProvider);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       setState(() => _saving = false);

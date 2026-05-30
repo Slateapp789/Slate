@@ -1,46 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
+import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
-
-final notificationsProvider = FutureProvider<List<SlateNotification>>((
-  ref,
-) async {
-  final workspaceId = await ref.watch(workspaceIdProvider.future);
-  if (workspaceId == null) return [];
-  return ref.watch(notificationsRepositoryProvider).list(workspaceId);
-});
-
-final notificationPreferencesProvider = FutureProvider<Map<String, dynamic>>((
-  ref,
-) async {
-  final workspaceId = await ref.watch(workspaceIdProvider.future);
-  if (workspaceId == null) return _defaultNotificationPrefs;
-  return await ref
-          .watch(notificationsRepositoryProvider)
-          .preferences(workspaceId) ??
-      _defaultNotificationPrefs;
-});
-
-const _defaultNotificationPrefs = {
-  'all_notifications': true,
-  'payment_received': true,
-  'new_booking': true,
-  'booking_request': true,
-  'no_show': true,
-  'invoice_overdue': true,
-  'lead_followup': true,
-  'appointment_reminder_15': false,
-  'task_due_morning': false,
-  'morning_digest': true,
-  'weekly_summary': true,
-  'quiet_hours_enabled': true,
-  'quiet_sundays': false,
-};
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
@@ -108,12 +75,9 @@ class NotificationsScreen extends ConsumerWidget {
                     color: AppColors.green,
                     onRefresh: () async =>
                         ref.invalidate(notificationsProvider),
-                    child: ListView.separated(
+                    child: ListView(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-                      itemBuilder: (context, index) =>
-                          _NotificationTile(item: items[index]),
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemCount: items.length,
+                      children: _groupedNotificationChildren(items),
                     ),
                   );
                 },
@@ -281,6 +245,8 @@ class _PreferenceGroup extends ConsumerWidget {
                         .read(notificationsRepositoryProvider)
                         .upsertPreferences(workspaceId, {items[i].key: next});
                     ref.invalidate(notificationPreferencesProvider);
+                    ref.invalidate(notificationsProvider);
+                    ref.invalidate(unreadNotificationsProvider);
                   },
                 ),
                 if (i < items.length - 1)
@@ -348,60 +314,167 @@ class _PreferenceRow extends StatelessWidget {
   }
 }
 
-class _NotificationTile extends StatelessWidget {
+List<Widget> _groupedNotificationChildren(List<SlateNotification> items) {
+  final today = DateTime.now();
+  final todayStart = DateTime(today.year, today.month, today.day);
+  final todayItems = items.where((item) {
+    final created = item.createdAt?.toLocal();
+    return created != null && !created.isBefore(todayStart);
+  }).toList();
+  final earlierItems = items
+      .where((item) => !todayItems.contains(item))
+      .toList();
+
+  return [
+    if (todayItems.isNotEmpty) ...[
+      const _NotificationGroupLabel('Today'),
+      ...todayItems.map(
+        (item) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _NotificationTile(item: item),
+        ),
+      ),
+    ],
+    if (earlierItems.isNotEmpty) ...[
+      const SizedBox(height: 10),
+      const _NotificationGroupLabel('Earlier'),
+      ...earlierItems.map(
+        (item) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _NotificationTile(item: item),
+        ),
+      ),
+    ],
+  ];
+}
+
+class _NotificationGroupLabel extends StatelessWidget {
+  final String label;
+  const _NotificationGroupLabel(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, top: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.t3,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1,
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationTile extends ConsumerWidget {
   final SlateNotification item;
   const _NotificationTile({required this.item});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: item.read ? AppColors.bgCard : AppColors.greenDim,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: item.read ? AppColors.border : AppColors.green,
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GestureDetector(
+      onTap: () async {
+        if (!item.read) {
+          await ref.read(notificationsRepositoryProvider).markRead(item.id);
+          ref.invalidate(notificationsProvider);
+          ref.invalidate(unreadNotificationsProvider);
+        }
+        if (context.mounted && item.deepLink?.isNotEmpty == true) {
+          _openDeepLink(context, item.deepLink!);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: item.read ? AppColors.bgCard : AppColors.greenDim,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: item.read ? AppColors.border : AppColors.green,
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            _iconForType(item.type),
-            color: item.read ? AppColors.t3 : AppColors.green,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    color: AppColors.t1,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  item.body,
-                  style: const TextStyle(color: AppColors.t2, fontSize: 13),
-                ),
-              ],
+        child: Row(
+          children: [
+            Icon(
+              _iconForType(item.type),
+              color: item.read ? AppColors.t3 : AppColors.green,
+              size: 20,
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      if (!item.read) ...[
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: const BoxDecoration(
+                            color: AppColors.green,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                      ],
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: const TextStyle(
+                            color: AppColors.t1,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.body,
+                    style: const TextStyle(color: AppColors.t2, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+            if (item.deepLink?.isNotEmpty == true) ...[
+              const SizedBox(width: 8),
+              const Icon(
+                LucideIcons.chevronRight,
+                color: AppColors.t3,
+                size: 16,
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 
   IconData _iconForType(String type) {
     return switch (type) {
-      'payment' => LucideIcons.banknote,
-      'booking' => LucideIcons.calendarPlus,
-      'task' => LucideIcons.checkSquare,
+      'payment' ||
+      'payment_received' ||
+      'invoice_overdue' => LucideIcons.banknote,
+      'booking' ||
+      'new_booking' ||
+      'booking_request' => LucideIcons.calendarPlus,
+      'task' || 'task_due' => LucideIcons.checkSquare,
+      'no_show' => LucideIcons.userX,
       _ => LucideIcons.bell,
     };
+  }
+
+  void _openDeepLink(BuildContext context, String deepLink) {
+    if (deepLink == '/notifications') return;
+    if (deepLink == '/payments' ||
+        deepLink == '/tasks' ||
+        deepLink == '/work' ||
+        deepLink == '/booking-requests') {
+      context.push(deepLink);
+    }
   }
 }
 

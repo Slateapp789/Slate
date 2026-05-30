@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/appointments_provider.dart';
 import '../../shared/providers/clients_provider.dart';
+import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import 'widgets/appointment_detail_widgets.dart';
@@ -92,12 +93,32 @@ class _AppointmentDetailScreenState
       await ref
           .read(appointmentsRepositoryProvider)
           .update(_appt['id'] as String, updates);
+      final workspaceId = await ref.read(workspaceIdProvider.future);
+      if (workspaceId != null &&
+          (status == 'cancelled' || status == 'no_show')) {
+        final name = _appt['contacts']?['name'] as String? ?? 'Client';
+        await ref
+            .read(notificationsRepositoryProvider)
+            .create(
+              workspaceId: workspaceId,
+              type: status == 'no_show' ? 'no_show' : 'booking',
+              title: status == 'no_show'
+                  ? 'Appointment no-show'
+                  : 'Appointment cancelled',
+              body: cancelReason?.isNotEmpty == true
+                  ? '$name: $cancelReason'
+                  : '$name appointment was updated.',
+              deepLink: '/work',
+            );
+      }
       setState(() {
         _appt['status'] = status;
         if (cancelReason != null) _appt['notes'] = cancelReason;
         _loading = false;
       });
       ref.invalidate(appointmentsProvider);
+      ref.invalidate(notificationsProvider);
+      ref.invalidate(unreadNotificationsProvider);
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) _snack('Error: $e');

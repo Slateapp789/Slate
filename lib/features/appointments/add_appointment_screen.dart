@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/appointments_provider.dart';
 import '../../shared/providers/clients_provider.dart';
+import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
@@ -231,8 +232,23 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
             recurrenceRule: recurrenceRule,
             repeatOccurrences: repeatOccurrences,
           );
+      await ref
+          .read(notificationsRepositoryProvider)
+          .create(
+            workspaceId: workspaceId,
+            type: 'new_booking',
+            title: repeatOccurrences > 1
+                ? 'Repeating booking created'
+                : 'New booking created',
+            body: repeatOccurrences > 1
+                ? 'Created $repeatOccurrences appointments for ${_selectedServiceName ?? 'this service'}.'
+                : '${_selectedServiceName ?? 'Appointment'} booked for ${_formatDate(_selectedDate)}.',
+            deepLink: '/work',
+          );
 
       ref.invalidate(appointmentsProvider);
+      ref.invalidate(notificationsProvider);
+      ref.invalidate(unreadNotificationsProvider);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       setState(() => _saving = false);

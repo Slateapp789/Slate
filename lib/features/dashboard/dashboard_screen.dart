@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:confetti/confetti.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
+import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
@@ -31,6 +32,7 @@ class DashboardScreen extends ConsumerWidget {
     final revenue = ref.watch(dashboardRevenueProvider);
     final pulse = ref.watch(dashboardPulseProvider);
     final focus = ref.watch(dashboardFocusProvider);
+    final unreadNotifications = ref.watch(unreadNotificationsProvider);
     final todayAppts = ref.watch(todayAppointmentsProvider);
     final tasks = ref.watch(allTasksProvider);
 
@@ -42,6 +44,7 @@ class DashboardScreen extends ConsumerWidget {
           ref.invalidate(dashboardRevenueProvider);
           ref.invalidate(dashboardPulseProvider);
           ref.invalidate(dashboardFocusProvider);
+          ref.invalidate(unreadNotificationsProvider);
           ref.invalidate(todayAppointmentsProvider);
           ref.invalidate(allTasksProvider);
           ref.invalidate(tasksProvider);
@@ -88,24 +91,91 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => context.push('/notifications'),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppColors.bgCard,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: const Icon(
+                                LucideIcons.bell,
+                                color: AppColors.t2,
+                                size: 20,
+                              ),
+                            ),
+                            unreadNotifications.when(
+                              data: (count) => count == 0
+                                  ? const SizedBox.shrink()
+                                  : Positioned(
+                                      right: -4,
+                                      top: -4,
+                                      child: Container(
+                                        constraints: const BoxConstraints(
+                                          minWidth: 18,
+                                          minHeight: 18,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 5,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.error,
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                          border: Border.all(
+                                            color: AppColors.bg,
+                                            width: 2,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          count > 9 ? '9+' : '$count',
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                              loading: () => const SizedBox.shrink(),
+                              error: (_, __) => const SizedBox.shrink(),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.settings_rounded,
-                        color: AppColors.t2,
-                        size: 20,
+                      const SizedBox(width: 10),
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsScreen(),
+                          ),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.bgCard,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: const Icon(
+                            Icons.settings_rounded,
+                            color: AppColors.t2,
+                            size: 20,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),

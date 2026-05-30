@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/slate_models.dart';
+import '../../../shared/providers/notifications_provider.dart';
 import '../../../shared/providers/tasks_provider.dart';
 import '../../../shared/providers/workspace_provider.dart';
 import '../../../shared/repositories/slate_repositories.dart';
@@ -195,9 +196,38 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                           contactId: widget.clientId,
                           dueDate: dueDate,
                         );
+                    if (dueDate != null) {
+                      final today = DateTime.now();
+                      final todayDate = DateTime(
+                        today.year,
+                        today.month,
+                        today.day,
+                      );
+                      final dueDateOnly = DateTime(
+                        dueDate!.year,
+                        dueDate!.month,
+                        dueDate!.day,
+                      );
+                      if (!dueDateOnly.isAfter(
+                        todayDate.add(const Duration(days: 1)),
+                      )) {
+                        await ref
+                            .read(notificationsRepositoryProvider)
+                            .create(
+                              workspaceId: workspaceId,
+                              type: 'task_due',
+                              title: 'Client task due soon',
+                              body:
+                                  '${widget.clientName}: ${titleController.text.trim()}',
+                              deepLink: '/tasks',
+                            );
+                      }
+                    }
                     ref.invalidate(clientTasksProvider(widget.clientId));
                     ref.invalidate(allTasksProvider);
                     ref.invalidate(tasksProvider);
+                    ref.invalidate(notificationsProvider);
+                    ref.invalidate(unreadNotificationsProvider);
                     if (ctx.mounted) Navigator.pop(ctx);
                   },
                   style: ElevatedButton.styleFrom(

@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/clients_provider.dart';
+import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 
@@ -601,8 +602,26 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           dueDate: dueDate,
           contactId: clientId,
         );
+    if (dueDate != null) {
+      final today = DateTime.now();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      final dueDateOnly = DateTime(dueDate.year, dueDate.month, dueDate.day);
+      if (!dueDateOnly.isAfter(todayDate.add(const Duration(days: 1)))) {
+        await ref
+            .read(notificationsRepositoryProvider)
+            .create(
+              workspaceId: workspaceId,
+              type: 'task_due',
+              title: 'Task due soon',
+              body: title.trim(),
+              deepLink: '/tasks',
+            );
+      }
+    }
     ref.invalidate(allTasksProvider);
     ref.invalidate(tasksProvider);
+    ref.invalidate(notificationsProvider);
+    ref.invalidate(unreadNotificationsProvider);
     if (ctx.mounted) Navigator.pop(ctx);
   }
 
