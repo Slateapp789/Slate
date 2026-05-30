@@ -104,10 +104,9 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     return StreamBuilder<AuthState>(
       stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const _LoadingScreen();
-        }
-        final session = snapshot.data?.session;
+        final session =
+            snapshot.data?.session ??
+            Supabase.instance.client.auth.currentSession;
         final currentUserId = session?.user.id;
         if (currentUserId != _lastUserId) {
           _lastUserId = currentUserId;
