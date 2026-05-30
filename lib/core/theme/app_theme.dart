@@ -2,58 +2,58 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  // Backgrounds - Northbound Light neutrals.
-  static const bg = Color(0xFFF6F4EF);
-  static const bgCard = Color(0xFFFDFBF7);
-  static const bgRaised = Color(0xFFFFFFFF);
-  static const bgInteract = Color(0xFFE9EAE5);
-  static const border = Color(0xFFD9DCD6);
-  static const borderStrong = Color(0xFFA8AEA6);
+  // Backgrounds - neutral graphite-to-mist greys.
+  static const bg = Color(0xFFD6D5D1);
+  static const bgCard = Color(0xFFE9E8E4);
+  static const bgRaised = Color(0xFFF5F4F0);
+  static const bgInteract = Color(0xFFC9C8C3);
+  static const border = Color(0xFFB8B7B1);
+  static const borderStrong = Color(0xFF85847F);
 
   // Text
-  static const t1 = Color(0xFF252A28);
-  static const t2 = Color(0xBF252A28);
-  static const t3 = Color(0x73252A28);
-  static const t4 = Color(0x33252A28);
+  static const t1 = Color(0xFF242424);
+  static const t2 = Color(0xBF242424);
+  static const t3 = Color(0x73242424);
+  static const t4 = Color(0x33242424);
 
-  // Accent - faded glacier greys. Green aliases remain for existing code.
-  static const slate = Color(0xFF6E7771);
-  static const slateLight = Color(0xFFD4D8D3);
-  static const slateDim = Color(0x66D4D8D3);
-  static const slateGlow = Color(0x99D4D8D3);
-  static const green = Color(0xFF68786D);
-  static const greenLight = Color(0xFFDCE3DD);
-  static const greenDim = Color(0x66DCE3DD);
-  static const greenGlow = Color(0x99DCE3DD);
+  // Accent - pure neutral slate. Green aliases remain for existing code.
+  static const slate = Color(0xFF5F5F5B);
+  static const slateLight = Color(0xFFBCBAB4);
+  static const slateDim = Color(0x66BCBAB4);
+  static const slateGlow = Color(0x99BCBAB4);
+  static const green = Color(0xFF5F5F5B);
+  static const greenLight = Color(0xFFC8C6BF);
+  static const greenDim = Color(0x66C8C6BF);
+  static const greenGlow = Color(0x99C8C6BF);
 
   // Aliases so existing code doesn't break
-  static const violet = Color(0xFF777F78);
-  static const violetDim = Color(0x66E0E1DC);
-  static const violetGlow = Color(0x99E0E1DC);
+  static const violet = Color(0xFF6D6C67);
+  static const violetDim = Color(0x66CFCDC7);
+  static const violetGlow = Color(0x99CFCDC7);
 
   // Semantic
-  static const success = Color(0xFF68786D);
-  static const successDim = Color(0x40DCE3DD);
-  static const warning = Color(0xFF8A7660);
-  static const warningDim = Color(0x40E7DDCF);
-  static const error = Color(0xFFB27772);
-  static const errorDim = Color(0x3FE9D8D5);
+  static const success = Color(0xFF626760);
+  static const successDim = Color(0x335F645E);
+  static const warning = Color(0xFF8A806F);
+  static const warningDim = Color(0x33A49A8A);
+  static const error = Color(0xFF9D6B67);
+  static const errorDim = Color(0x33BCA19E);
 
-  // Module colours - tonal greys with subtle temperature shifts.
-  static const modClients = Color(0xFF9EA49D);
-  static const modCalendar = Color(0xFFAEB4AD);
-  static const modFinance = Color(0xFF8D9A90);
-  static const modTasks = Color(0xFFC1B7A5);
+  // Module colours - tonal greys without the previous green cast.
+  static const modClients = Color(0xFF83827D);
+  static const modCalendar = Color(0xFF92908A);
+  static const modFinance = Color(0xFF706F6A);
+  static const modTasks = Color(0xFFA4A19A);
 
   // Module icon backgrounds.
-  static const modBg = Color(0xFFEDEBE6);
+  static const modBg = Color(0xFFDAD8D2);
 
   // Hero/summary panels used for financial and high-trust information.
-  static const panelSoft = Color(0xFFE9EDE7);
-  static const panelSoftRaised = Color(0xFFD4D8D3);
-  static const panelInk = Color(0xFF252A28);
-  static const panelMuted = Color(0x99252A28);
-  static const panelFaint = Color(0x26252A28);
+  static const panelSoft = Color(0xFFD0CFCA);
+  static const panelSoftRaised = Color(0xFFBDBBB5);
+  static const panelInk = Color(0xFF242424);
+  static const panelMuted = Color(0x99242424);
+  static const panelFaint = Color(0x26242424);
 }
 
 class AppSpacing {
@@ -89,7 +89,7 @@ class AppMotion {
 class AppShadows {
   static List<BoxShadow> get soft => [
     BoxShadow(
-      color: const Color(0xFF6B716D).withValues(alpha: 0.12),
+      color: const Color(0xFF3F3F3C).withValues(alpha: 0.11),
       blurRadius: 24,
       offset: const Offset(0, 14),
     ),
@@ -97,7 +97,7 @@ class AppShadows {
 
   static List<BoxShadow> get glass => [
     BoxShadow(
-      color: const Color(0xFF6B716D).withValues(alpha: 0.16),
+      color: const Color(0xFF3F3F3C).withValues(alpha: 0.15),
       blurRadius: 34,
       offset: const Offset(0, 16),
     ),
