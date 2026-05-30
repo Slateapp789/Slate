@@ -314,7 +314,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 if (task.status == 'done') {
                   _reopenTask(task);
                 } else {
-                  _confirmComplete(task);
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _confirmComplete(task);
+                  });
                 }
               },
             ),
@@ -325,7 +327,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               secondary: true,
               onPressed: () {
                 Navigator.pop(ctx);
-                _showTaskEditor(context, task: task);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) _showTaskEditor(context, task: task);
+                });
               },
             ),
             const SizedBox(height: 10),
@@ -334,7 +338,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               destructive: true,
               onPressed: () {
                 Navigator.pop(ctx);
-                _confirmDelete(task);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) _confirmDelete(task);
+                });
               },
             ),
           ],
@@ -886,6 +892,11 @@ class _ClientPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasSelectedClient =
+        selectedClientId != null &&
+        clients.any((client) => client.id == selectedClientId);
+    final safeSelectedClientId = hasSelectedClient ? selectedClientId : null;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
@@ -894,7 +905,7 @@ class _ClientPicker extends StatelessWidget {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String?>(
-          value: selectedClientId,
+          value: safeSelectedClientId,
           isExpanded: true,
           dropdownColor: AppColors.bgRaised,
           icon: const Icon(
