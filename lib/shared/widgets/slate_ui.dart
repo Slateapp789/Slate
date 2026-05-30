@@ -81,9 +81,9 @@ class SlateGlassSurface extends StatelessWidget {
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: color ?? AppColors.t1.withValues(alpha: 0.08),
+            color: color ?? AppColors.bgRaised.withValues(alpha: 0.62),
             borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: AppColors.t1.withValues(alpha: 0.13)),
+            border: Border.all(color: AppColors.t1.withValues(alpha: 0.09)),
             boxShadow: AppShadows.glass,
           ),
           child: child,
