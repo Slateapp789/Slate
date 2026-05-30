@@ -4,13 +4,16 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/providers/appointments_provider.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
+import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/working_hours.dart';
 
 class AddAppointmentScreen extends ConsumerStatefulWidget {
-  const AddAppointmentScreen({super.key});
+  final DateTime? initialDate;
+
+  const AddAppointmentScreen({super.key, this.initialDate});
 
   @override
   ConsumerState<AddAppointmentScreen> createState() =>
@@ -39,7 +42,16 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   final _durationController = TextEditingController(text: '60');
   final _locationController = TextEditingController();
   final _notesController = TextEditingController();
+  final List<TextEditingController> _taskControllers = [];
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialDate != null) {
+      _selectedDate = widget.initialDate!;
+    }
+  }
 
   @override
   void dispose() {
@@ -51,6 +63,9 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     _durationController.dispose();
     _locationController.dispose();
     _notesController.dispose();
+    for (final controller in _taskControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -262,7 +277,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         settings?['business_address'] as String?,
       );
 
-      await ref
+      final bookingIds = await ref
           .read(appointmentsRepositoryProvider)
           .create(
             workspaceId: workspaceId,
@@ -277,6 +292,26 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
             recurrenceRule: recurrenceRule,
             repeatOccurrences: repeatOccurrences,
           );
+      final taskTitles = _taskControllers
+          .map((controller) => controller.text.trim())
+          .where((title) => title.isNotEmpty)
+          .toList();
+      if (taskTitles.isNotEmpty && bookingIds.isNotEmpty) {
+        await Future.wait(
+          taskTitles.map(
+            (title) => ref
+                .read(tasksRepositoryProvider)
+                .create(
+                  workspaceId: workspaceId,
+                  title: title,
+                  priority: 'medium',
+                  dueDate: _selectedDate,
+                  contactId: contactId,
+                  appointmentId: bookingIds.first,
+                ),
+          ),
+        );
+      }
       await ref
           .read(notificationsRepositoryProvider)
           .create(
@@ -292,6 +327,8 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
           );
 
       ref.invalidate(appointmentsProvider);
+      ref.invalidate(tasksProvider);
+      ref.invalidate(allTasksProvider);
       ref.invalidate(clientsProvider);
       ref.invalidate(notificationsProvider);
       ref.invalidate(unreadNotificationsProvider);
@@ -324,6 +361,16 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         price >= 0 &&
         duration != null &&
         duration > 0;
+  }
+
+  int get _selectedDurationValue =>
+      int.tryParse(_durationController.text.trim()) ?? _selectedDuration;
+
+  void _setDuration(int minutes) {
+    setState(() {
+      _selectedDuration = minutes;
+      _durationController.text = '$minutes';
+    });
   }
 
   String? _locationTextWithDefault(String? businessAddress) {
@@ -362,7 +409,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       _selectedDate.day,
       _selectedHour,
       _selectedMinute,
-    ).add(Duration(minutes: _selectedDuration));
+    ).add(Duration(minutes: _selectedDurationValue));
     final endStr =
         '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
     final workingHours = workspaceSettings.value?['working_hours'] is Map
@@ -740,33 +787,12 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                             ),
                           ],
                           const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _textInput(
-                                  controller: _priceController,
-                                  hint: 'Price',
-                                  prefix: '£',
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _textInput(
-                                  controller: _durationController,
-                                  hint: 'Duration',
-                                  suffix: 'min',
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _selectedDuration =
-                                          int.tryParse(value) ?? 60;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ],
+                          _textInput(
+                            controller: _priceController,
+                            hint: 'Price',
+                            prefix: '£',
+                            keyboardType: TextInputType.number,
+                            onChanged: (_) => setState(() {}),
                           ),
                         ],
                       ),
@@ -818,53 +844,102 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                     const SizedBox(height: 20),
 
                     // ── Time ─────────────────────────────────────────
-                    _label('TIME'),
+                    _label('TIME & DURATION'),
                     const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: _pickTime,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.access_time_rounded,
-                              color: AppColors.t3,
-                              size: 16,
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgCard,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        children: [
+                          GestureDetector(
+                            onTap: _pickTime,
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.access_time_rounded,
+                                  color: AppColors.t3,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  '${_selectedHour.toString().padLeft(2, '0')}:${_selectedMinute.toString().padLeft(2, '0')}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.t1,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'to $endStr',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.t3,
+                                  ),
+                                ),
+                                const Spacer(),
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: AppColors.t3,
+                                  size: 18,
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            Text(
-                              '${_selectedHour.toString().padLeft(2, '0')}:${_selectedMinute.toString().padLeft(2, '0')}',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.t1,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '– $endStr',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.t3,
-                              ),
-                            ),
-                            const Spacer(),
-                            const Icon(
-                              Icons.chevron_right_rounded,
-                              color: AppColors.t3,
-                              size: 18,
-                            ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 14),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [30, 45, 60, 90, 120].map((minutes) {
+                              final selected =
+                                  _selectedDurationValue == minutes;
+                              return GestureDetector(
+                                onTap: () => _setDuration(minutes),
+                                child: AnimatedContainer(
+                                  duration: AppMotion.fast,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? AppColors.slateLight
+                                        : AppColors.bgInteract,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: selected
+                                          ? AppColors.borderStrong
+                                          : AppColors.border,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '${minutes}m',
+                                    style: TextStyle(
+                                      color: selected
+                                          ? AppColors.panelInk
+                                          : AppColors.t2,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 10),
+                          _textInput(
+                            controller: _durationController,
+                            hint: 'Custom duration',
+                            suffix: 'min',
+                            keyboardType: TextInputType.number,
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -882,7 +957,6 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                               label: 'Business',
                             ),
                             _LocationChoice(value: 'client', label: 'Client'),
-                            _LocationChoice(value: 'custom', label: 'Custom'),
                             _LocationChoice(value: 'online', label: 'Online'),
                           ].map((choice) {
                             final selected = _locationMode == choice.value;
@@ -927,9 +1001,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                           ? 'Business address or room'
                           : _locationMode == 'client'
                           ? 'Client address'
-                          : _locationMode == 'online'
-                          ? 'Call link or phone note'
-                          : 'Custom location',
+                          : 'Call link or phone note',
                     ),
                     const SizedBox(height: 20),
 
@@ -1096,6 +1168,82 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 20),
+
+                    // ── Tasks ───────────────────────────────────────
+                    _label('TASKS (OPTIONAL)'),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgCard,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        children: [
+                          if (_taskControllers.isEmpty)
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Add prep or follow-up tasks for this booking.',
+                                style: TextStyle(
+                                  color: AppColors.t3,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ..._taskControllers.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final controller = entry.value;
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                bottom: index == _taskControllers.length - 1
+                                    ? 0
+                                    : 10,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _textInput(
+                                      controller: controller,
+                                      hint: 'Task title',
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _taskControllers.removeAt(index);
+                                      });
+                                      controller.dispose();
+                                    },
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      color: AppColors.t3,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _taskControllers.add(TextEditingController());
+                                });
+                              },
+                              icon: const Icon(Icons.add_rounded, size: 17),
+                              label: const Text('Add task'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 20),
 
                     // ── Notes ─────────────────────────────────────────

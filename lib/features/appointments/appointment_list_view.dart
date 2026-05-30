@@ -206,13 +206,13 @@ class _BookingCalendarView extends StatelessWidget {
           _MonthCalendar(
             selectedDate: selectedDate,
             countForDay: _countForDay,
-            valueForDay: _valueForDay,
             onDateSelected: onDateSelected,
           ),
           const SizedBox(height: 16),
           _DayPlanHeader(
             date: selectedDate,
             appointments: selectedDayAppointments,
+            onAddBooking: onEmptyAction,
           ),
           const SizedBox(height: 12),
           if (selectedDayAppointments.isEmpty)
@@ -259,32 +259,16 @@ class _BookingCalendarView extends StatelessWidget {
           appt['status'] != 'cancelled';
     }).length;
   }
-
-  double _valueForDay(DateTime day) {
-    final start = _dateOnly(day);
-    final end = start.add(const Duration(days: 1));
-    return appointments
-        .where((appt) {
-          final dt = _start(appt);
-          return dt != null &&
-              !dt.isBefore(start) &&
-              dt.isBefore(end) &&
-              appt['status'] != 'cancelled';
-        })
-        .fold<double>(0, (sum, appt) => sum + _price(appt));
-  }
 }
 
 class _MonthCalendar extends StatelessWidget {
   final DateTime selectedDate;
   final int Function(DateTime day) countForDay;
-  final double Function(DateTime day) valueForDay;
   final ValueChanged<DateTime> onDateSelected;
 
   const _MonthCalendar({
     required this.selectedDate,
     required this.countForDay,
-    required this.valueForDay,
     required this.onDateSelected,
   });
 
@@ -301,7 +285,7 @@ class _MonthCalendar extends StatelessWidget {
       radius: AppRadius.xl,
       color: AppColors.panelSoft,
       borderColor: AppColors.t1.withValues(alpha: 0.06),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       child: Column(
         children: [
           Row(
@@ -331,7 +315,7 @@ class _MonthCalendar extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             children: weekdayLabels
                 .map(
@@ -350,7 +334,7 @@ class _MonthCalendar extends StatelessWidget {
                 )
                 .toList(),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           GridView.builder(
             itemCount: days.length,
             shrinkWrap: true,
@@ -359,20 +343,19 @@ class _MonthCalendar extends StatelessWidget {
               crossAxisCount: 7,
               mainAxisSpacing: 6,
               crossAxisSpacing: 6,
-              childAspectRatio: 0.82,
+              childAspectRatio: 1.08,
             ),
             itemBuilder: (context, index) {
               final date = days[index];
               final selected = _dateOnly(date) == _dateOnly(selectedDate);
               final inMonth = date.month == month.month;
               final count = countForDay(date);
-              final value = valueForDay(date);
               return GestureDetector(
                 onTap: () => onDateSelected(_dateOnly(date)),
                 child: AnimatedContainer(
                   duration: AppMotion.fast,
                   curve: AppMotion.curve,
-                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  padding: const EdgeInsets.symmetric(vertical: 5),
                   decoration: BoxDecoration(
                     color: selected
                         ? AppColors.slateLight
@@ -403,8 +386,8 @@ class _MonthCalendar extends StatelessWidget {
                       const Spacer(),
                       if (count > 0)
                         Container(
-                          width: 5,
-                          height: 5,
+                          width: 6,
+                          height: 6,
                           decoration: BoxDecoration(
                             color: selected
                                 ? AppColors.panelInk
@@ -412,19 +395,6 @@ class _MonthCalendar extends StatelessWidget {
                             shape: BoxShape.circle,
                           ),
                         ),
-                      if (count > 0 && value > 0) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          '£${value.toStringAsFixed(0)}',
-                          maxLines: 1,
-                          overflow: TextOverflow.fade,
-                          style: TextStyle(
-                            color: selected ? AppColors.panelInk : AppColors.t3,
-                            fontSize: 8,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -458,15 +428,16 @@ String _monthLabel(DateTime month) {
 class _DayPlanHeader extends StatelessWidget {
   final DateTime date;
   final List<Map<String, dynamic>> appointments;
+  final VoidCallback onAddBooking;
 
-  const _DayPlanHeader({required this.date, required this.appointments});
+  const _DayPlanHeader({
+    required this.date,
+    required this.appointments,
+    required this.onAddBooking,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final value = appointments.fold<double>(
-      0,
-      (sum, appt) => sum + _price(appt),
-    );
     final scheduled = appointments
         .where((appt) => appt['status'] == 'scheduled')
         .length;
@@ -498,12 +469,11 @@ class _DayPlanHeader extends StatelessWidget {
             ],
           ),
         ),
-        if (appointments.isNotEmpty)
-          _AppointmentPill(
-            label: '£${value.toStringAsFixed(0)}',
-            icon: LucideIcons.banknote,
-            color: AppColors.slate,
-          ),
+        TextButton.icon(
+          onPressed: onAddBooking,
+          icon: const Icon(LucideIcons.plus, size: 15),
+          label: const Text('Add'),
+        ),
       ],
     );
   }

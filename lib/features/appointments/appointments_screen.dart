@@ -44,10 +44,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
     ref.invalidate(appointmentsProvider);
   }
 
-  Future<void> _addAppointment() async {
+  Future<void> _addAppointment({DateTime? date}) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => AddAppointmentScreen()),
+      MaterialPageRoute(
+        builder: (_) => AddAppointmentScreen(initialDate: date),
+      ),
     );
     ref.invalidate(appointmentsProvider);
   }
@@ -111,7 +113,9 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                       ),
                       const SizedBox(width: 8),
                       GestureDetector(
-                        onTap: _addAppointment,
+                        onTap: () => _addAppointment(
+                          date: _calendarMode ? _selectedCalendarDate : null,
+                        ),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
@@ -162,7 +166,12 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                     AppSpacing.pageX,
                     AppSpacing.md,
                   ),
-                  child: _BookingCommandPanel(stats: stats),
+                  child: _NextBookingCard(
+                    booking: stats.nextBooking,
+                    onTap: stats.nextBooking == null
+                        ? () => _addAppointment()
+                        : () => _openDetail(stats.nextBooking!),
+                  ),
                 );
               },
               loading: () => const SizedBox.shrink(),
@@ -266,7 +275,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                       },
                       onTap: _openDetail,
                       onRefresh: () => ref.invalidate(appointmentsProvider),
-                      onEmptyAction: _addAppointment,
+                      onEmptyAction: () => _addAppointment(),
                     );
                   }
 
@@ -280,7 +289,8 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                         emptySubtitle: 'Tap New to add a booking',
                         onTap: _openDetail,
                         onRefresh: () => ref.invalidate(appointmentsProvider),
-                        onEmptyAction: _addAppointment,
+                        onEmptyAction: () =>
+                            _addAppointment(date: _selectedCalendarDate),
                         groupByDate: false,
                       ),
                       _AppointmentListView(
@@ -427,153 +437,111 @@ class _BookingStats {
   }
 }
 
-class _BookingCommandPanel extends StatelessWidget {
-  final _BookingStats stats;
+class _NextBookingCard extends StatelessWidget {
+  final Map<String, dynamic>? booking;
+  final VoidCallback onTap;
 
-  const _BookingCommandPanel({required this.stats});
+  const _NextBookingCard({required this.booking, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final next = stats.nextBooking;
-    final nextLabel = next == null ? 'Schedule clear' : _nextBookingLabel(next);
+    final start = booking == null ? null : _start(booking!);
+    final end = booking == null ? null : _end(booking!);
+    final client = booking?['contacts']?['name'] as String? ?? 'No booking set';
+    final service =
+        booking?['services']?['name'] as String? ??
+        booking?['title'] as String? ??
+        'Add a booking';
+    final location = booking?['location'] as String?;
+    final price = booking == null ? null : _price(booking!);
 
-    return SlateSurface(
-      radius: AppRadius.xl,
-      color: AppColors.panelSoft,
-      borderColor: AppColors.t1.withValues(alpha: 0.06),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                LucideIcons.calendarCheck,
-                size: 17,
-                color: AppColors.t2,
+    return GestureDetector(
+      onTap: onTap,
+      child: SlateSurface(
+        radius: AppRadius.xl,
+        color: AppColors.panelSoft,
+        borderColor: AppColors.t1.withValues(alpha: 0.06),
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 58,
+              height: 68,
+              decoration: BoxDecoration(
+                color: AppColors.slateLight,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: AppColors.t1.withValues(alpha: 0.08)),
               ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  "TODAY'S PLAN",
-                  style: TextStyle(
-                    color: AppColors.t3,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    start == null ? '--' : _shortTime(start),
+                    style: const TextStyle(
+                      color: AppColors.panelInk,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  Text(
+                    start == null || end == null
+                        ? 'new'
+                        : '${end.difference(start).inMinutes}m',
+                    style: TextStyle(
+                      color: AppColors.panelInk.withValues(alpha: 0.62),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
-              if (stats.overdueUnfinished > 0)
-                _CommandBadge(
-                  label: 'Review ${stats.overdueUnfinished} past',
-                  color: AppColors.error,
-                ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            nextLabel,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.t1,
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
             ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _BookingMetric(
-                label: 'Today',
-                value: '${stats.todayRemaining}/${stats.todayTotal}',
-                detail: '${stats.todayCompleted} done',
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'NEXT BOOKING',
+                    style: TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    client,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.t1,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    [
+                      service,
+                      if (location?.isNotEmpty == true) location!,
+                      if (price != null && price > 0)
+                        '£${price.toStringAsFixed(0)}',
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppColors.t3, fontSize: 12),
+                  ),
+                ],
               ),
-              _BookingMetric(
-                label: 'Next 7 days',
-                value: '${stats.weekBookings}',
-                detail: 'bookings · £${stats.weekValue.toStringAsFixed(0)}',
-              ),
-              _BookingMetric(
-                label: 'Earned',
-                value: '£${stats.todayRevenue.toStringAsFixed(0)}',
-                detail: 'today',
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BookingMetric extends StatelessWidget {
-  final String label;
-  final String value;
-  final String detail;
-
-  const _BookingMetric({
-    required this.label,
-    required this.value,
-    required this.detail,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
+            ),
+            Icon(
+              booking == null ? LucideIcons.plus : LucideIcons.chevronRight,
               color: AppColors.t3,
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
+              size: 18,
             ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.t1,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            detail,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: AppColors.t3, fontSize: 11),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CommandBadge extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _CommandBadge({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
+          ],
         ),
       ),
     );
@@ -590,14 +558,6 @@ DateTime? _end(Map<String, dynamic> appt) =>
 
 double _price(Map<String, dynamic> appt) =>
     (appt['price'] as num?)?.toDouble() ?? 0;
-
-String _nextBookingLabel(Map<String, dynamic> appt) {
-  final client = appt['contacts']?['name'] as String? ?? 'Walk-in';
-  final service = appt['services']?['name'] as String? ?? 'booking';
-  final start = _start(appt);
-  if (start == null) return '$client next';
-  return 'Next: ${_shortTime(start)} $client, $service';
-}
 
 String _shortTime(DateTime dt) =>
     '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';

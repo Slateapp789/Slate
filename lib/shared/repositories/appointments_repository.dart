@@ -78,7 +78,7 @@ class AppointmentsRepository {
         .toList();
   }
 
-  Future<void> create({
+  Future<List<String>> create({
     required String workspaceId,
     required String contactId,
     String? serviceId,
@@ -115,7 +115,13 @@ class AppointmentsRepository {
     });
 
     try {
-      await _client.from('appointments').insert(rows);
+      final inserted = await _client
+          .from('appointments')
+          .insert(rows)
+          .select('id');
+      return List<Map<String, dynamic>>.from(
+        inserted,
+      ).map((row) => row['id'] as String).toList();
     } catch (_) {
       final fallbackRows = rows
           .map(
@@ -125,7 +131,13 @@ class AppointmentsRepository {
               ..remove('location'),
           )
           .toList();
-      await _client.from('appointments').insert(fallbackRows);
+      final inserted = await _client
+          .from('appointments')
+          .insert(fallbackRows)
+          .select('id');
+      return List<Map<String, dynamic>>.from(
+        inserted,
+      ).map((row) => row['id'] as String).toList();
     }
   }
 

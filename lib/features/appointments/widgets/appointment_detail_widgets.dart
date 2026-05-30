@@ -22,7 +22,6 @@ class AppointmentHeroCard extends StatelessWidget {
   final String? selectedServiceId;
   final TextEditingController priceController;
   final TextEditingController serviceTitleController;
-  final TextEditingController durationController;
   final ValueChanged<String?> onClientChanged;
   final ValueChanged<String?> onServiceChanged;
 
@@ -41,7 +40,6 @@ class AppointmentHeroCard extends StatelessWidget {
     this.selectedServiceId,
     required this.priceController,
     required this.serviceTitleController,
-    required this.durationController,
     required this.onClientChanged,
     required this.onServiceChanged,
   });
@@ -226,15 +224,6 @@ class AppointmentHeroCard extends StatelessWidget {
           style: const TextStyle(color: AppColors.t1),
           decoration: _inputDecoration('0'),
         ),
-        const SizedBox(height: 12),
-        _fieldLabel('DURATION (MIN)'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: durationController,
-          keyboardType: TextInputType.number,
-          style: const TextStyle(color: AppColors.t1),
-          decoration: _inputDecoration('60'),
-        ),
       ],
     );
   }
@@ -322,8 +311,11 @@ class AppointmentDateTimeCard extends StatelessWidget {
   final DateTime selectedDate;
   final int selectedHour;
   final int selectedMinute;
+  final TextEditingController durationController;
   final VoidCallback onPickDate;
   final VoidCallback onPickTime;
+  final ValueChanged<int> onDurationSelected;
+  final ValueChanged<String> onDurationChanged;
 
   const AppointmentDateTimeCard({
     super.key,
@@ -333,8 +325,11 @@ class AppointmentDateTimeCard extends StatelessWidget {
     required this.selectedDate,
     required this.selectedHour,
     required this.selectedMinute,
+    required this.durationController,
     required this.onPickDate,
     required this.onPickTime,
+    required this.onDurationSelected,
+    required this.onDurationChanged,
   });
 
   String _formatDate(DateTime dt) {
@@ -426,6 +421,73 @@ class AppointmentDateTimeCard extends StatelessWidget {
             '${selectedHour.toString().padLeft(2, '0')}:${selectedMinute.toString().padLeft(2, '0')}',
           ),
         ),
+        const SizedBox(height: 16),
+        Divider(height: 1, color: AppColors.border),
+        const SizedBox(height: 16),
+        _durationEditor(),
+      ],
+    );
+  }
+
+  Widget _durationEditor() {
+    final selectedDuration = int.tryParse(durationController.text.trim()) ?? 60;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Icon(LucideIcons.timer, color: AppColors.t3, size: 16),
+            SizedBox(width: 12),
+            Text(
+              'Duration',
+              style: TextStyle(fontSize: 13, color: AppColors.t3),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [30, 45, 60, 90, 120].map((minutes) {
+            final selected = selectedDuration == minutes;
+            return GestureDetector(
+              onTap: () => onDurationSelected(minutes),
+              child: AnimatedContainer(
+                duration: AppMotion.fast,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.slateLight : AppColors.bgInteract,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: selected ? AppColors.borderStrong : AppColors.border,
+                  ),
+                ),
+                child: Text(
+                  '${minutes}m',
+                  style: TextStyle(
+                    color: selected ? AppColors.panelInk : AppColors.t2,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: durationController,
+          keyboardType: TextInputType.number,
+          onChanged: onDurationChanged,
+          style: const TextStyle(color: AppColors.t1),
+          decoration: _inputDecoration('Custom duration').copyWith(
+            suffixText: 'min',
+            suffixStyle: const TextStyle(color: AppColors.t3),
+          ),
+        ),
       ],
     );
   }
@@ -469,6 +531,26 @@ class AppointmentDateTimeCard extends StatelessWidget {
       ],
     );
   }
+
+  InputDecoration _inputDecoration(String hint) => InputDecoration(
+    hintText: hint,
+    hintStyle: const TextStyle(color: AppColors.t3),
+    filled: true,
+    fillColor: AppColors.bgInteract,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+  );
 }
 
 // ── Status banners + action buttons ──────────────────────────────────────────

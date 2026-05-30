@@ -34,6 +34,7 @@ class _AppointmentDetailScreenState
   late Map<String, dynamic> _appt;
   bool _loading = false;
   bool _editing = false;
+  String _locationMode = 'business';
 
   String? _selectedClientId;
   String? _selectedServiceId;
@@ -66,6 +67,13 @@ class _AppointmentDetailScreenState
     _locationController = TextEditingController(
       text: _appt['location'] as String? ?? '',
     );
+    final locationText = (_appt['location'] as String? ?? '').toLowerCase();
+    if (locationText.contains('client')) {
+      _locationMode = 'client';
+    } else if (locationText.contains('online') ||
+        locationText.contains('phone')) {
+      _locationMode = 'online';
+    }
     final startTime = DateTime.tryParse(
       _appt['start_time'] as String? ?? '',
     )?.toLocal();
@@ -181,9 +189,7 @@ class _AppointmentDetailScreenState
             : _serviceTitleController.text.trim(),
         'start_time': startTime.toIso8601String(),
         'end_time': endTime.toIso8601String(),
-        'location': _locationController.text.trim().isEmpty
-            ? null
-            : _locationController.text.trim(),
+        'location': _bookingLocationValue,
         'notes': _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
@@ -213,6 +219,16 @@ class _AppointmentDetailScreenState
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: AppColors.error),
     );
+  }
+
+  String? get _bookingLocationValue {
+    final custom = _locationController.text.trim();
+    if (custom.isNotEmpty) return custom;
+    return switch (_locationMode) {
+      'client' => 'Client location',
+      'online' => 'Online / phone',
+      _ => 'Business location',
+    };
   }
 
   Future<void> _addLinkedTask(String title) async {
@@ -784,7 +800,6 @@ class _AppointmentDetailScreenState
                 selectedServiceId: _selectedServiceId,
                 priceController: _priceController,
                 serviceTitleController: _serviceTitleController,
-                durationController: _durationController,
                 onClientChanged: (v) => setState(() => _selectedClientId = v),
                 onServiceChanged: (v) {
                   if (v == null) return;
@@ -821,8 +836,13 @@ class _AppointmentDetailScreenState
                 selectedDate: _selectedDate,
                 selectedHour: _selectedHour,
                 selectedMinute: _selectedMinute,
+                durationController: _durationController,
                 onPickDate: _pickDate,
                 onPickTime: _pickTime,
+                onDurationSelected: (minutes) {
+                  setState(() => _durationController.text = '$minutes');
+                },
+                onDurationChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 12),
 
@@ -835,37 +855,101 @@ class _AppointmentDetailScreenState
                   border: Border.all(color: AppColors.border),
                 ),
                 child: _editing
-                    ? TextField(
-                        controller: _locationController,
-                        style: const TextStyle(color: AppColors.t1),
-                        decoration: InputDecoration(
-                          labelText: 'Location',
-                          labelStyle: const TextStyle(
-                            color: AppColors.t3,
-                            fontSize: 13,
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children:
+                                const [
+                                  _BookingLocationOption(
+                                    value: 'business',
+                                    label: 'Business',
+                                  ),
+                                  _BookingLocationOption(
+                                    value: 'client',
+                                    label: 'Client',
+                                  ),
+                                  _BookingLocationOption(
+                                    value: 'online',
+                                    label: 'Online',
+                                  ),
+                                ].map((option) {
+                                  final selected =
+                                      _locationMode == option.value;
+                                  return GestureDetector(
+                                    onTap: () => setState(
+                                      () => _locationMode = option.value,
+                                    ),
+                                    child: AnimatedContainer(
+                                      duration: AppMotion.fast,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 13,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: selected
+                                            ? AppColors.slateLight
+                                            : AppColors.bgInteract,
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                        border: Border.all(
+                                          color: selected
+                                              ? AppColors.borderStrong
+                                              : AppColors.border,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        option.label,
+                                        style: TextStyle(
+                                          color: selected
+                                              ? AppColors.panelInk
+                                              : AppColors.t2,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
                           ),
-                          filled: true,
-                          fillColor: AppColors.bgInteract,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: AppColors.border,
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _locationController,
+                            style: const TextStyle(color: AppColors.t1),
+                            decoration: InputDecoration(
+                              hintText: _locationMode == 'business'
+                                  ? 'Business address or room'
+                                  : _locationMode == 'client'
+                                  ? 'Client address'
+                                  : 'Call link or phone note',
+                              hintStyle: const TextStyle(color: AppColors.t3),
+                              filled: true,
+                              fillColor: AppColors.bgInteract,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: AppColors.border,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: AppColors.border,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(
+                                  color: AppColors.green,
+                                  width: 1.5,
+                                ),
+                              ),
                             ),
                           ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: AppColors.border,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: AppColors.green,
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
+                        ],
                       )
                     : Row(
                         children: [
@@ -1138,4 +1222,11 @@ class _BookingTasksCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BookingLocationOption {
+  final String value;
+  final String label;
+
+  const _BookingLocationOption({required this.value, required this.label});
 }
