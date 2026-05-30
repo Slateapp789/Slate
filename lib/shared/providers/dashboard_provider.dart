@@ -16,22 +16,6 @@ class DashboardRevenue {
   });
 }
 
-class DashboardPulse {
-  final int upcomingBookings;
-  final int pendingBookingRequests;
-  final int overduePayments;
-  final int repeatClients;
-  final String busiestPeriod;
-
-  const DashboardPulse({
-    required this.upcomingBookings,
-    required this.pendingBookingRequests,
-    required this.overduePayments,
-    required this.repeatClients,
-    required this.busiestPeriod,
-  });
-}
-
 class DashboardFocus {
   final Map<String, dynamic>? nextAppointment;
   final int pendingBookingRequests;
@@ -134,75 +118,6 @@ final todayAppointmentsProvider = FutureProvider<List<Map<String, dynamic>>>((
         start: startOfToday,
         end: startOfTomorrow,
       );
-});
-
-final dashboardPulseProvider = FutureProvider<DashboardPulse>((ref) async {
-  final workspaceId = await ref.watch(workspaceIdProvider.future);
-  if (workspaceId == null) {
-    return const DashboardPulse(
-      upcomingBookings: 0,
-      pendingBookingRequests: 0,
-      overduePayments: 0,
-      repeatClients: 0,
-      busiestPeriod: 'No bookings yet',
-    );
-  }
-
-  final now = DateTime.now();
-  final monthStart = _dateOnly(_startOfMonth(now));
-  final repository = ref.watch(dashboardRepositoryProvider);
-
-  final upcomingRows = await repository.upcomingAppointmentIds(
-    workspaceId: workspaceId,
-    from: now,
-  );
-  final overdueRows = await repository.overduePaymentIds(workspaceId);
-  final monthlyAppointments = await repository.monthlyAppointmentSignals(
-    workspaceId: workspaceId,
-    monthStart: monthStart,
-  );
-
-  int pendingRequests = 0;
-  try {
-    pendingRequests = await repository.pendingBookingRequests(workspaceId);
-  } catch (_) {
-    pendingRequests = 0;
-  }
-
-  final contactCounts = <String, int>{};
-  final hourBuckets = <String, int>{'Morning': 0, 'Afternoon': 0, 'Evening': 0};
-  for (final row in List<Map<String, dynamic>>.from(monthlyAppointments)) {
-    final contactId = row['contact_id'] as String?;
-    if (contactId != null) {
-      contactCounts[contactId] = (contactCounts[contactId] ?? 0) + 1;
-    }
-    final start = DateTime.tryParse(
-      row['start_time']?.toString() ?? '',
-    )?.toLocal();
-    if (start != null) {
-      if (start.hour < 12) {
-        hourBuckets['Morning'] = hourBuckets['Morning']! + 1;
-      } else if (start.hour < 17) {
-        hourBuckets['Afternoon'] = hourBuckets['Afternoon']! + 1;
-      } else {
-        hourBuckets['Evening'] = hourBuckets['Evening']! + 1;
-      }
-    }
-  }
-
-  final busiest = hourBuckets.entries.toList()
-    ..sort((a, b) => b.value.compareTo(a.value));
-  final busiestPeriod = busiest.first.value == 0
-      ? 'No bookings yet'
-      : '${busiest.first.key} (${busiest.first.value})';
-
-  return DashboardPulse(
-    upcomingBookings: List<Map<String, dynamic>>.from(upcomingRows).length,
-    pendingBookingRequests: pendingRequests,
-    overduePayments: List<Map<String, dynamic>>.from(overdueRows).length,
-    repeatClients: contactCounts.values.where((count) => count > 1).length,
-    busiestPeriod: busiestPeriod,
-  );
 });
 
 final dashboardFocusProvider = FutureProvider<DashboardFocus>((ref) async {

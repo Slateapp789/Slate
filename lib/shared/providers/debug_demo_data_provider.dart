@@ -22,7 +22,6 @@ final debugDemoSeedProvider = FutureProvider<void>((ref) async {
 
   ref.invalidate(clientsProvider);
   ref.invalidate(dashboardRevenueProvider);
-  ref.invalidate(dashboardPulseProvider);
   ref.invalidate(dashboardFocusProvider);
   ref.invalidate(todayAppointmentsProvider);
   ref.invalidate(allTasksProvider);

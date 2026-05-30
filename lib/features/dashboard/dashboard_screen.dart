@@ -31,7 +31,6 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final workspace = ref.watch(workspaceProvider);
     final revenue = ref.watch(dashboardRevenueProvider);
-    final pulse = ref.watch(dashboardPulseProvider);
     final focus = ref.watch(dashboardFocusProvider);
     final unreadNotifications = ref.watch(unreadNotificationsProvider);
     final todayAppts = ref.watch(todayAppointmentsProvider);
@@ -43,7 +42,6 @@ class DashboardScreen extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(workspaceProvider);
           ref.invalidate(dashboardRevenueProvider);
-          ref.invalidate(dashboardPulseProvider);
           ref.invalidate(dashboardFocusProvider);
           ref.invalidate(unreadNotificationsProvider);
           ref.invalidate(todayAppointmentsProvider);
@@ -178,11 +176,17 @@ class DashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
 
-              pulse.when(
-                data: (p) => _PulseGrid(pulse: p),
-                loading: () => _skeletonBox(height: 134, radius: 18),
-                error: (_, __) => _errorCard('Could not load business pulse'),
-              ),
+              if (focus.isLoading || todayAppts.isLoading || tasks.isLoading)
+                _skeletonBox(height: 172, radius: AppRadius.lg)
+              else if (focus.hasError || todayAppts.hasError || tasks.hasError)
+                _errorCard('Could not load today pulse')
+              else
+                _TodayPulsePanel(
+                  focus: focus.value!,
+                  appointments: todayAppts.value ?? const [],
+                  tasks: tasks.value ?? const [],
+                  onNavigate: onNavigate,
+                ),
               const SizedBox(height: 24),
 
               // ── Today's schedule ─────────────────────────────────────
@@ -504,130 +508,212 @@ class _FocusRow extends StatelessWidget {
   }
 }
 
-class _PulseGrid extends StatelessWidget {
-  final DashboardPulse pulse;
-  const _PulseGrid({required this.pulse});
+class _TodayPulsePanel extends StatelessWidget {
+  final DashboardFocus focus;
+  final List<Map<String, dynamic>> appointments;
+  final List<SlateTask> tasks;
+  final void Function(int) onNavigate;
+
+  const _TodayPulsePanel({
+    required this.focus,
+    required this.appointments,
+    required this.tasks,
+    required this.onNavigate,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueTasks = tasks.where((task) {
+      final due = task.dueDate;
+      if (task.status == 'done' || due == null) return false;
+      final dueDay = DateTime(due.year, due.month, due.day);
+      return !dueDay.isAfter(today);
+    }).length;
+    final remainingToday = appointments.where((appt) {
+      final status = appt['status']?.toString() ?? 'scheduled';
+      if (status == 'completed' || status == 'cancelled') return false;
+      final start = DateTime.tryParse(
+        appt['start_time']?.toString() ?? '',
+      )?.toLocal();
+      return start == null || start.isAfter(now);
+    }).length;
+
     return SlateSurface(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.all(16),
       radius: AppRadius.lg,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            const SizedBox(width: 16),
-            _PulseTile(
-              icon: LucideIcons.calendarClock,
-              label: 'Upcoming',
-              value: pulse.upcomingBookings.toString(),
-            ),
-            _PulseDivider(),
-            _PulseTile(
-              icon: LucideIcons.inbox,
-              label: 'Requests',
-              value: pulse.pendingBookingRequests.toString(),
-              highlight: pulse.pendingBookingRequests > 0,
-              onTap: () => context.push('/booking-requests'),
-            ),
-            _PulseDivider(),
-            _PulseTile(
-              icon: LucideIcons.repeat,
-              label: 'Repeat clients',
-              value: pulse.repeatClients.toString(),
-            ),
-            _PulseDivider(),
-            _PulseTile(
-              icon: LucideIcons.clock3,
-              label: 'Busiest',
-              value: pulse.busiestPeriod,
-              compact: true,
-            ),
-            const SizedBox(width: 16),
-          ],
-        ),
+      color: AppColors.bgCard.withValues(alpha: 0.78),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(LucideIcons.activity, size: 16, color: AppColors.t2),
+              SizedBox(width: 8),
+              Text(
+                'TODAY PULSE',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.t3,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _PulseAction(
+                  icon: LucideIcons.inbox,
+                  label: 'Requests',
+                  value: focus.pendingBookingRequests.toString(),
+                  detail: focus.pendingBookingRequests == 0
+                      ? 'Clear'
+                      : 'Review now',
+                  color: focus.pendingBookingRequests > 0
+                      ? AppColors.warning
+                      : AppColors.t2,
+                  emphasized: focus.pendingBookingRequests > 0,
+                  onTap: () => context.push('/booking-requests'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _PulseAction(
+                  icon: LucideIcons.banknote,
+                  label: 'Overdue',
+                  value: '£${focus.overdueTotal.toStringAsFixed(0)}',
+                  detail: focus.overduePayments == 0
+                      ? 'Settled'
+                      : '${focus.overduePayments} to chase',
+                  color: focus.overduePayments > 0
+                      ? AppColors.error
+                      : AppColors.t2,
+                  emphasized: focus.overduePayments > 0,
+                  onTap: () => onNavigate(3),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _PulseAction(
+                  icon: LucideIcons.listChecks,
+                  label: 'Due tasks',
+                  value: dueTasks.toString(),
+                  detail: dueTasks == 0 ? 'On track' : 'Finish today',
+                  color: dueTasks > 0 ? AppColors.warning : AppColors.t2,
+                  emphasized: dueTasks > 0,
+                  onTap: () => onNavigate(4),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _PulseAction(
+                  icon: LucideIcons.calendarClock,
+                  label: 'Today left',
+                  value: remainingToday.toString(),
+                  detail: remainingToday == 0 ? 'Day clear' : 'Bookings',
+                  color: remainingToday > 0 ? AppColors.green : AppColors.t2,
+                  onTap: () => onNavigate(2),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _PulseDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 42,
-      margin: const EdgeInsets.symmetric(horizontal: 14),
-      color: AppColors.border,
-    );
-  }
-}
-
-class _PulseTile extends StatelessWidget {
+class _PulseAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final bool highlight;
-  final bool compact;
-  final VoidCallback? onTap;
+  final String detail;
+  final Color color;
+  final bool emphasized;
+  final VoidCallback onTap;
 
-  const _PulseTile({
+  const _PulseAction({
     required this.icon,
     required this.label,
     required this.value,
-    this.highlight = false,
-    this.compact = false,
-    this.onTap,
+    required this.detail,
+    required this.color,
+    required this.onTap,
+    this.emphasized = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = highlight ? AppColors.green : AppColors.t2;
-    return GestureDetector(
-      onTap: onTap,
-      child: SizedBox(
-        width: compact ? 108 : 86,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 16),
-            const SizedBox(height: 14),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppColors.t1,
-                fontSize: compact ? 18 : 25,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0,
+    return Material(
+      color: emphasized
+          ? color.withValues(alpha: 0.1)
+          : AppColors.t1.withValues(alpha: 0.035),
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 15, color: color),
+                  const Spacer(),
+                  Icon(
+                    LucideIcons.chevronRight,
+                    size: 14,
+                    color: AppColors.t3.withValues(alpha: 0.7),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label.toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.t3,
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0,
-              ),
-            ),
-            if (onTap != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 12),
               Text(
-                'Review',
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.t1,
+                  letterSpacing: 0,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.t3,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: color,
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
+                  color: color,
                 ),
               ),
             ],
-          ],
+          ),
         ),
       ),
     );

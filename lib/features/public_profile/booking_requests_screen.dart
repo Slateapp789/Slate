@@ -290,8 +290,8 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
       ref.invalidate(bookingRequestsProvider);
       ref.invalidate(appointmentsProvider);
       ref.invalidate(dashboardRevenueProvider);
-      ref.invalidate(dashboardPulseProvider);
       ref.invalidate(dashboardFocusProvider);
+      ref.invalidate(todayAppointmentsProvider);
       ref.invalidate(notificationsProvider);
       ref.invalidate(unreadNotificationsProvider);
       if (mounted) {
