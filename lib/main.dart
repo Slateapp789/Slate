@@ -57,14 +57,17 @@ final _router = GoRouter(
       builder: (context, state) => const OnboardingScreen(),
     ),
     GoRoute(path: '/home', builder: (context, state) => const MainShell()),
-    GoRoute(path: '/tasks', builder: (context, state) => const TasksScreen()),
+    GoRoute(
+      path: '/tasks',
+      builder: (context, state) => const MainShell(initialIndex: 4),
+    ),
     GoRoute(
       path: '/work',
-      builder: (context, state) => const AppointmentsScreen(),
+      builder: (context, state) => const MainShell(initialIndex: 2),
     ),
     GoRoute(
       path: '/payments',
-      builder: (context, state) => const FinanceScreen(),
+      builder: (context, state) => const MainShell(initialIndex: 3),
     ),
     GoRoute(
       path: '/notifications',
@@ -143,32 +146,28 @@ class WorkspaceGate extends ConsumerWidget {
 }
 
 class MainShell extends StatefulWidget {
-  const MainShell({super.key});
+  final int initialIndex;
+  const MainShell({super.key, this.initialIndex = 0});
 
   @override
   State<MainShell> createState() => _MainShellState();
 }
 
 class _MainShellState extends State<MainShell> {
-  int _currentIndex = 0;
+  late int _currentIndex;
 
-  // Tabs: 0=Home, 1=Clients, 2=Work, 3=Money
-  // Tasks is no longer a root tab — accessed via Dashboard "See all"
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+  }
+
+  // Tabs: 0=Home, 1=Clients, 2=Work, 3=Money, 4=Tasks
   Widget getScreen() {
     switch (_currentIndex) {
       case 0:
         return DashboardScreen(
-          onNavigate: (i) {
-            // Index 4 = tasks — push as a stack route rather than switching tabs
-            if (i == 4) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TasksScreen()),
-              );
-            } else {
-              setState(() => _currentIndex = i);
-            }
-          },
+          onNavigate: (i) => setState(() => _currentIndex = i),
         );
       case 1:
         return const ClientsScreen();
@@ -176,18 +175,11 @@ class _MainShellState extends State<MainShell> {
         return const AppointmentsScreen();
       case 3:
         return const FinanceScreen();
+      case 4:
+        return const TasksScreen();
       default:
         return DashboardScreen(
-          onNavigate: (i) {
-            if (i == 4) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TasksScreen()),
-              );
-            } else {
-              setState(() => _currentIndex = i);
-            }
-          },
+          onNavigate: (i) => setState(() => _currentIndex = i),
         );
     }
   }
@@ -249,10 +241,7 @@ class _MainShellState extends State<MainShell> {
                 label: 'New Task',
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const TasksScreen()),
-                  );
+                  setState(() => _currentIndex = 4);
                 },
               ),
             ],
@@ -341,6 +330,11 @@ class _SlatePillNavBar extends StatelessWidget {
       label: 'Money',
       icon: LucideIcons.banknote,
       color: AppColors.warning,
+    ),
+    _NavItem(
+      label: 'Tasks',
+      icon: LucideIcons.listChecks,
+      color: AppColors.modTasks,
     ),
   ];
 
@@ -432,12 +426,10 @@ class _SlatePillNavBar extends StatelessWidget {
                             ),
                           ),
                           Row(
-                            children: [
-                              _tabSlot(0),
-                              _tabSlot(1),
-                              _tabSlot(2),
-                              _tabSlot(3),
-                            ],
+                            children: List.generate(
+                              tabCount,
+                              (index) => _tabSlot(index),
+                            ),
                           ),
                         ],
                       );

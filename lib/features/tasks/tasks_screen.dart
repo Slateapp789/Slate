@@ -13,7 +13,7 @@ import '../../shared/widgets/slate_ui.dart';
 
 part 'task_card.dart';
 
-enum _TaskView { focus, upcoming, done, all }
+enum _TaskView { urgent, upcoming, done, all }
 
 class _TaskSection {
   final String title;
@@ -35,7 +35,7 @@ class TasksScreen extends ConsumerStatefulWidget {
 }
 
 class _TasksScreenState extends ConsumerState<TasksScreen> {
-  _TaskView _view = _TaskView.focus;
+  _TaskView _view = _TaskView.urgent;
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +112,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 ),
                 data: (data) {
                   final sorted = [...data]..sort(_taskSort);
-                  final summary = _TaskSummary.from(sorted);
                   final sections = _sectionsFor(sorted);
 
                   return RefreshIndicator(
@@ -126,11 +125,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         112,
                       ),
                       children: [
-                        _TaskCommandPanel(
-                          summary: summary,
-                          onQuickAdd: () => _showTaskEditor(context),
-                        ),
-                        const SizedBox(height: 14),
                         _TaskViewSwitcher(
                           value: _view,
                           onChanged: (view) => setState(() => _view = view),
@@ -179,13 +173,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   Widget _emptyState() {
     final title = switch (_view) {
-      _TaskView.focus => 'Nothing pressing',
+      _TaskView.urgent => 'Nothing urgent',
       _TaskView.upcoming => 'No upcoming tasks',
       _TaskView.done => 'No completed tasks',
       _TaskView.all => 'No tasks yet',
     };
     final subtitle = switch (_view) {
-      _TaskView.focus => 'Add a task or check upcoming work.',
+      _TaskView.urgent => 'Add a task or check upcoming work.',
       _TaskView.upcoming => 'Tasks with future due dates will appear here.',
       _TaskView.done => 'Completed tasks will appear here.',
       _TaskView.all => 'Tap New to add the first task.',
@@ -209,7 +203,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     final noDate = open.where((task) => task.dueDate == null).toList();
 
     switch (_view) {
-      case _TaskView.focus:
+      case _TaskView.urgent:
         return [
           _TaskSection(
             title: 'Overdue',
@@ -512,8 +506,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           );
     }
     await _maybeCreateDueNotification(workspaceId, title, dueDate);
-    _refreshTasks();
     if (ctx.mounted) Navigator.pop(ctx);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _refreshTasks();
+      _refreshTaskNotifications();
+    });
   }
 
   Future<void> _maybeCreateDueNotification(
@@ -535,8 +533,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             body: title.trim(),
             deepLink: '/tasks',
           );
-      ref.invalidate(notificationsProvider);
-      ref.invalidate(unreadNotificationsProvider);
     }
   }
 
@@ -641,132 +637,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     ref.invalidate(allTasksProvider);
     ref.invalidate(tasksProvider);
   }
-}
 
-class _TaskCommandPanel extends StatelessWidget {
-  final _TaskSummary summary;
-  final VoidCallback onQuickAdd;
-
-  const _TaskCommandPanel({required this.summary, required this.onQuickAdd});
-
-  @override
-  Widget build(BuildContext context) {
-    return SlateSurface(
-      padding: const EdgeInsets.all(18),
-      radius: AppRadius.lg,
-      color: AppColors.bgCard.withValues(alpha: 0.82),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Today command list',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.t1,
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: onQuickAdd,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.t1.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(LucideIcons.plus, size: 13, color: AppColors.t2),
-                      SizedBox(width: 5),
-                      Text(
-                        'Quick add',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.t2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _SummaryMetric(
-                  label: 'Open',
-                  value: summary.open,
-                  color: AppColors.t2,
-                ),
-              ),
-              Expanded(
-                child: _SummaryMetric(
-                  label: 'Overdue',
-                  value: summary.overdue,
-                  color: summary.overdue > 0 ? AppColors.error : AppColors.t3,
-                ),
-              ),
-              Expanded(
-                child: _SummaryMetric(
-                  label: 'Today',
-                  value: summary.today,
-                  color: summary.today > 0 ? AppColors.warning : AppColors.t3,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryMetric extends StatelessWidget {
-  final String label;
-  final int value;
-  final Color color;
-
-  const _SummaryMetric({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          value.toString(),
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            color: color,
-            height: 1,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          label.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.w900,
-            color: AppColors.t3,
-          ),
-        ),
-      ],
-    );
+  void _refreshTaskNotifications() {
+    ref.invalidate(notificationsProvider);
+    ref.invalidate(unreadNotificationsProvider);
   }
 }
 
@@ -982,7 +856,9 @@ class _DueDatePicker extends StatelessWidget {
                 _dateOnly(DateTime.now().add(const Duration(days: 7))),
               ),
             ),
-            _DateChoice(label: 'No date', onTap: () => onChanged(null)),
+            _DateChoice(label: 'Custom', onTap: () => _pickCustomDate(context)),
+            if (dueDate != null)
+              _DateChoice(label: 'Clear date', onTap: () => onChanged(null)),
           ],
         ),
         const SizedBox(height: 10),
@@ -1013,7 +889,7 @@ class _DueDatePicker extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    dueDate == null ? 'Pick a date' : _formatDate(dueDate!),
+                    dueDate == null ? 'Custom date' : _formatDate(dueDate!),
                     style: TextStyle(
                       color: dueDate != null ? AppColors.t1 : AppColors.t3,
                       fontSize: 14,
@@ -1036,6 +912,17 @@ class _DueDatePicker extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _pickCustomDate(BuildContext context) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: dueDate ?? now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 2),
+    );
+    if (picked != null) onChanged(_dateOnly(picked));
   }
 }
 
@@ -1166,27 +1053,6 @@ class _PriorityBadge extends StatelessWidget {
   }
 }
 
-class _TaskSummary {
-  final int open;
-  final int overdue;
-  final int today;
-
-  const _TaskSummary({
-    required this.open,
-    required this.overdue,
-    required this.today,
-  });
-
-  factory _TaskSummary.from(List<SlateTask> tasks) {
-    final open = tasks.where((task) => task.status != 'done').toList();
-    return _TaskSummary(
-      open: open.length,
-      overdue: open.where(_isOverdueTask).length,
-      today: open.where(_isTodayTask).length,
-    );
-  }
-}
-
 int _taskSort(SlateTask a, SlateTask b) {
   if (a.status != b.status) {
     if (a.status == 'done') return 1;
@@ -1231,7 +1097,7 @@ String _priorityLabel(String priority) {
 
 String _viewLabel(_TaskView view) {
   return switch (view) {
-    _TaskView.focus => 'Focus',
+    _TaskView.urgent => 'Urgent',
     _TaskView.upcoming => 'Upcoming',
     _TaskView.done => 'Done',
     _TaskView.all => 'All',
