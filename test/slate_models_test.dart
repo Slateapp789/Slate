@@ -12,13 +12,26 @@ void main() {
         'name': 'Sarah Morgan',
         'phone': '07123 456789',
         'email': 'sarah@example.com',
+        'address': '10 North Road',
         'notes': 'Prefers mornings',
+        'important_notes': 'Patch test required',
         'status': 'active',
+        'preferred_contact_method': 'sms',
+        'source': 'Referral',
+        'birthday': '1993-06-10',
+        'tags': ['regular', 'morning'],
+        'last_activity_at': '2026-05-20T10:00:00Z',
       });
 
       expect(client.name, 'Sarah Morgan');
+      expect(client.address, '10 North Road');
+      expect(client.importantNotes, 'Patch test required');
+      expect(client.preferredContactMethod, 'sms');
+      expect(client.source, 'Referral');
+      expect(client.tags, ['regular', 'morning']);
       expect(client.toMap()['workspace_id'], 'workspace-1');
       expect(client.toMap()['notes'], 'Prefers mornings');
+      expect(client.toMap()['birthday'], '1993-06-10');
     });
 
     test('Appointment reads joined client and service names', () {

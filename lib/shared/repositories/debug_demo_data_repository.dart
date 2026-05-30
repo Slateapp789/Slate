@@ -234,13 +234,37 @@ class DebugDemoDataRepository {
     String email,
     String note,
   ) {
+    final isLead = name == 'Priya Shah';
     return {
       'workspace_id': workspaceId,
       'name': name,
       'phone': phone,
       'email': email,
+      'address': name.hashCode.isEven
+          ? '${name.length + 10} King Street'
+          : null,
       'notes': '$marker $note',
-      'status': name == 'Priya Shah' ? 'lead' : 'active',
+      'important_notes': name == 'Aisha Khan'
+          ? 'Prefers quiet morning appointments.'
+          : null,
+      'status': isLead ? 'lead' : 'active',
+      'preferred_contact_method': isLead ? 'whatsapp' : 'sms',
+      'source': isLead ? 'Public profile' : 'Referral',
+      'birthday': DateTime(
+        1990 + (name.length % 15),
+        name.length % 12 + 1,
+        12,
+      ).toIso8601String().split('T').first,
+      'tags': [
+        if (isLead) 'lead',
+        if (name.length.isEven) 'regular',
+        if (note.toLowerCase().contains('evening')) 'evening',
+        if (note.toLowerCase().contains('monthly')) 'monthly',
+      ],
+      'last_activity_at': DateTime.now()
+          .subtract(Duration(days: name.length))
+          .toUtc()
+          .toIso8601String(),
     };
   }
 

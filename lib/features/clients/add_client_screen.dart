@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/widgets/slate_ui.dart';
 
 class AddClientScreen extends ConsumerStatefulWidget {
   const AddClientScreen({super.key});
@@ -17,8 +18,14 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _sourceController = TextEditingController();
+  final _tagsController = TextEditingController();
   final _notesController = TextEditingController();
+  final _importantNotesController = TextEditingController();
   String _status = 'active';
+  String _preferredContactMethod = 'phone';
+  DateTime? _birthday;
   bool _saving = false;
 
   @override
@@ -26,7 +33,11 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
+    _addressController.dispose();
+    _sourceController.dispose();
+    _tagsController.dispose();
     _notesController.dispose();
+    _importantNotesController.dispose();
     super.dispose();
   }
 
@@ -46,10 +57,21 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
             name: _nameController.text,
             phone: _phoneController.text,
             email: _emailController.text,
+            address: _addressController.text,
             notes: _notesController.text,
+            importantNotes: _importantNotesController.text,
             status: _status,
+            preferredContactMethod: _preferredContactMethod,
+            source: _sourceController.text,
+            birthday: _birthday,
+            tags: _tagsController.text
+                .split(',')
+                .map((tag) => tag.trim())
+                .where((tag) => tag.isNotEmpty)
+                .toList(),
           );
       ref.invalidate(clientsProvider);
+      ref.invalidate(clientCrmRecordsProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -83,7 +105,6 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header ───────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Row(
@@ -108,7 +129,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
-                      'New Client',
+                      'New client',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
@@ -121,15 +142,13 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
               ),
             ),
 
-            // ── Form ──────────────────────────────────────────────────────
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 132),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 8),
-                    // Name
+                    _sectionTitle('Core details'),
                     _field(
                       label: 'NAME',
                       controller: _nameController,
@@ -138,34 +157,80 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                       onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 12),
-                    // Phone
-                    _field(
-                      label: 'PHONE',
-                      controller: _phoneController,
-                      hint: 'Mobile number',
-                      keyboardType: TextInputType.phone,
-                    ),
-                    const SizedBox(height: 12),
-                    // Email
-                    _field(
-                      label: 'EMAIL',
-                      controller: _emailController,
-                      hint: 'Email address',
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 12),
-                    // Status
                     _statusRow(),
+                    const SizedBox(height: 20),
+                    _sectionTitle('Contact'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _field(
+                            label: 'PHONE',
+                            controller: _phoneController,
+                            hint: 'Mobile number',
+                            keyboardType: TextInputType.phone,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _field(
+                            label: 'EMAIL',
+                            controller: _emailController,
+                            hint: 'Email address',
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 12),
-                    // Notes
+                    _field(
+                      label: 'ADDRESS',
+                      controller: _addressController,
+                      hint: 'Client or usual service address',
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 12),
+                    _choiceRow(
+                      label: 'PREFERRED CONTACT',
+                      value: _preferredContactMethod,
+                      options: const {
+                        'phone': 'Phone',
+                        'sms': 'Text',
+                        'email': 'Email',
+                        'whatsapp': 'WhatsApp',
+                      },
+                      onChanged: (value) =>
+                          setState(() => _preferredContactMethod = value),
+                    ),
+                    const SizedBox(height: 20),
+                    _sectionTitle('CRM context'),
+                    _field(
+                      label: 'SOURCE',
+                      controller: _sourceController,
+                      hint: 'Instagram, referral, walk-in, website...',
+                    ),
+                    const SizedBox(height: 12),
+                    _dateTile(),
+                    const SizedBox(height: 12),
+                    _field(
+                      label: 'TAGS',
+                      controller: _tagsController,
+                      hint: 'VIP, monthly, mobile, colour',
+                    ),
+                    const SizedBox(height: 12),
                     _field(
                       label: 'NOTES',
                       controller: _notesController,
-                      hint: 'Training goals, preferences, anything useful...',
+                      hint: 'Preferences, booking context, useful details...',
                       maxLines: 3,
                     ),
+                    const SizedBox(height: 12),
+                    _field(
+                      label: 'IMPORTANT',
+                      controller: _importantNotesController,
+                      hint: 'Allergies, access notes, must-know details...',
+                      maxLines: 2,
+                    ),
                     const SizedBox(height: 32),
-                    // Save
                     SizedBox(
                       width: double.infinity,
                       height: 54,
@@ -203,6 +268,21 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 10),
+      child: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.t3,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0,
         ),
       ),
     );
@@ -314,5 +394,113 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
         ),
       ),
     );
+  }
+
+  Widget _choiceRow({
+    required String label,
+    required String value,
+    required Map<String, String> options,
+    required ValueChanged<String> onChanged,
+  }) {
+    return SlateSurface(
+      color: AppColors.bgCard,
+      borderColor: AppColors.border,
+      radius: AppRadius.md,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0,
+              color: AppColors.t3,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: options.entries.map((entry) {
+              final active = value == entry.key;
+              return GestureDetector(
+                onTap: () => onChanged(entry.key),
+                child: AnimatedContainer(
+                  duration: AppMotion.standard,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: active
+                        ? AppColors.green.withValues(alpha: 0.14)
+                        : AppColors.bgInteract,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    border: Border.all(
+                      color: active ? AppColors.green : AppColors.border,
+                    ),
+                  ),
+                  child: Text(
+                    entry.value,
+                    style: TextStyle(
+                      color: active ? AppColors.green : AppColors.t3,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dateTile() {
+    return SlateSurface(
+      onTap: _pickBirthday,
+      color: AppColors.bgCard,
+      borderColor: AppColors.border,
+      radius: AppRadius.md,
+      child: Row(
+        children: [
+          const Icon(LucideIcons.cake, color: AppColors.t3, size: 18),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Birthday',
+              style: TextStyle(
+                color: AppColors.t1,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Text(
+            _birthday == null
+                ? 'Add date'
+                : '${_birthday!.day}/${_birthday!.month}/${_birthday!.year}',
+            style: const TextStyle(
+              color: AppColors.t3,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickBirthday() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthday ?? DateTime(now.year - 25),
+      firstDate: DateTime(now.year - 100),
+      lastDate: now,
+    );
+    if (picked != null) setState(() => _birthday = picked);
   }
 }

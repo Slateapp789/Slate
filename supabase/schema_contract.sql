@@ -6,7 +6,7 @@
 -- workspaces(id, name, industry, created_at)
 -- workspace_members(id, workspace_id, user_id, role, created_at)
 -- workspace_settings(id, workspace_id, working_hours jsonb, revenue_target numeric, created_at, updated_at)
--- contacts(id, workspace_id, name, phone, email, notes, status, created_at)
+-- contacts(id, workspace_id, name, phone, email, address, notes, important_notes, status, preferred_contact_method, source, birthday, tags, last_activity_at, created_at)
 -- services(id, workspace_id, name, duration_mins, price, description, show_on_profile, created_at)
 -- appointments(id, workspace_id, contact_id, service_id, title, start_time, end_time, price, status, notes, created_at)
 -- invoices(id, workspace_id, contact_id, invoice_number, type, status, issue_date, due_date, subtotal, tax_rate, tax_amount, discount_value, total, amount_paid, notes, created_at)
@@ -31,10 +31,33 @@ alter table if exists services
   add column if not exists description text,
   add column if not exists show_on_profile boolean not null default true;
 
+alter table if exists contacts
+  add column if not exists address text,
+  add column if not exists tags text[],
+  add column if not exists last_activity_at timestamptz,
+  add column if not exists preferred_contact_method text not null default 'phone',
+  add column if not exists source text,
+  add column if not exists birthday date,
+  add column if not exists important_notes text;
+
+create index if not exists contacts_workspace_status_idx
+  on contacts(workspace_id, status);
+create index if not exists contacts_workspace_last_activity_idx
+  on contacts(workspace_id, last_activity_at desc);
+create index if not exists services_workspace_id_idx
+  on services(workspace_id);
+
 alter table if exists appointments
   add column if not exists location text,
   add column if not exists recurrence_rule text,
   add column if not exists recurrence_parent_id uuid;
+
+create index if not exists appointments_workspace_id_idx
+  on appointments(workspace_id);
+create index if not exists appointments_contact_id_idx
+  on appointments(contact_id);
+create index if not exists appointments_service_id_idx
+  on appointments(service_id);
 
 alter table if exists workspace_settings
   add column if not exists min_booking_notice_hours integer not null default 2,
@@ -45,6 +68,20 @@ alter table if exists tasks
   add column if not exists reminder_timing text not null default 'none',
   add column if not exists appointment_id uuid references appointments(id) on delete set null,
   add column if not exists updated_at timestamptz not null default now();
+
+create index if not exists tasks_workspace_id_idx
+  on tasks(workspace_id);
+create index if not exists tasks_contact_id_idx
+  on tasks(contact_id);
+create index if not exists tasks_appointment_id_idx
+  on tasks(appointment_id);
+
+create index if not exists invoices_workspace_id_idx
+  on invoices(workspace_id);
+create index if not exists invoices_contact_id_idx
+  on invoices(contact_id);
+create index if not exists invoices_appointment_id_idx
+  on invoices(appointment_id);
 
 create table if not exists task_checklist_items (
   id uuid primary key default gen_random_uuid(),

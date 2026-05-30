@@ -66,8 +66,15 @@ class Client {
   final String name;
   final String? phone;
   final String? email;
+  final String? address;
   final String? notes;
+  final String? importantNotes;
   final String status;
+  final String preferredContactMethod;
+  final String? source;
+  final DateTime? birthday;
+  final List<String> tags;
+  final DateTime? lastActivityAt;
   final DateTime? createdAt;
 
   const Client({
@@ -76,8 +83,15 @@ class Client {
     required this.name,
     this.phone,
     this.email,
+    this.address,
     this.notes,
+    this.importantNotes,
     this.status = 'active',
+    this.preferredContactMethod = 'phone',
+    this.source,
+    this.birthday,
+    this.tags = const [],
+    this.lastActivityAt,
     this.createdAt,
   });
 
@@ -88,8 +102,16 @@ class Client {
       name: map['name'] as String? ?? 'Unnamed client',
       phone: map['phone'] as String?,
       email: map['email'] as String?,
+      address: map['address'] as String?,
       notes: map['notes'] as String?,
+      importantNotes: map['important_notes'] as String?,
       status: map['status'] as String? ?? 'active',
+      preferredContactMethod:
+          map['preferred_contact_method'] as String? ?? 'phone',
+      source: map['source'] as String?,
+      birthday: _dateTimeFrom(map['birthday']),
+      tags: _stringListFrom(map['tags']),
+      lastActivityAt: _dateTimeFrom(map['last_activity_at']),
       createdAt: _dateTimeFrom(map['created_at']),
     );
   }
@@ -100,8 +122,17 @@ class Client {
     'name': name,
     'phone': phone,
     'email': email,
+    'address': address,
     'notes': notes,
+    'important_notes': importantNotes,
     'status': status,
+    'preferred_contact_method': preferredContactMethod,
+    'source': source,
+    if (birthday != null)
+      'birthday': birthday!.toIso8601String().split('T').first,
+    'tags': tags,
+    if (lastActivityAt != null)
+      'last_activity_at': lastActivityAt!.toIso8601String(),
     if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
   };
 }

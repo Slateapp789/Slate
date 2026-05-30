@@ -38,8 +38,14 @@ class ClientsRepository {
     required String name,
     String? phone,
     String? email,
+    String? address,
     String? notes,
+    String? importantNotes,
     String status = 'active',
+    String preferredContactMethod = 'phone',
+    String? source,
+    DateTime? birthday,
+    List<String> tags = const [],
   }) async {
     final row = await _client
         .from('contacts')
@@ -48,8 +54,20 @@ class ClientsRepository {
           'name': name.trim(),
           'phone': phone?.trim().isEmpty ?? true ? null : phone!.trim(),
           'email': email?.trim().isEmpty ?? true ? null : email!.trim(),
+          'address': address?.trim().isEmpty ?? true ? null : address!.trim(),
           'notes': notes?.trim().isEmpty ?? true ? null : notes!.trim(),
+          'important_notes': importantNotes?.trim().isEmpty ?? true
+              ? null
+              : importantNotes!.trim(),
           'status': status,
+          'preferred_contact_method': preferredContactMethod,
+          'source': source?.trim().isEmpty ?? true ? null : source!.trim(),
+          'birthday': birthday?.toIso8601String().split('T').first,
+          'tags': tags
+              .map((tag) => tag.trim())
+              .where((tag) => tag.isNotEmpty)
+              .toList(),
+          'last_activity_at': DateTime.now().toUtc().toIso8601String(),
         })
         .select('id')
         .single();
@@ -57,7 +75,13 @@ class ClientsRepository {
   }
 
   Future<void> update(String clientId, Map<String, dynamic> values) async {
-    await _client.from('contacts').update(values).eq('id', clientId);
+    await _client
+        .from('contacts')
+        .update({
+          ...values,
+          'last_activity_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', clientId);
   }
 
   Future<void> delete(String clientId) async {

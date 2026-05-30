@@ -29,8 +29,14 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
+  late TextEditingController _addressController;
+  late TextEditingController _sourceController;
+  late TextEditingController _tagsController;
   late TextEditingController _notesController;
+  late TextEditingController _importantNotesController;
   String _status = 'active';
+  String _preferredContactMethod = 'phone';
+  DateTime? _birthday;
   bool _saving = false;
 
   @override
@@ -47,10 +53,25 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     _emailController = TextEditingController(
       text: _client['email'] as String? ?? '',
     );
+    _addressController = TextEditingController(
+      text: _client['address'] as String? ?? '',
+    );
+    _sourceController = TextEditingController(
+      text: _client['source'] as String? ?? '',
+    );
+    _tagsController = TextEditingController(
+      text: ((_client['tags'] as List?) ?? const []).join(', '),
+    );
     _notesController = TextEditingController(
       text: _client['notes'] as String? ?? '',
     );
+    _importantNotesController = TextEditingController(
+      text: _client['important_notes'] as String? ?? '',
+    );
     _status = _client['status'] as String? ?? 'active';
+    _preferredContactMethod =
+        _client['preferred_contact_method'] as String? ?? 'phone';
+    _birthday = DateTime.tryParse(_client['birthday']?.toString() ?? '');
   }
 
   @override
@@ -59,7 +80,11 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
+    _addressController.dispose();
+    _sourceController.dispose();
+    _tagsController.dispose();
     _notesController.dispose();
+    _importantNotesController.dispose();
     super.dispose();
   }
 
@@ -79,21 +104,48 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
             'email': _emailController.text.trim().isEmpty
                 ? null
                 : _emailController.text.trim(),
+            'address': _addressController.text.trim().isEmpty
+                ? null
+                : _addressController.text.trim(),
             'notes': _notesController.text.trim().isEmpty
                 ? null
                 : _notesController.text.trim(),
+            'important_notes': _importantNotesController.text.trim().isEmpty
+                ? null
+                : _importantNotesController.text.trim(),
             'status': _status,
+            'preferred_contact_method': _preferredContactMethod,
+            'source': _sourceController.text.trim().isEmpty
+                ? null
+                : _sourceController.text.trim(),
+            'birthday': _birthday?.toIso8601String().split('T').first,
+            'tags': _tagsController.text
+                .split(',')
+                .map((tag) => tag.trim())
+                .where((tag) => tag.isNotEmpty)
+                .toList(),
           });
       setState(() {
         _client['name'] = _nameController.text.trim();
         _client['phone'] = _phoneController.text.trim();
         _client['email'] = _emailController.text.trim();
+        _client['address'] = _addressController.text.trim();
+        _client['source'] = _sourceController.text.trim();
+        _client['tags'] = _tagsController.text
+            .split(',')
+            .map((tag) => tag.trim())
+            .where((tag) => tag.isNotEmpty)
+            .toList();
         _client['notes'] = _notesController.text.trim();
+        _client['important_notes'] = _importantNotesController.text.trim();
         _client['status'] = _status;
+        _client['preferred_contact_method'] = _preferredContactMethod;
+        _client['birthday'] = _birthday?.toIso8601String().split('T').first;
         _editing = false;
         _saving = false;
       });
       ref.invalidate(clientsProvider);
+      ref.invalidate(clientCrmRecordsProvider);
     } catch (e) {
       setState(() => _saving = false);
       if (mounted) _snack('Error: $e', AppColors.error);
@@ -181,6 +233,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     final payments = ref.watch(clientPaymentsProvider(clientId));
     final phone = _client['phone'] as String? ?? '';
     final email = _client['email'] as String? ?? '';
+    final address = _client['address'] as String? ?? '';
     final name = _client['name'] as String? ?? '?';
     final initials = name
         .trim()
@@ -292,12 +345,27 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
             ),
             const SizedBox(height: 20),
 
+            if (_editing)
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.bgCard,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: _editForm(),
+                  ),
+                ),
+              ),
+
             // ── Avatar + info card ───────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  if (!_editing) ...[
+            if (!_editing) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
                     Container(
                       width: 64,
                       height: 64,
@@ -320,101 +388,103 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                       ),
                     ),
                     const SizedBox(height: 16),
-                  ],
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.bgCard,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.bgCard,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: _infoView(phone, email, address),
                     ),
-                    child: _editing ? _editForm() : _infoView(phone, email),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            // ── Call / Email buttons ─────────────────────────────────────────
-            if (!_editing && (phone.isNotEmpty || email.isNotEmpty)) ...[
-              const SizedBox(height: 12),
+              // ── Call / Email buttons ─────────────────────────────────────────
+              if (phone.isNotEmpty || email.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      if (phone.isNotEmpty)
+                        Expanded(
+                          child: _ActionButton(
+                            icon: LucideIcons.phone,
+                            label: 'Call',
+                            onTap: () => _callPhone(phone),
+                          ),
+                        ),
+                      if (phone.isNotEmpty && email.isNotEmpty)
+                        const SizedBox(width: 10),
+                      if (email.isNotEmpty)
+                        Expanded(
+                          child: _ActionButton(
+                            icon: LucideIcons.mail,
+                            label: 'Email',
+                            onTap: () => _sendEmail(email),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+
+              // ── Tabs ─────────────────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.bgCard,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    indicator: BoxDecoration(
+                      color: AppColors.green,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicatorPadding: const EdgeInsets.all(3),
+                    dividerColor: Colors.transparent,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: AppColors.t3,
+                    labelStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    tabs: [
+                      const Tab(text: 'Overview'),
+                      Tab(
+                        text: 'Bookings (${appointments.value?.length ?? 0})',
+                      ),
+                      Tab(text: 'Payments (${payments.value?.length ?? 0})'),
+                      Tab(text: 'Tasks (${tasks.value?.length ?? 0})'),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Tab content ──────────────────────────────────────────────────
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
                   children: [
-                    if (phone.isNotEmpty)
-                      Expanded(
-                        child: _ActionButton(
-                          icon: LucideIcons.phone,
-                          label: 'Call',
-                          onTap: () => _callPhone(phone),
-                        ),
-                      ),
-                    if (phone.isNotEmpty && email.isNotEmpty)
-                      const SizedBox(width: 10),
-                    if (email.isNotEmpty)
-                      Expanded(
-                        child: _ActionButton(
-                          icon: LucideIcons.mail,
-                          label: 'Email',
-                          onTap: () => _sendEmail(email),
-                        ),
-                      ),
+                    ClientOverviewTab(
+                      clientId: clientId,
+                      clientName: name,
+                      notes: _client['notes'] as String? ?? '',
+                    ),
+                    ClientAppointmentsTab(clientId: clientId),
+                    ClientPaymentsTab(clientId: clientId, clientName: name),
+                    ClientTasksTab(clientId: clientId, clientName: name),
                   ],
                 ),
               ),
             ],
-            const SizedBox(height: 20),
-
-            // ── Tabs ─────────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: TabBar(
-                  controller: _tabController,
-                  indicator: BoxDecoration(
-                    color: AppColors.green,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  indicatorPadding: const EdgeInsets.all(3),
-                  dividerColor: Colors.transparent,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: AppColors.t3,
-                  labelStyle: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  tabs: [
-                    const Tab(text: 'Overview'),
-                    Tab(text: 'Bookings (${appointments.value?.length ?? 0})'),
-                    Tab(text: 'Payments (${payments.value?.length ?? 0})'),
-                    Tab(text: 'Tasks (${tasks.value?.length ?? 0})'),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // ── Tab content ──────────────────────────────────────────────────
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  ClientOverviewTab(
-                    clientId: clientId,
-                    clientName: name,
-                    notes: _client['notes'] as String? ?? '',
-                  ),
-                  ClientAppointmentsTab(clientId: clientId),
-                  ClientPaymentsTab(clientId: clientId, clientName: name),
-                  ClientTasksTab(clientId: clientId, clientName: name),
-                ],
-              ),
-            ),
           ],
         ),
       ),
@@ -423,9 +493,17 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 
   // ── Info view (read mode) ─────────────────────────────────────────────────
 
-  Widget _infoView(String phone, String email) {
+  Widget _infoView(String phone, String email, String address) {
     final status = _client['status'] as String? ?? 'active';
     final notes = _client['notes'] as String? ?? '';
+    final important = _client['important_notes'] as String? ?? '';
+    final source = _client['source'] as String? ?? '';
+    final preferred = _client['preferred_contact_method'] as String? ?? 'phone';
+    final birthday = DateTime.tryParse(_client['birthday']?.toString() ?? '');
+    final tags = ((_client['tags'] as List?) ?? const [])
+        .map((tag) => tag.toString())
+        .where((tag) => tag.trim().isNotEmpty)
+        .toList();
     final statusColor = status == 'active'
         ? AppColors.green
         : status == 'lead'
@@ -450,6 +528,10 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
             email,
             () => _sendEmail(email),
           ),
+          Divider(height: 1, color: AppColors.border),
+        ],
+        if (address.isNotEmpty) ...[
+          _plainRow(LucideIcons.mapPin, 'Address', address),
           Divider(height: 1, color: AppColors.border),
         ],
         Padding(
@@ -484,6 +566,81 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
             ],
           ),
         ),
+        Divider(height: 1, color: AppColors.border),
+        _plainRow(
+          LucideIcons.messageCircle,
+          'Preferred contact',
+          _contactLabel(preferred),
+        ),
+        if (source.isNotEmpty) ...[
+          Divider(height: 1, color: AppColors.border),
+          _plainRow(LucideIcons.radio, 'Source', source),
+        ],
+        if (birthday != null) ...[
+          Divider(height: 1, color: AppColors.border),
+          _plainRow(
+            LucideIcons.cake,
+            'Birthday',
+            '${birthday.day}/${birthday.month}/${birthday.year}',
+          ),
+        ],
+        if (tags.isNotEmpty) ...[
+          Divider(height: 1, color: AppColors.border),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: tags.map((tag) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgInteract,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                  child: Text(
+                    tag,
+                    style: const TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+        if (important.isNotEmpty) ...[
+          Divider(height: 1, color: AppColors.border),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  LucideIcons.alertCircle,
+                  color: AppColors.error,
+                  size: 16,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    important,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.error,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         if (notes.isNotEmpty) ...[
           Divider(height: 1, color: AppColors.border),
           Padding(
@@ -504,6 +661,34 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
           ),
         ],
       ],
+    );
+  }
+
+  Widget _plainRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.t3, size: 16),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: AppColors.t3),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.t2,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -576,6 +761,18 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
             keyboardType: TextInputType.emailAddress,
           ),
           const SizedBox(height: 12),
+          _editField('Address', _addressController, maxLines: 2),
+          const SizedBox(height: 12),
+          _editField('Source', _sourceController),
+          const SizedBox(height: 12),
+          _editField('Tags', _tagsController),
+          const SizedBox(height: 12),
+          _dateEditor(),
+          const SizedBox(height: 12),
+          _contactMethodEditor(),
+          const SizedBox(height: 12),
+          _editField('Important', _importantNotesController, maxLines: 2),
+          const SizedBox(height: 12),
           _editField('Notes', _notesController, maxLines: 3),
           const SizedBox(height: 16),
           const Text(
@@ -620,6 +817,104 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
         ],
       ),
     );
+  }
+
+  Widget _contactMethodEditor() {
+    const options = {
+      'phone': 'Phone',
+      'sms': 'Text',
+      'email': 'Email',
+      'whatsapp': 'WhatsApp',
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Preferred contact',
+          style: TextStyle(
+            fontSize: 12,
+            color: AppColors.t3,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.entries.map((entry) {
+            final active = _preferredContactMethod == entry.key;
+            return GestureDetector(
+              onTap: () => setState(() => _preferredContactMethod = entry.key),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: active ? AppColors.green : AppColors.bgInteract,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  border: Border.all(
+                    color: active ? AppColors.green : AppColors.border,
+                  ),
+                ),
+                child: Text(
+                  entry.value,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: active ? Colors.white : AppColors.t3,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _dateEditor() {
+    return GestureDetector(
+      onTap: _pickBirthday,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: AppColors.bgInteract,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            const Text(
+              'Birthday',
+              style: TextStyle(color: AppColors.t3, fontSize: 13),
+            ),
+            const Spacer(),
+            Text(
+              _birthday == null
+                  ? 'Add date'
+                  : '${_birthday!.day}/${_birthday!.month}/${_birthday!.year}',
+              style: const TextStyle(
+                color: AppColors.t2,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickBirthday() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthday ?? DateTime(now.year - 25),
+      firstDate: DateTime(now.year - 100),
+      lastDate: now,
+    );
+    if (picked != null) setState(() => _birthday = picked);
   }
 
   Widget _editField(
@@ -755,3 +1050,12 @@ Widget _cancelBtn(BuildContext ctx) => SizedBox(
     ),
   ),
 );
+
+String _contactLabel(String value) {
+  return switch (value) {
+    'sms' => 'Text message',
+    'email' => 'Email',
+    'whatsapp' => 'WhatsApp',
+    _ => 'Phone',
+  };
+}
