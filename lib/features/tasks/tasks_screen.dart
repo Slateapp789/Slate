@@ -27,6 +27,27 @@ class _TaskSection {
   });
 }
 
+class _TaskCounts {
+  final int overdue;
+  final int today;
+  final int upcoming;
+  final int noDate;
+  final int done;
+  final int open;
+
+  const _TaskCounts({
+    required this.overdue,
+    required this.today,
+    required this.upcoming,
+    required this.noDate,
+    required this.done,
+    required this.open,
+  });
+
+  int get urgent => overdue + today + noDate;
+  int get total => open + done;
+}
+
 class TasksScreen extends ConsumerStatefulWidget {
   const TasksScreen({super.key});
 
@@ -113,6 +134,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 data: (data) {
                   final sorted = [...data]..sort(_taskSort);
                   final sections = _sectionsFor(sorted);
+                  final counts = _countsFor(sorted);
 
                   return RefreshIndicator(
                     onRefresh: () async => ref.invalidate(allTasksProvider),
@@ -125,8 +147,17 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         112,
                       ),
                       children: [
+                        _TaskCommandStrip(
+                          counts: counts,
+                          onOpenUrgent: () =>
+                              setState(() => _view = _TaskView.urgent),
+                          onOpenUpcoming: () =>
+                              setState(() => _view = _TaskView.upcoming),
+                        ),
+                        const SizedBox(height: 14),
                         _TaskViewSwitcher(
                           value: _view,
+                          counts: counts,
                           onChanged: (view) => setState(() => _view = view),
                         ),
                         const SizedBox(height: 18),
@@ -244,6 +275,24 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           _TaskSection(title: 'Done', subtitle: 'Completed', tasks: done),
         ];
     }
+  }
+
+  _TaskCounts _countsFor(List<SlateTask> tasks) {
+    final open = tasks.where((task) => task.status != 'done').toList();
+    final done = tasks.where((task) => task.status == 'done').length;
+    final overdue = open.where(_isOverdueTask).length;
+    final today = open.where(_isTodayTask).length;
+    final upcoming = open.where(_isUpcomingTask).length;
+    final noDate = open.where((task) => task.dueDate == null).length;
+
+    return _TaskCounts(
+      overdue: overdue,
+      today: today,
+      upcoming: upcoming,
+      noDate: noDate,
+      done: done,
+      open: open.length,
+    );
   }
 
   void _showTaskDetails(SlateTask task) {
@@ -454,7 +503,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       ? null
                       : () async {
                           setModal(() => saving = true);
-                          await _saveTask(
+                          final saved = await _saveTask(
                             ctx,
                             task: task,
                             title: titleController.text,
@@ -462,7 +511,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                             dueDate: dueDate,
                             clientId: selectedClientId,
                           );
-                          if (ctx.mounted) setModal(() => saving = false);
+                          if (!saved && ctx.mounted) {
+                            setModal(() => saving = false);
+                          }
                         },
                 ),
               ],
@@ -473,7 +524,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     ).whenComplete(titleController.dispose);
   }
 
-  Future<void> _saveTask(
+  Future<bool> _saveTask(
     BuildContext ctx, {
     SlateTask? task,
     required String title,
@@ -481,9 +532,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     required DateTime? dueDate,
     required String? clientId,
   }) async {
-    if (title.trim().isEmpty) return;
+    if (title.trim().isEmpty) return false;
     final workspaceId = await ref.read(workspaceIdProvider.future);
-    if (workspaceId == null) return;
+    if (workspaceId == null) return false;
+    FocusManager.instance.primaryFocus?.unfocus();
     if (task == null) {
       await ref
           .read(tasksRepositoryProvider)
@@ -512,6 +564,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       _refreshTasks();
       _refreshTaskNotifications();
     });
+    return true;
   }
 
   Future<void> _maybeCreateDueNotification(
@@ -646,9 +699,14 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
 class _TaskViewSwitcher extends StatelessWidget {
   final _TaskView value;
+  final _TaskCounts counts;
   final ValueChanged<_TaskView> onChanged;
 
-  const _TaskViewSwitcher({required this.value, required this.onChanged});
+  const _TaskViewSwitcher({
+    required this.value,
+    required this.counts,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -657,6 +715,7 @@ class _TaskViewSwitcher extends StatelessWidget {
       child: Row(
         children: _TaskView.values.map((view) {
           final active = value == view;
+          final count = _viewCount(view, counts);
           return GestureDetector(
             onTap: () => onChanged(view),
             child: Container(
@@ -674,7 +733,7 @@ class _TaskViewSwitcher extends StatelessWidget {
                 ),
               ),
               child: Text(
-                _viewLabel(view),
+                '${_viewLabel(view)} $count',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
@@ -684,6 +743,116 @@ class _TaskViewSwitcher extends StatelessWidget {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+class _TaskCommandStrip extends StatelessWidget {
+  final _TaskCounts counts;
+  final VoidCallback onOpenUrgent;
+  final VoidCallback onOpenUpcoming;
+
+  const _TaskCommandStrip({
+    required this.counts,
+    required this.onOpenUrgent,
+    required this.onOpenUpcoming,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateSurface(
+      color: AppColors.bgCard.withValues(alpha: 0.58),
+      borderColor: AppColors.t1.withValues(alpha: 0.05),
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      child: Row(
+        children: [
+          Expanded(
+            child: _TaskStat(
+              label: 'Overdue',
+              value: '${counts.overdue}',
+              color: counts.overdue > 0 ? AppColors.error : AppColors.t3,
+              onTap: onOpenUrgent,
+            ),
+          ),
+          Expanded(
+            child: _TaskStat(
+              label: 'Today',
+              value: '${counts.today}',
+              color: counts.today > 0 ? AppColors.warning : AppColors.t3,
+              onTap: onOpenUrgent,
+            ),
+          ),
+          Expanded(
+            child: _TaskStat(
+              label: 'Upcoming',
+              value: '${counts.upcoming}',
+              color: AppColors.slate,
+              onTap: onOpenUpcoming,
+            ),
+          ),
+          Expanded(
+            child: _TaskStat(
+              label: 'Open',
+              value: '${counts.open}',
+              color: AppColors.t2,
+              onTap: onOpenUrgent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TaskStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _TaskStat({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.t3,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1101,6 +1270,15 @@ String _viewLabel(_TaskView view) {
     _TaskView.upcoming => 'Upcoming',
     _TaskView.done => 'Done',
     _TaskView.all => 'All',
+  };
+}
+
+int _viewCount(_TaskView view, _TaskCounts counts) {
+  return switch (view) {
+    _TaskView.urgent => counts.urgent,
+    _TaskView.upcoming => counts.upcoming,
+    _TaskView.done => counts.done,
+    _TaskView.all => counts.total,
   };
 }
 
