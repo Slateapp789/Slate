@@ -170,7 +170,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         100,
                       ),
                       itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      separatorBuilder: (_, __) => const SizedBox(height: 2),
                       itemBuilder: (context, i) {
                         final task = filtered[i];
                         return _TaskCard(

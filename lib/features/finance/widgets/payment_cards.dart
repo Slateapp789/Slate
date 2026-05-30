@@ -223,42 +223,39 @@ class PaymentCard extends StatelessWidget {
         ? 'Pending'
         : payment.status;
 
-    final initials = clientName
-        .trim()
-        .split(' ')
-        .map((word) => word.isNotEmpty ? word[0] : '')
-        .take(2)
-        .join()
-        .toUpperCase();
-
     return GestureDetector(
       onTap: onTap,
       onLongPress: onDelete,
-      child: SlateSurface(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        radius: AppRadius.md,
-        borderColor: isOverdue
-            ? AppColors.error.withValues(alpha: 0.3)
-            : isPending
-            ? AppColors.warning.withValues(alpha: 0.2)
-            : AppColors.t1.withValues(alpha: 0.07),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isOverdue
+                  ? AppColors.error.withValues(alpha: 0.18)
+                  : AppColors.t1.withValues(alpha: 0.06),
+            ),
+          ),
+        ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
                 color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
+                shape: BoxShape.circle,
               ),
               child: Center(
-                child: Text(
-                  initials,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: statusColor,
-                  ),
+                child: Icon(
+                  isPaid
+                      ? LucideIcons.check
+                      : isOverdue
+                      ? LucideIcons.alertCircle
+                      : LucideIcons.clock3,
+                  size: 16,
+                  color: statusColor,
                 ),
               ),
             ),
@@ -271,9 +268,11 @@ class PaymentCard extends StatelessWidget {
                     clientName,
                     style: const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                       color: AppColors.t1,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (description.isNotEmpty) ...[
                     const SizedBox(height: 2),
@@ -301,7 +300,7 @@ class PaymentCard extends StatelessWidget {
                 Text(
                   '£${payment.total.toStringAsFixed(0)}',
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 17,
                     fontWeight: FontWeight.w900,
                     color: AppColors.t1,
                   ),
@@ -309,7 +308,7 @@ class PaymentCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
+                    horizontal: 9,
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(

@@ -38,7 +38,8 @@ class _TaskCardState extends State<_TaskCard> {
         scale: _toggling ? 0.985 : 1,
         duration: AppMotion.fast,
         curve: AppMotion.curve,
-        child: SlateSurface(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.md),
           onTap: _toggling
               ? null
               : () async {
@@ -47,102 +48,107 @@ class _TaskCardState extends State<_TaskCard> {
                   widget.onToggle();
                   if (mounted) setState(() => _toggling = false);
                 },
-          padding: const EdgeInsets.all(AppSpacing.md),
-          radius: AppRadius.md,
-          color: isDone
-              ? AppColors.t1.withValues(alpha: 0.035)
-              : AppColors.bgCard,
-          child: Row(
-            children: [
-              AnimatedContainer(
-                duration: AppMotion.standard,
-                curve: AppMotion.curve,
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isDone ? AppColors.green : Colors.transparent,
-                  border: Border.all(
-                    color: isDone ? AppColors.green : AppColors.border,
-                    width: 2,
-                  ),
-                ),
-                child: isDone
-                    ? const Icon(
-                        Icons.check_rounded,
-                        color: Colors.white,
-                        size: 13,
-                      )
-                    : null,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: AppColors.t1.withValues(alpha: 0.06)),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      task.title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isDone ? AppColors.t3 : AppColors.t1,
-                        decoration: isDone ? TextDecoration.lineThrough : null,
-                      ),
+            ),
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: AppMotion.standard,
+                  curve: AppMotion.curve,
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDone ? AppColors.green : Colors.transparent,
+                    border: Border.all(
+                      color: isDone ? AppColors.green : AppColors.border,
+                      width: 2,
                     ),
-                    if (clientName != null || dueDate != null) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          if (clientName != null) ...[
-                            const Icon(
-                              LucideIcons.user,
-                              size: 11,
-                              color: AppColors.t3,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              clientName,
-                              style: const TextStyle(
-                                fontSize: 12,
+                  ),
+                  child: isDone
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: Colors.white,
+                          size: 13,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        task.title,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isDone ? AppColors.t3 : AppColors.t1,
+                          decoration: isDone
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                      if (clientName != null || dueDate != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            if (clientName != null) ...[
+                              const Icon(
+                                LucideIcons.user,
+                                size: 11,
                                 color: AppColors.t3,
                               ),
-                            ),
-                            if (dueDate != null)
-                              const Text(
-                                '  ·  ',
-                                style: TextStyle(
+                              const SizedBox(width: 4),
+                              Text(
+                                clientName,
+                                style: const TextStyle(
                                   fontSize: 12,
                                   color: AppColors.t3,
                                 ),
                               ),
-                          ],
-                          if (dueDate != null)
-                            Text(
-                              _formatDue(dueDate),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: _isOverdue(dueDate) && !isDone
-                                    ? AppColors.error
-                                    : _isDueToday(dueDate) && !isDone
-                                    ? AppColors.warning
-                                    : AppColors.t3,
+                              if (dueDate != null)
+                                const Text(
+                                  '  ·  ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.t3,
+                                  ),
+                                ),
+                            ],
+                            if (dueDate != null)
+                              Text(
+                                _formatDue(dueDate),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _isOverdue(dueDate) && !isDone
+                                      ? AppColors.error
+                                      : _isDueToday(dueDate) && !isDone
+                                      ? AppColors.warning
+                                      : AppColors.t3,
+                                ),
                               ),
-                            ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: isDone ? AppColors.t3 : priorityColor,
-                  shape: BoxShape.circle,
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: isDone ? AppColors.t3 : priorityColor,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

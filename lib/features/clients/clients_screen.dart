@@ -179,7 +179,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                         horizontal: AppSpacing.pageX,
                       ),
                       itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      separatorBuilder: (_, __) => const SizedBox(height: 2),
                       itemBuilder: (context, i) {
                         final client = filtered[i];
                         final status = client.status;
@@ -189,7 +189,8 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                             ? AppColors.warning
                             : AppColors.t3;
 
-                        return SlateSurface(
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           onTap: () async {
                             await Navigator.push(
                               context,
@@ -200,83 +201,90 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                             );
                             ref.invalidate(clientsProvider);
                           },
-                          radius: AppRadius.lg,
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(
                                   color: AppColors.t1.withValues(alpha: 0.06),
-                                  borderRadius: BorderRadius.circular(
-                                    AppRadius.sm,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    client.name.isNotEmpty
-                                        ? client.name[0].toUpperCase()
-                                        : '?',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.t2,
-                                    ),
-                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      client.name,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.t1.withValues(alpha: 0.06),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      client.name.isNotEmpty
+                                          ? client.name[0].toUpperCase()
+                                          : '?',
                                       style: const TextStyle(
-                                        fontSize: 15,
+                                        fontSize: 16,
                                         fontWeight: FontWeight.w800,
-                                        color: AppColors.t1,
+                                        color: AppColors.t2,
                                       ),
                                     ),
-                                    if ((client.phone ?? '').isNotEmpty)
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
                                       Text(
-                                        client.phone!,
+                                        client.name,
                                         style: const TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.t3,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w800,
+                                          color: AppColors.t1,
                                         ),
                                       ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(
-                                    AppRadius.pill,
+                                      if ((client.phone ?? '').isNotEmpty)
+                                        Text(
+                                          client.phone!,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.t3,
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
-                                child: Text(
-                                  status,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: statusColor,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: statusColor.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadius.pill,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    status,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: statusColor,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Icon(
-                                LucideIcons.chevronRight,
-                                color: AppColors.t3,
-                                size: 16,
-                              ),
-                            ],
+                                const SizedBox(width: 8),
+                                const Icon(
+                                  LucideIcons.chevronRight,
+                                  color: AppColors.t3,
+                                  size: 16,
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       },

@@ -201,29 +201,31 @@ class DashboardScreen extends ConsumerWidget {
                         'No appointments today',
                         'Tap + to add one',
                       )
-                    : SizedBox(
-                        height: 118,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: appts.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(width: 10),
-                          itemBuilder: (context, i) => _AppointmentCard(
-                            appt: appts[i],
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => AppointmentDetailScreen(
-                                    appointment: appts[i],
+                    : SlateSurface(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.xs,
+                        ),
+                        radius: AppRadius.lg,
+                        child: Column(
+                          children: appts.take(4).map((appt) {
+                            return _DashboardTimelineRow(
+                              appt: appt,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => AppointmentDetailScreen(
+                                      appointment: appt,
+                                    ),
                                   ),
-                                ),
-                              ).then((_) {
-                                ref.invalidate(todayAppointmentsProvider);
-                                ref.invalidate(dashboardRevenueProvider);
-                              });
-                            },
-                          ),
+                                ).then((_) {
+                                  ref.invalidate(todayAppointmentsProvider);
+                                  ref.invalidate(dashboardRevenueProvider);
+                                });
+                              },
+                            );
+                          }).toList(),
                         ),
                       ),
                 loading: () => _skeletonBox(height: 118),
@@ -508,38 +510,56 @@ class _PulseGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 1.65,
-      children: [
-        _PulseTile(
-          icon: LucideIcons.calendarClock,
-          label: 'Upcoming',
-          value: pulse.upcomingBookings.toString(),
+    return SlateSurface(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      radius: AppRadius.lg,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            const SizedBox(width: 16),
+            _PulseTile(
+              icon: LucideIcons.calendarClock,
+              label: 'Upcoming',
+              value: pulse.upcomingBookings.toString(),
+            ),
+            _PulseDivider(),
+            _PulseTile(
+              icon: LucideIcons.inbox,
+              label: 'Requests',
+              value: pulse.pendingBookingRequests.toString(),
+              highlight: pulse.pendingBookingRequests > 0,
+              onTap: () => context.push('/booking-requests'),
+            ),
+            _PulseDivider(),
+            _PulseTile(
+              icon: LucideIcons.repeat,
+              label: 'Repeat clients',
+              value: pulse.repeatClients.toString(),
+            ),
+            _PulseDivider(),
+            _PulseTile(
+              icon: LucideIcons.clock3,
+              label: 'Busiest',
+              value: pulse.busiestPeriod,
+              compact: true,
+            ),
+            const SizedBox(width: 16),
+          ],
         ),
-        _PulseTile(
-          icon: LucideIcons.inbox,
-          label: 'Requests',
-          value: pulse.pendingBookingRequests.toString(),
-          highlight: pulse.pendingBookingRequests > 0,
-          onTap: () => context.push('/booking-requests'),
-        ),
-        _PulseTile(
-          icon: LucideIcons.repeat,
-          label: 'Repeat clients',
-          value: pulse.repeatClients.toString(),
-        ),
-        _PulseTile(
-          icon: LucideIcons.clock3,
-          label: 'Busiest',
-          value: pulse.busiestPeriod,
-          compact: true,
-        ),
-      ],
+      ),
+    );
+  }
+}
+
+class _PulseDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 42,
+      margin: const EdgeInsets.symmetric(horizontal: 14),
+      color: AppColors.border,
     );
   }
 }
@@ -564,46 +584,31 @@ class _PulseTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = highlight ? AppColors.green : AppColors.t2;
-    return SlateSurface(
+    return GestureDetector(
       onTap: onTap,
-      padding: const EdgeInsets.all(14),
-      radius: AppRadius.md,
-      color: highlight ? AppColors.greenDim : AppColors.bgCard,
-      borderColor: highlight
-          ? AppColors.green.withValues(alpha: 0.44)
-          : AppColors.t1.withValues(alpha: 0.07),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 74),
+      child: SizedBox(
+        width: compact ? 108 : 86,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(icon, color: color, size: 16),
-                const Spacer(),
-                if (onTap != null)
-                  const Icon(
-                    LucideIcons.chevronRight,
-                    color: AppColors.t3,
-                    size: 14,
-                  ),
-              ],
-            ),
-            const Spacer(),
+            Icon(icon, color: color, size: 16),
+            const SizedBox(height: 14),
             Text(
               value,
-              maxLines: compact ? 1 : 1,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: AppColors.t1,
-                fontSize: compact ? 17 : 24,
+                fontSize: compact ? 18 : 25,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 3),
             Text(
               label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.t3,
                 fontSize: 9,
@@ -611,6 +616,17 @@ class _PulseTile extends StatelessWidget {
                 letterSpacing: 0,
               ),
             ),
+            if (onTap != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Review',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -618,11 +634,11 @@ class _PulseTile extends StatelessWidget {
   }
 }
 
-// ── Appointment card ──────────────────────────────────────────────────────────
-class _AppointmentCard extends StatelessWidget {
+class _DashboardTimelineRow extends StatelessWidget {
   final Map<String, dynamic> appt;
   final VoidCallback onTap;
-  const _AppointmentCard({required this.appt, required this.onTap});
+
+  const _DashboardTimelineRow({required this.appt, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -632,101 +648,81 @@ class _AppointmentCard extends StatelessWidget {
     final endTime = DateTime.tryParse(
       appt['end_time'] as String? ?? '',
     )?.toLocal();
-    final timeStr = startTime != null
-        ? '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}'
-        : '--:--';
-    final endStr = endTime != null
-        ? '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}'
-        : null;
+    final timeStr = startTime == null
+        ? '--:--'
+        : '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+    final endStr = endTime == null
+        ? null
+        : '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
     final clientName = appt['contacts']?['name'] as String? ?? 'Walk-in';
     final serviceName = appt['services']?['name'] as String? ?? 'Appointment';
-    final status = appt['status'] as String? ?? 'scheduled';
-    final isScheduled = status == 'scheduled';
-    final isCompleted = status == 'completed';
 
-    final borderColor = isCompleted
-        ? AppColors.success.withValues(alpha: 0.4)
-        : isScheduled
-        ? AppColors.green.withValues(alpha: 0.4)
-        : AppColors.border;
-    final bgColor = isCompleted
-        ? AppColors.successDim
-        : isScheduled
-        ? AppColors.greenDim
-        : AppColors.bgCard;
-    final timeColor = isCompleted
-        ? AppColors.success
-        : isScheduled
-        ? AppColors.green
-        : AppColors.t3;
-
-    return GestureDetector(
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.md),
       onTap: onTap,
-      child: Container(
-        width: 155,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  timeStr,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: timeColor,
+            SizedBox(
+              width: 56,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    timeStr,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.t1,
+                    ),
                   ),
-                ),
-                if (isCompleted)
-                  const Icon(
-                    LucideIcons.checkCircle,
-                    size: 13,
-                    color: AppColors.success,
-                  ),
-              ],
-            ),
-            if (endStr != null) ...[
-              const SizedBox(height: 1),
-              Text(
-                '– $endStr',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: timeColor.withValues(alpha: 0.7),
-                ),
+                  if (endStr != null)
+                    Text(
+                      endStr,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.t3,
+                      ),
+                    ),
+                ],
               ),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              clientName,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.t1,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-            Text(
-              serviceName,
-              style: const TextStyle(fontSize: 11, color: AppColors.t3),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const Spacer(),
             Container(
-              height: 3,
-              decoration: BoxDecoration(
-                color: timeColor,
-                borderRadius: BorderRadius.circular(3),
+              width: 9,
+              height: 9,
+              decoration: const BoxDecoration(
+                color: AppColors.green,
+                shape: BoxShape.circle,
               ),
             ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    clientName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.t1,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    serviceName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: AppColors.t3),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 15),
           ],
         ),
       ),

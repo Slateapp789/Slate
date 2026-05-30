@@ -219,7 +219,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                         100,
                       ),
                       itemCount: sorted.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      separatorBuilder: (_, __) => const SizedBox(height: 2),
                       itemBuilder: (context, i) {
                         final p = sorted[i];
                         final isActionable =
