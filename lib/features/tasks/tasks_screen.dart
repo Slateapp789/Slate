@@ -631,7 +631,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           );
         },
       ),
-    ).whenComplete(titleController.dispose);
+    ).whenComplete(() => _disposeControllerAfterSheetClose(titleController));
   }
 
   Future<bool> _saveTask(
@@ -801,7 +801,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           );
         },
       ),
-    ).whenComplete(controller.dispose);
+    ).whenComplete(() => _disposeControllerAfterSheetClose(controller));
+  }
+
+  void _disposeControllerAfterSheetClose(TextEditingController controller) {
+    Future.delayed(AppMotion.deliberate + AppMotion.fast, controller.dispose);
   }
 
   Future<void> _toggleChecklistItem(
