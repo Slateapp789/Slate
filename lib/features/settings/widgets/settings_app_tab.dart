@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
+import '../providers/settings_providers.dart';
 import 'settings_helpers.dart';
 
-class SettingsAppTab extends StatelessWidget {
+class SettingsAppTab extends ConsumerWidget {
   const SettingsAppTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(settingsBusinessProfileProvider);
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
       children: [
@@ -58,10 +61,29 @@ class SettingsAppTab extends StatelessWidget {
                 '/booking-requests',
               ),
               Divider(height: 1, color: AppColors.border),
-              _comingSoonRow(
-                LucideIcons.globe,
-                'Public Profile Page',
-                '/p/your-handle',
+              profile.maybeWhen(
+                data: (value) {
+                  final handle = value?.handle.trim();
+                  if (handle == null || handle.isEmpty) {
+                    return _comingSoonRow(
+                      LucideIcons.globe,
+                      'Public Profile Page',
+                      'Set a handle in Business settings',
+                    );
+                  }
+                  return _actionRow(
+                    context,
+                    LucideIcons.globe,
+                    'Public Profile Page',
+                    '/p/$handle',
+                    '/p/$handle',
+                  );
+                },
+                orElse: () => _comingSoonRow(
+                  LucideIcons.globe,
+                  'Public Profile Page',
+                  'Set a handle in Business settings',
+                ),
               ),
               Divider(height: 1, color: AppColors.border),
               _actionRow(
