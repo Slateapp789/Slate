@@ -20,6 +20,16 @@ Map<String, dynamic>? _nestedMap(dynamic value) {
   return null;
 }
 
+List<String> _stringListFrom(dynamic value) {
+  if (value is List) {
+    return value
+        .map((item) => item?.toString().trim() ?? '')
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+  return const [];
+}
+
 class Workspace {
   final String id;
   final String name;
@@ -327,6 +337,8 @@ class BusinessProfile {
   final String handle;
   final String? bio;
   final String? coverPhotoUrl;
+  final List<String> galleryImageUrls;
+  final List<String> reviewQuotes;
   final bool reviewsEnabled;
   final bool galleryEnabled;
   final bool payNowEnabled;
@@ -341,6 +353,8 @@ class BusinessProfile {
     required this.handle,
     this.bio,
     this.coverPhotoUrl,
+    this.galleryImageUrls = const [],
+    this.reviewQuotes = const [],
     this.reviewsEnabled = false,
     this.galleryEnabled = false,
     this.payNowEnabled = false,
@@ -357,6 +371,8 @@ class BusinessProfile {
       handle: map['handle'] as String? ?? '',
       bio: map['bio'] as String?,
       coverPhotoUrl: map['cover_photo_url'] as String?,
+      galleryImageUrls: _stringListFrom(map['gallery_image_urls']),
+      reviewQuotes: _stringListFrom(map['review_quotes']),
       reviewsEnabled: map['reviews_enabled'] as bool? ?? false,
       galleryEnabled: map['gallery_enabled'] as bool? ?? false,
       payNowEnabled: map['pay_now_enabled'] as bool? ?? false,
@@ -373,6 +389,8 @@ class BusinessProfile {
     'handle': handle,
     'bio': bio,
     'cover_photo_url': coverPhotoUrl,
+    'gallery_image_urls': galleryImageUrls,
+    'review_quotes': reviewQuotes,
     'reviews_enabled': reviewsEnabled,
     'gallery_enabled': galleryEnabled,
     'pay_now_enabled': payNowEnabled,

@@ -118,9 +118,15 @@ void main() {
         'id': 'profile-1',
         'workspace_id': 'workspace-1',
         'handle': 'slate-demo',
+        'cover_photo_url': 'https://example.com/cover.jpg',
+        'gallery_image_urls': ['https://example.com/1.jpg', ''],
+        'review_quotes': ['Great service'],
       });
 
       expect(profile.bookingMode, 'manual');
+      expect(profile.coverPhotoUrl, 'https://example.com/cover.jpg');
+      expect(profile.galleryImageUrls, ['https://example.com/1.jpg']);
+      expect(profile.reviewQuotes, ['Great service']);
       expect(profile.reviewsEnabled, isFalse);
       expect(profile.galleryEnabled, isFalse);
       expect(profile.payNowEnabled, isFalse);

@@ -37,7 +37,16 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   late TextEditingController _industryController;
   late TextEditingController _handleController;
   late TextEditingController _bioController;
+  late TextEditingController _coverPhotoController;
+  late TextEditingController _galleryController;
+  late TextEditingController _reviewsController;
   late TextEditingController _noticeController;
+
+  List<String> _linesFrom(String value) => value
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .toList();
 
   @override
   void initState() {
@@ -46,6 +55,9 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     _industryController = TextEditingController();
     _handleController = TextEditingController();
     _bioController = TextEditingController();
+    _coverPhotoController = TextEditingController();
+    _galleryController = TextEditingController();
+    _reviewsController = TextEditingController();
     _noticeController = TextEditingController();
   }
 
@@ -55,6 +67,9 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     _industryController.dispose();
     _handleController.dispose();
     _bioController.dispose();
+    _coverPhotoController.dispose();
+    _galleryController.dispose();
+    _reviewsController.dispose();
     _noticeController.dispose();
     super.dispose();
   }
@@ -109,6 +124,11 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
               'bio': _bioController.text.trim().isEmpty
                   ? null
                   : _bioController.text.trim(),
+              'cover_photo_url': _coverPhotoController.text.trim().isEmpty
+                  ? null
+                  : _coverPhotoController.text.trim(),
+              'gallery_image_urls': _linesFrom(_galleryController.text),
+              'review_quotes': _linesFrom(_reviewsController.text),
               'notice_text': _noticeController.text.trim().isEmpty
                   ? null
                   : _noticeController.text.trim(),
@@ -909,6 +929,10 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                 if (!_profileHydrated) {
                   _handleController.text = bp?.handle ?? '';
                   _bioController.text = bp?.bio ?? '';
+                  _coverPhotoController.text = bp?.coverPhotoUrl ?? '';
+                  _galleryController.text =
+                      bp?.galleryImageUrls.join('\n') ?? '';
+                  _reviewsController.text = bp?.reviewQuotes.join('\n') ?? '';
                   _noticeController.text = bp?.noticeText ?? '';
                   _bookingMode = bp?.bookingMode ?? 'manual';
                   _reviewsEnabled = bp?.reviewsEnabled ?? false;
@@ -939,6 +963,13 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                       ),
                       const SizedBox(height: 12),
                       settingsField(
+                        label: 'COVER PHOTO URL',
+                        controller: _coverPhotoController,
+                        hint: 'https://...',
+                        keyboardType: TextInputType.url,
+                      ),
+                      const SizedBox(height: 12),
+                      settingsField(
                         label: 'NOTICE',
                         controller: _noticeController,
                         hint: 'Optional seasonal notice',
@@ -966,6 +997,27 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                         onChanged: (value) =>
                             setState(() => _galleryEnabled = value),
                       ),
+                      if (_galleryEnabled) ...[
+                        const SizedBox(height: 2),
+                        settingsField(
+                          label: 'GALLERY IMAGE URLS',
+                          controller: _galleryController,
+                          hint: 'One image URL per line',
+                          keyboardType: TextInputType.url,
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      if (_reviewsEnabled) ...[
+                        const SizedBox(height: 2),
+                        settingsField(
+                          label: 'REVIEW QUOTES',
+                          controller: _reviewsController,
+                          hint: 'One short quote per line',
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       _ProfileToggleRow(
                         title: 'Pay now',
                         subtitle:

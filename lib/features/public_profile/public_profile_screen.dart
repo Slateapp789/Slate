@@ -178,6 +178,22 @@ class _ProfileContent extends StatelessWidget {
             _Notice(text: profile.profile.noticeText!),
             const SizedBox(height: 16),
           ],
+          if (profile.profile.galleryEnabled &&
+              profile.profile.galleryImageUrls.isNotEmpty) ...[
+            _Section(
+              title: 'Gallery',
+              child: _GalleryGrid(urls: profile.profile.galleryImageUrls),
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (profile.profile.reviewsEnabled &&
+              profile.profile.reviewQuotes.isNotEmpty) ...[
+            _Section(
+              title: 'Reviews',
+              child: _ReviewsList(quotes: profile.profile.reviewQuotes),
+            ),
+            const SizedBox(height: 16),
+          ],
           _Section(
             title: 'Services',
             child: profile.services.isEmpty
@@ -298,30 +314,54 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final coverUrl = profile.profile.coverPhotoUrl;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: AppColors.green,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Center(
-            child: Text(
-              profile.businessName.isEmpty
-                  ? 'S'
-                  : profile.businessName[0].toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
+        if (coverUrl?.isNotEmpty == true) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Image.network(
+                coverUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: AppColors.bgCard,
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    LucideIcons.imageOff,
+                    color: AppColors.t3,
+                    size: 30,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 18),
+          const SizedBox(height: 18),
+        ] else ...[
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.green,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Center(
+              child: Text(
+                profile.businessName.isEmpty
+                    ? 'S'
+                    : profile.businessName[0].toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+        ],
         Text(
           profile.businessName,
           style: const TextStyle(
@@ -354,6 +394,92 @@ class _Hero extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _GalleryGrid extends StatelessWidget {
+  final List<String> urls;
+
+  const _GalleryGrid({required this.urls});
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleUrls = urls.take(6).toList();
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 1.12,
+      ),
+      itemCount: visibleUrls.length,
+      itemBuilder: (context, index) => ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.network(
+          visibleUrls[index],
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: AppColors.bgInteract,
+            alignment: Alignment.center,
+            child: const Icon(
+              LucideIcons.imageOff,
+              color: AppColors.t3,
+              size: 22,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewsList extends StatelessWidget {
+  final List<String> quotes;
+
+  const _ReviewsList({required this.quotes});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: quotes
+          .take(3)
+          .map(
+            (quote) => Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.bgInteract,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    LucideIcons.star,
+                    color: AppColors.green,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      quote,
+                      style: const TextStyle(
+                        color: AppColors.t2,
+                        fontSize: 13,
+                        height: 1.38,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 }

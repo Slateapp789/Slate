@@ -17,6 +17,8 @@
 alter table if exists business_profiles
   add column if not exists bio text,
   add column if not exists cover_photo_url text,
+  add column if not exists gallery_image_urls jsonb not null default '[]'::jsonb,
+  add column if not exists review_quotes jsonb not null default '[]'::jsonb,
   add column if not exists reviews_enabled boolean not null default false,
   add column if not exists gallery_enabled boolean not null default false,
   add column if not exists pay_now_enabled boolean not null default false,
