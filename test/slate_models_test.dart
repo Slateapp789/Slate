@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slate/shared/models/slate_models.dart';
+import 'package:slate/shared/utils/calendar_export.dart';
 import 'package:slate/shared/utils/working_hours.dart';
 
 void main() {
@@ -189,5 +190,24 @@ void main() {
       formatWorkingHourValue(hours['Monday']),
       '08:00 - 14:00, 16:00 - 21:00',
     );
+  });
+
+  test('calendar export builds valid ICS events', () {
+    final ics = buildSlateIcs([
+      {
+        'id': 'appointment-1',
+        'title': 'Cut, colour',
+        'start_time': '2026-06-01T09:00:00Z',
+        'end_time': '2026-06-01T10:30:00Z',
+        'contacts': {'name': 'Nadia'},
+        'services': {'name': 'Colour refresh'},
+      },
+    ]);
+
+    expect(ics, contains('BEGIN:VCALENDAR'));
+    expect(ics, contains('BEGIN:VEVENT'));
+    expect(ics, contains(r'SUMMARY:Cut\, colour'));
+    expect(ics, contains('DTSTART:20260601T090000Z'));
+    expect(ics, contains('Client: Nadia'));
   });
 }

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../shared/providers/appointments_provider.dart';
 import '../../shared/providers/calendar_sync_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/calendar_export.dart';
 
 class CalendarSyncScreen extends ConsumerWidget {
   const CalendarSyncScreen({super.key});
@@ -72,7 +75,10 @@ class CalendarSyncScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             sync.when(
               data: (state) => state.enabled
-                  ? _ConnectedActions(onDisconnect: () => _disconnect(ref))
+                  ? _ConnectedActions(
+                      onExport: () => _copyIcsFeed(context, ref),
+                      onDisconnect: () => _disconnect(ref),
+                    )
                   : _ProviderActions(
                       onConnect: (provider) {
                         _connect(ref, provider);
@@ -125,6 +131,20 @@ class CalendarSyncScreen extends ConsumerWidget {
     ref.invalidate(calendarSyncProvider);
     ref.invalidate(workspaceSettingsProvider);
     ref.invalidate(dashboardFocusProvider);
+  }
+
+  Future<void> _copyIcsFeed(BuildContext context, WidgetRef ref) async {
+    final rows = await ref.read(appointmentsProvider.future);
+    final ics = buildSlateIcs(rows);
+    await Clipboard.setData(ClipboardData(text: ics));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Calendar feed copied'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 }
 
@@ -244,26 +264,49 @@ class _ProviderActions extends StatelessWidget {
 }
 
 class _ConnectedActions extends StatelessWidget {
+  final VoidCallback onExport;
   final VoidCallback onDisconnect;
-  const _ConnectedActions({required this.onDisconnect});
+  const _ConnectedActions({required this.onExport, required this.onDisconnect});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: OutlinedButton.icon(
-        onPressed: onDisconnect,
-        icon: const Icon(LucideIcons.unlink, size: 17),
-        label: const Text('Disconnect calendar'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.error,
-          side: BorderSide(color: AppColors.error.withValues(alpha: 0.35)),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed: onExport,
+            icon: const Icon(LucideIcons.download, size: 17),
+            label: const Text('Copy .ics calendar feed'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.slateLight.withValues(alpha: 0.82),
+              foregroundColor: AppColors.panelInk,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 0,
+            ),
           ),
         ),
-      ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: OutlinedButton.icon(
+            onPressed: onDisconnect,
+            icon: const Icon(LucideIcons.unlink, size: 17),
+            label: const Text('Disconnect calendar'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.error,
+              side: BorderSide(color: AppColors.error.withValues(alpha: 0.35)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
