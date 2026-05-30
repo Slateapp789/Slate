@@ -2,58 +2,58 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  // Backgrounds - warm chalk / soft slate.
-  static const bg = Color(0xFFF3F1EC);
-  static const bgCard = Color(0xFFFBFAF7);
+  // Backgrounds - Northbound Light neutrals.
+  static const bg = Color(0xFFF6F4EF);
+  static const bgCard = Color(0xFFFDFBF7);
   static const bgRaised = Color(0xFFFFFFFF);
-  static const bgInteract = Color(0xFFE9ECEB);
-  static const border = Color(0xFFD8DCD9);
-  static const borderStrong = Color(0xFFBDC5C0);
+  static const bgInteract = Color(0xFFE9EAE5);
+  static const border = Color(0xFFD9DCD6);
+  static const borderStrong = Color(0xFFA8AEA6);
 
   // Text
-  static const t1 = Color(0xFF202629);
-  static const t2 = Color(0xBF202629);
-  static const t3 = Color(0x73202629);
-  static const t4 = Color(0x33202629);
+  static const t1 = Color(0xFF252A28);
+  static const t2 = Color(0xBF252A28);
+  static const t3 = Color(0x73252A28);
+  static const t4 = Color(0x33252A28);
 
-  // Accent - pastel Slate palette. Green aliases remain for existing code.
-  static const slate = Color(0xFF5F8EA3);
-  static const slateLight = Color(0xFFB9D8E6);
-  static const slateDim = Color(0x667DB7CE);
-  static const slateGlow = Color(0x998FC7DA);
-  static const green = Color(0xFF82B99A);
-  static const greenLight = Color(0xFFCBE7D4);
-  static const greenDim = Color(0x66CBE7D4);
-  static const greenGlow = Color(0x99B6DFC4);
+  // Accent - faded glacier greys. Green aliases remain for existing code.
+  static const slate = Color(0xFF6E7771);
+  static const slateLight = Color(0xFFD4D8D3);
+  static const slateDim = Color(0x66D4D8D3);
+  static const slateGlow = Color(0x99D4D8D3);
+  static const green = Color(0xFF68786D);
+  static const greenLight = Color(0xFFDCE3DD);
+  static const greenDim = Color(0x66DCE3DD);
+  static const greenGlow = Color(0x99DCE3DD);
 
   // Aliases so existing code doesn't break
-  static const violet = Color(0xFFA993D4);
-  static const violetDim = Color(0x66D9CFF1);
-  static const violetGlow = Color(0x99D9CFF1);
+  static const violet = Color(0xFF777F78);
+  static const violetDim = Color(0x66E0E1DC);
+  static const violetGlow = Color(0x99E0E1DC);
 
   // Semantic
-  static const success = Color(0xFF6FAE86);
-  static const successDim = Color(0x3DCBE7D4);
-  static const warning = Color(0xFFD9915F);
-  static const warningDim = Color(0x40F4CBA5);
-  static const error = Color(0xFFD87070);
-  static const errorDim = Color(0x3DF3B9B4);
+  static const success = Color(0xFF68786D);
+  static const successDim = Color(0x40DCE3DD);
+  static const warning = Color(0xFF8A7660);
+  static const warningDim = Color(0x40E7DDCF);
+  static const error = Color(0xFFB27772);
+  static const errorDim = Color(0x3FE9D8D5);
 
-  // Module colours - soft but distinct.
-  static const modClients = Color(0xFFA993D4);
-  static const modCalendar = Color(0xFF7DB7CE);
-  static const modFinance = Color(0xFF82B99A);
-  static const modTasks = Color(0xFFE4BE6E);
+  // Module colours - tonal greys with subtle temperature shifts.
+  static const modClients = Color(0xFF9EA49D);
+  static const modCalendar = Color(0xFFAEB4AD);
+  static const modFinance = Color(0xFF8D9A90);
+  static const modTasks = Color(0xFFC1B7A5);
 
   // Module icon backgrounds.
-  static const modBg = Color(0xFFF0EDE7);
+  static const modBg = Color(0xFFEDEBE6);
 
   // Hero/summary panels used for financial and high-trust information.
-  static const panelSoft = Color(0xFFE3F1E8);
-  static const panelSoftRaised = Color(0xFFCBE7D4);
-  static const panelInk = Color(0xFF202629);
-  static const panelMuted = Color(0x99202629);
-  static const panelFaint = Color(0x26202629);
+  static const panelSoft = Color(0xFFE9EDE7);
+  static const panelSoftRaised = Color(0xFFD4D8D3);
+  static const panelInk = Color(0xFF252A28);
+  static const panelMuted = Color(0x99252A28);
+  static const panelFaint = Color(0x26252A28);
 }
 
 class AppSpacing {
