@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/slate_ui.dart';
 import 'screens/ob_welcome.dart';
 import 'screens/ob_profile.dart';
 import 'screens/ob_handle.dart';
@@ -54,25 +55,34 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   children: [
                     Row(
                       children: [
-                        GestureDetector(
+                        SlateIconButton(
+                          icon: Icons.arrow_back_ios_new_rounded,
                           onTap: prevPage,
-                          child: Icon(
-                            Icons.arrow_back_ios_new_rounded,
-                            color: AppColors.t2,
-                            size: 20,
-                          ),
+                          size: 38,
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: AppSpacing.md),
                         Expanded(
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: _currentPage / (screens.length - 1),
-                              backgroundColor: AppColors.bgInteract,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.green,
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            child: TweenAnimationBuilder<double>(
+                              tween: Tween(
+                                end: _currentPage / (screens.length - 1),
                               ),
-                              minHeight: 4,
+                              duration: AppMotion.deliberate,
+                              curve: AppMotion.curve,
+                              builder: (context, value, _) {
+                                return LinearProgressIndicator(
+                                  value: value,
+                                  backgroundColor: AppColors.t1.withValues(
+                                    alpha: 0.06,
+                                  ),
+                                  valueColor:
+                                      const AlwaysStoppedAnimation<Color>(
+                                        AppColors.slateLight,
+                                      ),
+                                  minHeight: 5,
+                                );
+                              },
                             ),
                           ),
                         ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/slate_ui.dart';
 
 class ObWelcome extends StatelessWidget {
   final VoidCallback onNext;
@@ -8,22 +10,27 @@ class ObWelcome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpacing.pageX),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Spacer(),
-          Text(
-            'Slate',
-            style: TextStyle(
-              fontSize: 40,
-              fontWeight: FontWeight.w900,
-              color: AppColors.green,
-              letterSpacing: 0,
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: AppColors.t1.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: AppColors.t1.withValues(alpha: 0.09)),
+            ),
+            child: const Icon(
+              LucideIcons.layers,
+              color: AppColors.slateLight,
+              size: 26,
             ),
           ),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             'Run your business.\nNot your admin.',
             style: TextStyle(
               fontSize: 36,
@@ -34,39 +41,30 @@ class ObWelcome extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             'Your appointments, clients, and payments — one app built for people who work for themselves.',
             style: TextStyle(fontSize: 16, color: AppColors.t3, height: 1.5),
           ),
           const SizedBox(height: 40),
-          // Value props
-          _ValueProp(emoji: '📅', text: 'Know exactly what\'s on today'),
+          const _ValueProp(
+            icon: LucideIcons.calendarDays,
+            text: 'Know exactly what is on today',
+          ),
           const SizedBox(height: 16),
-          _ValueProp(emoji: '💰', text: 'Get paid faster, with less chasing'),
+          const _ValueProp(
+            icon: LucideIcons.banknote,
+            text: 'Get paid faster, with less chasing',
+          ),
           const SizedBox(height: 16),
-          _ValueProp(
-            emoji: '👥',
+          const _ValueProp(
+            icon: LucideIcons.users,
             text: 'Every client, every history, one place',
           ),
           const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: ElevatedButton(
-              onPressed: onNext,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.green,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'Get started — it\'s free',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-            ),
+          SlateButton(
+            label: 'Get started',
+            icon: LucideIcons.arrowRight,
+            onPressed: onNext,
           ),
           const SizedBox(height: 32),
         ],
@@ -76,22 +74,32 @@ class ObWelcome extends StatelessWidget {
 }
 
 class _ValueProp extends StatelessWidget {
-  final String emoji;
+  final IconData icon;
   final String text;
-  const _ValueProp({required this.emoji, required this.text});
+  const _ValueProp({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text(emoji, style: const TextStyle(fontSize: 20)),
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: AppColors.t1.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: Icon(icon, color: AppColors.t3, size: 17),
+        ),
         const SizedBox(width: 12),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 15,
-            color: AppColors.t2,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 15,
+              color: AppColors.t2,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ],

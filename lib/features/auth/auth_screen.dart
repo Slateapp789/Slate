@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/widgets/slate_ui.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -63,28 +65,40 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       backgroundColor: AppColors.bg,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(AppSpacing.pageX),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Spacer(),
-              Text(
-                'Slate',
-                style: TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.green,
-                  letterSpacing: 0,
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: AppColors.t1.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  border: Border.all(
+                    color: AppColors.t1.withValues(alpha: 0.09),
+                  ),
+                ),
+                child: const Icon(
+                  LucideIcons.layers,
+                  color: AppColors.slateLight,
+                  size: 24,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                _isLogin ? 'Welcome back.' : 'Create your account.',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t1,
-                  letterSpacing: 0,
+              const SizedBox(height: AppSpacing.lg),
+              AnimatedSwitcher(
+                duration: AppMotion.standard,
+                child: Text(
+                  _isLogin ? 'Welcome back.' : 'Create your account.',
+                  key: ValueKey(_isLogin),
+                  style: const TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.t1,
+                    letterSpacing: 0,
+                    height: 1.05,
+                  ),
                 ),
               ),
               const SizedBox(height: 6),
@@ -108,49 +122,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.errorDim,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _error!,
-                    style: TextStyle(color: AppColors.error, fontSize: 13),
-                  ),
-                ),
+                SlateErrorState(message: _error!),
               ],
               const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.green,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(
-                          _isLogin ? 'Sign in' : 'Create account',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                ),
+              SlateButton(
+                label: _isLoading
+                    ? 'One moment'
+                    : _isLogin
+                    ? 'Sign in'
+                    : 'Create account',
+                icon: _isLoading ? null : LucideIcons.arrowRight,
+                onPressed: _isLoading ? null : _submit,
               ),
               const SizedBox(height: 16),
               Center(
@@ -159,23 +141,27 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     _isLogin = !_isLogin;
                     _error = null;
                   }),
-                  child: RichText(
-                    text: TextSpan(
-                      style: TextStyle(fontSize: 14, color: AppColors.t3),
-                      children: [
-                        TextSpan(
-                          text: _isLogin
-                              ? "Don't have an account? "
-                              : 'Already have an account? ',
-                        ),
-                        TextSpan(
-                          text: _isLogin ? 'Sign up' : 'Sign in',
-                          style: TextStyle(
-                            color: AppColors.green,
-                            fontWeight: FontWeight.w700,
+                  child: AnimatedSwitcher(
+                    duration: AppMotion.standard,
+                    child: RichText(
+                      key: ValueKey('auth-toggle-$_isLogin'),
+                      text: TextSpan(
+                        style: TextStyle(fontSize: 14, color: AppColors.t3),
+                        children: [
+                          TextSpan(
+                            text: _isLogin
+                                ? "Don't have an account? "
+                                : 'Already have an account? ',
                           ),
-                        ),
-                      ],
+                          TextSpan(
+                            text: _isLogin ? 'Sign up' : 'Sign in',
+                            style: TextStyle(
+                              color: AppColors.green,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -208,29 +194,8 @@ class _SlateTextField extends StatelessWidget {
       controller: controller,
       obscureText: obscure,
       keyboardType: keyboardType,
-      style: TextStyle(color: AppColors.t1, fontSize: 15),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: AppColors.t3),
-        filled: true,
-        fillColor: AppColors.bgCard,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.green, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 16,
-        ),
-      ),
+      style: const TextStyle(color: AppColors.t1, fontSize: 15),
+      decoration: InputDecoration(hintText: hint),
     );
   }
 }
