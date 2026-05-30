@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
@@ -16,6 +17,7 @@ class SettingsAccountTab extends ConsumerStatefulWidget {
 class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
   bool _changingPassword = false;
   bool _savingPassword = false;
+  bool _exporting = false;
   final _newPasswordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   bool _obscureNew = true;
@@ -103,6 +105,154 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
                   Navigator.pop(ctx);
                   await ref.read(authRepositoryProvider).signOut();
                   ref.invalidate(workspaceProvider);
+                },
+              ),
+              const SizedBox(height: 10),
+              cancelBtn(ctx),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportData() async {
+    setState(() => _exporting = true);
+    try {
+      final workspaceId = await ref.read(workspaceIdProvider.future);
+      if (workspaceId == null) return;
+      final json = await ref
+          .read(privacyRepositoryProvider)
+          .exportWorkspaceData(workspaceId);
+      if (!mounted) return;
+      setState(() => _exporting = false);
+      _showExportSheet(json);
+    } catch (e) {
+      setState(() => _exporting = false);
+      if (mounted) _snack('Could not export data: $e', AppColors.error);
+    }
+  }
+
+  void _showExportSheet(String json) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              settingsHandle(),
+              const SizedBox(height: 20),
+              const Text(
+                'Workspace export',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'This includes the workspace data Slate currently stores for your account.',
+                style: TextStyle(color: AppColors.t3, height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.42,
+                ),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.bgInteract,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    json,
+                    style: const TextStyle(
+                      color: AppColors.t2,
+                      fontSize: 11,
+                      height: 1.35,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              saveBtn(
+                label: 'Copy export',
+                onTap: () async {
+                  await Clipboard.setData(ClipboardData(text: json));
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) _snack('Export copied', AppColors.green);
+                },
+              ),
+              const SizedBox(height: 10),
+              cancelBtn(ctx),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteAccountSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              settingsHandle(),
+              const SizedBox(height: 22),
+              const Icon(
+                LucideIcons.shieldAlert,
+                color: AppColors.warning,
+                size: 28,
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Account deletion needs a server workflow',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'The app can export your data now. Full account deletion should run through a verified backend path so auth, storage, and workspace rows are removed together.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.t3, height: 1.4),
+              ),
+              const SizedBox(height: 22),
+              saveBtn(
+                label: 'Copy support note',
+                color: AppColors.warning,
+                onTap: () async {
+                  await Clipboard.setData(
+                    const ClipboardData(
+                      text:
+                          'Please delete my Slate account and all workspace data.',
+                    ),
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) _snack('Deletion note copied', AppColors.green);
                 },
               ),
               const SizedBox(height: 10),
@@ -237,6 +387,35 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
                   onTap: () => setState(() => _changingPassword = true),
                   valueColor: AppColors.t3,
                 ),
+        ),
+        const SizedBox(height: 28),
+
+        // ── Security & Data ─────────────────────────────────────────────
+        sectionLabel('Security & Data'),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              tappableRow(
+                label: 'Export workspace data',
+                value: _exporting ? 'Preparing...' : 'JSON',
+                onTap: _exporting ? () {} : _exportData,
+                valueColor: AppColors.green,
+              ),
+              Divider(height: 1, color: AppColors.border),
+              tappableRow(
+                label: 'Delete account',
+                value: 'Backend required',
+                onTap: _showDeleteAccountSheet,
+                valueColor: AppColors.warning,
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 28),
 

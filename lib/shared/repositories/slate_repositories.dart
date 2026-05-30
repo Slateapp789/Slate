@@ -7,6 +7,7 @@ export 'debug_demo_data_repository.dart';
 export 'notifications_repository.dart';
 export 'onboarding_repository.dart';
 export 'payments_repository.dart';
+export 'privacy_repository.dart';
 export 'profile_repository.dart';
 export 'services_repository.dart';
 export 'supabase_client_provider.dart';
