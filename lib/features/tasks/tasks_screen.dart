@@ -147,14 +147,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         112,
                       ),
                       children: [
-                        _TaskCommandStrip(
-                          counts: counts,
-                          onOpenUrgent: () =>
-                              setState(() => _view = _TaskView.urgent),
-                          onOpenUpcoming: () =>
-                              setState(() => _view = _TaskView.upcoming),
-                        ),
-                        const SizedBox(height: 14),
                         _TaskViewSwitcher(
                           value: _view,
                           counts: counts,
@@ -743,116 +735,6 @@ class _TaskViewSwitcher extends StatelessWidget {
             ),
           );
         }).toList(),
-      ),
-    );
-  }
-}
-
-class _TaskCommandStrip extends StatelessWidget {
-  final _TaskCounts counts;
-  final VoidCallback onOpenUrgent;
-  final VoidCallback onOpenUpcoming;
-
-  const _TaskCommandStrip({
-    required this.counts,
-    required this.onOpenUrgent,
-    required this.onOpenUpcoming,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SlateSurface(
-      color: AppColors.bgCard.withValues(alpha: 0.58),
-      borderColor: AppColors.t1.withValues(alpha: 0.05),
-      radius: AppRadius.xl,
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      child: Row(
-        children: [
-          Expanded(
-            child: _TaskStat(
-              label: 'Overdue',
-              value: '${counts.overdue}',
-              color: counts.overdue > 0 ? AppColors.error : AppColors.t3,
-              onTap: onOpenUrgent,
-            ),
-          ),
-          Expanded(
-            child: _TaskStat(
-              label: 'Today',
-              value: '${counts.today}',
-              color: counts.today > 0 ? AppColors.warning : AppColors.t3,
-              onTap: onOpenUrgent,
-            ),
-          ),
-          Expanded(
-            child: _TaskStat(
-              label: 'Upcoming',
-              value: '${counts.upcoming}',
-              color: AppColors.slate,
-              onTap: onOpenUpcoming,
-            ),
-          ),
-          Expanded(
-            child: _TaskStat(
-              label: 'Open',
-              value: '${counts.open}',
-              color: AppColors.t2,
-              onTap: onOpenUrgent,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TaskStat extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _TaskStat({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.t3,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
