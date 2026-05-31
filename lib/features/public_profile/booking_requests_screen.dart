@@ -23,11 +23,21 @@ final bookingRequestsProvider = FutureProvider<List<BookingRequest>>((
   }
 });
 
-class BookingRequestsScreen extends ConsumerWidget {
+enum _RequestView { active, pending, contacted, closed }
+
+class BookingRequestsScreen extends ConsumerStatefulWidget {
   const BookingRequestsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BookingRequestsScreen> createState() =>
+      _BookingRequestsScreenState();
+}
+
+class _BookingRequestsScreenState extends ConsumerState<BookingRequestsScreen> {
+  _RequestView _view = _RequestView.active;
+
+  @override
+  Widget build(BuildContext context) {
     final requests = ref.watch(bookingRequestsProvider);
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -69,6 +79,60 @@ class BookingRequestsScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            requests.maybeWhen(
+              data: (items) {
+                if (items.isEmpty) return const SizedBox.shrink();
+                final pending = items
+                    .where((item) => item.status == 'pending')
+                    .length;
+                final contacted = items
+                    .where((item) => item.status == 'contacted')
+                    .length;
+                final closed = items
+                    .where(
+                      (item) =>
+                          item.status == 'confirmed' ||
+                          item.status == 'declined',
+                    )
+                    .length;
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  child: Row(
+                    children: [
+                      _RequestFilterChip(
+                        label: 'Active ${pending + contacted}',
+                        active: _view == _RequestView.active,
+                        onTap: () =>
+                            setState(() => _view = _RequestView.active),
+                      ),
+                      const SizedBox(width: 8),
+                      _RequestFilterChip(
+                        label: 'New $pending',
+                        active: _view == _RequestView.pending,
+                        onTap: () =>
+                            setState(() => _view = _RequestView.pending),
+                      ),
+                      const SizedBox(width: 8),
+                      _RequestFilterChip(
+                        label: 'Contacted $contacted',
+                        active: _view == _RequestView.contacted,
+                        onTap: () =>
+                            setState(() => _view = _RequestView.contacted),
+                      ),
+                      const SizedBox(width: 8),
+                      _RequestFilterChip(
+                        label: 'Closed $closed',
+                        active: _view == _RequestView.closed,
+                        onTap: () =>
+                            setState(() => _view = _RequestView.closed),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              orElse: () => const SizedBox.shrink(),
+            ),
             Expanded(
               child: requests.when(
                 loading: () => const Center(
@@ -86,6 +150,18 @@ class BookingRequestsScreen extends ConsumerWidget {
                           'Requests from your public profile will appear here.',
                     );
                   }
+                  final filtered = _filterRequests(items);
+                  if (filtered.isEmpty) {
+                    return _EmptyRequests(
+                      title: switch (_view) {
+                        _RequestView.pending => 'No new requests',
+                        _RequestView.contacted => 'No contacted requests',
+                        _RequestView.closed => 'No closed requests',
+                        _ => 'No active requests',
+                      },
+                      subtitle: 'Switch filters to review other requests.',
+                    );
+                  }
                   return RefreshIndicator(
                     color: AppColors.green,
                     onRefresh: () async =>
@@ -93,15 +169,88 @@ class BookingRequestsScreen extends ConsumerWidget {
                     child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
                       itemBuilder: (context, index) =>
-                          _RequestCard(request: items[index]),
+                          _RequestCard(request: filtered[index]),
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemCount: items.length,
+                      itemCount: filtered.length,
                     ),
                   );
                 },
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  List<BookingRequest> _filterRequests(List<BookingRequest> items) {
+    final filtered = items.where((item) {
+      return switch (_view) {
+        _RequestView.active =>
+          item.status == 'pending' || item.status == 'contacted',
+        _RequestView.pending => item.status == 'pending',
+        _RequestView.contacted => item.status == 'contacted',
+        _RequestView.closed =>
+          item.status == 'confirmed' || item.status == 'declined',
+      };
+    }).toList();
+
+    const statusOrder = {
+      'pending': 0,
+      'contacted': 1,
+      'confirmed': 2,
+      'declined': 3,
+    };
+    filtered.sort((a, b) {
+      final statusCompare = (statusOrder[a.status] ?? 9).compareTo(
+        statusOrder[b.status] ?? 9,
+      );
+      if (statusCompare != 0) return statusCompare;
+      final aCreated = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bCreated = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bCreated.compareTo(aCreated);
+    });
+    return filtered;
+  }
+}
+
+class _RequestFilterChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _RequestFilterChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: AppMotion.fast,
+        curve: AppMotion.curve,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+        decoration: BoxDecoration(
+          color: active
+              ? AppColors.t1.withValues(alpha: 0.10)
+              : AppColors.bgCard,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(
+            color: active
+                ? AppColors.t1.withValues(alpha: 0.15)
+                : AppColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: active ? AppColors.t1 : AppColors.t3,
+          ),
         ),
       ),
     );
