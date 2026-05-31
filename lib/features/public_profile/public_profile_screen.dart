@@ -41,9 +41,15 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   }
 
   Future<void> _sendRequest(PublicProfile profile) async {
-    if (_nameController.text.trim().isEmpty ||
-        _phoneController.text.trim().isEmpty) {
+    if (_sending || _sent) return;
+    final phone = _phoneController.text.trim();
+    final phoneDigits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (_nameController.text.trim().isEmpty || phone.isEmpty) {
       _showSnack('Name and phone are required', AppColors.warning);
+      return;
+    }
+    if (phoneDigits.length < 7) {
+      _showSnack('Add a valid phone number', AppColors.warning);
       return;
     }
     setState(() => _sending = true);
@@ -116,6 +122,8 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             sending: _sending,
             sent: _sent,
             onServiceChanged: (id) => setState(() => _selectedServiceId = id),
+            onPreferredTimePicked: (value) =>
+                setState(() => _preferredTimeController.text = value),
             onSubmit: () => _sendRequest(data),
           );
         },
@@ -134,6 +142,7 @@ class _ProfileContent extends StatelessWidget {
   final bool sending;
   final bool sent;
   final ValueChanged<String?> onServiceChanged;
+  final ValueChanged<String> onPreferredTimePicked;
   final VoidCallback onSubmit;
 
   const _ProfileContent({
@@ -146,6 +155,7 @@ class _ProfileContent extends StatelessWidget {
     required this.sending,
     required this.sent,
     required this.onServiceChanged,
+    required this.onPreferredTimePicked,
     required this.onSubmit,
   });
 
@@ -275,6 +285,8 @@ class _ProfileContent extends StatelessWidget {
                         controller: preferredTimeController,
                         hint: 'Preferred day or time',
                       ),
+                      const SizedBox(height: 8),
+                      _PreferredTimeShortcuts(onPick: onPreferredTimePicked),
                       const SizedBox(height: 10),
                       _ProfileField(
                         controller: messageController,
@@ -701,6 +713,50 @@ class _ProfileField extends StatelessWidget {
       keyboardType: keyboardType,
       style: const TextStyle(color: AppColors.t1),
       decoration: _fieldDecoration(hint),
+    );
+  }
+}
+
+class _PreferredTimeShortcuts extends StatelessWidget {
+  final ValueChanged<String> onPick;
+
+  const _PreferredTimeShortcuts({required this.onPick});
+
+  @override
+  Widget build(BuildContext context) {
+    const options = ['This week', 'Next week', 'Weekend', 'Evening'];
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: options
+            .map(
+              (option) => GestureDetector(
+                onTap: () => onPick(option),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgInteract,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Text(
+                    option,
+                    style: const TextStyle(
+                      color: AppColors.t2,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            )
+            .toList(),
+      ),
     );
   }
 }
