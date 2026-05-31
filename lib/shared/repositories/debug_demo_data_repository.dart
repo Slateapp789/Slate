@@ -27,6 +27,7 @@ class DebugDemoDataRepository {
     await Future.wait([
       _insertAppointments(workspaceId, clients, services, now),
       _insertPayments(workspaceId, clients, now),
+      _insertExpenses(workspaceId, now),
       _insertTasks(workspaceId, clients, now),
       _insertBookingRequests(workspaceId, services, now),
       _insertNotifications(workspaceId, now),
@@ -72,6 +73,13 @@ class DebugDemoDataRepository {
           .delete()
           .eq('workspace_id', workspaceId)
           .ilike('invoice_number', 'DEMO-PAY-%'),
+    );
+    await _tryDelete(
+      () => _client
+          .from('expenses')
+          .delete()
+          .eq('workspace_id', workspaceId)
+          .ilike('notes', '%$marker%'),
     );
     await _tryDelete(
       () => _client
@@ -401,6 +409,24 @@ class DebugDemoDataRepository {
     }
 
     await _client.from('invoices').insert(rows);
+  }
+
+  Future<void> _insertExpenses(String workspaceId, DateTime now) async {
+    final rows = <Map<String, dynamic>>[];
+    final categories = ['Materials', 'Rent', 'Travel', 'Tools', 'Other'];
+    final amounts = [18, 45, 12, 29, 8, 64, 22, 15];
+    for (var i = 0; i < 16; i++) {
+      final date = now.subtract(Duration(days: i * 5));
+      rows.add({
+        'workspace_id': workspaceId,
+        'amount': amounts[i % amounts.length],
+        'category': categories[i % categories.length],
+        'expense_date': date.toIso8601String().split('T').first,
+        'notes': '$marker Demo ${categories[i % categories.length]} expense.',
+      });
+    }
+
+    await _tryInsert(() => _client.from('expenses').insert(rows));
   }
 
   Future<void> _insertTasks(

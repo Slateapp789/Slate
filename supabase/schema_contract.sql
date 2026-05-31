@@ -10,6 +10,7 @@
 -- services(id, workspace_id, name, duration_mins, price, description, show_on_profile, created_at)
 -- appointments(id, workspace_id, contact_id, service_id, title, start_time, end_time, price, status, notes, created_at)
 -- invoices(id, workspace_id, contact_id, invoice_number, type, status, issue_date, due_date, subtotal, tax_rate, tax_amount, discount_value, total, amount_paid, notes, created_at)
+-- expenses(id, workspace_id, amount, category, expense_date, notes, created_at, updated_at)
 -- tasks(id, workspace_id, contact_id, appointment_id, title, priority, due_date, status, reminder_timing, created_at, updated_at)
 -- business_profiles(id, workspace_id, handle, created_at)
 
@@ -82,6 +83,20 @@ create index if not exists invoices_contact_id_idx
   on invoices(contact_id);
 create index if not exists invoices_appointment_id_idx
   on invoices(appointment_id);
+
+create table if not exists expenses (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  amount numeric not null check (amount >= 0),
+  category text not null default 'Other',
+  expense_date date not null default current_date,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists expenses_workspace_date_idx
+  on expenses(workspace_id, expense_date desc);
 
 create table if not exists task_checklist_items (
   id uuid primary key default gen_random_uuid(),

@@ -28,6 +28,7 @@ alter table if exists services enable row level security;
 alter table if exists appointments enable row level security;
 alter table if exists invoices enable row level security;
 alter table if exists invoice_line_items enable row level security;
+alter table if exists expenses enable row level security;
 alter table if exists tasks enable row level security;
 alter table if exists task_checklist_items enable row level security;
 alter table if exists business_profiles enable row level security;
@@ -124,6 +125,12 @@ with check (public.is_workspace_member(workspace_id));
 drop policy if exists "Members can manage invoice line items" on invoice_line_items;
 create policy "Members can manage invoice line items"
 on invoice_line_items for all
+using (public.is_workspace_member(workspace_id))
+with check (public.is_workspace_member(workspace_id));
+
+drop policy if exists "Members can manage expenses" on expenses;
+create policy "Members can manage expenses"
+on expenses for all
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 

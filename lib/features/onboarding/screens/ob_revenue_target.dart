@@ -57,7 +57,7 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
           ),
           const SizedBox(height: 8),
           const Text(
-            "How much do you want to earn per month? We'll track your progress on the dashboard.",
+            "How much do you want to earn per month? We'll turn this into a weekly finance target and track your progress.",
             style: TextStyle(fontSize: 15, color: AppColors.t3, height: 1.5),
           ),
           const SizedBox(height: 32),

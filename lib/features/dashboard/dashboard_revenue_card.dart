@@ -45,8 +45,10 @@ class _RevenueCardState extends State<_RevenueCard> {
   double get _current =>
       _period == 'Week' ? widget.weekRevenue : widget.monthRevenue;
 
-  bool get _targetReached =>
-      widget.revenueTarget > 0 && _current >= widget.revenueTarget;
+  double get _periodTarget =>
+      _period == 'Week' ? widget.revenueTarget / 4.345 : widget.revenueTarget;
+
+  bool get _targetReached => _periodTarget > 0 && _current >= _periodTarget;
 
   void _maybeConfetti() {
     if (_hasTriggeredConfetti) return;
@@ -61,10 +63,9 @@ class _RevenueCardState extends State<_RevenueCard> {
   @override
   Widget build(BuildContext context) {
     final revenue = _current;
-    final hasTarget = widget.revenueTarget > 0;
-    final progress = hasTarget
-        ? (revenue / widget.revenueTarget).clamp(0.0, 1.0)
-        : 0.0;
+    final target = _periodTarget;
+    final hasTarget = target > 0;
+    final progress = hasTarget ? (revenue / target).clamp(0.0, 1.0) : 0.0;
     final targetReached = _targetReached;
 
     return Stack(
@@ -155,7 +156,7 @@ class _RevenueCardState extends State<_RevenueCard> {
                     Text(
                       targetReached
                           ? 'Target reached'
-                          : '£${(widget.revenueTarget - revenue).toStringAsFixed(0)} to go',
+                          : '£${(target - revenue).toStringAsFixed(0)} to go',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -165,7 +166,7 @@ class _RevenueCardState extends State<_RevenueCard> {
                       ),
                     ),
                     Text(
-                      '£${widget.revenueTarget.toStringAsFixed(0)} target',
+                      '£${target.toStringAsFixed(0)} target',
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.panelMuted,

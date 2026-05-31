@@ -93,6 +93,25 @@ void main() {
       expect(map['total'], 120);
     });
 
+    test('Expense keeps lightweight money tracking fields', () {
+      final expense = Expense.fromMap({
+        'id': 'expense-1',
+        'workspace_id': 'workspace-1',
+        'amount': '42.75',
+        'category': 'Materials',
+        'expense_date': '2026-05-31',
+        'notes': 'Colour supplies',
+      });
+
+      final map = expense.toMap();
+
+      expect(expense.amount, 42.75);
+      expect(expense.category, 'Materials');
+      expect(expense.expenseDate, DateTime(2026, 5, 31));
+      expect(map['expense_date'], '2026-05-31');
+      expect(map['notes'], 'Colour supplies');
+    });
+
     test('SlateTask reads linked client data and date fields', () {
       final task = SlateTask.fromMap({
         'id': 'task-1',

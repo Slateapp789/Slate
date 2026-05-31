@@ -315,6 +315,50 @@ class Payment {
   };
 }
 
+class Expense {
+  final String id;
+  final String workspaceId;
+  final double amount;
+  final String category;
+  final DateTime expenseDate;
+  final String? notes;
+  final DateTime? createdAt;
+
+  const Expense({
+    required this.id,
+    required this.workspaceId,
+    required this.amount,
+    required this.category,
+    required this.expenseDate,
+    this.notes,
+    this.createdAt,
+  });
+
+  factory Expense.fromMap(Map<String, dynamic> map) {
+    return Expense(
+      id: map['id'] as String,
+      workspaceId: map['workspace_id'] as String? ?? '',
+      amount: _doubleFrom(map['amount']),
+      category: map['category'] as String? ?? 'Other',
+      expenseDate:
+          _dateTimeFrom(map['expense_date']) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      notes: map['notes'] as String?,
+      createdAt: _dateTimeFrom(map['created_at']),
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'workspace_id': workspaceId,
+    'amount': amount,
+    'category': category,
+    'expense_date': expenseDate.toIso8601String().split('T').first,
+    'notes': notes,
+    if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+  };
+}
+
 class SlateTask {
   final String id;
   final String workspaceId;
