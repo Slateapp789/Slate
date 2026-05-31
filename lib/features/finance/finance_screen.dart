@@ -491,111 +491,128 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (ctx) => SlateSheetFrame(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SlateSurface(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              radius: AppRadius.lg,
-              color: AppColors.greenDim,
-              borderColor: AppColors.t1.withValues(alpha: 0.08),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    payment.status == 'paid' ? 'PAYMENT RECEIVED' : 'PAYMENT',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.t3,
-                    ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.76,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SlateSurface(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  radius: AppRadius.lg,
+                  color: AppColors.greenDim,
+                  borderColor: AppColors.t1.withValues(alpha: 0.08),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        payment.status == 'paid'
+                            ? 'PAYMENT RECEIVED'
+                            : 'PAYMENT',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.t3,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        clientName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.t1,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _paymentTiming(payment),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.t3,
+                        ),
+                      ),
+                      if (description.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          description,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.t3,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Text(
+                        '£${amount.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.t1,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    clientName,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.t1,
-                    ),
+                ),
+                const SizedBox(height: 16),
+                if (canMarkPaid) ...[
+                  SlateButton(
+                    label: 'Mark as Received',
+                    icon: LucideIcons.checkCircle,
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await _markPaymentPaid(context, payment);
+                    },
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _paymentTiming(payment),
-                    style: const TextStyle(fontSize: 13, color: AppColors.t3),
-                  ),
-                  if (description.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      description,
-                      style: const TextStyle(fontSize: 13, color: AppColors.t3),
-                    ),
-                  ],
                   const SizedBox(height: 10),
-                  Text(
-                    '£${amount.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.t1,
-                      letterSpacing: 0,
-                    ),
-                  ),
                 ],
-              ),
+                SlateButton(
+                  label: 'Edit Payment',
+                  icon: LucideIcons.pencil,
+                  secondary: true,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    WidgetsBinding.instance.addPostFrameCallback((_) async {
+                      if (!context.mounted) return;
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddPaymentScreen(payment: payment),
+                        ),
+                      );
+                      ref.invalidate(invoicesProvider);
+                      ref.invalidate(dashboardRevenueProvider);
+                      ref.invalidate(clientCrmRecordsProvider);
+                    });
+                  },
+                ),
+                const SizedBox(height: 10),
+                SlateButton(
+                  label: 'Delete Payment',
+                  icon: LucideIcons.trash2,
+                  destructive: true,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _confirmDeletePayment(context, payment);
+                  },
+                ),
+                const SizedBox(height: 10),
+                SlateButton(
+                  label: 'Close',
+                  secondary: true,
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+                const SizedBox(height: 2),
+              ],
             ),
-            const SizedBox(height: 16),
-            if (canMarkPaid) ...[
-              SlateButton(
-                label: 'Mark as Received',
-                icon: LucideIcons.checkCircle,
-                onPressed: () async {
-                  Navigator.pop(ctx);
-                  await _markPaymentPaid(context, payment);
-                },
-              ),
-              const SizedBox(height: 10),
-            ],
-            SlateButton(
-              label: 'Edit Payment',
-              icon: LucideIcons.pencil,
-              secondary: true,
-              onPressed: () {
-                Navigator.pop(ctx);
-                WidgetsBinding.instance.addPostFrameCallback((_) async {
-                  if (!context.mounted) return;
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AddPaymentScreen(payment: payment),
-                    ),
-                  );
-                  ref.invalidate(invoicesProvider);
-                  ref.invalidate(dashboardRevenueProvider);
-                  ref.invalidate(clientCrmRecordsProvider);
-                });
-              },
-            ),
-            const SizedBox(height: 10),
-            SlateButton(
-              label: 'Delete Payment',
-              icon: LucideIcons.trash2,
-              destructive: true,
-              onPressed: () {
-                Navigator.pop(ctx);
-                _confirmDeletePayment(context, payment);
-              },
-            ),
-            const SizedBox(height: 10),
-            SlateButton(
-              label: 'Close',
-              secondary: true,
-              onPressed: () => Navigator.pop(ctx),
-            ),
-          ],
+          ),
         ),
       ),
     );
