@@ -8,10 +8,12 @@ import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/models/slate_models.dart';
 
 class AddPaymentScreen extends ConsumerStatefulWidget {
   final String? initialClientId;
-  const AddPaymentScreen({super.key, this.initialClientId});
+  final Payment? payment;
+  const AddPaymentScreen({super.key, this.initialClientId, this.payment});
 
   @override
   ConsumerState<AddPaymentScreen> createState() => _AddPaymentScreenState();
@@ -26,10 +28,26 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
   DateTime _dueDate = DateTime.now().add(const Duration(days: 7));
   bool _saving = false;
 
+  bool get _editing => widget.payment != null;
+
   @override
   void initState() {
     super.initState();
-    _selectedClientId = widget.initialClientId;
+    final payment = widget.payment;
+    if (payment == null) {
+      _selectedClientId = widget.initialClientId;
+      return;
+    }
+    _amountController.text = payment.total == 0
+        ? ''
+        : payment.total.toStringAsFixed(
+            payment.total.truncateToDouble() == payment.total ? 0 : 2,
+          );
+    _descriptionController.text = payment.notes ?? '';
+    _selectedClientId = payment.contactId ?? widget.initialClientId;
+    _status = payment.status;
+    _date = payment.issueDate;
+    _dueDate = payment.dueDate ?? payment.issueDate;
   }
 
   @override
@@ -53,27 +71,41 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
       final amount = double.parse(_amountController.text.trim());
       final description = _descriptionController.text.trim();
 
-      await ref
-          .read(paymentsRepositoryProvider)
-          .create(
-            workspaceId: workspaceId,
-            amount: amount,
-            status: _status,
-            date: _date,
-            dueDate: _status == 'paid' ? _date : _dueDate,
-            contactId: _selectedClientId,
-            notes: description,
-          );
-      await ref
-          .read(notificationsRepositoryProvider)
-          .create(
-            workspaceId: workspaceId,
-            type: _status == 'paid' ? 'payment_received' : 'invoice_overdue',
-            title: _status == 'paid' ? 'Payment recorded' : 'Payment pending',
-            body:
-                '£${amount.toStringAsFixed(0)} ${_status == 'paid' ? 'was recorded' : 'needs follow-up'}.',
-            deepLink: '/payments',
-          );
+      if (_editing) {
+        await ref
+            .read(paymentsRepositoryProvider)
+            .update(
+              paymentId: widget.payment!.id,
+              amount: amount,
+              status: _status,
+              date: _date,
+              dueDate: _status == 'paid' ? _date : _dueDate,
+              contactId: _selectedClientId,
+              notes: description,
+            );
+      } else {
+        await ref
+            .read(paymentsRepositoryProvider)
+            .create(
+              workspaceId: workspaceId,
+              amount: amount,
+              status: _status,
+              date: _date,
+              dueDate: _status == 'paid' ? _date : _dueDate,
+              contactId: _selectedClientId,
+              notes: description,
+            );
+        await ref
+            .read(notificationsRepositoryProvider)
+            .create(
+              workspaceId: workspaceId,
+              type: _status == 'paid' ? 'payment_received' : 'invoice_overdue',
+              title: _status == 'paid' ? 'Payment recorded' : 'Payment pending',
+              body:
+                  '£${amount.toStringAsFixed(0)} ${_status == 'paid' ? 'was recorded' : 'needs follow-up'}.',
+              deepLink: '/payments',
+            );
+      }
 
       ref.invalidate(invoicesProvider);
       ref.invalidate(dashboardRevenueProvider);
@@ -185,10 +217,10 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Record Payment',
-                      style: TextStyle(
+                      _editing ? 'Edit Payment' : 'Record Payment',
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                         color: AppColors.t1,
@@ -536,9 +568,9 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Text(
-                          'Save Payment',
-                          style: TextStyle(
+                      : Text(
+                          _editing ? 'Save Changes' : 'Save Payment',
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),

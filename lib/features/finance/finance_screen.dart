@@ -297,7 +297,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     final clientName = payment.clientName ?? 'Unknown client';
     final amount = payment.total;
     final description = payment.notes ?? '';
-    final canMarkPaid = payment.status == 'sent' ||
+    final canMarkPaid =
+        payment.status == 'sent' ||
         payment.status == 'pending' ||
         payment.status == 'overdue';
 
@@ -371,6 +372,27 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               ),
               const SizedBox(height: 10),
             ],
+            SlateButton(
+              label: 'Edit Payment',
+              icon: LucideIcons.pencil,
+              secondary: true,
+              onPressed: () {
+                Navigator.pop(ctx);
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  if (!context.mounted) return;
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AddPaymentScreen(payment: payment),
+                    ),
+                  );
+                  ref.invalidate(invoicesProvider);
+                  ref.invalidate(dashboardRevenueProvider);
+                  ref.invalidate(clientCrmRecordsProvider);
+                });
+              },
+            ),
+            const SizedBox(height: 10),
             SlateButton(
               label: 'Delete Payment',
               icon: LucideIcons.trash2,

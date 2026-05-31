@@ -4,6 +4,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/slate_models.dart';
+import '../../../shared/providers/clients_provider.dart';
+import '../../../shared/providers/dashboard_provider.dart';
+import '../../../shared/providers/finance_provider.dart';
 import '../../finance/add_payment_screen.dart';
 import '../providers/client_detail_providers.dart';
 
@@ -41,6 +44,9 @@ class ClientPaymentsTab extends ConsumerWidget {
                 ),
               );
               ref.invalidate(clientPaymentsProvider(clientId));
+              ref.invalidate(invoicesProvider);
+              ref.invalidate(dashboardRevenueProvider);
+              ref.invalidate(clientCrmRecordsProvider);
             },
           );
         }
@@ -63,7 +69,21 @@ class ClientPaymentsTab extends ConsumerWidget {
                 return _PaymentSummary(paid: paid, outstanding: outstanding);
               }
               final payment = items[index - 1];
-              return _PaymentRow(payment: payment);
+              return _PaymentRow(
+                payment: payment,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AddPaymentScreen(payment: payment),
+                    ),
+                  );
+                  ref.invalidate(clientPaymentsProvider(clientId));
+                  ref.invalidate(invoicesProvider);
+                  ref.invalidate(dashboardRevenueProvider);
+                  ref.invalidate(clientCrmRecordsProvider);
+                },
+              );
             },
           ),
         );
@@ -150,7 +170,8 @@ class _Metric extends StatelessWidget {
 
 class _PaymentRow extends StatelessWidget {
   final Payment payment;
-  const _PaymentRow({required this.payment});
+  final VoidCallback onTap;
+  const _PaymentRow({required this.payment, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -161,60 +182,65 @@ class _PaymentRow extends StatelessWidget {
       'overdue' => AppColors.error,
       _ => AppColors.warning,
     };
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Icon(LucideIcons.banknote, color: color, size: 18),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(LucideIcons.banknote, color: color, size: 18),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    payment.notes ?? payment.number.ifEmpty('Payment'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.t1,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _formatDate(payment.issueDate),
+                    style: const TextStyle(color: AppColors.t3, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  payment.notes ?? payment.number.ifEmpty('Payment'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  '£${amount.toStringAsFixed(0)}',
                   style: const TextStyle(
                     color: AppColors.t1,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  _formatDate(payment.issueDate),
-                  style: const TextStyle(color: AppColors.t3, fontSize: 12),
+                  status,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ],
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '£${amount.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  color: AppColors.t1,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                status,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ],
+            const SizedBox(width: 8),
+            const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
+          ],
+        ),
       ),
     );
   }

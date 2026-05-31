@@ -93,6 +93,33 @@ class PaymentsRepository {
         .eq('id', payment.id);
   }
 
+  Future<void> update({
+    required String paymentId,
+    required double amount,
+    required String status,
+    required DateTime date,
+    DateTime? dueDate,
+    String? contactId,
+    String? notes,
+  }) async {
+    final dateString = date.toIso8601String().split('T').first;
+    final dueDateString = (dueDate ?? date).toIso8601String().split('T').first;
+    await _client
+        .from('invoices')
+        .update({
+          'contact_id': contactId,
+          'status': status,
+          'issue_date': dateString,
+          'due_date': dueDateString,
+          'subtotal': amount,
+          'tax_amount': 0,
+          'total': amount,
+          'amount_paid': status == 'paid' ? amount : 0,
+          'notes': notes?.trim().isEmpty ?? true ? null : notes!.trim(),
+        })
+        .eq('id', paymentId);
+  }
+
   Future<void> delete(String paymentId) async {
     await _client.from('invoices').delete().eq('id', paymentId);
   }
