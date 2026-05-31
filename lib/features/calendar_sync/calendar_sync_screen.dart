@@ -79,23 +79,21 @@ class CalendarSyncScreen extends ConsumerWidget {
                       onExport: () => _copyIcsFeed(context, ref),
                       onDisconnect: () => _disconnect(ref),
                     )
-                  : _ProviderActions(
-                      onConnect: (provider) {
-                        _connect(ref, provider);
-                      },
+                  : _ExportActions(
+                      onEnable: () => _connect(ref),
+                      onCopy: () => _copyIcsFeed(context, ref),
                     ),
               loading: () => const SizedBox.shrink(),
-              error: (_, __) => _ProviderActions(
-                onConnect: (provider) {
-                  _connect(ref, provider);
-                },
+              error: (_, __) => _ExportActions(
+                onEnable: () => _connect(ref),
+                onCopy: () => _copyIcsFeed(context, ref),
               ),
             ),
             const SizedBox(height: 22),
             const _SyncRow(
-              icon: LucideIcons.repeat,
-              label: 'Two-way sync',
-              value: 'Ready for provider OAuth',
+              icon: LucideIcons.download,
+              label: 'Calendar export',
+              value: 'Available now',
             ),
             const _SyncRow(
               icon: LucideIcons.alertTriangle,
@@ -103,9 +101,9 @@ class CalendarSyncScreen extends ConsumerWidget {
               value: 'Active in booking form',
             ),
             const _SyncRow(
-              icon: LucideIcons.calendarRange,
-              label: 'Imported busy blocks',
-              value: 'Next integration step',
+              icon: LucideIcons.repeat,
+              label: 'Two-way provider sync',
+              value: 'Later',
             ),
           ],
         ),
@@ -113,12 +111,12 @@ class CalendarSyncScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _connect(WidgetRef ref, String provider) async {
+  Future<void> _connect(WidgetRef ref) async {
     final workspaceId = await ref.read(workspaceIdProvider.future);
     if (workspaceId == null) return;
     await ref
         .read(calendarSyncRepositoryProvider)
-        .connect(workspaceId: workspaceId, provider: provider);
+        .connect(workspaceId: workspaceId, provider: 'ics_export');
     ref.invalidate(calendarSyncProvider);
     ref.invalidate(workspaceSettingsProvider);
     ref.invalidate(dashboardFocusProvider);
@@ -192,8 +190,8 @@ class _SyncInfoCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             enabled
-                ? '${provider ?? 'Calendar'} sync is enabled. Slate can now warn about conflicts while provider OAuth is completed.'
-                : 'Keep sync contained here: provider account, sync status, conflict checks and disconnect controls.',
+                ? '${_providerLabel(provider)} export is enabled. Copy the feed into your calendar app to see Slate bookings outside the app.'
+                : 'Start with a safe calendar export feed. Google and Apple two-way sync can come later without mixing provider logic into bookings.',
             style: const TextStyle(
               color: AppColors.t3,
               fontSize: 14,
@@ -235,27 +233,47 @@ class _SyncLoadingCard extends StatelessWidget {
   }
 }
 
-class _ProviderActions extends StatelessWidget {
-  final ValueChanged<String> onConnect;
-  const _ProviderActions({required this.onConnect});
+class _ExportActions extends StatelessWidget {
+  final VoidCallback onEnable;
+  final VoidCallback onCopy;
+  const _ExportActions({required this.onEnable, required this.onCopy});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _ProviderButton(
-            icon: LucideIcons.mail,
-            label: 'Google',
-            onTap: () => onConnect('google'),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed: onEnable,
+            icon: const Icon(LucideIcons.calendarCheck, size: 17),
+            label: const Text('Enable calendar export'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.slateLight.withValues(alpha: 0.82),
+              foregroundColor: AppColors.panelInk,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 0,
+            ),
           ),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _ProviderButton(
-            icon: LucideIcons.apple,
-            label: 'Apple',
-            onTap: () => onConnect('apple'),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: OutlinedButton.icon(
+            onPressed: onCopy,
+            icon: const Icon(LucideIcons.copy, size: 17),
+            label: const Text('Copy feed without enabling'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.t2,
+              side: const BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
           ),
         ),
       ],
@@ -311,38 +329,6 @@ class _ConnectedActions extends StatelessWidget {
   }
 }
 
-class _ProviderButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _ProviderButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 52,
-      child: ElevatedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 17),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.slateLight.withValues(alpha: 0.82),
-          foregroundColor: AppColors.panelInk,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          elevation: 0,
-        ),
-      ),
-    );
-  }
-}
-
 class _SyncRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -392,4 +378,13 @@ class _SyncRow extends StatelessWidget {
 
 String _formatDateTime(DateTime dt) {
   return '${dt.day}/${dt.month}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+}
+
+String _providerLabel(String? provider) {
+  return switch (provider) {
+    'ics_export' || null => 'Calendar',
+    'google' => 'Google Calendar',
+    'apple' => 'Apple Calendar',
+    _ => provider,
+  };
 }
