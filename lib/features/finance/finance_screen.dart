@@ -145,17 +145,14 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   }
 
   Widget _skeletonList() {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.pageX,
-        0,
-        AppSpacing.pageX,
-        40,
+    return Column(
+      children: List.generate(
+        4,
+        (index) => const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: SlateLoadingBlock(height: 76, radius: AppRadius.md),
+        ),
       ),
-      itemCount: 4,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (_, __) =>
-          const SlateLoadingBlock(height: 76, radius: AppRadius.md),
     );
   }
 
