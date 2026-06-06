@@ -13,12 +13,14 @@ import '../providers/client_detail_providers.dart';
 class ClientOverviewTab extends ConsumerWidget {
   final String clientId;
   final String clientName;
+  final Map<String, dynamic> client;
   final String notes;
 
   const ClientOverviewTab({
     super.key,
     required this.clientId,
     required this.clientName,
+    required this.client,
     required this.notes,
   });
 
@@ -38,6 +40,8 @@ class ClientOverviewTab extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
         children: [
+          _DetailsSection(client: client),
+          const SizedBox(height: 12),
           _PulseSection(
             appointments: appointments.value ?? const [],
             payments: payments.value ?? const [],
@@ -95,7 +99,7 @@ class _PulseSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'CLIENT PULSE',
+            'CLIENT SUMMARY',
             style: TextStyle(
               color: AppColors.t3,
               fontSize: 10,
@@ -197,6 +201,191 @@ class _MetricTile extends StatelessWidget {
   }
 }
 
+class _DetailsSection extends StatelessWidget {
+  final Map<String, dynamic> client;
+
+  const _DetailsSection({required this.client});
+
+  @override
+  Widget build(BuildContext context) {
+    final phone = client['phone'] as String? ?? '';
+    final email = client['email'] as String? ?? '';
+    final address = client['address'] as String? ?? '';
+    final status = client['status'] as String? ?? 'active';
+    final source = client['source'] as String? ?? '';
+    final preferred = client['preferred_contact_method'] as String? ?? 'phone';
+    final birthday = DateTime.tryParse(client['birthday']?.toString() ?? '');
+    final important = client['important_notes'] as String? ?? '';
+    final tags = ((client['tags'] as List?) ?? const [])
+        .map((tag) => tag.toString())
+        .where((tag) => tag.trim().isNotEmpty)
+        .toList();
+    final rows = <Widget>[
+      _DetailRow(icon: LucideIcons.tag, label: 'Status', value: status),
+      _DetailRow(
+        icon: LucideIcons.messageCircle,
+        label: 'Preferred',
+        value: _contactLabel(preferred),
+      ),
+      if (phone.isNotEmpty)
+        _DetailRow(icon: LucideIcons.phone, label: 'Phone', value: phone),
+      if (email.isNotEmpty)
+        _DetailRow(icon: LucideIcons.mail, label: 'Email', value: email),
+      if (address.isNotEmpty)
+        _DetailRow(icon: LucideIcons.mapPin, label: 'Address', value: address),
+      if (source.isNotEmpty)
+        _DetailRow(icon: LucideIcons.radio, label: 'Source', value: source),
+      if (birthday != null)
+        _DetailRow(
+          icon: LucideIcons.cake,
+          label: 'Birthday',
+          value: '${birthday.day}/${birthday.month}/${birthday.year}',
+        ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'DETAILS',
+            style: TextStyle(
+              color: AppColors.t3,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (rows.isEmpty && tags.isEmpty && important.isEmpty)
+            const Text(
+              'No client details yet.',
+              style: TextStyle(color: AppColors.t3, fontSize: 13),
+            )
+          else ...[
+            ...rows.expand((row) => [row, const SizedBox(height: 9)]),
+            if (tags.isNotEmpty) ...[
+              Wrap(
+                spacing: 7,
+                runSpacing: 7,
+                children: tags
+                    .map(
+                      (tag) => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.bgInteract,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Text(
+                          tag,
+                          style: const TextStyle(
+                            color: AppColors.t2,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (important.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.errorDim,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      LucideIcons.alertCircle,
+                      color: AppColors.error,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        important,
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: AppColors.t3, size: 15),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label.toUpperCase(),
+                style: const TextStyle(
+                  color: AppColors.t3,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _NotesSection extends StatelessWidget {
   final String notes;
   final String clientName;
@@ -242,7 +431,7 @@ class _NotesSection extends StatelessWidget {
                 Text(
                   hasNotes
                       ? notes
-                      : 'No notes yet. Add preferences, follow-up context, or anything worth remembering about $clientName.',
+                      : 'No notes yet. Add preferences, booking notes, or anything worth remembering about $clientName.',
                   style: TextStyle(
                     color: hasNotes ? AppColors.t2 : AppColors.t3,
                     fontSize: 13,
@@ -366,7 +555,7 @@ class _FollowUpSectionState extends ConsumerState<_FollowUpSection> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Next follow-up',
+                      'Next task',
                       style: TextStyle(
                         color: AppColors.t1,
                         fontSize: 14,
@@ -375,7 +564,7 @@ class _FollowUpSectionState extends ConsumerState<_FollowUpSection> {
                     ),
                     SizedBox(height: 3),
                     Text(
-                      'Create the next client nudge as a task.',
+                      'Create a dated task for this client.',
                       style: TextStyle(color: AppColors.t3, fontSize: 12),
                     ),
                   ],
@@ -700,4 +889,13 @@ String _formatLongDate(DateTime date) {
     'Dec',
   ];
   return '${date.day} ${months[date.month - 1]} ${date.year}';
+}
+
+String _contactLabel(String value) {
+  return switch (value) {
+    'sms' => 'Text message',
+    'email' => 'Email',
+    'whatsapp' => 'WhatsApp',
+    _ => 'Phone',
+  };
 }

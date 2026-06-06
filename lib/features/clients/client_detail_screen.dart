@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/widgets/slate_ui.dart';
 import 'providers/client_detail_providers.dart';
 import 'widgets/client_appointments_tab.dart';
 import 'widgets/client_overview_tab.dart';
@@ -38,6 +39,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   String _preferredContactMethod = 'phone';
   DateTime? _birthday;
   bool _saving = false;
+  bool _moreDetailsExpanded = false;
 
   @override
   void initState() {
@@ -250,7 +252,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
           children: [
             // ── Header ──────────────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               child: Row(
                 children: [
                   GestureDetector(
@@ -343,7 +345,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
 
             if (_editing)
               Expanded(
@@ -360,76 +362,23 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                 ),
               ),
 
-            // ── Avatar + info card ───────────────────────────────────────────
             if (!_editing) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: AppColors.greenDim,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: AppColors.green.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          initials,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.green,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: _infoView(phone, email, address),
-                    ),
-                  ],
+                child: _ClientCompactHeader(
+                  initials: initials,
+                  status: _client['status'] as String? ?? 'active',
+                  preferredContact: _contactLabel(
+                    _client['preferred_contact_method'] as String? ?? 'phone',
+                  ),
+                  phone: phone,
+                  email: email,
+                  address: address,
+                  onCall: phone.isEmpty ? null : () => _callPhone(phone),
+                  onEmail: email.isEmpty ? null : () => _sendEmail(email),
                 ),
               ),
-
-              // ── Call / Email buttons ─────────────────────────────────────────
-              if (phone.isNotEmpty || email.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      if (phone.isNotEmpty)
-                        Expanded(
-                          child: _ActionButton(
-                            icon: LucideIcons.phone,
-                            label: 'Call',
-                            onTap: () => _callPhone(phone),
-                          ),
-                        ),
-                      if (phone.isNotEmpty && email.isNotEmpty)
-                        const SizedBox(width: 10),
-                      if (email.isNotEmpty)
-                        Expanded(
-                          child: _ActionButton(
-                            icon: LucideIcons.mail,
-                            label: 'Email',
-                            onTap: () => _sendEmail(email),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
 
               // ── Tabs ─────────────────────────────────────────────────────────
               Padding(
@@ -466,7 +415,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
 
               // ── Tab content ──────────────────────────────────────────────────
               Expanded(
@@ -476,6 +425,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                     ClientOverviewTab(
                       clientId: clientId,
                       clientName: name,
+                      client: _client,
                       notes: _client['notes'] as String? ?? '',
                     ),
                     ClientAppointmentsTab(clientId: clientId),
@@ -486,254 +436,6 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-
-  // ── Info view (read mode) ─────────────────────────────────────────────────
-
-  Widget _infoView(String phone, String email, String address) {
-    final status = _client['status'] as String? ?? 'active';
-    final notes = _client['notes'] as String? ?? '';
-    final important = _client['important_notes'] as String? ?? '';
-    final source = _client['source'] as String? ?? '';
-    final preferred = _client['preferred_contact_method'] as String? ?? 'phone';
-    final birthday = DateTime.tryParse(_client['birthday']?.toString() ?? '');
-    final tags = ((_client['tags'] as List?) ?? const [])
-        .map((tag) => tag.toString())
-        .where((tag) => tag.trim().isNotEmpty)
-        .toList();
-    final statusColor = status == 'active'
-        ? AppColors.green
-        : status == 'lead'
-        ? AppColors.warning
-        : AppColors.t3;
-
-    return Column(
-      children: [
-        if (phone.isNotEmpty) ...[
-          _tappableRow(
-            LucideIcons.phone,
-            'Phone',
-            phone,
-            () => _callPhone(phone),
-          ),
-          Divider(height: 1, color: AppColors.border),
-        ],
-        if (email.isNotEmpty) ...[
-          _tappableRow(
-            LucideIcons.mail,
-            'Email',
-            email,
-            () => _sendEmail(email),
-          ),
-          Divider(height: 1, color: AppColors.border),
-        ],
-        if (address.isNotEmpty) ...[
-          _plainRow(LucideIcons.mapPin, 'Address', address),
-          Divider(height: 1, color: AppColors.border),
-        ],
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              const Icon(LucideIcons.tag, color: AppColors.t3, size: 16),
-              const SizedBox(width: 12),
-              const Text(
-                'Status',
-                style: TextStyle(fontSize: 13, color: AppColors.t3),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  status.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: statusColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Divider(height: 1, color: AppColors.border),
-        _plainRow(
-          LucideIcons.messageCircle,
-          'Preferred contact',
-          _contactLabel(preferred),
-        ),
-        if (source.isNotEmpty) ...[
-          Divider(height: 1, color: AppColors.border),
-          _plainRow(LucideIcons.radio, 'Source', source),
-        ],
-        if (birthday != null) ...[
-          Divider(height: 1, color: AppColors.border),
-          _plainRow(
-            LucideIcons.cake,
-            'Birthday',
-            '${birthday.day}/${birthday.month}/${birthday.year}',
-          ),
-        ],
-        if (tags.isNotEmpty) ...[
-          Divider(height: 1, color: AppColors.border),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: tags.map((tag) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgInteract,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                  child: Text(
-                    tag,
-                    style: const TextStyle(
-                      color: AppColors.t3,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-        if (important.isNotEmpty) ...[
-          Divider(height: 1, color: AppColors.border),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  LucideIcons.alertCircle,
-                  color: AppColors.error,
-                  size: 16,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    important,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.error,
-                      height: 1.35,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        if (notes.isNotEmpty) ...[
-          Divider(height: 1, color: AppColors.border),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(LucideIcons.fileText, color: AppColors.t3, size: 16),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    notes,
-                    style: const TextStyle(fontSize: 13, color: AppColors.t2),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _plainRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.t3, size: 16),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 13, color: AppColors.t3),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.t2,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tappableRow(
-    IconData icon,
-    String label,
-    String value,
-    VoidCallback onTap,
-  ) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(icon, color: AppColors.green, size: 16),
-              const SizedBox(width: 12),
-              Text(
-                label,
-                style: const TextStyle(fontSize: 13, color: AppColors.t3),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.green,
-                  ),
-                  textAlign: TextAlign.end,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Icon(
-                LucideIcons.externalLink,
-                color: AppColors.green,
-                size: 12,
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -763,18 +465,8 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
           const SizedBox(height: 12),
           _editField('Address', _addressController, maxLines: 2),
           const SizedBox(height: 12),
-          _editField('Source', _sourceController),
-          const SizedBox(height: 12),
-          _editField('Tags', _tagsController),
-          const SizedBox(height: 12),
-          _dateEditor(),
-          const SizedBox(height: 12),
           _contactMethodEditor(),
           const SizedBox(height: 12),
-          _editField('Important', _importantNotesController, maxLines: 2),
-          const SizedBox(height: 12),
-          _editField('Notes', _notesController, maxLines: 3),
-          const SizedBox(height: 16),
           const Text(
             'Status',
             style: TextStyle(
@@ -813,6 +505,29 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                 ),
               );
             }).toList(),
+          ),
+          const SizedBox(height: 16),
+          SlateDisclosure(
+            title: 'More client details',
+            subtitle: 'Source, birthday, tags and notes',
+            icon: LucideIcons.listPlus,
+            expanded: _moreDetailsExpanded,
+            onToggle: () =>
+                setState(() => _moreDetailsExpanded = !_moreDetailsExpanded),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _editField('Source', _sourceController),
+                const SizedBox(height: 12),
+                _editField('Tags', _tagsController),
+                const SizedBox(height: 12),
+                _dateEditor(),
+                const SizedBox(height: 12),
+                _editField('Important', _importantNotesController, maxLines: 2),
+                const SizedBox(height: 12),
+                _editField('Notes', _notesController, maxLines: 3),
+              ],
+            ),
           ),
         ],
       ),
@@ -954,47 +669,155 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   }
 }
 
-// ── Call / Email action button ────────────────────────────────────────────────
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
+class _ClientCompactHeader extends StatelessWidget {
+  final String initials;
+  final String status;
+  final String preferredContact;
+  final String phone;
+  final String email;
+  final String address;
+  final VoidCallback? onCall;
+  final VoidCallback? onEmail;
 
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
+  const _ClientCompactHeader({
+    required this.initials,
+    required this.status,
+    required this.preferredContact,
+    required this.phone,
+    required this.email,
+    required this.address,
+    required this.onCall,
+    required this.onEmail,
   });
 
   @override
   Widget build(BuildContext context) {
+    final statusColor = status == 'active'
+        ? AppColors.green
+        : status == 'lead'
+        ? AppColors.warning
+        : AppColors.t3;
+    final detail = [
+      if (phone.isNotEmpty) phone,
+      if (email.isNotEmpty) email,
+      if (address.isNotEmpty) address,
+      if (phone.isEmpty && email.isEmpty && address.isEmpty)
+        '$preferredContact preferred',
+    ].join(' · ');
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppColors.greenDim,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.green.withValues(alpha: 0.2)),
+            ),
+            child: Center(
+              child: Text(
+                initials.isEmpty ? '?' : initials,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.green,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Text(
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        preferredContact,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.t2,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (onCall != null)
+            _CompactContactButton(icon: LucideIcons.phone, onTap: onCall!),
+          if (onEmail != null) ...[
+            const SizedBox(width: 6),
+            _CompactContactButton(icon: LucideIcons.mail, onTap: onEmail!),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactContactButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _CompactContactButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
     return Material(
-      color: AppColors.bgCard,
+      color: AppColors.greenDim,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.green.withValues(alpha: 0.3)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: AppColors.green, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.green,
-                ),
-              ),
-            ],
-          ),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Icon(icon, color: AppColors.green, size: 17),
         ),
       ),
     );

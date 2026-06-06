@@ -47,6 +47,25 @@ class ExpensesRepository {
     });
   }
 
+  Future<void> update({
+    required String expenseId,
+    required double amount,
+    required String category,
+    required DateTime date,
+    String? notes,
+  }) async {
+    await _client
+        .from('expenses')
+        .update({
+          'amount': amount,
+          'category': category,
+          'expense_date': date.toIso8601String().split('T').first,
+          'notes': notes?.trim().isEmpty ?? true ? null : notes!.trim(),
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', expenseId);
+  }
+
   Future<void> delete(String expenseId) async {
     await _client.from('expenses').delete().eq('id', expenseId);
   }

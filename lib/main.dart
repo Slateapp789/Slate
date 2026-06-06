@@ -58,6 +58,10 @@ final _router = GoRouter(
     ),
     GoRoute(path: '/home', builder: (context, state) => const MainShell()),
     GoRoute(
+      path: '/clients',
+      builder: (context, state) => const MainShell(initialIndex: 1),
+    ),
+    GoRoute(
       path: '/tasks',
       builder: (context, state) => const MainShell(initialIndex: 4),
     ),
@@ -155,6 +159,7 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   late int _currentIndex;
+  FinanceInitialFocus _financeInitialFocus = FinanceInitialFocus.top;
 
   @override
   void initState() {
@@ -168,18 +173,26 @@ class _MainShellState extends State<MainShell> {
       case 0:
         return DashboardScreen(
           onNavigate: (i) => setState(() => _currentIndex = i),
+          onOpenMoneyFollowUps: () => setState(() {
+            _financeInitialFocus = FinanceInitialFocus.followUps;
+            _currentIndex = 3;
+          }),
         );
       case 1:
         return const ClientsScreen();
       case 2:
         return const AppointmentsScreen();
       case 3:
-        return const FinanceScreen();
+        return FinanceScreen(initialFocus: _financeInitialFocus);
       case 4:
         return const TasksScreen();
       default:
         return DashboardScreen(
           onNavigate: (i) => setState(() => _currentIndex = i),
+          onOpenMoneyFollowUps: () => setState(() {
+            _financeInitialFocus = FinanceInitialFocus.followUps;
+            _currentIndex = 3;
+          }),
         );
     }
   }
@@ -294,10 +307,34 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       backgroundColor: AppColors.bg,
       extendBody: true,
-      body: getScreen(),
+      body: AnimatedSwitcher(
+        duration: AppMotion.standard,
+        switchInCurve: AppMotion.curve,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: AppMotion.curve,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.025, 0),
+                end: Offset.zero,
+              ).animate(curved),
+              child: child,
+            ),
+          );
+        },
+        child: KeyedSubtree(key: ValueKey(_currentIndex), child: getScreen()),
+      ),
       bottomNavigationBar: _SlatePillNavBar(
         currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
+        onTap: (i) => setState(() {
+          _financeInitialFocus = FinanceInitialFocus.top;
+          _currentIndex = i;
+        }),
         onAction: _showFabSheet,
       ),
     );
@@ -356,28 +393,30 @@ class _SlatePillNavBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: SizedBox(
                 height: 70,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onHorizontalDragEnd: (details) {
-                    final velocity = details.primaryVelocity ?? 0;
-                    if (velocity < -180 && currentIndex < tabCount - 1) {
-                      onTap(currentIndex + 1);
-                    } else if (velocity > 180 && currentIndex > 0) {
-                      onTap(currentIndex - 1);
-                    }
-                  },
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      const activeFlex = 16;
-                      const inactiveFlex = 10;
-                      final totalFlex =
-                          activeFlex + (tabCount - 1) * inactiveFlex;
-                      final leftFlex = currentIndex * inactiveFlex;
-                      final left = constraints.maxWidth * leftFlex / totalFlex;
-                      final width =
-                          constraints.maxWidth * activeFlex / totalFlex;
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final tabWidth = constraints.maxWidth / tabCount;
+                    final left = currentIndex * tabWidth;
 
-                      return Stack(
+                    int indexForPosition(double dx) {
+                      return (dx / tabWidth).floor().clamp(0, tabCount - 1);
+                    }
+
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onHorizontalDragStart: (details) {
+                        final index = indexForPosition(
+                          details.localPosition.dx,
+                        );
+                        if (index != currentIndex) onTap(index);
+                      },
+                      onHorizontalDragUpdate: (details) {
+                        final index = indexForPosition(
+                          details.localPosition.dx,
+                        );
+                        if (index != currentIndex) onTap(index);
+                      },
+                      child: Stack(
                         alignment: Alignment.center,
                         children: [
                           AnimatedPositioned(
@@ -385,7 +424,7 @@ class _SlatePillNavBar extends StatelessWidget {
                             curve: AppMotion.emphasized,
                             left: left,
                             top: 9,
-                            width: width,
+                            width: tabWidth,
                             height: 52,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -427,13 +466,13 @@ class _SlatePillNavBar extends StatelessWidget {
                           Row(
                             children: List.generate(
                               tabCount,
-                              (index) => _tabSlot(index),
+                              (index) => Expanded(child: _buildTab(index)),
                             ),
                           ),
                         ],
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -457,20 +496,14 @@ class _SlatePillNavBar extends StatelessWidget {
     );
   }
 
-  Widget _tabSlot(int index) {
-    return Expanded(
-      flex: index == currentIndex ? 16 : 10,
-      child: _buildTab(index),
-    );
-  }
-
   Widget _buildTab(int index) {
     final tab = _tabs[index];
     final active = index == currentIndex;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => onTap(index),
       child: Container(
-        height: 52,
+        height: 70,
         margin: const EdgeInsets.symmetric(horizontal: 2),
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Column(
@@ -478,7 +511,7 @@ class _SlatePillNavBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedScale(
-              scale: active ? 1.08 : 1,
+              scale: active ? 1.15 : 1,
               duration: AppMotion.standard,
               curve: AppMotion.curve,
               child: Icon(

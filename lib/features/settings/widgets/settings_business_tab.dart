@@ -8,6 +8,8 @@ import '../providers/settings_providers.dart';
 import 'settings_helpers.dart';
 import 'settings_services_section.dart';
 
+final _profileHandlePattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$');
+
 class SettingsBusinessTab extends ConsumerStatefulWidget {
   const SettingsBusinessTab({super.key});
 
@@ -111,6 +113,13 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     final handle = _handleController.text.trim().toLowerCase();
     if (handle.length < 3) {
       _snack('Handle must be at least 3 characters', AppColors.warning);
+      return;
+    }
+    if (!_profileHandlePattern.hasMatch(handle)) {
+      _snack(
+        'Use letters, numbers, and hyphens. Start and end with a letter or number.',
+        AppColors.warning,
+      );
       return;
     }
     setState(() => _saving = true);

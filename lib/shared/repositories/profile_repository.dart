@@ -13,36 +13,28 @@ class ProfileRepository {
   const ProfileRepository(this._client);
 
   Future<PublicProfile?> getPublicProfile(String handle) async {
-    final profile = await _client
-        .from('business_profiles')
-        .select(
-          '*, workspaces(name, industry), workspace_settings(working_hours)',
-        )
-        .eq('handle', handle)
-        .maybeSingle();
-    if (profile == null) return null;
+    late final FunctionResponse response;
+    try {
+      response = await _client.functions.invoke(
+        'get-public-profile',
+        body: {'handle': handle},
+      );
+    } on FunctionException catch (error) {
+      if (error.status == 404) return null;
+      rethrow;
+    }
 
-    final profileMap = Map<String, dynamic>.from(profile);
+    final data = Map<String, dynamic>.from(response.data as Map);
+    final profileMap = Map<String, dynamic>.from(data['profile'] as Map);
     final businessProfile = BusinessProfile.fromMap(profileMap);
-    final workspace = Map<String, dynamic>.from(
-      profileMap['workspaces'] as Map,
-    );
-    final settings = profileMap['workspace_settings'] == null
-        ? <String, dynamic>{}
-        : Map<String, dynamic>.from(profileMap['workspace_settings'] as Map);
-    final services = await _client
-        .from('services')
-        .select()
-        .eq('workspace_id', businessProfile.workspaceId)
-        .eq('show_on_profile', true)
-        .order('name', ascending: true);
+    final services = List<dynamic>.from(data['services'] as List? ?? []);
 
     return PublicProfile(
       profile: businessProfile,
-      businessName: workspace['name'] as String? ?? 'Business',
-      industry: workspace['industry'] as String?,
+      businessName: data['businessName'] as String? ?? 'Business',
+      industry: data['industry'] as String?,
       workingHours: Map<String, dynamic>.from(
-        settings['working_hours'] as Map? ?? {},
+        data['workingHours'] as Map? ?? {},
       ),
       services: services
           .map<Service>(
@@ -73,51 +65,24 @@ class ProfileRepository {
   }
 
   Future<void> createBookingRequest({
-    required String workspaceId,
+    required String handle,
     required String name,
     required String phone,
     String? serviceId,
     String? preferredTimeText,
     String? message,
   }) async {
-    final row = {
-      'workspace_id': workspaceId,
-      'name': name,
-      'phone': phone,
-      'service_id': serviceId,
-      'preferred_time_text': preferredTimeText,
-      'message': message,
-      'status': 'pending',
-    };
-
-    try {
-      await _client.from('booking_requests').insert(row);
-    } on PostgrestException catch (error) {
-      if (!error.message.contains('preferred_time_text')) rethrow;
-      final preferred = preferredTimeText == null || preferredTimeText.isEmpty
-          ? ''
-          : 'Preferred time: $preferredTimeText\n\n';
-      final fallbackRow = Map<String, dynamic>.from(row)
-        ..remove('preferred_time_text');
-      await _client.from('booking_requests').insert({
-        ...fallbackRow,
-        'message': '$preferred${message ?? ''}'.trim().isEmpty
-            ? null
-            : '$preferred${message ?? ''}'.trim(),
-      });
-    }
-
-    try {
-      await _client.from('notifications').insert({
-        'workspace_id': workspaceId,
-        'type': 'booking_request',
-        'title': 'New booking request',
-        'body': '$name requested a booking.',
-        'deep_link': '/booking-requests',
-      });
-    } catch (_) {
-      // Booking requests should still work in environments before notifications are migrated.
-    }
+    await _client.functions.invoke(
+      'create-booking-request',
+      body: {
+        'handle': handle,
+        'name': name,
+        'phone': phone,
+        'serviceId': serviceId,
+        'preferredTimeText': preferredTimeText,
+        'message': message,
+      },
+    );
   }
 
   Future<List<BookingRequest>> bookingRequests(String workspaceId) async {
@@ -148,29 +113,75 @@ class ProfileRepository {
     required DateTime startTime,
     required int durationMins,
     required double price,
+    String? clientName,
+    String? clientPhone,
+    String? serviceTitle,
+    String? location,
+    String? extraNotes,
+    bool createPaymentDue = false,
   }) async {
-    final contactId = await _findOrCreateRequestContact(request);
+    final contactId = await _findOrCreateRequestContact(
+      request,
+      clientName: clientName,
+      clientPhone: clientPhone,
+    );
     final endTime = startTime.add(Duration(minutes: durationMins));
-    final title = request.serviceName?.trim().isNotEmpty == true
+    final title = serviceTitle?.trim().isNotEmpty == true
+        ? serviceTitle!.trim()
+        : request.serviceName?.trim().isNotEmpty == true
         ? request.serviceName!.trim()
         : 'Booking request';
     final notes = [
       if (request.preferredTimeText?.trim().isNotEmpty == true)
         'Requested time: ${request.preferredTimeText!.trim()}',
       if (request.message?.trim().isNotEmpty == true) request.message!.trim(),
+      if (extraNotes?.trim().isNotEmpty == true) extraNotes!.trim(),
     ].join('\n\n');
+    final serviceId = await _validServiceIdForRequest(request);
 
-    await _client.from('appointments').insert({
-      'workspace_id': request.workspaceId,
-      'contact_id': contactId,
-      if (request.serviceId != null) 'service_id': request.serviceId,
-      'title': title,
-      'start_time': startTime.toUtc().toIso8601String(),
-      'end_time': endTime.toUtc().toIso8601String(),
-      'price': price,
-      'status': 'scheduled',
-      'notes': notes.isEmpty ? null : notes,
-    });
+    final appointment = await _client
+        .from('appointments')
+        .insert({
+          'workspace_id': request.workspaceId,
+          'contact_id': contactId,
+          if (serviceId != null) 'service_id': serviceId,
+          'title': title,
+          'start_time': startTime.toUtc().toIso8601String(),
+          'end_time': endTime.toUtc().toIso8601String(),
+          'price': price,
+          'status': 'scheduled',
+          'notes': notes.isEmpty ? null : notes,
+          if (location?.trim().isNotEmpty == true) 'location': location!.trim(),
+        })
+        .select('id')
+        .single();
+
+    if (createPaymentDue && price > 0) {
+      final existing = await _client
+          .from('invoices')
+          .select('id')
+          .eq('workspace_id', request.workspaceId);
+      final count = List<dynamic>.from(existing).length + 1;
+      final paymentNumber = 'PAY-${count.toString().padLeft(3, '0')}';
+      final dateString = startTime.toIso8601String().split('T').first;
+      await _client.from('invoices').insert({
+        'workspace_id': request.workspaceId,
+        'contact_id': contactId,
+        'appointment_id': appointment['id'] as String,
+        'invoice_number': paymentNumber,
+        'type': 'invoice',
+        'status': 'sent',
+        'issue_date': dateString,
+        'due_date': dateString,
+        'subtotal': price,
+        'tax_rate': 0,
+        'tax_amount': 0,
+        'discount_value': 0,
+        'total': price,
+        'amount_paid': 0,
+        'notes': 'Payment due for $title',
+      });
+    }
 
     await updateBookingRequestStatus(request.id, 'confirmed');
 
@@ -187,12 +198,22 @@ class ProfileRepository {
     }
   }
 
-  Future<String> _findOrCreateRequestContact(BookingRequest request) async {
+  Future<String> _findOrCreateRequestContact(
+    BookingRequest request, {
+    String? clientName,
+    String? clientPhone,
+  }) async {
+    final phone = clientPhone?.trim().isNotEmpty == true
+        ? clientPhone!.trim()
+        : request.phone.trim();
+    final name = clientName?.trim().isNotEmpty == true
+        ? clientName!.trim()
+        : request.name.trim();
     final existing = await _client
         .from('contacts')
         .select('id')
         .eq('workspace_id', request.workspaceId)
-        .eq('phone', request.phone)
+        .eq('phone', phone)
         .maybeSingle();
     if (existing != null) return existing['id'] as String;
 
@@ -207,14 +228,30 @@ class ProfileRepository {
         .from('contacts')
         .insert({
           'workspace_id': request.workspaceId,
-          'name': request.name.trim().isEmpty ? 'New client' : request.name,
-          'phone': request.phone.trim(),
+          'name': name.isEmpty ? 'New client' : name,
+          'phone': phone,
           'notes': notes,
           'status': 'active',
         })
         .select('id')
         .single();
     return inserted['id'] as String;
+  }
+
+  Future<String?> _validServiceIdForRequest(BookingRequest request) async {
+    final serviceId = request.serviceId;
+    if (serviceId == null || serviceId.trim().isEmpty) return null;
+    try {
+      final service = await _client
+          .from('services')
+          .select('id')
+          .eq('id', serviceId)
+          .eq('workspace_id', request.workspaceId)
+          .maybeSingle();
+      return service == null ? null : serviceId;
+    } catch (_) {
+      return null;
+    }
   }
 }
 

@@ -70,11 +70,33 @@ void main() {
       expect(payment.clientName, 'Alex');
     });
 
+    test('user-facing text strips demo markers', () {
+      final payment = Payment.fromMap({
+        'id': 'pay-demo',
+        'workspace_id': 'workspace-1',
+        'invoice_number': 'PAY-001',
+        'status': 'sent',
+        'issue_date': '2026-05-28',
+        'total': 70,
+        'notes': '[Slate demo] Awaiting payment.',
+      });
+      final task = SlateTask.fromMap({
+        'id': 'task-demo',
+        'workspace_id': 'workspace-1',
+        'title': 'Demo: Confirm colour formula',
+        'status': 'open',
+      });
+
+      expect(payment.notes, 'Awaiting payment.');
+      expect(task.title, 'Confirm colour formula');
+    });
+
     test('Payment serializes back to the invoice-backed database shape', () {
       final payment = Payment.fromMap({
         'id': 'pay-2',
         'workspace_id': 'workspace-1',
         'contact_id': 'client-1',
+        'appointment_id': 'booking-1',
         'payment_number': 'PAY-002',
         'status': 'sent',
         'issue_date': '2026-05-29',
@@ -90,6 +112,7 @@ void main() {
       expect(map['issue_date'], '2026-05-29');
       expect(map['due_date'], '2026-06-05');
       expect(map['contact_id'], 'client-1');
+      expect(map['appointment_id'], 'booking-1');
       expect(map['total'], 120);
     });
 

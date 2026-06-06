@@ -57,7 +57,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
       await ref
           .read(profileRepositoryProvider)
           .createBookingRequest(
-            workspaceId: profile.profile.workspaceId,
+            handle: profile.profile.handle,
             name: _nameController.text.trim(),
             phone: _phoneController.text.trim(),
             serviceId: _selectedServiceId,
@@ -161,7 +161,7 @@ class _ProfileContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bookingClosed = profile.profile.bookingMode == 'closed';
+    final bookingClosed = profile.profile.bookingMode != 'manual';
     final enabledBadges = <_ProfileBadgeData>[
       if (profile.profile.reviewsEnabled)
         const _ProfileBadgeData(LucideIcons.star, 'Reviews enabled'),
@@ -253,12 +253,14 @@ class _ProfileContent extends StatelessWidget {
                       _ProfileField(
                         controller: nameController,
                         hint: 'Your name',
+                        maxLength: 80,
                       ),
                       const SizedBox(height: 10),
                       _ProfileField(
                         controller: phoneController,
                         hint: 'Phone number',
                         keyboardType: TextInputType.phone,
+                        maxLength: 32,
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String?>(
@@ -284,6 +286,7 @@ class _ProfileContent extends StatelessWidget {
                       _ProfileField(
                         controller: preferredTimeController,
                         hint: 'Preferred day or time',
+                        maxLength: 160,
                       ),
                       const SizedBox(height: 8),
                       _PreferredTimeShortcuts(onPick: onPreferredTimePicked),
@@ -292,6 +295,7 @@ class _ProfileContent extends StatelessWidget {
                         controller: messageController,
                         hint: 'Anything we should know?',
                         maxLines: 3,
+                        maxLength: 1000,
                       ),
                       const SizedBox(height: 14),
                       SizedBox(
@@ -697,12 +701,14 @@ class _ProfileField extends StatelessWidget {
   final String hint;
   final int maxLines;
   final TextInputType keyboardType;
+  final int? maxLength;
 
   const _ProfileField({
     required this.controller,
     required this.hint,
     this.maxLines = 1,
     this.keyboardType = TextInputType.text,
+    this.maxLength,
   });
 
   @override
@@ -710,6 +716,11 @@ class _ProfileField extends StatelessWidget {
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      maxLength: maxLength,
+      buildCounter: maxLength == null
+          ? null
+          : (_, {required currentLength, required isFocused, maxLength}) =>
+                null,
       keyboardType: keyboardType,
       style: const TextStyle(color: AppColors.t1),
       decoration: _fieldDecoration(hint),

@@ -1,0 +1,280 @@
+part of 'tasks_screen.dart';
+
+enum _TaskView { urgent, upcoming, done, all }
+
+class _TaskSection {
+  final String title;
+  final String subtitle;
+  final List<SlateTask> tasks;
+
+  const _TaskSection({
+    required this.title,
+    required this.subtitle,
+    required this.tasks,
+  });
+}
+
+class _TaskCounts {
+  final int overdue;
+  final int today;
+  final int upcoming;
+  final int noDate;
+  final int done;
+  final int open;
+
+  const _TaskCounts({
+    required this.overdue,
+    required this.today,
+    required this.upcoming,
+    required this.noDate,
+    required this.done,
+    required this.open,
+  });
+
+  int get urgent => overdue + today + noDate;
+  int get total => open + done;
+}
+
+class _TaskTemplate {
+  final String label;
+  final String title;
+  final String priority;
+  final int? dueInDays;
+
+  const _TaskTemplate({
+    required this.label,
+    required this.title,
+    required this.priority,
+    this.dueInDays,
+  });
+}
+
+const _taskTemplates = [
+  _TaskTemplate(
+    label: 'Follow up',
+    title: 'Follow up with client',
+    priority: 'medium',
+    dueInDays: 1,
+  ),
+  _TaskTemplate(
+    label: 'Chase payment',
+    title: 'Chase outstanding payment',
+    priority: 'high',
+    dueInDays: 0,
+  ),
+  _TaskTemplate(
+    label: 'Prep booking',
+    title: 'Prep for booking',
+    priority: 'medium',
+    dueInDays: 0,
+  ),
+  _TaskTemplate(
+    label: 'Book again',
+    title: 'Ask client to book again',
+    priority: 'low',
+    dueInDays: 7,
+  ),
+];
+
+List<_TaskSection> _sectionsForView(List<SlateTask> tasks, _TaskView view) {
+  final open = tasks.where((task) => task.status != 'done').toList();
+  final done = tasks.where((task) => task.status == 'done').toList();
+  final overdue = open.where(_isOverdueTask).toList();
+  final today = open.where(_isTodayTask).toList();
+  final upcoming = open.where(_isUpcomingTask).toList();
+  final noDate = open.where((task) => task.dueDate == null).toList();
+
+  switch (view) {
+    case _TaskView.urgent:
+      return [
+        _TaskSection(
+          title: 'Overdue',
+          subtitle: 'Needs a decision',
+          tasks: overdue,
+        ),
+        _TaskSection(title: 'Today', subtitle: 'Due today', tasks: today),
+        _TaskSection(
+          title: 'No date',
+          subtitle: 'Clarify when these matter',
+          tasks: noDate,
+        ),
+      ];
+    case _TaskView.upcoming:
+      return [
+        _TaskSection(
+          title: 'Next 7 days',
+          subtitle: 'Coming soon',
+          tasks: upcoming.where(_isWithinWeekTask).toList(),
+        ),
+        _TaskSection(
+          title: 'Later',
+          subtitle: 'Future work',
+          tasks: upcoming.where((task) => !_isWithinWeekTask(task)).toList(),
+        ),
+      ];
+    case _TaskView.done:
+      return [
+        _TaskSection(
+          title: 'Completed',
+          subtitle: 'Recently done',
+          tasks: done,
+        ),
+      ];
+    case _TaskView.all:
+      return [
+        _TaskSection(title: 'Open', subtitle: 'Still active', tasks: open),
+        _TaskSection(title: 'Done', subtitle: 'Completed', tasks: done),
+      ];
+  }
+}
+
+_TaskCounts _countsForTasks(List<SlateTask> tasks) {
+  final open = tasks.where((task) => task.status != 'done').toList();
+  final done = tasks.where((task) => task.status == 'done').length;
+  final overdue = open.where(_isOverdueTask).length;
+  final today = open.where(_isTodayTask).length;
+  final upcoming = open.where(_isUpcomingTask).length;
+  final noDate = open.where((task) => task.dueDate == null).length;
+
+  return _TaskCounts(
+    overdue: overdue,
+    today: today,
+    upcoming: upcoming,
+    noDate: noDate,
+    done: done,
+    open: open.length,
+  );
+}
+
+int _taskSort(SlateTask a, SlateTask b) {
+  if (a.status != b.status) {
+    if (a.status == 'done') return 1;
+    if (b.status == 'done') return -1;
+  }
+  final aDate = a.dueDate;
+  final bDate = b.dueDate;
+  if (aDate != null && bDate != null) {
+    final dateCompare = aDate.compareTo(bDate);
+    if (dateCompare != 0) return dateCompare;
+  } else if (aDate != null) {
+    return -1;
+  } else if (bDate != null) {
+    return 1;
+  }
+  return _priorityRank(a.priority).compareTo(_priorityRank(b.priority));
+}
+
+int _priorityRank(String priority) {
+  return switch (priority) {
+    'high' => 0,
+    'medium' => 1,
+    _ => 2,
+  };
+}
+
+Color _priorityColor(String priority) {
+  return switch (priority) {
+    'high' => AppColors.error,
+    'medium' => AppColors.warning,
+    _ => AppColors.t3,
+  };
+}
+
+String _priorityLabel(String priority) {
+  return switch (priority) {
+    'high' => 'High',
+    'medium' => 'Medium',
+    _ => 'Low',
+  };
+}
+
+String _reminderLabel(String reminderTiming) {
+  return switch (reminderTiming) {
+    'today' => 'On due day',
+    'day_before' => 'Day before',
+    'week_before' => 'Week before',
+    _ => 'No reminder',
+  };
+}
+
+String _viewLabel(_TaskView view) {
+  return switch (view) {
+    _TaskView.urgent => 'Urgent',
+    _TaskView.upcoming => 'Upcoming',
+    _TaskView.done => 'Done',
+    _TaskView.all => 'All',
+  };
+}
+
+int _viewCount(_TaskView view, _TaskCounts counts) {
+  return switch (view) {
+    _TaskView.urgent => counts.urgent,
+    _TaskView.upcoming => counts.upcoming,
+    _TaskView.done => counts.done,
+    _TaskView.all => counts.total,
+  };
+}
+
+bool _isOverdueTask(SlateTask task) {
+  final due = task.dueDate;
+  if (due == null || task.status == 'done') return false;
+  return _dateOnly(due).isBefore(_dateOnly(DateTime.now()));
+}
+
+bool _isTodayTask(SlateTask task) {
+  final due = task.dueDate;
+  if (due == null || task.status == 'done') return false;
+  final today = _dateOnly(DateTime.now());
+  return _dateOnly(due) == today;
+}
+
+bool _isUpcomingTask(SlateTask task) {
+  final due = task.dueDate;
+  if (due == null || task.status == 'done') return false;
+  return _dateOnly(due).isAfter(_dateOnly(DateTime.now()));
+}
+
+bool _isWithinWeekTask(SlateTask task) {
+  final due = task.dueDate;
+  if (due == null) return false;
+  final today = _dateOnly(DateTime.now());
+  final week = today.add(const Duration(days: 7));
+  final dueDay = _dateOnly(due);
+  return dueDay.isAfter(today) && !dueDay.isAfter(week);
+}
+
+bool _isDueToday(DateTime dt) => _dateOnly(dt) == _dateOnly(DateTime.now());
+
+bool _isOverdue(DateTime dt) =>
+    _dateOnly(dt).isBefore(_dateOnly(DateTime.now()));
+
+DateTime _dateOnly(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
+
+String _formatDue(DateTime dt) {
+  final today = _dateOnly(DateTime.now());
+  final d = _dateOnly(dt);
+  final diff = d.difference(today).inDays;
+  if (diff == 0) return 'Due today';
+  if (diff == 1) return 'Due tomorrow';
+  if (diff == -1) return 'Due yesterday';
+  if (diff < 0) return 'Overdue ${-diff}d';
+  return _formatDate(dt);
+}
+
+String _formatDate(DateTime dt) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${dt.day} ${months[dt.month - 1]}';
+}

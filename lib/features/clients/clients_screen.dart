@@ -225,7 +225,7 @@ class _Header extends StatelessWidget {
               Text(
                 total == 0
                     ? 'Build your client base'
-                    : '$total clients · $leads leads · $attention follow-ups',
+                    : '$total clients · $leads leads · $attention to review',
                 style: const TextStyle(color: AppColors.t3, fontSize: 13),
               ),
             ],
@@ -394,121 +394,96 @@ class _ClientRow extends StatelessWidget {
         .take(2)
         .join()
         .toUpperCase();
-    final next = record.nextBooking;
-    final nextText = next == null
-        ? null
-        : 'Next booking ${_friendlyDate(next.startTime)}';
-    final taskText = record.openTaskCount == 0
-        ? null
-        : record.overdueTaskCount > 0
-        ? '${record.overdueTaskCount} overdue task${record.overdueTaskCount == 1 ? '' : 's'}'
-        : '${record.openTaskCount} open task${record.openTaskCount == 1 ? '' : 's'}';
+    final signal = _clientSignal(record);
 
     return SlateSurface(
       onTap: onTap,
-      radius: AppRadius.xl,
+      radius: AppRadius.lg,
       color: AppColors.bgCard,
       borderColor: record.overdueTaskCount > 0
           ? AppColors.error.withValues(alpha: 0.20)
           : AppColors.border,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: AppColors.t1.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Center(
-                  child: Text(
-                    initials.isEmpty ? '?' : initials,
-                    style: const TextStyle(
-                      color: AppColors.t2,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.t1.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Center(
+              child: Text(
+                initials.isEmpty ? '?' : initials,
+                style: const TextStyle(
+                  color: AppColors.t2,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            client.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.t1,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        if (record.isLead) const _StatusPill(label: 'Lead'),
-                      ],
-                    ),
-                    if (client.tags.isNotEmpty) ...[
-                      const SizedBox(height: 5),
-                      Text(
-                        client.tags.take(2).join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.t3,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              const Icon(
-                LucideIcons.chevronRight,
-                color: AppColors.t3,
-                size: 16,
-              ),
-            ],
+            ),
           ),
-          if (nextText != null ||
-              taskText != null ||
-              record.outstandingBalance > 0) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (nextText != null)
-                  _InfoChip(icon: LucideIcons.calendarDays, label: nextText),
-                if (taskText != null)
-                  _InfoChip(
-                    icon: LucideIcons.listChecks,
-                    label: taskText,
-                    urgent: record.overdueTaskCount > 0,
+                Text(
+                  client.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.t1,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
                   ),
-                if (record.outstandingBalance > 0)
-                  _InfoChip(
-                    icon: LucideIcons.walletCards,
-                    label:
-                        '£${record.outstandingBalance.toStringAsFixed(0)} unpaid',
-                    urgent: true,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  signal,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: record.needsAttention
+                        ? AppColors.warning
+                        : AppColors.t3,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                   ),
+                ),
               ],
             ),
+          ),
+          if (record.isLead) ...[
+            const SizedBox(width: AppSpacing.xs),
+            const _StatusPill(label: 'Lead'),
           ],
+          const SizedBox(width: AppSpacing.xs),
+          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
         ],
       ),
     );
+  }
+
+  String _clientSignal(ClientCrmRecord record) {
+    final next = record.nextBooking;
+    if (next != null) return 'Next booking ${_friendlyDate(next.startTime)}';
+    if (record.outstandingBalance > 0) {
+      return '£${record.outstandingBalance.toStringAsFixed(0)} unpaid';
+    }
+    if (record.overdueTaskCount > 0) {
+      return '${record.overdueTaskCount} overdue task${record.overdueTaskCount == 1 ? '' : 's'}';
+    }
+    if (record.openTaskCount > 0) {
+      return '${record.openTaskCount} open task${record.openTaskCount == 1 ? '' : 's'}';
+    }
+    if (record.client.tags.isNotEmpty) return record.client.tags.first;
+    if (record.client.status == 'lead') return 'Lead';
+    return 'No upcoming activity';
   }
 }
 
@@ -532,45 +507,6 @@ class _StatusPill extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w900,
         ),
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool urgent;
-
-  const _InfoChip({
-    required this.icon,
-    required this.label,
-    this.urgent = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = urgent ? AppColors.error : AppColors.t2;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 14),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
       ),
     );
   }

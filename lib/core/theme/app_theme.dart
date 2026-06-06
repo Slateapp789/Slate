@@ -2,58 +2,62 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  // Backgrounds - neutral graphite-to-mist greys.
-  static const bg = Color(0xFFD6D5D1);
-  static const bgCard = Color(0xFFE9E8E4);
-  static const bgRaised = Color(0xFFF5F4F0);
-  static const bgInteract = Color(0xFFC9C8C3);
-  static const border = Color(0xFFB8B7B1);
-  static const borderStrong = Color(0xFF85847F);
+  // Backgrounds - graphite slate with lime as the living accent.
+  static const bg = Color(0xFF141713);
+  static const bgCard = Color(0xFF1D211C);
+  static const bgRaised = Color(0xFF282D25);
+  static const bgInteract = Color(0xFF30372D);
+  static const border = Color(0xFF3E463A);
+  static const borderStrong = Color(0xFF68735F);
 
   // Text
-  static const t1 = Color(0xFF242424);
-  static const t2 = Color(0xBF242424);
-  static const t3 = Color(0x73242424);
-  static const t4 = Color(0x33242424);
+  static const t1 = Color(0xFFF3F5EE);
+  static const t2 = Color(0xCCF3F5EE);
+  static const t3 = Color(0x8CF3F5EE);
+  static const t4 = Color(0x3DF3F5EE);
 
-  // Accent - pure neutral slate. Green aliases remain for existing code.
-  static const slate = Color(0xFF5F5F5B);
-  static const slateLight = Color(0xFFBCBAB4);
-  static const slateDim = Color(0x66BCBAB4);
-  static const slateGlow = Color(0x99BCBAB4);
-  static const green = Color(0xFF5F5F5B);
-  static const greenLight = Color(0xFFC8C6BF);
-  static const greenDim = Color(0x66C8C6BF);
-  static const greenGlow = Color(0x99C8C6BF);
+  // Accent. Green aliases remain for existing code.
+  static const slate = Color(0xFFB8F24B);
+  static const slateLight = Color(0xFFD8FF7A);
+  static const slateDim = Color(0x3DB8F24B);
+  static const slateGlow = Color(0x66B8F24B);
+  static const accentPrimary = Color(0xFFB8F24B);
+  static const accentPrimaryStrong = Color(0xFFD8FF7A);
+  static const green = Color(0xFFB8F24B);
+  static const greenLight = Color(0xFFD8FF7A);
+  static const greenDim = Color(0x26B8F24B);
+  static const greenGlow = Color(0x66B8F24B);
 
   // Aliases so existing code doesn't break
-  static const violet = Color(0xFF6D6C67);
-  static const violetDim = Color(0x66CFCDC7);
-  static const violetGlow = Color(0x99CFCDC7);
+  static const violet = Color(0xFFB8F24B);
+  static const violetDim = Color(0x33B8F24B);
+  static const violetGlow = Color(0x66B8F24B);
 
   // Semantic
-  static const success = Color(0xFF626760);
-  static const successDim = Color(0x335F645E);
-  static const warning = Color(0xFF8A806F);
-  static const warningDim = Color(0x33A49A8A);
-  static const error = Color(0xFF9D6B67);
-  static const errorDim = Color(0x33BCA19E);
+  static const statusSuccess = Color(0xFF8CCF65);
+  static const statusSuccessDim = Color(0x298CCF65);
+  static const success = Color(0xFF8CCF65);
+  static const successDim = Color(0x298CCF65);
+  static const warning = Color(0xFFE4BE6A);
+  static const warningDim = Color(0x29E4BE6A);
+  static const error = Color(0xFFFF837A);
+  static const errorDim = Color(0x29FF837A);
 
-  // Module colours - tonal greys without the previous green cast.
-  static const modClients = Color(0xFF83827D);
-  static const modCalendar = Color(0xFF92908A);
-  static const modFinance = Color(0xFF706F6A);
-  static const modTasks = Color(0xFFA4A19A);
+  // Module colours - restrained greys with subtle lime lift.
+  static const modClients = Color(0xFF8FA086);
+  static const modCalendar = Color(0xFFA8B894);
+  static const modFinance = Color(0xFFB8F24B);
+  static const modTasks = Color(0xFFC3C9BB);
 
   // Module icon backgrounds.
-  static const modBg = Color(0xFFDAD8D2);
+  static const modBg = Color(0xFF2D342A);
 
   // Hero/summary panels used for financial and high-trust information.
-  static const panelSoft = Color(0xFFD0CFCA);
-  static const panelSoftRaised = Color(0xFFBDBBB5);
-  static const panelInk = Color(0xFF242424);
-  static const panelMuted = Color(0x99242424);
-  static const panelFaint = Color(0x26242424);
+  static const panelSoft = Color(0xFF1B2018);
+  static const panelSoftRaised = Color(0xFF38432F);
+  static const panelInk = Color(0xFFF5F7EF);
+  static const panelMuted = Color(0x99F5F7EF);
+  static const panelFaint = Color(0x263D4637);
 }
 
 class AppSpacing {
@@ -89,7 +93,7 @@ class AppMotion {
 class AppShadows {
   static List<BoxShadow> get soft => [
     BoxShadow(
-      color: const Color(0xFF3F3F3C).withValues(alpha: 0.11),
+      color: Colors.black.withValues(alpha: 0.24),
       blurRadius: 24,
       offset: const Offset(0, 14),
     ),
@@ -97,7 +101,7 @@ class AppShadows {
 
   static List<BoxShadow> get glass => [
     BoxShadow(
-      color: const Color(0xFF3F3F3C).withValues(alpha: 0.15),
+      color: Colors.black.withValues(alpha: 0.32),
       blurRadius: 34,
       offset: const Offset(0, 16),
     ),
@@ -112,11 +116,19 @@ class AppShadows {
 class AppTheme {
   static ThemeData get dark {
     return ThemeData(
-      brightness: Brightness.light,
+      brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.bg,
-      colorScheme: const ColorScheme.light(
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: _SlatePageTransitionsBuilder(),
+          TargetPlatform.iOS: _SlatePageTransitionsBuilder(),
+          TargetPlatform.macOS: _SlatePageTransitionsBuilder(),
+        },
+      ),
+      colorScheme: const ColorScheme.dark(
         primary: AppColors.green,
         surface: AppColors.bgCard,
+        onSurface: AppColors.t1,
         error: AppColors.error,
       ),
       textTheme: GoogleFonts.interTextTheme(
@@ -202,7 +214,7 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.green,
-          foregroundColor: AppColors.panelInk,
+          foregroundColor: AppColors.bg,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
@@ -215,6 +227,35 @@ class AppTheme {
         color: AppColors.border,
         thickness: 1,
         space: 1,
+      ),
+    );
+  }
+}
+
+class _SlatePageTransitionsBuilder extends PageTransitionsBuilder {
+  const _SlatePageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: AppMotion.curve,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0.035, 0),
+          end: Offset.zero,
+        ).animate(curved),
+        child: child,
       ),
     );
   }

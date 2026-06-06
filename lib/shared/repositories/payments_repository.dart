@@ -50,6 +50,17 @@ class PaymentsRepository {
     return rows.map<Payment>((row) => Payment.fromMap(row)).toList();
   }
 
+  Future<List<Payment>> forAppointment(String appointmentId) async {
+    final rows = await _client
+        .from('invoices')
+        .select('*, contacts(name)')
+        .eq('appointment_id', appointmentId)
+        .order('created_at', ascending: false);
+    return rows
+        .map<Payment>((row) => Payment.fromMap(Map<String, dynamic>.from(row)))
+        .toList();
+  }
+
   Future<void> create({
     required String workspaceId,
     required double amount,
@@ -57,6 +68,7 @@ class PaymentsRepository {
     required DateTime date,
     DateTime? dueDate,
     String? contactId,
+    String? appointmentId,
     String? notes,
   }) async {
     final existing = await _client
@@ -71,6 +83,7 @@ class PaymentsRepository {
     await _client.from('invoices').insert({
       'workspace_id': workspaceId,
       'contact_id': contactId,
+      'appointment_id': appointmentId,
       'invoice_number': paymentNumber,
       'type': 'invoice',
       'status': status,
@@ -100,6 +113,7 @@ class PaymentsRepository {
     required DateTime date,
     DateTime? dueDate,
     String? contactId,
+    String? appointmentId,
     String? notes,
   }) async {
     final dateString = date.toIso8601String().split('T').first;
@@ -108,6 +122,7 @@ class PaymentsRepository {
         .from('invoices')
         .update({
           'contact_id': contactId,
+          'appointment_id': appointmentId,
           'status': status,
           'issue_date': dateString,
           'due_date': dueDateString,

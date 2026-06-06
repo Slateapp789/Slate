@@ -19,10 +19,26 @@ SUPABASE_ANON_KEY=your-supabase-anon-or-publishable-key
 
 The Supabase anon/publishable key is not a server secret. It is expected to be present in client apps, but database safety depends on correct Supabase Row Level Security policies. Never put a `service_role` key or any other privileged backend secret in Flutter code, `.env`, or mobile app bundles.
 
+The public booking/profile Edge Functions are deployed with JWT verification enabled, so the current mobile `.env` uses the legacy anon JWT rather than the newer publishable key. Both are public client keys; the service role key only lives in Supabase Edge Function secrets.
+
+## Current Public Boundary
+
+- Anonymous users do not read `business_profiles`, `services`, or `booking_requests` directly.
+- Public profile reads go through the `get-public-profile` Edge Function, which returns only the safe public projection.
+- Public booking requests go through the `create-booking-request` Edge Function, which validates handle/service ownership, forces `pending` status, applies length limits, rate-limits by source hash and phone, and creates the owner notification server-side.
+- Workspace data access remains gated by RLS policies scoped to authenticated workspace members.
+
+## Account Deletion Boundary
+
+- The app no longer writes deletion requests directly to the database.
+- Deletion requests go through the `request-account-deletion` Edge Function, which verifies the signed-in user and workspace membership before creating or refreshing an open request.
+- Destructive completion goes through the `complete-account-deletion` Edge Function. It deletes the workspace rows through cascade, deletes the Supabase Auth user through the admin API, and writes a non-identifying audit row with a hashed email.
+- `complete-account-deletion` requires an `ACCOUNT_DELETION_ADMIN_TOKEN` Edge Function secret. Do not put this token in Flutter, `.env`, docs, commits, screenshots, or logs.
+- `account_deletion_audit` has RLS enabled with an explicit deny-all client policy. It is service-role/admin-only.
+
 ## Immediate Security Priorities
 
-- Verify Row Level Security for `workspaces`, `workspace_members`, `contacts`, `appointments`, `services`, `tasks`, `invoices`, `business_profiles`, `booking_requests`, `notifications`, `notification_preferences`, and `push_tokens`.
+- Enable Supabase Auth leaked password protection before beta.
 - Keep all workspace-scoped queries filtered by the active workspace.
-- Move direct Supabase writes out of screens into repositories so access rules and error handling are centralized.
-- Add account deletion/export flows before production launch.
+- Set `ACCOUNT_DELETION_ADMIN_TOKEN` in Supabase Edge Function secrets before using account deletion completion.
 - Add biometric lock and 2FA preference support after the main V1 loop is stable.

@@ -12,8 +12,14 @@ import '../../shared/models/slate_models.dart';
 
 class AddPaymentScreen extends ConsumerStatefulWidget {
   final String? initialClientId;
+  final String? appointmentId;
   final Payment? payment;
-  const AddPaymentScreen({super.key, this.initialClientId, this.payment});
+  const AddPaymentScreen({
+    super.key,
+    this.initialClientId,
+    this.appointmentId,
+    this.payment,
+  });
 
   @override
   ConsumerState<AddPaymentScreen> createState() => _AddPaymentScreenState();
@@ -45,7 +51,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
           );
     _descriptionController.text = payment.notes ?? '';
     _selectedClientId = payment.contactId ?? widget.initialClientId;
-    _status = payment.status;
+    _status = payment.status == 'paid' ? 'paid' : 'sent';
     _date = payment.issueDate;
     _dueDate = payment.dueDate ?? payment.issueDate;
   }
@@ -59,7 +65,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
 
   bool get _canSave =>
       _amountController.text.trim().isNotEmpty &&
-      double.tryParse(_amountController.text.trim()) != null;
+      (double.tryParse(_amountController.text.trim()) ?? 0) > 0;
 
   Future<void> _save() async {
     if (!_canSave) return;
@@ -81,6 +87,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
               date: _date,
               dueDate: _status == 'paid' ? _date : _dueDate,
               contactId: _selectedClientId,
+              appointmentId: widget.payment!.appointmentId,
               notes: description,
             );
       } else {
@@ -93,6 +100,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
               date: _date,
               dueDate: _status == 'paid' ? _date : _dueDate,
               contactId: _selectedClientId,
+              appointmentId: widget.appointmentId,
               notes: description,
             );
         await ref
@@ -100,9 +108,11 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
             .create(
               workspaceId: workspaceId,
               type: _status == 'paid' ? 'payment_received' : 'invoice_overdue',
-              title: _status == 'paid' ? 'Payment recorded' : 'Payment pending',
+              title: _status == 'paid'
+                  ? 'Payment recorded'
+                  : 'Payment to collect',
               body:
-                  '£${amount.toStringAsFixed(0)} ${_status == 'paid' ? 'was recorded' : 'needs follow-up'}.',
+                  '£${amount.toStringAsFixed(0)} ${_status == 'paid' ? 'was recorded' : 'is outstanding'}.',
               deepLink: '/payments',
             );
       }
@@ -279,7 +289,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                               letterSpacing: 0,
                             ),
                             decoration: const InputDecoration(
-                              hintText: '0',
+                              hintText: '0.00',
                               hintStyle: TextStyle(
                                 fontSize: 44,
                                 fontWeight: FontWeight.w900,
@@ -324,8 +334,6 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                         _statusChip('paid', 'Received', AppColors.green),
                         const SizedBox(width: 8),
                         _statusChip('sent', 'Pending', AppColors.warning),
-                        const SizedBox(width: 8),
-                        _statusChip('overdue', 'Overdue', AppColors.error),
                       ],
                     ),
                   ],

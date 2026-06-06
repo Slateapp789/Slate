@@ -7,7 +7,7 @@
 -- workspace_members(id, workspace_id, user_id, role, created_at)
 -- workspace_settings(id, workspace_id, working_hours jsonb, revenue_target numeric, created_at, updated_at)
 -- contacts(id, workspace_id, name, phone, email, address, notes, important_notes, status, preferred_contact_method, source, birthday, tags, last_activity_at, created_at)
--- services(id, workspace_id, name, duration_mins, price, description, show_on_profile, created_at)
+-- services(id, workspace_id, name, duration_mins, price, description, show_on_profile, active, created_at)
 -- appointments(id, workspace_id, contact_id, service_id, title, start_time, end_time, price, status, notes, created_at)
 -- invoices(id, workspace_id, contact_id, invoice_number, type, status, issue_date, due_date, subtotal, tax_rate, tax_amount, discount_value, total, amount_paid, notes, created_at)
 -- expenses(id, workspace_id, amount, category, expense_date, notes, created_at, updated_at)
@@ -15,6 +15,9 @@
 -- business_profiles(id, workspace_id, handle, created_at)
 
 -- V1 extension fields.
+create index if not exists workspace_members_user_id_idx
+  on workspace_members(user_id);
+
 alter table if exists business_profiles
   add column if not exists bio text,
   add column if not exists cover_photo_url text,
@@ -30,7 +33,8 @@ alter table if exists business_profiles
 
 alter table if exists services
   add column if not exists description text,
-  add column if not exists show_on_profile boolean not null default true;
+  add column if not exists show_on_profile boolean not null default true,
+  add column if not exists active boolean not null default true;
 
 alter table if exists contacts
   add column if not exists address text,
@@ -83,6 +87,10 @@ create index if not exists invoices_contact_id_idx
   on invoices(contact_id);
 create index if not exists invoices_appointment_id_idx
   on invoices(appointment_id);
+create index if not exists invoice_line_items_invoice_id_idx
+  on invoice_line_items(invoice_id);
+create index if not exists invoice_line_items_workspace_id_idx
+  on invoice_line_items(workspace_id);
 
 create table if not exists expenses (
   id uuid primary key default gen_random_uuid(),
@@ -128,6 +136,10 @@ create table if not exists booking_requests (
 
 alter table if exists booking_requests
   add column if not exists preferred_time_text text;
+create index if not exists booking_requests_workspace_id_idx
+  on booking_requests(workspace_id);
+create index if not exists booking_requests_service_id_idx
+  on booking_requests(service_id);
 
 create table if not exists notifications (
   id uuid primary key default gen_random_uuid(),
@@ -139,6 +151,8 @@ create table if not exists notifications (
   read boolean not null default false,
   created_at timestamptz not null default now()
 );
+create index if not exists notifications_workspace_id_idx
+  on notifications(workspace_id);
 
 create table if not exists notification_preferences (
   id uuid primary key default gen_random_uuid(),
@@ -169,6 +183,8 @@ create table if not exists push_tokens (
   last_seen_at timestamptz not null default now(),
   unique(user_id, token)
 );
+create index if not exists push_tokens_workspace_id_idx
+  on push_tokens(workspace_id);
 
 create table if not exists calendar_sync_accounts (
   id uuid primary key default gen_random_uuid(),
@@ -179,6 +195,8 @@ create table if not exists calendar_sync_accounts (
   last_synced_at timestamptz,
   created_at timestamptz not null default now()
 );
+create index if not exists calendar_sync_accounts_workspace_id_idx
+  on calendar_sync_accounts(workspace_id);
 
 create table if not exists account_deletion_requests (
   id uuid primary key default gen_random_uuid(),
@@ -187,12 +205,131 @@ create table if not exists account_deletion_requests (
   email text not null,
   status text not null default 'requested',
   requested_at timestamptz not null default now(),
+  requested_by_user_id uuid,
+  processing_started_at timestamptz,
   completed_at timestamptz,
+  completed_by text,
+  completion_mode text,
   notes text
 );
+create index if not exists account_deletion_requests_workspace_id_idx
+  on account_deletion_requests(workspace_id);
 
 -- RLS expectation:
 -- Every workspace-owned table must enforce access through workspace_members.
--- Public profile reads should be limited to business_profiles + services intended for public display.
+-- Public profile reads should go through a trusted Edge Function.
+-- Public booking-request writes should go through a trusted Edge Function.
 -- Account deletion should be completed by a trusted server/edge-function path with service-role permissions.
 -- See supabase/rls_policies.sql for the concrete V1 policy contract.
+
+alter table if exists account_deletion_requests
+  add column if not exists requested_by_user_id uuid,
+  add column if not exists processing_started_at timestamptz,
+  add column if not exists completed_by text,
+  add column if not exists completion_mode text;
+
+create unique index if not exists account_deletion_requests_open_user_idx
+  on account_deletion_requests(workspace_id, requested_by_user_id)
+  where status in ('requested', 'processing')
+    and requested_by_user_id is not null;
+
+create table if not exists account_deletion_audit (
+  id uuid primary key default gen_random_uuid(),
+  request_id uuid,
+  workspace_id uuid,
+  user_id uuid,
+  email_hash text,
+  requested_at timestamptz,
+  completed_at timestamptz not null default now(),
+  completed_by text not null,
+  completion_mode text not null,
+  workspace_deleted boolean not null default false,
+  auth_user_deleted boolean not null default false,
+  notes text
+);
+alter table if exists account_deletion_audit enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'account_deletion_requests_status_check'
+      and conrelid = 'public.account_deletion_requests'::regclass
+  ) then
+    alter table public.account_deletion_requests
+      add constraint account_deletion_requests_status_check
+      check (status in ('requested', 'processing', 'completed', 'rejected', 'canceled'))
+      not valid;
+  end if;
+end $$;
+
+alter table if exists booking_requests
+  add column if not exists source_hash text;
+
+create index if not exists booking_requests_source_hash_created_idx
+  on booking_requests(workspace_id, source_hash, created_at desc);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'booking_requests_status_check'
+      and conrelid = 'public.booking_requests'::regclass
+  ) then
+    alter table public.booking_requests
+      add constraint booking_requests_status_check
+      check (status in ('pending', 'contacted', 'confirmed', 'declined'))
+      not valid;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'booking_requests_public_text_bounds_check'
+      and conrelid = 'public.booking_requests'::regclass
+  ) then
+    alter table public.booking_requests
+      add constraint booking_requests_public_text_bounds_check
+      check (
+        char_length(btrim(name)) between 1 and 80
+        and char_length(btrim(phone)) between 7 and 32
+        and (preferred_time_text is null or char_length(preferred_time_text) <= 160)
+        and (message is null or char_length(message) <= 1000)
+      )
+      not valid;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'business_profiles_handle_format_check'
+      and conrelid = 'public.business_profiles'::regclass
+  ) then
+    alter table public.business_profiles
+      add constraint business_profiles_handle_format_check
+      check (
+        handle is null
+        or handle = ''
+        or handle ~ '^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$'
+      )
+      not valid;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'business_profiles_booking_mode_check'
+      and conrelid = 'public.business_profiles'::regclass
+  ) then
+    alter table public.business_profiles
+      add constraint business_profiles_booking_mode_check
+      check (booking_mode in ('manual', 'closed'))
+      not valid;
+  end if;
+end $$;
+
+create unique index if not exists business_profiles_handle_unique_idx
+  on public.business_profiles(lower(handle))
+  where handle is not null and handle <> '';

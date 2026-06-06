@@ -102,12 +102,13 @@ Widget saveBtn({
   required String label,
   required VoidCallback onTap,
   bool loading = false,
+  bool disabled = false,
   Color color = AppColors.green,
 }) => SizedBox(
   width: double.infinity,
   height: 52,
   child: ElevatedButton(
-    onPressed: loading ? null : onTap,
+    onPressed: loading || disabled ? null : onTap,
     style: ElevatedButton.styleFrom(
       backgroundColor: color,
       foregroundColor: Colors.white,

@@ -100,6 +100,7 @@ class SlateIconButton extends StatefulWidget {
   final Color? backgroundColor;
   final double size;
   final Widget? badge;
+  final String? semanticLabel;
 
   const SlateIconButton({
     super.key,
@@ -109,6 +110,7 @@ class SlateIconButton extends StatefulWidget {
     this.backgroundColor,
     this.size = AppSpacing.minTouch,
     this.badge,
+    this.semanticLabel,
   });
 
   @override
@@ -120,36 +122,42 @@ class _SlateIconButtonState extends State<SlateIconButton> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _pressed ? 0.94 : 1,
-        duration: AppMotion.fast,
-        curve: AppMotion.curve,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: widget.size,
-              height: widget.size,
-              decoration: BoxDecoration(
-                color:
-                    widget.backgroundColor ??
-                    AppColors.t1.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                border: Border.all(color: AppColors.t1.withValues(alpha: 0.08)),
+    return Semantics(
+      button: true,
+      label: widget.semanticLabel,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _pressed ? 0.94 : 1,
+          duration: AppMotion.fast,
+          curve: AppMotion.curve,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: widget.size,
+                height: widget.size,
+                decoration: BoxDecoration(
+                  color:
+                      widget.backgroundColor ??
+                      AppColors.t1.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(
+                    color: AppColors.t1.withValues(alpha: 0.08),
+                  ),
+                ),
+                child: Icon(
+                  widget.icon,
+                  color: widget.color ?? AppColors.t2,
+                  size: 20,
+                ),
               ),
-              child: Icon(
-                widget.icon,
-                color: widget.color ?? AppColors.t2,
-                size: 20,
-              ),
-            ),
-            if (widget.badge != null) widget.badge!,
-          ],
+              if (widget.badge != null) widget.badge!,
+            ],
+          ),
         ),
       ),
     );
@@ -325,6 +333,116 @@ class SlateErrorState extends StatelessWidget {
   }
 }
 
+class SlateDisclosure extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final Widget child;
+  final EdgeInsetsGeometry childPadding;
+
+  const SlateDisclosure({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.expanded,
+    required this.onToggle,
+    required this.child,
+    this.subtitle,
+    this.childPadding = const EdgeInsets.fromLTRB(
+      AppSpacing.md,
+      0,
+      AppSpacing.md,
+      AppSpacing.md,
+    ),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateSurface(
+      padding: EdgeInsets.zero,
+      radius: AppRadius.lg,
+      child: Column(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: AppColors.t1.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Icon(icon, size: 17, color: AppColors.t2),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.t1,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        if (subtitle != null) ...[
+                          const SizedBox(height: AppSpacing.xxs),
+                          Text(
+                            subtitle!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.t3,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: AppMotion.fast,
+                    curve: AppMotion.curve,
+                    child: const Icon(
+                      LucideIcons.chevronDown,
+                      color: AppColors.t3,
+                      size: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(padding: childPadding, child: child),
+            crossFadeState: expanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: AppMotion.standard,
+            firstCurve: AppMotion.curve,
+            secondCurve: AppMotion.curve,
+            sizeCurve: AppMotion.curve,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class SlateButton extends StatefulWidget {
   final String label;
   final VoidCallback? onPressed;
@@ -355,12 +473,12 @@ class _SlateButtonState extends State<SlateButton> {
         ? AppColors.error
         : widget.secondary
         ? AppColors.t1.withValues(alpha: 0.06)
-        : AppColors.slateLight;
+        : AppColors.accentPrimaryStrong;
     final fg = widget.destructive
         ? Colors.white
         : widget.secondary
         ? AppColors.t2
-        : AppColors.panelInk;
+        : AppColors.bg;
 
     return GestureDetector(
       onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,

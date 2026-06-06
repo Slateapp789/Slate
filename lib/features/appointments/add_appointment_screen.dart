@@ -3,12 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/appointments_provider.dart';
 import '../../shared/providers/clients_provider.dart';
+import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/working_hours.dart';
+
+part 'add_appointment_logic.dart';
+part 'add_appointment_widgets.dart';
 
 class AddAppointmentScreen extends ConsumerStatefulWidget {
   final DateTime? initialDate;
@@ -32,8 +36,10 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   int _selectedHour = 9;
   int _selectedMinute = 0;
   int _selectedDuration = 60;
+  bool _customDuration = false;
   String _locationMode = 'business';
   String _repeatMode = 'none';
+  bool _createPaymentDue = false;
   final _newClientNameController = TextEditingController();
   final _newClientPhoneController = TextEditingController();
   final _newClientEmailController = TextEditingController();
@@ -90,147 +96,16 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   }
 
   Future<void> _pickTime() async {
-    int tempHour = _selectedHour;
-    int tempMinute = _selectedMinute;
-
-    await showModalBottomSheet(
+    final picked = await _showAppointmentTimePicker(
       context: context,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModal) => SizedBox(
-          height: 280,
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Select time',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.t1,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedHour = tempHour;
-                          _selectedMinute = tempMinute;
-                        });
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        'Done',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.green,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ListWheelScrollView.useDelegate(
-                        itemExtent: 48,
-                        perspective: 0.003,
-                        diameterRatio: 1.8,
-                        physics: const FixedExtentScrollPhysics(),
-                        controller: FixedExtentScrollController(
-                          initialItem: tempHour,
-                        ),
-                        onSelectedItemChanged: (i) =>
-                            setModal(() => tempHour = i),
-                        childDelegate: ListWheelChildBuilderDelegate(
-                          childCount: 24,
-                          builder: (context, i) {
-                            final selected = i == tempHour;
-                            return Center(
-                              child: Text(
-                                i.toString().padLeft(2, '0'),
-                                style: TextStyle(
-                                  fontSize: selected ? 24 : 18,
-                                  fontWeight: selected
-                                      ? FontWeight.w800
-                                      : FontWeight.w400,
-                                  color: selected ? AppColors.t1 : AppColors.t3,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    const Text(
-                      ':',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.t1,
-                      ),
-                    ),
-                    Expanded(
-                      child: ListWheelScrollView.useDelegate(
-                        itemExtent: 48,
-                        perspective: 0.003,
-                        diameterRatio: 1.8,
-                        physics: const FixedExtentScrollPhysics(),
-                        controller: FixedExtentScrollController(
-                          initialItem: tempMinute ~/ 15,
-                        ),
-                        onSelectedItemChanged: (i) =>
-                            setModal(() => tempMinute = i * 15),
-                        childDelegate: ListWheelChildBuilderDelegate(
-                          childCount: 4,
-                          builder: (context, i) {
-                            final min = i * 15;
-                            final selected = min == tempMinute;
-                            return Center(
-                              child: Text(
-                                min.toString().padLeft(2, '0'),
-                                style: TextStyle(
-                                  fontSize: selected ? 24 : 18,
-                                  fontWeight: selected
-                                      ? FontWeight.w800
-                                      : FontWeight.w400,
-                                  color: selected ? AppColors.t1 : AppColors.t3,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      initialHour: _selectedHour,
+      initialMinute: _selectedMinute,
     );
+    if (picked == null) return;
+    setState(() {
+      _selectedHour = picked.hour;
+      _selectedMinute = picked.minute;
+    });
   }
 
   Future<void> _save() async {
@@ -312,6 +187,22 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
           ),
         );
       }
+      if (_createPaymentDue && bookingIds.isNotEmpty && price > 0) {
+        for (final bookingId in bookingIds) {
+          await ref
+              .read(paymentsRepositoryProvider)
+              .create(
+                workspaceId: workspaceId,
+                amount: price,
+                status: 'sent',
+                date: startTime,
+                dueDate: startTime,
+                contactId: contactId,
+                appointmentId: bookingId,
+                notes: 'Payment due for $serviceLabel',
+              );
+        }
+      }
       await ref
           .read(notificationsRepositoryProvider)
           .create(
@@ -322,11 +213,13 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                 : 'New booking created',
             body: repeatOccurrences > 1
                 ? 'Created $repeatOccurrences bookings for $serviceLabel.'
-                : '$serviceLabel booked for ${_formatDate(_selectedDate)}.',
+                : '$serviceLabel booked for ${_formatAppointmentDate(_selectedDate)}.',
             deepLink: '/work',
           );
 
       ref.invalidate(appointmentsProvider);
+      ref.invalidate(invoicesProvider);
+      ref.invalidate(financeSummaryProvider);
       ref.invalidate(tasksProvider);
       ref.invalidate(allTasksProvider);
       ref.invalidate(clientsProvider);
@@ -370,6 +263,13 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     setState(() {
       _selectedDuration = minutes;
       _durationController.text = '$minutes';
+      _customDuration = false;
+    });
+  }
+
+  void _showCustomDuration() {
+    setState(() {
+      _customDuration = true;
     });
   }
 
@@ -528,11 +428,12 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // ── Client ──────────────────────────────────────
-                    _label('CLIENT'),
+                    const _AppointmentSectionLabel('CLIENT'),
                     const SizedBox(height: 8),
                     clients.when(
-                      loading: () => _skeleton(54),
-                      error: (_, __) => _errorBox('Error loading clients'),
+                      loading: () => const _AppointmentSkeleton(height: 54),
+                      error: (_, __) =>
+                          const _AppointmentErrorBox('Error loading clients'),
                       data: (data) => Column(
                         children: [
                           if (!_creatingClient)
@@ -591,7 +492,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                               ),
                             ),
                           if (_creatingClient) ...[
-                            _textInput(
+                            _AppointmentTextInput(
                               controller: _newClientNameController,
                               hint: 'Client name',
                               onChanged: (_) => setState(() {}),
@@ -600,7 +501,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                             Row(
                               children: [
                                 Expanded(
-                                  child: _textInput(
+                                  child: _AppointmentTextInput(
                                     controller: _newClientPhoneController,
                                     hint: 'Phone',
                                     keyboardType: TextInputType.phone,
@@ -608,7 +509,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
-                                  child: _textInput(
+                                  child: _AppointmentTextInput(
                                     controller: _newClientEmailController,
                                     hint: 'Email',
                                     keyboardType: TextInputType.emailAddress,
@@ -648,11 +549,12 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                     const SizedBox(height: 20),
 
                     // ── Service ──────────────────────────────────────
-                    _label('SERVICE'),
+                    const _AppointmentSectionLabel('SERVICE'),
                     const SizedBox(height: 8),
                     services.when(
-                      loading: () => _skeleton(54),
-                      error: (_, __) => _errorBox('Error loading services'),
+                      loading: () => const _AppointmentSkeleton(height: 54),
+                      error: (_, __) =>
+                          const _AppointmentErrorBox('Error loading services'),
                       data: (data) => Column(
                         children: [
                           Container(
@@ -752,6 +654,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                       _priceController.clear();
                                       _durationController.text = '60';
                                       _selectedDuration = 60;
+                                      _customDuration = false;
                                     });
                                     return;
                                   }
@@ -769,6 +672,13 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                     _selectedServiceName =
                                         svc['name'] as String?;
                                     _selectedDuration = duration;
+                                    _customDuration = ![
+                                      30,
+                                      45,
+                                      60,
+                                      90,
+                                      120,
+                                    ].contains(duration);
                                     _priceController.text = price == null
                                         ? ''
                                         : price.toStringAsFixed(0);
@@ -780,19 +690,25 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                           ),
                           if (_customService) ...[
                             const SizedBox(height: 10),
-                            _textInput(
+                            _AppointmentTextInput(
                               controller: _customServiceController,
                               hint: 'Service name',
                               onChanged: (_) => setState(() {}),
                             ),
                           ],
                           const SizedBox(height: 10),
-                          _textInput(
+                          _AppointmentTextInput(
                             controller: _priceController,
                             hint: 'Price',
                             prefix: '£',
                             keyboardType: TextInputType.number,
                             onChanged: (_) => setState(() {}),
+                          ),
+                          const SizedBox(height: 12),
+                          _PaymentDueToggle(
+                            value: _createPaymentDue,
+                            onChanged: (value) =>
+                                setState(() => _createPaymentDue = value),
                           ),
                         ],
                       ),
@@ -800,7 +716,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                     const SizedBox(height: 20),
 
                     // ── Date ─────────────────────────────────────────
-                    _label('DATE'),
+                    const _AppointmentSectionLabel('DATE'),
                     const SizedBox(height: 8),
                     GestureDetector(
                       onTap: _pickDate,
@@ -824,7 +740,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              _formatDate(_selectedDate),
+                              _formatAppointmentDate(_selectedDate),
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
@@ -844,7 +760,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                     const SizedBox(height: 20),
 
                     // ── Time ─────────────────────────────────────────
-                    _label('TIME & DURATION'),
+                    const _AppointmentSectionLabel('TIME & DURATION'),
                     const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
@@ -895,11 +811,45 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: [30, 45, 60, 90, 120].map((minutes) {
-                              final selected =
-                                  _selectedDurationValue == minutes;
-                              return GestureDetector(
-                                onTap: () => _setDuration(minutes),
+                            children: [
+                              ...[30, 45, 60, 90, 120].map((minutes) {
+                                final selected =
+                                    !_customDuration &&
+                                    _selectedDurationValue == minutes;
+                                return GestureDetector(
+                                  onTap: () => _setDuration(minutes),
+                                  child: AnimatedContainer(
+                                    duration: AppMotion.fast,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? AppColors.slateLight
+                                          : AppColors.bgInteract,
+                                      borderRadius: BorderRadius.circular(999),
+                                      border: Border.all(
+                                        color: selected
+                                            ? AppColors.borderStrong
+                                            : AppColors.border,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '${minutes}m',
+                                      style: TextStyle(
+                                        color: selected
+                                            ? AppColors.panelInk
+                                            : AppColors.t2,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }),
+                              GestureDetector(
+                                onTap: _showCustomDuration,
                                 child: AnimatedContainer(
                                   duration: AppMotion.fast,
                                   padding: const EdgeInsets.symmetric(
@@ -907,20 +857,20 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                     vertical: 8,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: selected
+                                    color: _customDuration
                                         ? AppColors.slateLight
                                         : AppColors.bgInteract,
                                     borderRadius: BorderRadius.circular(999),
                                     border: Border.all(
-                                      color: selected
+                                      color: _customDuration
                                           ? AppColors.borderStrong
                                           : AppColors.border,
                                     ),
                                   ),
                                   child: Text(
-                                    '${minutes}m',
+                                    'Custom',
                                     style: TextStyle(
-                                      color: selected
+                                      color: _customDuration
                                           ? AppColors.panelInk
                                           : AppColors.t2,
                                       fontWeight: FontWeight.w800,
@@ -928,24 +878,26 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                     ),
                                   ),
                                 ),
-                              );
-                            }).toList(),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 10),
-                          _textInput(
-                            controller: _durationController,
-                            hint: 'Custom duration',
-                            suffix: 'min',
-                            keyboardType: TextInputType.number,
-                            onChanged: (_) => setState(() {}),
-                          ),
+                          if (_customDuration) ...[
+                            const SizedBox(height: 10),
+                            _AppointmentTextInput(
+                              controller: _durationController,
+                              hint: 'Custom duration',
+                              suffix: 'min',
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ],
                         ],
                       ),
                     ),
                     const SizedBox(height: 20),
 
                     // ── Location ─────────────────────────────────────
-                    _label('LOCATION'),
+                    const _AppointmentSectionLabel('LOCATION'),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -995,7 +947,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                           }).toList(),
                     ),
                     const SizedBox(height: 10),
-                    _textInput(
+                    _AppointmentTextInput(
                       controller: _locationController,
                       hint: _locationMode == 'business'
                           ? 'Business address or room'
@@ -1078,7 +1030,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                     ],
 
                     // ── Repeat ───────────────────────────────────────
-                    _label('REPEAT'),
+                    const _AppointmentSectionLabel('REPEAT'),
                     const SizedBox(height: 8),
                     Container(
                       decoration: BoxDecoration(
@@ -1171,7 +1123,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                     const SizedBox(height: 20),
 
                     // ── Tasks ───────────────────────────────────────
-                    _label('TASKS (OPTIONAL)'),
+                    const _AppointmentSectionLabel('TASKS (OPTIONAL)'),
                     const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
@@ -1206,7 +1158,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                               child: Row(
                                 children: [
                                   Expanded(
-                                    child: _textInput(
+                                    child: _AppointmentTextInput(
                                       controller: controller,
                                       hint: 'Task title',
                                     ),
@@ -1247,7 +1199,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                     const SizedBox(height: 20),
 
                     // ── Notes ─────────────────────────────────────────
-                    _label('NOTES (OPTIONAL)'),
+                    const _AppointmentSectionLabel('NOTES (OPTIONAL)'),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _notesController,
@@ -1287,116 +1239,6 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     );
   }
 
-  Widget _label(String text) => Text(
-    text,
-    style: const TextStyle(
-      fontSize: 10,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0,
-      color: AppColors.t3,
-    ),
-  );
-
-  Widget _skeleton(double height) => Container(
-    height: height,
-    decoration: BoxDecoration(
-      color: AppColors.bgCard,
-      borderRadius: BorderRadius.circular(14),
-    ),
-  );
-
-  Widget _errorBox(String msg) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: AppColors.bgCard,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: AppColors.border),
-    ),
-    child: Text(
-      msg,
-      style: const TextStyle(color: AppColors.error, fontSize: 13),
-    ),
-  );
-
-  Widget _textInput({
-    required TextEditingController controller,
-    required String hint,
-    String? prefix,
-    String? suffix,
-    TextInputType? keyboardType,
-    ValueChanged<String>? onChanged,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      onChanged: onChanged,
-      style: const TextStyle(color: AppColors.t1, fontSize: 15),
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixText: prefix,
-        suffixText: suffix,
-        prefixStyle: const TextStyle(color: AppColors.t2),
-        suffixStyle: const TextStyle(color: AppColors.t3),
-        hintStyle: const TextStyle(color: AppColors.t3),
-        filled: true,
-        fillColor: AppColors.bgCard,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.green, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 15,
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime dt) {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${days[dt.weekday - 1]} ${dt.day} ${months[dt.month - 1]} ${dt.year}';
-  }
-
-  String? _recurrenceRuleFor(String mode) {
-    return switch (mode) {
-      'weekly' => 'FREQ=WEEKLY;INTERVAL=1',
-      'fortnightly' => 'FREQ=WEEKLY;INTERVAL=2',
-      'monthly' => 'FREQ=MONTHLY;INTERVAL=1',
-      _ => null,
-    };
-  }
-
-  int _repeatOccurrencesFor(String mode) {
-    return switch (mode) {
-      'weekly' => 12,
-      'fortnightly' => 6,
-      'monthly' => 3,
-      _ => 1,
-    };
-  }
-
   String get _repeatSummary {
     final count = _repeatOccurrencesFor(_repeatMode);
     final label = switch (_repeatMode) {
@@ -1407,11 +1249,4 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     };
     return 'Creates $count bookings $label from the selected date.';
   }
-}
-
-class _LocationChoice {
-  final String value;
-  final String label;
-
-  const _LocationChoice({required this.value, required this.label});
 }

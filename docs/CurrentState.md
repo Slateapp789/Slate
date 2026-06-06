@@ -1,6 +1,6 @@
 # Slate Current State
 
-Last updated: 2026-05-31
+Last updated: 2026-06-07
 
 ## Completed / Mostly Working Features
 
@@ -102,10 +102,15 @@ Last updated: 2026-05-31
 - Paid/unpaid tracking.
 - Overdue refresh logic.
 - Add expense.
+- Edit expense.
 - Delete expense.
+- Expense category summary.
+- Week/month/custom period switcher.
 - Weekly target progress.
+- Weekly/monthly target editing from Money.
 - Comparisons vs last week/month/custom period foundation.
 - Paid/unpaid/expenses/profit summary.
+- Booking-linked payment rows through `appointment_id`.
 - Supabase-backed `expenses` table with RLS.
 
 ### Public Business Profile
@@ -123,7 +128,8 @@ Last updated: 2026-05-31
 
 - In-app booking request triage.
 - Status update.
-- Manual confirmation flow that creates/matches client and creates booking.
+- Manual confirmation flow that checks/edits client, phone, service, date, time, duration, price, location, private notes, and optional payment due before creating the booking.
+- Decline confirmation before closing a request.
 - Notification creation on request/confirmation paths.
 
 ### Notifications
@@ -147,7 +153,7 @@ Last updated: 2026-05-31
 - Notification settings.
 - Calendar sync entry point.
 - Account email/password/sign out.
-- Privacy export and deletion request.
+- Privacy export and account deletion request flow.
 
 ### Security / Foundation
 
@@ -155,6 +161,8 @@ Last updated: 2026-05-31
 - `.env.example`.
 - RLS policy contract.
 - Live RLS enabled on current public tables.
+- Public profile and booking request access routed through Edge Functions.
+- Account deletion request/completion Edge Functions exist; completion remains admin-token gated.
 - Schema contract.
 - GitHub remote connected.
 - Model serialization tests.
@@ -163,13 +171,13 @@ Last updated: 2026-05-31
 
 ## Partially Completed Features
 
-- Money expenses: create/delete exists; edit expense and richer category reporting are not complete.
+- Money-to-booking workflow: new bookings and completed bookings can create linked payments; more end-to-end QA is still needed.
 - Calendar sync: account state and ICS export exist; real external provider sync does not.
 - Notifications: in-app centre/preferences exist; APNs/FCM push delivery and Edge Functions are not complete.
 - Recurring bookings: recurrence fields exist; full recurring creation/edit/exception UX is not complete.
 - Public profile: request-booking MVP exists; full slot-selection/self-booking/pay-now is not complete.
-- Privacy: export and deletion request exist; actual server-side deletion/purge workflow is not complete.
-- Security: RLS enabled, but live duplicate policies and advisor warnings remain.
+- Privacy: export and account deletion request/completion foundation exists; operational QA/SLA documentation is still needed before production.
+- Security: RLS enabled, public profile/request tables are no longer directly public, and advisors currently only flag leaked password protection plus low-traffic unused-index info.
 - Typed models: main models exist; some features still pass raw maps.
 - Navigation: GoRouter exists, but many flows still use `MaterialPageRoute`.
 - Testing: model/util tests exist; repository/widget/integration tests are still thin.
@@ -178,18 +186,18 @@ Last updated: 2026-05-31
 
 Near-term:
 
-- Finish Money daily-use workflow: edit expenses, expense categories, target editing, period switcher polish.
-- Connect Money to Bookings: completed booking prompts payment, booking detail shows payment status.
-- Improve booking request confirmation with the same strong booking form patterns.
-- Clean Supabase policy duplicates and add missing indexes.
-- Split oversized files.
+- QA Money daily-use workflow across real device and simulator.
+- QA Money-to-Bookings across new booking, completed booking, paid/unpaid, and dashboard refresh.
+- QA booking request confirmation on real device.
+- Monitor Supabase advisors and enable leaked password protection before beta.
+- Continue splitting oversized files.
 
 V1 before beta:
 
 - Production-grade reminders logic.
 - Better notification scheduling and push foundation.
 - Calendar sync hardening.
-- Data export/delete completion.
+- Data export/delete operational hardening.
 - More robust QA around onboarding, auth, bookings, money, tasks, public profile.
 
 Post-V1 / V2:
@@ -201,24 +209,30 @@ Post-V1 / V2:
 - QR code export.
 - Closure dates.
 - Advanced analytics.
-- AI assistant.
 - Teams/staff.
 - Marketplace/discovery only if product direction changes.
 
 ## Technical Debt
 
 - Large files:
-  - `lib/features/tasks/tasks_screen.dart` ~2037 lines.
-  - `lib/features/appointments/add_appointment_screen.dart` ~1417 lines.
-  - `lib/features/appointments/appointment_detail_screen.dart` ~1232 lines.
+  - `lib/features/tasks/tasks_screen.dart` ~946 lines after extracting task card, task logic, task detail, and task editor parts.
+  - `lib/features/tasks/task_logic.dart` ~280 lines.
+  - `lib/features/tasks/task_card.dart` ~259 lines.
+  - `lib/features/tasks/task_detail_widgets.dart` ~320 lines.
+  - `lib/features/tasks/task_editor_widgets.dart` ~497 lines.
+  - `lib/features/appointments/add_appointment_screen.dart` ~1200 lines after extracting appointment logic and reusable booking form widgets.
+  - `lib/features/appointments/add_appointment_logic.dart` ~45 lines.
+  - `lib/features/appointments/add_appointment_widgets.dart` ~328 lines.
+  - `lib/features/appointments/appointment_detail_screen.dart` ~1217 lines after extracting private detail sections and time picker.
+  - `lib/features/appointments/appointment_detail_sections.dart` ~375 lines.
   - `lib/features/settings/widgets/settings_business_tab.dart` ~1215 lines.
-  - `lib/features/finance/finance_screen.dart` ~1207 lines.
+  - `lib/features/finance/finance_screen.dart` ~1087 lines after extracting target/activity widgets.
+  - `lib/features/finance/finance_screen_widgets.dart` ~394 lines.
   - `lib/features/clients/client_detail_screen.dart` ~1061 lines.
 - Mixed routing approach.
 - Raw map payloads still used in several areas.
 - Some legacy product/code names remain.
-- Live Supabase has duplicate older policies.
-- Performance advisor flags unindexed foreign keys on newer tables.
+- Supabase advisors now only flag leaked password protection plus expected low-traffic unused-index info.
 - No CI yet.
 - No repository tests with mocked Supabase.
 - Limited widget/integration tests.
@@ -227,11 +241,11 @@ Post-V1 / V2:
 
 ## Priority Queue
 
-1. Finish Money UX because it was just expanded and is closest to being production-useful.
-2. Connect Money to Bookings so completing work leads naturally to payment tracking.
-3. Clean live Supabase policy/index debt before adding more tables.
-4. Refactor largest files in small safe slices.
-5. Improve booking request confirmation UX.
+1. QA and polish Money UX because it is now connected enough to be used daily.
+2. QA booking-to-payment loops so completing work leads naturally to payment tracking.
+3. Enable leaked password protection and keep Supabase advisor output clean before beta.
+4. Continue refactoring largest files in small safe slices.
+5. QA booking request confirmation UX.
 6. Add repository and flow tests for bookings, money, tasks, CRM.
 7. Build production notification delivery foundation.
 8. Harden privacy/security for beta.
@@ -242,6 +256,6 @@ Product risk: medium-low. The core loop is coherent.
 
 Architecture risk: medium. The app is improving but several screens remain large.
 
-Security risk: medium before production. RLS is enabled, but auth leaked password protection and policy cleanup remain.
+Security risk: medium before production. RLS/public boundaries are stronger, but auth leaked password protection and production deletion operations still need hardening.
 
 UX risk: medium. Many screens are much stronger now, but Money/Settings/Booking Requests need polish.

@@ -1,16 +1,28 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/slate_models.dart';
 import '../repositories/slate_repositories.dart';
+import 'clients_provider.dart';
+import 'finance_provider.dart';
+import 'tasks_provider.dart';
 import 'workspace_provider.dart';
+
+const dashboardUnpaidThreshold = Duration(days: 3);
+const dashboardUnconfirmedThreshold = Duration(hours: 24);
+const dashboardUncontactedThreshold = Duration(days: 7);
 
 class DashboardRevenue {
   final double weekTotal;
   final double monthTotal;
+  final double weekExpenses;
+  final double monthExpenses;
   final double outstanding;
   final double revenueTarget;
 
   const DashboardRevenue({
     required this.weekTotal,
     required this.monthTotal,
+    required this.weekExpenses,
+    required this.monthExpenses,
     required this.outstanding,
     required this.revenueTarget,
   });
@@ -46,6 +58,14 @@ double _sumTotals(List<Map<String, dynamic>> rows) {
   });
 }
 
+double _sumAmounts(List<Map<String, dynamic>> rows) {
+  return rows.fold<double>(0, (sum, row) {
+    final v = row['amount'];
+    if (v is num) return sum + v.toDouble();
+    return sum + (double.tryParse(v?.toString() ?? '') ?? 0);
+  });
+}
+
 String _dateOnly(DateTime dt) =>
     '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 
@@ -62,6 +82,8 @@ final dashboardRevenueProvider = FutureProvider<DashboardRevenue>((ref) async {
     return const DashboardRevenue(
       weekTotal: 0,
       monthTotal: 0,
+      weekExpenses: 0,
+      monthExpenses: 0,
       outstanding: 0,
       revenueTarget: 0,
     );
@@ -87,6 +109,14 @@ final dashboardRevenueProvider = FutureProvider<DashboardRevenue>((ref) async {
     status: 'sent',
     statuses: ['sent', 'overdue'],
   );
+  final weekExpenses = await repository.expenseTotals(
+    workspaceId: workspaceId,
+    expenseDateFrom: weekStart,
+  );
+  final monthExpenses = await repository.expenseTotals(
+    workspaceId: workspaceId,
+    expenseDateFrom: monthStart,
+  );
 
   double revenueTarget = 0;
   try {
@@ -96,6 +126,8 @@ final dashboardRevenueProvider = FutureProvider<DashboardRevenue>((ref) async {
   return DashboardRevenue(
     weekTotal: _sumTotals(List<Map<String, dynamic>>.from(weekPaid)),
     monthTotal: _sumTotals(List<Map<String, dynamic>>.from(monthPaid)),
+    weekExpenses: _sumAmounts(List<Map<String, dynamic>>.from(weekExpenses)),
+    monthExpenses: _sumAmounts(List<Map<String, dynamic>>.from(monthExpenses)),
     outstanding: _sumTotals(List<Map<String, dynamic>>.from(outstandingRows)),
     revenueTarget: revenueTarget,
   );
@@ -167,3 +199,109 @@ final dashboardFocusProvider = FutureProvider<DashboardFocus>((ref) async {
     calendarSyncEnabled: calendarSyncEnabled,
   );
 });
+
+enum DashboardAttentionType {
+  unpaid,
+  unconfirmedAppointment,
+  overdueTask,
+  uncontactedLead,
+}
+
+class DashboardAttentionItem {
+  final DashboardAttentionType type;
+  final String title;
+  final String detail;
+  final Object source;
+  final DateTime sortTime;
+
+  const DashboardAttentionItem({
+    required this.type,
+    required this.title,
+    required this.detail,
+    required this.source,
+    required this.sortTime,
+  });
+}
+
+final dashboardAttentionProvider = FutureProvider<List<DashboardAttentionItem>>(
+  (ref) async {
+    final payments = await ref.watch(invoicesProvider.future);
+    final tasks = await ref.watch(allTasksProvider.future);
+    final appointments = await ref.watch(todayAppointmentsProvider.future);
+    final clients = await ref.watch(clientsProvider.future);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final items = <DashboardAttentionItem>[];
+
+    for (final payment in payments) {
+      if (payment.status == 'paid') continue;
+      final dueDate = payment.dueDate ?? payment.issueDate;
+      final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
+      if (today.difference(dueDay) <= dashboardUnpaidThreshold) continue;
+      items.add(
+        DashboardAttentionItem(
+          type: DashboardAttentionType.unpaid,
+          title: 'Collect £${payment.total.toStringAsFixed(0)}',
+          detail: payment.clientName ?? payment.number,
+          source: payment,
+          sortTime: dueDate,
+        ),
+      );
+    }
+
+    for (final row in appointments) {
+      final appointment = Appointment.fromMap(row);
+      final status = appointment.status.toLowerCase();
+      final isUnconfirmed = status == 'unconfirmed' || status == 'pending';
+      final startsSoon =
+          appointment.startTime.isAfter(now) &&
+          appointment.startTime.difference(now) <=
+              dashboardUnconfirmedThreshold;
+      if (!isUnconfirmed || !startsSoon) continue;
+      items.add(
+        DashboardAttentionItem(
+          type: DashboardAttentionType.unconfirmedAppointment,
+          title: 'Confirm ${appointment.clientName ?? 'appointment'}',
+          detail: appointment.serviceName ?? appointment.title ?? 'Today',
+          source: row,
+          sortTime: appointment.startTime,
+        ),
+      );
+    }
+
+    for (final task in tasks) {
+      final due = task.dueDate;
+      if (task.status == 'done' || due == null) continue;
+      final dueDay = DateTime(due.year, due.month, due.day);
+      if (!dueDay.isBefore(today)) continue;
+      items.add(
+        DashboardAttentionItem(
+          type: DashboardAttentionType.overdueTask,
+          title: task.title,
+          detail: task.clientName ?? 'Overdue task',
+          source: task,
+          sortTime: due,
+        ),
+      );
+    }
+
+    for (final client in clients) {
+      if (client.status != 'lead') continue;
+      final latest = client.lastActivityAt ?? client.createdAt;
+      if (latest == null) continue;
+      if (now.difference(latest) <= dashboardUncontactedThreshold) continue;
+      items.add(
+        DashboardAttentionItem(
+          type: DashboardAttentionType.uncontactedLead,
+          title: 'Contact ${client.name}',
+          detail: 'Lead waiting ${now.difference(latest).inDays}d',
+          source: client,
+          sortTime: latest,
+        ),
+      );
+    }
+
+    items.sort((a, b) => a.sortTime.compareTo(b.sortTime));
+    return items;
+  },
+);

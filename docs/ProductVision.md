@@ -1,6 +1,6 @@
 # Slate Product Vision
 
-Last updated: 2026-05-31
+Last updated: 2026-06-07
 
 ## What Slate Is
 
@@ -75,12 +75,12 @@ Current code scope includes:
 - CRM with client records, contact actions, notes, follow-ups, timeline, booking history, payment history, and tasks.
 - Bookings with today/upcoming/past views, calendar view, next booking, date selection, location type, custom services, inline client creation, edit flow, status control, linked tasks, and calendar export.
 - Tasks with priority, due date, reminders, client/booking context, templates, checklist items, deliberate completion, reopen, delete, and detail/edit sheets.
-- Money tracking with paid/unpaid payments, expenses, target progress, comparisons, add/edit payments, mark received, delete payments, add/delete expenses.
+- Money tracking with paid/unpaid payments, booking-linked payments, expenses, target progress, comparisons, add/edit payments, mark received, delete payments, add/edit/delete expenses, category summaries, and week/month/custom period views.
 - Public profile at `/p/:handle`, services, working hours, gallery/reviews toggles/content, notice, and booking request form.
 - Booking request triage and manual confirmation.
 - Notification centre, read/unread filtering, settings toggles, notification rows created by app events.
 - Calendar sync placeholder/account state and ICS export.
-- Privacy export and account deletion request foundation.
+- Privacy export and account deletion request/completion foundation.
 - Demo data seeding through `SEED_DEMO_DATA`.
 
 ## Future Vision
@@ -90,14 +90,13 @@ Future Slate should deepen the V1 operating loop before expanding sideways.
 Likely future directions:
 
 - Production-grade reminders and push notifications through Edge Functions/APNs/FCM.
-- Stronger booking-to-payment workflows.
-- Improved expense editing, categorisation, and finance targets.
+- QA and polish booking-to-payment workflows.
+- Deeper money reporting once the daily tracking loop is stable.
 - Calendar integration beyond ICS export.
 - Public profile improvements: QR code, closure dates, richer profile controls.
-- Data export/delete completion through trusted server-side jobs.
+- Data export/delete operational hardening around the trusted server-side deletion path.
 - Stripe/pay-now and deposits only when the simple payment workflow is stable.
 - Lightweight analytics where they directly support daily decisions.
-- AI assistant later, only after enough real user data exists to make it useful.
 - Team/staff support later, not V1.
 
 ## What Slate Is Not

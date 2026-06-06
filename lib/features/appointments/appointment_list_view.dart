@@ -219,7 +219,8 @@ class _BookingCalendarView extends StatelessWidget {
             SlateEmptyState(
               icon: LucideIcons.calendarPlus,
               title: 'No bookings this day',
-              subtitle: 'Use the gap for admin, follow-ups, or add a booking.',
+              subtitle:
+                  'Use the gap for admin, client tasks, or add a booking.',
             )
           else
             ...selectedDayAppointments.map(

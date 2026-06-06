@@ -18,6 +18,13 @@ final expensesProvider = FutureProvider<List<Expense>>((ref) async {
   return ref.watch(expensesRepositoryProvider).list(workspaceId);
 });
 
+final appointmentPaymentsProvider =
+    FutureProvider.family<List<Payment>, String>((ref, appointmentId) {
+      return ref
+          .watch(paymentsRepositoryProvider)
+          .forAppointment(appointmentId);
+    });
+
 final financeSummaryProvider = FutureProvider<FinanceSummary>((ref) async {
   final payments = await ref.watch(invoicesProvider.future);
   final expenses = await ref.watch(expensesProvider.future);
@@ -30,7 +37,116 @@ final financeSummaryProvider = FutureProvider<FinanceSummary>((ref) async {
   );
 });
 
+enum MoneyStatus { paid, unpaid, overdue }
+
+class MoneyPeriodRange {
+  final DateTime start;
+  final DateTime end;
+  final String label;
+
+  const MoneyPeriodRange({
+    required this.start,
+    required this.end,
+    required this.label,
+  });
+}
+
+DateTime startOfWeek(DateTime now) {
+  final monday = now.subtract(Duration(days: now.weekday - 1));
+  return DateTime(monday.year, monday.month, monday.day);
+}
+
+DateTime startOfDay(DateTime date) => DateTime(date.year, date.month, date.day);
+
+MoneyStatus moneyStatusFor(Payment payment, {DateTime? now}) {
+  if (payment.status == 'paid') return MoneyStatus.paid;
+  final today = startOfDay(now ?? DateTime.now());
+  final dueDate = payment.dueDate ?? payment.issueDate;
+  final dueDay = startOfDay(dueDate);
+  return dueDay.isBefore(today) ? MoneyStatus.overdue : MoneyStatus.unpaid;
+}
+
+DateTime displayReceivedDate(Payment payment, {DateTime? now}) {
+  final today = startOfDay(now ?? DateTime.now());
+  final received = startOfDay(payment.issueDate);
+  return received.isAfter(today) ? today : payment.issueDate;
+}
+
+class PeriodMoneySummary {
+  final String label;
+  final double paid;
+  final double unpaid;
+  final double overdue;
+  final double expenses;
+  final Map<String, double> categoryTotals;
+
+  const PeriodMoneySummary({
+    required this.label,
+    required this.paid,
+    required this.unpaid,
+    required this.overdue,
+    required this.expenses,
+    required this.categoryTotals,
+  });
+
+  double get toCollect => unpaid + overdue;
+  double get profit => paid - expenses;
+
+  factory PeriodMoneySummary.from({
+    required List<Payment> payments,
+    required List<Expense> expenses,
+    required MoneyPeriodRange range,
+    DateTime? now,
+  }) {
+    bool inRange(DateTime date) =>
+        !date.isBefore(range.start) && date.isBefore(range.end);
+
+    final today = now ?? DateTime.now();
+    final paid = payments
+        .where(
+          (payment) => moneyStatusFor(payment, now: today) == MoneyStatus.paid,
+        )
+        .where((payment) => inRange(payment.issueDate))
+        .fold<double>(0, (sum, payment) => sum + payment.total);
+    final unpaid = payments
+        .where(
+          (payment) =>
+              moneyStatusFor(payment, now: today) == MoneyStatus.unpaid,
+        )
+        .where((payment) => inRange(payment.dueDate ?? payment.issueDate))
+        .fold<double>(0, (sum, payment) => sum + payment.total);
+    final overdue = payments
+        .where(
+          (payment) =>
+              moneyStatusFor(payment, now: today) == MoneyStatus.overdue,
+        )
+        .where((payment) => inRange(payment.dueDate ?? payment.issueDate))
+        .fold<double>(0, (sum, payment) => sum + payment.total);
+    final categoryTotals = <String, double>{};
+    final expenseTotal = expenses
+        .where((expense) => inRange(expense.expenseDate))
+        .fold<double>(0, (sum, expense) {
+          categoryTotals.update(
+            expense.category,
+            (value) => value + expense.amount,
+            ifAbsent: () => expense.amount,
+          );
+          return sum + expense.amount;
+        });
+
+    return PeriodMoneySummary(
+      label: range.label,
+      paid: paid,
+      unpaid: unpaid,
+      overdue: overdue,
+      expenses: expenseTotal,
+      categoryTotals: categoryTotals,
+    );
+  }
+}
+
 class FinanceSummary {
+  final double monthlyTarget;
   final double weeklyTarget;
   final double thisWeekPaid;
   final double lastWeekPaid;
@@ -42,8 +158,11 @@ class FinanceSummary {
   final double thisMonthExpenses;
   final double thisWeekNet;
   final double thisMonthNet;
+  final PeriodMoneySummary thisWeekSummary;
+  final PeriodMoneySummary thisMonthSummary;
 
   const FinanceSummary({
+    required this.monthlyTarget,
     required this.weeklyTarget,
     required this.thisWeekPaid,
     required this.lastWeekPaid,
@@ -55,6 +174,8 @@ class FinanceSummary {
     required this.thisMonthExpenses,
     required this.thisWeekNet,
     required this.thisMonthNet,
+    required this.thisWeekSummary,
+    required this.thisMonthSummary,
   });
 
   double get weeklyProgress {
@@ -75,14 +196,25 @@ class FinanceSummary {
     required List<Payment> payments,
     required List<Expense> expenses,
     required double monthlyTarget,
+    DateTime? now,
   }) {
-    final now = DateTime.now();
-    final thisWeekStart = _startOfWeek(now);
+    final current = now ?? DateTime.now();
+    final thisWeekStart = startOfWeek(current);
     final nextWeekStart = thisWeekStart.add(const Duration(days: 7));
     final lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
-    final thisMonthStart = DateTime(now.year, now.month, 1);
-    final nextMonthStart = DateTime(now.year, now.month + 1, 1);
-    final lastMonthStart = DateTime(now.year, now.month - 1, 1);
+    final thisMonthStart = DateTime(current.year, current.month, 1);
+    final nextMonthStart = DateTime(current.year, current.month + 1, 1);
+    final lastMonthStart = DateTime(current.year, current.month - 1, 1);
+    final thisWeekRange = MoneyPeriodRange(
+      start: thisWeekStart,
+      end: nextWeekStart,
+      label: 'This week',
+    );
+    final thisMonthRange = MoneyPeriodRange(
+      start: thisMonthStart,
+      end: nextMonthStart,
+      label: 'This month',
+    );
 
     final paidPayments = payments.where((item) => item.status == 'paid');
     final thisWeekPaid = _sumPaymentsInRange(
@@ -106,10 +238,14 @@ class FinanceSummary {
       thisMonthStart,
     );
     final unpaid = payments
-        .where((item) => item.status != 'paid')
+        .where(
+          (item) => moneyStatusFor(item, now: current) == MoneyStatus.unpaid,
+        )
         .fold<double>(0, (sum, item) => sum + item.total);
     final overdue = payments
-        .where((item) => item.status == 'overdue')
+        .where(
+          (item) => moneyStatusFor(item, now: current) == MoneyStatus.overdue,
+        )
         .fold<double>(0, (sum, item) => sum + item.total);
     final thisWeekExpenses = _sumExpensesInRange(
       expenses,
@@ -123,6 +259,7 @@ class FinanceSummary {
     );
 
     return FinanceSummary(
+      monthlyTarget: monthlyTarget,
       weeklyTarget: monthlyTarget > 0 ? monthlyTarget / 4.345 : 0,
       thisWeekPaid: thisWeekPaid,
       lastWeekPaid: lastWeekPaid,
@@ -134,13 +271,20 @@ class FinanceSummary {
       thisMonthExpenses: thisMonthExpenses,
       thisWeekNet: thisWeekPaid - thisWeekExpenses,
       thisMonthNet: thisMonthPaid - thisMonthExpenses,
+      thisWeekSummary: PeriodMoneySummary.from(
+        range: thisWeekRange,
+        payments: payments,
+        expenses: expenses,
+        now: current,
+      ),
+      thisMonthSummary: PeriodMoneySummary.from(
+        range: thisMonthRange,
+        payments: payments,
+        expenses: expenses,
+        now: current,
+      ),
     );
   }
-}
-
-DateTime _startOfWeek(DateTime now) {
-  final monday = now.subtract(Duration(days: now.weekday - 1));
-  return DateTime(monday.year, monday.month, monday.day);
 }
 
 double _sumPaymentsInRange(

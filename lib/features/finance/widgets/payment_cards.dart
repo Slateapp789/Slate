@@ -3,6 +3,8 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/slate_models.dart';
+import '../../../shared/providers/finance_provider.dart';
+import '../../../shared/utils/date_format.dart';
 import '../../../shared/widgets/slate_ui.dart';
 
 class PaymentSummaryCard extends StatelessWidget {
@@ -20,14 +22,15 @@ class PaymentSummaryCard extends StatelessWidget {
     final monthStart = DateTime(now.year, now.month, 1);
 
     for (final payment in payments) {
-      if (payment.status == 'paid') {
+      final status = moneyStatusFor(payment);
+      if (status == MoneyStatus.paid) {
         received += payment.total;
         if (!payment.issueDate.isBefore(monthStart)) {
           thisMonth += payment.total;
         }
-      } else if (payment.status == 'sent' || payment.status == 'pending') {
+      } else if (status == MoneyStatus.unpaid) {
         outstanding += payment.total;
-      } else if (payment.status == 'overdue') {
+      } else if (status == MoneyStatus.overdue) {
         outstanding += payment.total;
         overdue += payment.total;
         overdueCount++;
@@ -202,10 +205,11 @@ class PaymentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final clientName = payment.clientName ?? 'Unknown';
-    final description = payment.notes ?? '';
-    final isOverdue = payment.status == 'overdue';
-    final isPending = payment.status == 'sent' || payment.status == 'pending';
-    final isPaid = payment.status == 'paid';
+    final description = _cleanDemoText(payment.notes ?? '');
+    final status = moneyStatusFor(payment);
+    final isOverdue = status == MoneyStatus.overdue;
+    final isPending = status == MoneyStatus.unpaid;
+    final isPaid = status == MoneyStatus.paid;
 
     final statusColor = isPaid
         ? AppColors.green
@@ -340,39 +344,25 @@ class PaymentCard extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime dt) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-  }
-
   String _dateSubtitle(Payment payment) {
     if (payment.status == 'paid') {
-      return 'Received ${_formatDate(payment.issueDate)}';
+      return 'Received ${slateShortDate(displayReceivedDate(payment))}';
     }
     final dueDate = payment.dueDate;
     if (dueDate == null || dueDate.millisecondsSinceEpoch == 0) {
-      return 'Created ${_formatDate(payment.issueDate)}';
+      return 'Created ${slateShortDate(payment.issueDate)}';
     }
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
     final diff = due.difference(today).inDays;
-    if (diff < 0) return 'Due ${_formatDate(dueDate)} · ${diff.abs()}d late';
+    if (diff < 0) return 'Due ${slateShortDate(dueDate)} · ${diff.abs()}d late';
     if (diff == 0) return 'Due today';
     if (diff == 1) return 'Due tomorrow';
-    return 'Due ${_formatDate(dueDate)} · ${diff}d';
+    return 'Due ${slateShortDate(dueDate)} · ${diff}d';
+  }
+
+  String _cleanDemoText(String value) {
+    return value.replaceAll('[Slate demo]', '').trim();
   }
 }

@@ -4,12 +4,18 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/appointments_provider.dart';
 import '../../shared/providers/clients_provider.dart';
+import '../../shared/providers/dashboard_provider.dart';
+import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/widgets/slate_ui.dart';
+import '../finance/add_payment_screen.dart';
 import 'widgets/appointment_detail_widgets.dart';
+
+part 'appointment_detail_sections.dart';
 
 const List<String> _cancelReasons = [
   'Client cancelled',
@@ -47,6 +53,9 @@ class _AppointmentDetailScreenState
   late TextEditingController _notesController;
   late TextEditingController _priceController;
   List<Map<String, dynamic>> _services = [];
+  bool _notesExpanded = false;
+  bool _paymentExpanded = false;
+  bool _tasksExpanded = false;
 
   @override
   void initState() {
@@ -118,7 +127,7 @@ class _AppointmentDetailScreenState
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  Future<void> _updateStatus(String status, {String? cancelReason}) async {
+  Future<bool> _updateStatus(String status, {String? cancelReason}) async {
     setState(() => _loading = true);
     try {
       final updates = {'status': status};
@@ -152,10 +161,195 @@ class _AppointmentDetailScreenState
       ref.invalidate(appointmentsProvider);
       ref.invalidate(notificationsProvider);
       ref.invalidate(unreadNotificationsProvider);
+      return true;
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) _snack('Error: $e');
+      return false;
     }
+  }
+
+  Future<void> _completeWithPayment(String paymentMode) async {
+    Navigator.pop(context);
+    final completed = await _updateStatus('completed');
+    if (!completed) return;
+    if (paymentMode == 'skip') return;
+
+    final workspaceId = await ref.read(workspaceIdProvider.future);
+    if (workspaceId == null) return;
+    final amount = (_appt['price'] as num?)?.toDouble() ?? 0;
+    if (amount <= 0) return;
+
+    final serviceName =
+        _appt['services']?['name'] as String? ??
+        _appt['title'] as String? ??
+        'Booking';
+    final startTime =
+        DateTime.tryParse(_appt['start_time'] as String? ?? '') ??
+        DateTime.now().toUtc();
+    final status = paymentMode == 'paid' ? 'paid' : 'sent';
+
+    await ref
+        .read(paymentsRepositoryProvider)
+        .create(
+          workspaceId: workspaceId,
+          amount: amount,
+          status: status,
+          date: startTime,
+          dueDate: startTime,
+          contactId: _appt['contact_id'] as String?,
+          appointmentId: _appt['id'] as String,
+          notes: paymentMode == 'paid'
+              ? 'Payment received for $serviceName'
+              : 'Payment due for $serviceName',
+        );
+    await ref
+        .read(notificationsRepositoryProvider)
+        .create(
+          workspaceId: workspaceId,
+          type: status == 'paid' ? 'payment_received' : 'invoice_overdue',
+          title: status == 'paid' ? 'Payment recorded' : 'Payment pending',
+          body:
+              '£${amount.toStringAsFixed(0)} ${status == 'paid' ? 'was recorded' : 'is outstanding'} for $serviceName.',
+          deepLink: '/payments',
+        );
+    _refreshPaymentState();
+  }
+
+  Future<void> _completeWithLinkedPayment({
+    Payment? payment,
+    bool markPaid = false,
+  }) async {
+    Navigator.pop(context);
+    final completed = await _updateStatus('completed');
+    if (!completed) return;
+    if (payment != null && markPaid) {
+      await _markLinkedPaymentPaid(payment);
+    }
+  }
+
+  Future<void> _markLinkedPaymentPaid(Payment payment) async {
+    await ref.read(paymentsRepositoryProvider).markPaid(payment);
+    await ref
+        .read(notificationsRepositoryProvider)
+        .create(
+          workspaceId: payment.workspaceId,
+          type: 'payment_received',
+          title: 'Payment received',
+          body:
+              '£${payment.total.toStringAsFixed(0)} from ${payment.clientName ?? 'a client'} is now paid.',
+          deepLink: '/payments',
+        );
+    _refreshPaymentState();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '£${payment.total.toStringAsFixed(0)} marked as received',
+          ),
+          backgroundColor: AppColors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _refreshPaymentState() {
+    ref.invalidate(appointmentPaymentsProvider(_appt['id'] as String));
+    ref.invalidate(invoicesProvider);
+    ref.invalidate(financeSummaryProvider);
+    ref.invalidate(dashboardRevenueProvider);
+    ref.invalidate(clientCrmRecordsProvider);
+    ref.invalidate(notificationsProvider);
+    ref.invalidate(unreadNotificationsProvider);
+  }
+
+  void _showCompletionSheet(List<Payment> payments) {
+    final amount = (_appt['price'] as num?)?.toDouble() ?? 0;
+    final hasLinkedPayment = payments.isNotEmpty;
+    final unpaidLinkedPayments = payments
+        .where((payment) => payment.status != 'paid')
+        .toList();
+    final unpaidLinkedPayment = unpaidLinkedPayments.isEmpty
+        ? null
+        : unpaidLinkedPayments.first;
+    final hasPaidLinkedPayment = payments.any(
+      (payment) => payment.status == 'paid',
+    );
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (ctx) => SlateSheetFrame(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Complete booking',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: AppColors.t1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              unpaidLinkedPayment != null
+                  ? 'This booking already has an unpaid Money item linked. Mark it paid now or leave it to follow up later.'
+                  : hasPaidLinkedPayment
+                  ? 'This booking already has a paid Money item linked.'
+                  : amount > 0
+                  ? 'How should Slate handle the £${amount.toStringAsFixed(0)} payment?'
+                  : 'No booking price is set, so you can complete it without recording money.',
+              style: const TextStyle(fontSize: 13, color: AppColors.t3),
+            ),
+            const SizedBox(height: 18),
+            if (unpaidLinkedPayment != null) ...[
+              SlateButton(
+                label: 'Mark Linked Payment Paid',
+                icon: LucideIcons.checkCircle,
+                onPressed: () => _completeWithLinkedPayment(
+                  payment: unpaidLinkedPayment,
+                  markPaid: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              SlateButton(
+                label: 'Complete, Leave Unpaid',
+                icon: LucideIcons.clock3,
+                secondary: true,
+                onPressed: () => _completeWithLinkedPayment(),
+              ),
+              const SizedBox(height: 10),
+            ] else if (!hasLinkedPayment && amount > 0) ...[
+              SlateButton(
+                label: 'Mark Paid',
+                icon: LucideIcons.checkCircle,
+                onPressed: () => _completeWithPayment('paid'),
+              ),
+              const SizedBox(height: 10),
+              SlateButton(
+                label: 'Record Unpaid',
+                icon: LucideIcons.clock3,
+                secondary: true,
+                onPressed: () => _completeWithPayment('unpaid'),
+              ),
+              const SizedBox(height: 10),
+            ],
+            if (unpaidLinkedPayment == null)
+              SlateButton(
+                label: hasLinkedPayment ? 'Complete Booking' : 'Skip Money',
+                icon: hasLinkedPayment
+                    ? LucideIcons.check
+                    : LucideIcons.arrowRight,
+                secondary: !hasLinkedPayment,
+                onPressed: () => _completeWithPayment('skip'),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _saveEdit() async {
@@ -228,6 +422,16 @@ class _AppointmentDetailScreenState
       'client' => 'Client location',
       'online' => 'Online / phone',
       _ => 'Business location',
+    };
+  }
+
+  String get _locationDisplayValue {
+    final location = (_appt['location'] as String?)?.trim();
+    if (location?.isNotEmpty == true) return location!;
+    return switch (_locationMode) {
+      'client' => 'Client location - add address',
+      'online' => 'Online / phone - add link',
+      _ => 'Business location - add address',
     };
   }
 
@@ -344,146 +548,16 @@ class _AppointmentDetailScreenState
   }
 
   Future<void> _pickTime() async {
-    int tempHour = _selectedHour;
-    int tempMinute = _selectedMinute;
-    await showModalBottomSheet(
+    final picked = await _showAppointmentDetailTimePicker(
       context: context,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModal) => SizedBox(
-          height: 280,
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Select time',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.t1,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedHour = tempHour;
-                          _selectedMinute = tempMinute;
-                        });
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        'Done',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.green,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ListWheelScrollView.useDelegate(
-                        itemExtent: 48,
-                        perspective: 0.003,
-                        diameterRatio: 1.8,
-                        physics: const FixedExtentScrollPhysics(),
-                        controller: FixedExtentScrollController(
-                          initialItem: tempHour,
-                        ),
-                        onSelectedItemChanged: (i) =>
-                            setModal(() => tempHour = i),
-                        childDelegate: ListWheelChildBuilderDelegate(
-                          childCount: 24,
-                          builder: (context, i) {
-                            final selected = i == tempHour;
-                            return Center(
-                              child: Text(
-                                i.toString().padLeft(2, '0'),
-                                style: TextStyle(
-                                  fontSize: selected ? 24 : 18,
-                                  fontWeight: selected
-                                      ? FontWeight.w800
-                                      : FontWeight.w400,
-                                  color: selected ? AppColors.t1 : AppColors.t3,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                    const Text(
-                      ':',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.t1,
-                      ),
-                    ),
-                    Expanded(
-                      child: ListWheelScrollView.useDelegate(
-                        itemExtent: 48,
-                        perspective: 0.003,
-                        diameterRatio: 1.8,
-                        physics: const FixedExtentScrollPhysics(),
-                        controller: FixedExtentScrollController(
-                          initialItem: tempMinute ~/ 15,
-                        ),
-                        onSelectedItemChanged: (i) =>
-                            setModal(() => tempMinute = i * 15),
-                        childDelegate: ListWheelChildBuilderDelegate(
-                          childCount: 4,
-                          builder: (context, i) {
-                            final min = i * 15;
-                            final selected = min == tempMinute;
-                            return Center(
-                              child: Text(
-                                min.toString().padLeft(2, '0'),
-                                style: TextStyle(
-                                  fontSize: selected ? 24 : 18,
-                                  fontWeight: selected
-                                      ? FontWeight.w800
-                                      : FontWeight.w400,
-                                  color: selected ? AppColors.t1 : AppColors.t3,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      initialHour: _selectedHour,
+      initialMinute: _selectedMinute,
     );
+    if (picked == null) return;
+    setState(() {
+      _selectedHour = picked.hour;
+      _selectedMinute = picked.minute;
+    });
   }
 
   void _showCancelSheet() {
@@ -659,10 +733,14 @@ class _AppointmentDetailScreenState
     )?.toLocal();
     final notes = _appt['notes'] as String? ?? '';
     final price = _appt['price'];
+    final bookingPrice = price?.toDouble() ?? 0;
     final recurrenceRule = _appt['recurrence_rule'] as String?;
     final clients = ref.watch(clientsProvider);
     final linkedTasks = ref.watch(
       appointmentTasksProvider(_appt['id'] as String),
+    );
+    final linkedPayments = ref.watch(
+      appointmentPaymentsProvider(_appt['id'] as String),
     );
     final statusColor = status == 'completed'
         ? AppColors.success
@@ -966,9 +1044,7 @@ class _AppointmentDetailScreenState
                           const Spacer(),
                           Flexible(
                             child: Text(
-                              (_appt['location'] as String?)?.isNotEmpty == true
-                                  ? _appt['location'] as String
-                                  : 'Not set',
+                              _locationDisplayValue,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 13,
@@ -1013,15 +1089,14 @@ class _AppointmentDetailScreenState
                 const SizedBox(height: 12),
               ],
 
-              // ── Notes ─────────────────────────────────────────────────────
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
+              SlateDisclosure(
+                title: 'Notes',
+                subtitle: notes.isEmpty ? 'No notes added' : 'Booking context',
+                icon: LucideIcons.fileText,
+                expanded: _editing || _notesExpanded,
+                onToggle: () => setState(() {
+                  if (!_editing) _notesExpanded = !_notesExpanded;
+                }),
                 child: _editing
                     ? TextField(
                         controller: _notesController,
@@ -1060,51 +1135,79 @@ class _AppointmentDetailScreenState
                           contentPadding: const EdgeInsets.all(12),
                         ),
                       )
-                    : Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            LucideIcons.fileText,
-                            color: AppColors.t3,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: notes.isEmpty
-                                ? const Text(
-                                    'No notes',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: AppColors.t3,
-                                    ),
-                                  )
-                                : Text(
-                                    notes,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: AppColors.t2,
-                                    ),
-                                  ),
-                          ),
-                        ],
+                    : Text(
+                        notes.isEmpty ? 'No notes' : notes,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: notes.isEmpty ? AppColors.t3 : AppColors.t2,
+                        ),
                       ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 12),
 
-              _BookingTasksCard(
-                tasks: linkedTasks,
-                onAddTask: _showAddTaskSheet,
-                onToggle: (task) async {
-                  final done = task.status == 'done';
-                  await ref
-                      .read(tasksRepositoryProvider)
-                      .updateStatus(task.id, done ? 'open' : 'done');
-                  ref.invalidate(
-                    appointmentTasksProvider(_appt['id'] as String),
-                  );
-                  ref.invalidate(tasksProvider);
-                  ref.invalidate(allTasksProvider);
-                },
+              SlateDisclosure(
+                title: 'Money',
+                subtitle: linkedPayments.when(
+                  loading: () => 'Loading payment state',
+                  error: (_, __) => 'Payment state unavailable',
+                  data: (rows) => rows.isEmpty
+                      ? bookingPrice > 0
+                            ? 'No payment linked · £${bookingPrice.toStringAsFixed(0)}'
+                            : 'No payment linked'
+                      : '${rows.length} linked payment${rows.length == 1 ? '' : 's'}',
+                ),
+                icon: LucideIcons.banknote,
+                expanded: _paymentExpanded,
+                onToggle: () =>
+                    setState(() => _paymentExpanded = !_paymentExpanded),
+                child: _BookingPaymentCard(
+                  payments: linkedPayments,
+                  price: bookingPrice,
+                  onRecordPayment: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AddPaymentScreen(
+                          initialClientId: _appt['contact_id'] as String?,
+                          appointmentId: _appt['id'] as String,
+                        ),
+                      ),
+                    );
+                    _refreshPaymentState();
+                  },
+                  onMarkPaid: _markLinkedPaymentPaid,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              SlateDisclosure(
+                title: 'Booking tasks',
+                subtitle: linkedTasks.when(
+                  loading: () => 'Loading tasks',
+                  error: (_, __) => 'Tasks unavailable',
+                  data: (items) => items.isEmpty
+                      ? 'Prep and follow-up tasks'
+                      : '${items.length} linked task${items.length == 1 ? '' : 's'}',
+                ),
+                icon: LucideIcons.listChecks,
+                expanded: _tasksExpanded,
+                onToggle: () =>
+                    setState(() => _tasksExpanded = !_tasksExpanded),
+                child: _BookingTasksCard(
+                  tasks: linkedTasks,
+                  onAddTask: _showAddTaskSheet,
+                  onToggle: (task) async {
+                    final done = task.status == 'done';
+                    await ref
+                        .read(tasksRepositoryProvider)
+                        .updateStatus(task.id, done ? 'open' : 'done');
+                    ref.invalidate(
+                      appointmentTasksProvider(_appt['id'] as String),
+                    );
+                    ref.invalidate(tasksProvider);
+                    ref.invalidate(allTasksProvider);
+                  },
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -1113,7 +1216,14 @@ class _AppointmentDetailScreenState
                 status: status,
                 notes: notes,
                 loading: _loading,
-                onComplete: () => _updateStatus('completed'),
+                onComplete: () {
+                  final payments = linkedPayments.value;
+                  if (payments == null) {
+                    _snack('Payment status is still loading');
+                    return;
+                  }
+                  _showCompletionSheet(payments);
+                },
                 onCancel: _showCancelSheet,
               ),
               const SizedBox(height: 40),
@@ -1123,110 +1233,4 @@ class _AppointmentDetailScreenState
       ),
     );
   }
-
-  String _repeatLabel(String rule) {
-    if (rule.contains('FREQ=MONTHLY')) return 'Repeats monthly';
-    if (rule.contains('INTERVAL=2')) return 'Repeats fortnightly';
-    if (rule.contains('FREQ=WEEKLY')) return 'Repeats weekly';
-    return 'Repeating booking';
-  }
-}
-
-class _BookingTasksCard extends StatelessWidget {
-  final AsyncValue<List<SlateTask>> tasks;
-  final VoidCallback onAddTask;
-  final ValueChanged<SlateTask> onToggle;
-
-  const _BookingTasksCard({
-    required this.tasks,
-    required this.onAddTask,
-    required this.onToggle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(LucideIcons.listChecks, color: AppColors.t3, size: 16),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Booking tasks',
-                  style: TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              TextButton.icon(
-                onPressed: onAddTask,
-                icon: const Icon(LucideIcons.plus, size: 15),
-                label: const Text('Add'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          tasks.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 10),
-              child: LinearProgressIndicator(minHeight: 2),
-            ),
-            error: (_, __) => const Text(
-              'Could not load booking tasks',
-              style: TextStyle(color: AppColors.error, fontSize: 13),
-            ),
-            data: (items) {
-              if (items.isEmpty) {
-                return const Text(
-                  'Add prep, follow-up, or payment tasks for this booking.',
-                  style: TextStyle(color: AppColors.t3, fontSize: 13),
-                );
-              }
-              return Column(
-                children: items.map((task) {
-                  final done = task.status == 'done';
-                  return ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    onTap: () => onToggle(task),
-                    leading: Icon(
-                      done ? LucideIcons.checkCircle2 : LucideIcons.circle,
-                      color: done ? AppColors.success : AppColors.t3,
-                      size: 19,
-                    ),
-                    title: Text(
-                      task.title,
-                      style: TextStyle(
-                        color: done ? AppColors.t3 : AppColors.t1,
-                        decoration: done ? TextDecoration.lineThrough : null,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BookingLocationOption {
-  final String value;
-  final String label;
-
-  const _BookingLocationOption({required this.value, required this.label});
 }

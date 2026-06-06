@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/onboarding_provider.dart';
 
+final _handlePattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$');
+
 class ObHandle extends ConsumerStatefulWidget {
   final VoidCallback onNext;
   final VoidCallback onBack;
@@ -35,14 +37,18 @@ class _ObHandleState extends ConsumerState<ObHandle> {
   }
 
   bool get _canContinue =>
-      _handleController.text.trim().length >= 3 && _error.isEmpty;
+      _handlePattern.hasMatch(_handleController.text.trim().toLowerCase()) &&
+      _error.isEmpty;
 
   void _validate(String value) {
     final clean = value.toLowerCase().trim();
     if (clean.length < 3) {
       setState(() => _error = 'Must be at least 3 characters');
-    } else if (!RegExp(r'^[a-z0-9-]+$').hasMatch(clean)) {
-      setState(() => _error = 'Only letters, numbers and hyphens');
+    } else if (!_handlePattern.hasMatch(clean)) {
+      setState(
+        () => _error =
+            'Use letters, numbers, and hyphens. Start and end with a letter or number.',
+      );
     } else {
       setState(() => _error = '');
     }
@@ -203,7 +209,7 @@ class _ObHandleState extends ConsumerState<ObHandle> {
           ],
           const SizedBox(height: 8),
           Text(
-            'Letters, numbers and hyphens only. Min 3 characters.',
+            'Letters, numbers and hyphens only. Min 3 characters. Start and end with a letter or number.',
             style: TextStyle(fontSize: 12, color: AppColors.t3),
           ),
           const SizedBox(height: 40),

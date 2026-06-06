@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/workspace_provider.dart';
@@ -21,6 +22,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
   bool _requestingDeletion = false;
   final _newPasswordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
+  final _deleteConfirmCtrl = TextEditingController();
   bool _obscureNew = true;
   bool _obscureConfirm = true;
 
@@ -28,6 +30,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
   void dispose() {
     _newPasswordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
+    _deleteConfirmCtrl.dispose();
     super.dispose();
   }
 
@@ -50,8 +53,8 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
       _snack("Passwords don't match", AppColors.error);
       return;
     }
-    if (newPass.length < 6) {
-      _snack('Password must be at least 6 characters', AppColors.error);
+    if (newPass.length < 8) {
+      _snack('Password must be at least 8 characters', AppColors.error);
       return;
     }
     setState(() => _savingPassword = true);
@@ -106,6 +109,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
                   Navigator.pop(ctx);
                   await ref.read(authRepositoryProvider).signOut();
                   ref.invalidate(workspaceProvider);
+                  if (mounted) context.go('/auth');
                 },
               ),
               const SizedBox(height: 10),
@@ -206,6 +210,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
   }
 
   void _showDeleteAccountSheet() {
+    _deleteConfirmCtrl.clear();
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.bgCard,
@@ -238,16 +243,47 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'This creates an auditable deletion request. A trusted backend process should then remove auth, storage, and workspace rows together.',
+                  'This creates an auditable deletion request. A trusted backend process can then remove auth, storage, and workspace rows together.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.t3, height: 1.4),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _deleteConfirmCtrl,
+                  onChanged: (_) => setSheetState(() {}),
+                  textCapitalization: TextCapitalization.characters,
+                  style: const TextStyle(color: AppColors.t1),
+                  decoration: InputDecoration(
+                    hintText: 'Type DELETE to confirm',
+                    hintStyle: const TextStyle(color: AppColors.t3),
+                    filled: true,
+                    fillColor: AppColors.bgInteract,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: AppColors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: AppColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: AppColors.warning),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 22),
                 saveBtn(
                   label: 'Request deletion',
                   color: AppColors.warning,
                   loading: _requestingDeletion,
+                  disabled:
+                      _deleteConfirmCtrl.text.trim().toUpperCase() != 'DELETE',
                   onTap: () async {
+                    if (_deleteConfirmCtrl.text.trim().toUpperCase() !=
+                        'DELETE') {
+                      return;
+                    }
                     setSheetState(() => _requestingDeletion = true);
                     setState(() => _requestingDeletion = true);
                     try {
@@ -257,12 +293,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
                       if (workspaceId == null) return;
                       await ref
                           .read(privacyRepositoryProvider)
-                          .requestAccountDeletion(
-                            workspaceId: workspaceId,
-                            email: ref
-                                .read(authRepositoryProvider)
-                                .currentEmail,
-                          );
+                          .requestAccountDeletion(workspaceId: workspaceId);
                       if (ctx.mounted) Navigator.pop(ctx);
                       if (mounted) {
                         _snack('Deletion request created', AppColors.green);

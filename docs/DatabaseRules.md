@@ -1,6 +1,6 @@
 # Slate Database Rules
 
-Last updated: 2026-05-31
+Last updated: 2026-06-07
 
 ## Source of Truth
 
@@ -59,7 +59,7 @@ All listed live tables currently have RLS enabled.
 
 `workspace_settings`
 
-- Business settings: timezone, address, working hours, revenue target, reminders, booking notice/window, calendar sync flag, invoice defaults.
+- Business settings: timezone, address, working hours, revenue target, reminders, booking notice/window, calendar sync flag, and invoice defaults.
 
 `contacts`
 
@@ -136,7 +136,7 @@ All listed live tables currently have RLS enabled.
 
 Core relationships:
 
-- Workspace has many contacts, services, appointments, tasks, invoices, expenses, notifications, booking requests.
+- Workspace has many contacts, services, appointments, tasks, invoices, expenses, notifications, and booking requests.
 - Contact has many appointments, invoices, tasks.
 - Appointment belongs to workspace, optionally contact and service.
 - Appointment can have linked tasks and linked invoices.
@@ -169,19 +169,21 @@ Helper function:
 Expected rule:
 
 - Authenticated users can access rows only where they are members of the row's workspace.
-- Public profile reads are allowed only for public business profile/service data.
-- Public booking request inserts are allowed only for valid public profiles in manual booking mode.
-- Privileged operations such as final account deletion should happen through trusted backend code, not Flutter.
+- Public profile reads go through the `get-public-profile` Edge Function, which returns only intended public data.
+- Public booking request writes go through the `create-booking-request` Edge Function, which validates handle/service ownership, bounds input, forces `pending`, and rate-limits.
+- Privileged operations such as final account deletion happen through trusted Edge Function code, not Flutter.
 
 ## Live RLS State
 
 Live RLS is enabled on all current public tables.
 
-Known issue:
+Recent cleanup:
 
-The live project still contains some older duplicate policies such as `appointments_policy`, `contacts_policy`, `services_policy`, `tasks_policy`, `invoices_policy`, and `workspace_settings_policy` alongside newer named policies. Supabase performance advisor flags these as multiple permissive policies and auth initplan concerns.
-
-This is not currently blocking local MVP use, but should be cleaned before production.
+- Removed legacy duplicate `*_policy` policies from the live project.
+- Scoped member policies to `authenticated`.
+- Removed direct public table policies for profiles, services, and booking requests; public access now uses Edge Functions.
+- Updated `public.is_workspace_member(...)` to use `(select auth.uid())`.
+- Added missing foreign-key indexes flagged by Supabase advisors.
 
 ## Security Advisor State
 
@@ -193,10 +195,10 @@ This requires Supabase Auth settings and may depend on plan/production stage. It
 
 Performance advisor highlights:
 
-- Unindexed foreign keys on some newer tables.
-- RLS initplan inefficiencies.
-- Multiple permissive policies from legacy policy overlap.
-- Some unused indexes due to low current usage.
+- No remaining unindexed foreign-key warnings after the 2026-05-31 cleanup.
+- No remaining auth initplan warnings after the 2026-05-31 cleanup.
+- No remaining duplicate legacy policy warnings after the 2026-05-31 cleanup.
+- Some indexes are still reported as unused because this is a low-traffic/demo-stage database; keep them when they support foreign keys or planned access patterns.
 
 ## Naming Conventions
 

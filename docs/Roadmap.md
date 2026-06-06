@@ -1,6 +1,6 @@
 # Slate Roadmap
 
-Last updated: 2026-05-31
+Last updated: 2026-06-07
 
 ## Current Milestone: V1 Operating Loop Stabilisation
 
@@ -10,9 +10,9 @@ Make `Client -> Booking -> Work -> Payment -> Repeat` feel coherent, safe, fast,
 
 Current focus:
 
-- Money tracking has just been expanded.
+- Money tracking has just been expanded and linked into booking completion.
 - Expenses table and RLS are live.
-- Next work should finish Money UX and connect it to bookings.
+- Next work should QA the Money/Bookings/request loop and reduce large-file risk.
 
 Dependencies:
 
@@ -25,6 +25,8 @@ Exit criteria:
 
 - Money can be used daily without confusion.
 - Completing a booking can lead to payment state.
+- Linked booking payments refresh cleanly in Money and booking detail.
+- Public booking requests can be confirmed with clear client/service/time/payment details.
 - Dashboard shows the most useful money signals.
 - No known runtime overflows or red screens.
 - Analyze/tests pass.
@@ -37,11 +39,11 @@ Prepare the app for early real users without overbuilding.
 
 Scope:
 
-- Clean Supabase duplicate policies and missing indexes.
+- Keep Supabase advisor output clean and resolve leaked password protection before beta.
 - Add repository tests for core domains.
 - Add widget/smoke tests for auth gate, onboarding gate, shell, dashboard, bookings, tasks, money.
-- Split the largest files enough that future work is safer.
-- Finish booking request confirmation UX.
+- Continue splitting the largest files enough that future work is safer.
+- QA booking request confirmation UX.
 - Improve settings as a real control centre for defaults.
 - Validate public profile request flow end to end.
 - Add manual QA scripts for real-device testing.
@@ -69,7 +71,7 @@ Make Slate safe enough for paying users.
 Scope:
 
 - Enable leaked password protection.
-- Complete account deletion server-side purge.
+- Exercise account deletion server-side purge and document the operational process.
 - Complete data export coverage.
 - Add error/crash reporting.
 - Add CI for analyze/tests.
@@ -158,7 +160,6 @@ Expand only after V1 proves daily retention.
 
 Possible scope:
 
-- AI assistant.
 - Advanced analytics.
 - Teams/staff.
 - Reviews.

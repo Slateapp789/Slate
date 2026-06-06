@@ -33,6 +33,21 @@ class DashboardRepository {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  Future<List<Map<String, dynamic>>> expenseTotals({
+    required String workspaceId,
+    String? expenseDateFrom,
+  }) async {
+    var query = _client
+        .from('expenses')
+        .select('amount')
+        .eq('workspace_id', workspaceId);
+    if (expenseDateFrom != null) {
+      query = query.gte('expense_date', expenseDateFrom);
+    }
+    final rows = await query;
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
   Future<double> revenueTarget(String workspaceId) async {
     final settings = await _client
         .from('workspace_settings')

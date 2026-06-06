@@ -30,6 +30,15 @@ List<String> _stringListFrom(dynamic value) {
   return const [];
 }
 
+String? _cleanDisplayText(dynamic value) {
+  final text = value
+      ?.toString()
+      .replaceAll('[Slate demo]', '')
+      .replaceFirst(RegExp(r'^Demo:\s*'), '')
+      .trim();
+  return text == null || text.isEmpty ? null : text;
+}
+
 class Workspace {
   final String id;
   final String name;
@@ -103,8 +112,8 @@ class Client {
       phone: map['phone'] as String?,
       email: map['email'] as String?,
       address: map['address'] as String?,
-      notes: map['notes'] as String?,
-      importantNotes: map['important_notes'] as String?,
+      notes: _cleanDisplayText(map['notes']),
+      importantNotes: _cleanDisplayText(map['important_notes']),
       status: map['status'] as String? ?? 'active',
       preferredContactMethod:
           map['preferred_contact_method'] as String? ?? 'phone',
@@ -163,7 +172,7 @@ class Service {
       name: map['name'] as String? ?? 'Service',
       durationMins: _intFrom(map['duration_mins'], 60),
       price: _doubleFrom(map['price']),
-      description: map['description'] as String?,
+      description: _cleanDisplayText(map['description']),
       showOnProfile: map['show_on_profile'] as bool? ?? true,
     );
   }
@@ -227,7 +236,7 @@ class Appointment {
       endTime: _dateTimeFrom(map['end_time']),
       status: map['status'] as String? ?? 'scheduled',
       price: _doubleFrom(map['price']),
-      notes: map['notes'] as String?,
+      notes: _cleanDisplayText(map['notes']),
       location: map['location'] as String?,
       recurrenceRule: map['recurrence_rule'] as String?,
       clientName: contact?['name'] as String?,
@@ -255,6 +264,7 @@ class Payment {
   final String id;
   final String workspaceId;
   final String? contactId;
+  final String? appointmentId;
   final String number;
   final String status;
   final DateTime issueDate;
@@ -268,6 +278,7 @@ class Payment {
     required this.id,
     required this.workspaceId,
     this.contactId,
+    this.appointmentId,
     required this.number,
     required this.status,
     required this.issueDate,
@@ -284,6 +295,7 @@ class Payment {
       id: map['id'] as String,
       workspaceId: map['workspace_id'] as String? ?? '',
       contactId: map['contact_id'] as String?,
+      appointmentId: map['appointment_id'] as String?,
       number:
           map['invoice_number'] as String? ??
           map['payment_number'] as String? ??
@@ -295,7 +307,7 @@ class Payment {
       dueDate: _dateTimeFrom(map['due_date']),
       total: _doubleFrom(map['total']),
       amountPaid: _doubleFrom(map['amount_paid']),
-      notes: map['notes'] as String?,
+      notes: _cleanDisplayText(map['notes']),
       clientName: contact?['name'] as String?,
     );
   }
@@ -304,6 +316,7 @@ class Payment {
     'id': id,
     'workspace_id': workspaceId,
     'contact_id': contactId,
+    'appointment_id': appointmentId,
     'invoice_number': number,
     'status': status,
     'issue_date': issueDate.toIso8601String().split('T').first,
@@ -343,7 +356,7 @@ class Expense {
       expenseDate:
           _dateTimeFrom(map['expense_date']) ??
           DateTime.fromMillisecondsSinceEpoch(0),
-      notes: map['notes'] as String?,
+      notes: _cleanDisplayText(map['notes']),
       createdAt: _dateTimeFrom(map['created_at']),
     );
   }
@@ -393,7 +406,7 @@ class SlateTask {
     return SlateTask(
       id: map['id'] as String,
       workspaceId: map['workspace_id'] as String? ?? '',
-      title: map['title'] as String? ?? '',
+      title: _cleanDisplayText(map['title']) ?? '',
       status: map['status'] as String? ?? 'open',
       priority: map['priority'] as String? ?? 'medium',
       reminderTiming: map['reminder_timing'] as String? ?? 'none',
@@ -583,7 +596,7 @@ class BookingRequest {
           ? null
           : _doubleFrom(service?['price']),
       preferredTimeText: map['preferred_time_text'] as String?,
-      message: map['message'] as String?,
+      message: _cleanDisplayText(map['message']),
       status: map['status'] as String? ?? 'pending',
       createdAt: _dateTimeFrom(map['created_at']),
     );
@@ -628,8 +641,8 @@ class SlateNotification {
       id: map['id'] as String,
       workspaceId: map['workspace_id'] as String? ?? '',
       type: map['type'] as String? ?? 'system',
-      title: map['title'] as String? ?? '',
-      body: map['body'] as String? ?? '',
+      title: _cleanDisplayText(map['title']) ?? '',
+      body: _cleanDisplayText(map['body']) ?? '',
       deepLink: map['deep_link'] as String?,
       read: map['read'] as bool? ?? false,
       createdAt: _dateTimeFrom(map['created_at']),

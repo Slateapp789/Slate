@@ -10,9 +10,9 @@ set search_path = public
 as $$
   select exists (
     select 1
-    from workspace_members
+    from public.workspace_members
     where workspace_id = target_workspace_id
-      and user_id = auth.uid()
+      and user_id = (select auth.uid())
   );
 $$;
 
@@ -38,15 +38,18 @@ alter table if exists notification_preferences enable row level security;
 alter table if exists push_tokens enable row level security;
 alter table if exists calendar_sync_accounts enable row level security;
 alter table if exists account_deletion_requests enable row level security;
+alter table if exists account_deletion_audit enable row level security;
 
 drop policy if exists "Members can read workspaces" on workspaces;
 create policy "Members can read workspaces"
 on workspaces for select
+to authenticated
 using (public.is_workspace_member(id));
 
 drop policy if exists "Members can update workspaces" on workspaces;
 create policy "Members can update workspaces"
 on workspaces for update
+to authenticated
 using (public.is_workspace_member(id))
 with check (public.is_workspace_member(id));
 
@@ -54,21 +57,21 @@ drop policy if exists "Authenticated users can create workspaces" on workspaces;
 create policy "Authenticated users can create workspaces"
 on workspaces for insert
 to authenticated
-with check (auth.uid() is not null);
+with check ((select auth.uid()) is not null);
 
 drop policy if exists "Members can read workspace members" on workspace_members;
 drop policy if exists "Users can read their own workspace membership" on workspace_members;
 create policy "Users can read their own workspace membership"
 on workspace_members for select
 to authenticated
-using (user_id = auth.uid());
+using (user_id = (select auth.uid()));
 
 drop policy if exists "Users can create their first workspace membership" on workspace_members;
 create policy "Users can create their first workspace membership"
 on workspace_members for insert
 to authenticated
 with check (
-  user_id = auth.uid()
+  user_id = (select auth.uid())
   and (
     public.is_workspace_member(workspace_id)
     or not exists (
@@ -82,129 +85,132 @@ with check (
 drop policy if exists "Members can manage workspace settings" on workspace_settings;
 create policy "Members can manage workspace settings"
 on workspace_settings for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can manage contacts" on contacts;
 create policy "Members can manage contacts"
 on contacts for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can manage services" on services;
 create policy "Members can manage services"
 on services for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Public can read visible services" on services;
-create policy "Public can read visible services"
-on services for select
-using (
-  show_on_profile = true
-  and exists (
-    select 1
-    from business_profiles
-    where business_profiles.workspace_id = services.workspace_id
-      and business_profiles.handle is not null
-  )
-);
+-- Public service reads are served by the get-public-profile Edge Function.
 
 drop policy if exists "Members can manage appointments" on appointments;
 create policy "Members can manage appointments"
 on appointments for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can manage invoices" on invoices;
 create policy "Members can manage invoices"
 on invoices for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can manage invoice line items" on invoice_line_items;
 create policy "Members can manage invoice line items"
 on invoice_line_items for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can manage expenses" on expenses;
 create policy "Members can manage expenses"
 on expenses for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can manage tasks" on tasks;
 create policy "Members can manage tasks"
 on tasks for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can manage task checklist items" on task_checklist_items;
 create policy "Members can manage task checklist items"
 on task_checklist_items for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can manage business profiles" on business_profiles;
 create policy "Members can manage business profiles"
 on business_profiles for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Public can read business profiles" on business_profiles;
-create policy "Public can read business profiles"
-on business_profiles for select
-using (handle is not null and handle <> '');
+-- Public profile reads are served by the get-public-profile Edge Function.
 
 drop policy if exists "Members can manage booking requests" on booking_requests;
 create policy "Members can manage booking requests"
 on booking_requests for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Public can create booking requests" on booking_requests;
-create policy "Public can create booking requests"
-on booking_requests for insert
-with check (
-  exists (
-    select 1
-    from business_profiles
-    where business_profiles.workspace_id = booking_requests.workspace_id
-      and business_profiles.booking_mode = 'manual'
-  )
-);
+-- Public booking requests are created by the create-booking-request Edge Function.
 
 drop policy if exists "Members can manage notifications" on notifications;
 create policy "Members can manage notifications"
 on notifications for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can manage notification preferences" on notification_preferences;
 create policy "Members can manage notification preferences"
 on notification_preferences for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can manage push tokens" on push_tokens;
 create policy "Members can manage push tokens"
 on push_tokens for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can manage calendar sync accounts" on calendar_sync_accounts;
 create policy "Members can manage calendar sync accounts"
 on calendar_sync_accounts for all
+to authenticated
 using (public.is_workspace_member(workspace_id))
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can create deletion requests" on account_deletion_requests;
 create policy "Members can create deletion requests"
 on account_deletion_requests for insert
+to authenticated
 with check (public.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can read deletion requests" on account_deletion_requests;
 create policy "Members can read deletion requests"
 on account_deletion_requests for select
+to authenticated
 using (public.is_workspace_member(workspace_id));
+
+drop policy if exists "No client access to account deletion audit" on account_deletion_audit;
+create policy "No client access to account deletion audit"
+on account_deletion_audit for all
+to anon, authenticated
+using (false)
+with check (false);

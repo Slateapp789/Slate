@@ -116,12 +116,23 @@ class AppointmentHeroCard extends StatelessWidget {
                         letterSpacing: 0,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    const Icon(
-                      LucideIcons.externalLink,
-                      size: 14,
-                      color: AppColors.green,
-                    ),
+                    if (contactId != null) ...[
+                      const SizedBox(width: 8),
+                      const Text(
+                        'View client',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.green,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        LucideIcons.chevronRight,
+                        size: 14,
+                        color: AppColors.green,
+                      ),
+                    ],
                   ],
                 ),
               ),

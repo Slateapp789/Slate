@@ -1,12 +1,12 @@
 # Slate UI Design System
 
-Last updated: 2026-05-31
+Last updated: 2026-06-04
 
 ## Design Intent
 
 Slate should feel premium, calm, modern, mobile-first, and high-trust. It is a working tool for people running real businesses from their phone.
 
-Current design direction has moved away from very dark charcoal and away from pastel experiments. The live code now uses a neutral northbound grey palette with soft contrast, glass surfaces, and a pill navigation bar.
+Current design direction is dark graphite with a restrained lime accent. Slate should feel operational and premium: quiet surfaces, clear hierarchy, and colour used sparingly so important actions and statuses are obvious.
 
 ## Current Colour System
 
@@ -14,31 +14,32 @@ Source: `lib/core/theme/app_theme.dart`
 
 Current palette:
 
-- Background: `AppColors.bg` `#D6D5D1`
-- Card: `AppColors.bgCard` `#E9E8E4`
-- Raised: `AppColors.bgRaised` `#F5F4F0`
-- Interactive: `AppColors.bgInteract` `#C9C8C3`
-- Border: `AppColors.border` `#B8B7B1`
-- Strong border: `AppColors.borderStrong` `#85847F`
-- Primary text: `AppColors.t1` `#242424`
+- Background: `AppColors.bg` `#141713`
+- Card: `AppColors.bgCard` `#1D211C`
+- Raised: `AppColors.bgRaised` `#282D25`
+- Interactive: `AppColors.bgInteract` `#30372D`
+- Border: `AppColors.border` `#3E463A`
+- Strong border: `AppColors.borderStrong` `#68735F`
+- Primary text: `AppColors.t1` `#F3F5EE`
 - Secondary text: `AppColors.t2`
 - Tertiary text: `AppColors.t3`
 - Disabled/faint text: `AppColors.t4`
 
 Accent:
 
-- Current accent is neutral slate: `AppColors.slate` / `AppColors.green` `#5F5F5B`.
+- Primary accent is lime: `AppColors.accentPrimary` / `AppColors.slate` / `AppColors.green` `#B8F24B`.
+- Reserve the bright accent for the main CTA on a screen or sheet and active navigation/selection.
 - Green/violet aliases remain in code for compatibility and should be gradually renamed only when safe.
 
 Semantic:
 
-- Success: muted grey-green.
+- Success: muted green (`AppColors.statusSuccess`), calmer than the primary accent.
 - Warning: muted warm grey.
 - Error: muted red.
 
 Rule:
 
-Avoid strong colour noise. Slate should use different shades of grey for hierarchy, with semantic colour only when it truly communicates state.
+Avoid strong colour noise. Lime means "primary action or active place"; success, warning, and error colours communicate state and should not compete with primary actions.
 
 ## Typography
 
@@ -209,7 +210,7 @@ Rules:
 
 ## Current Visual Debt
 
-- Some design tokens still have legacy names (`green`, `violet`) even though visual direction is neutral grey.
+- Some design tokens still have legacy names (`green`, `violet`) even though the intended role is now `accentPrimary`.
 - Large screens still contain local UI variants that should be consolidated.
 - Money and Bookings have evolved quickly and need a final consistency pass.
-- Current palette is intentionally grey-led; future colour experiments should be done as a deliberate theme pass, not piecemeal.
+- Current palette is intentionally dark graphite with a single bright accent; future colour experiments should be done as a deliberate theme pass, not piecemeal.

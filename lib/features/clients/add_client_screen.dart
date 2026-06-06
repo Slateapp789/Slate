@@ -27,6 +27,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
   String _preferredContactMethod = 'phone';
   DateTime? _birthday;
   bool _saving = false;
+  bool _moreDetailsExpanded = false;
 
   @override
   void dispose() {
@@ -202,33 +203,48 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                           setState(() => _preferredContactMethod = value),
                     ),
                     const SizedBox(height: 20),
-                    _sectionTitle('CRM context'),
-                    _field(
-                      label: 'SOURCE',
-                      controller: _sourceController,
-                      hint: 'Instagram, referral, walk-in, website...',
-                    ),
-                    const SizedBox(height: 12),
-                    _dateTile(),
-                    const SizedBox(height: 12),
-                    _field(
-                      label: 'TAGS',
-                      controller: _tagsController,
-                      hint: 'VIP, monthly, mobile, colour',
-                    ),
-                    const SizedBox(height: 12),
-                    _field(
-                      label: 'NOTES',
-                      controller: _notesController,
-                      hint: 'Preferences, booking context, useful details...',
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 12),
-                    _field(
-                      label: 'IMPORTANT',
-                      controller: _importantNotesController,
-                      hint: 'Allergies, access notes, must-know details...',
-                      maxLines: 2,
+                    SlateDisclosure(
+                      title: 'Add more details',
+                      subtitle: 'Source, birthday, tags and notes',
+                      icon: LucideIcons.listPlus,
+                      expanded: _moreDetailsExpanded,
+                      onToggle: () => setState(
+                        () => _moreDetailsExpanded = !_moreDetailsExpanded,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _field(
+                            label: 'SOURCE',
+                            controller: _sourceController,
+                            hint: 'Instagram, referral, walk-in, website...',
+                          ),
+                          const SizedBox(height: 12),
+                          _dateTile(),
+                          const SizedBox(height: 12),
+                          _field(
+                            label: 'TAGS',
+                            controller: _tagsController,
+                            hint: 'VIP, monthly, mobile, colour',
+                          ),
+                          const SizedBox(height: 12),
+                          _field(
+                            label: 'NOTES',
+                            controller: _notesController,
+                            hint:
+                                'Preferences, booking context, useful details...',
+                            maxLines: 3,
+                          ),
+                          const SizedBox(height: 12),
+                          _field(
+                            label: 'IMPORTANT',
+                            controller: _importantNotesController,
+                            hint:
+                                'Allergies, access notes, must-know details...',
+                            maxLines: 2,
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 32),
                     SizedBox(

@@ -8,19 +8,76 @@ import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
+import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
 import 'add_payment_screen.dart';
+import 'widgets/money_summary_widgets.dart';
 import 'widgets/payment_cards.dart';
 
+part 'finance_screen_widgets.dart';
+
+enum FinanceInitialFocus { top, followUps }
+
 class FinanceScreen extends ConsumerStatefulWidget {
-  const FinanceScreen({super.key});
+  final FinanceInitialFocus initialFocus;
+
+  const FinanceScreen({super.key, this.initialFocus = FinanceInitialFocus.top});
 
   @override
   ConsumerState<FinanceScreen> createState() => _FinanceScreenState();
 }
 
 class _FinanceScreenState extends ConsumerState<FinanceScreen> {
+  FinancePeriod _period = FinancePeriod.week;
+  DateTime? _customStart;
+  DateTime? _customEnd;
+  final _scrollController = ScrollController();
+  final _followUpsKey = GlobalKey();
+  bool _didApplyInitialFocus = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _applyInitialFocus());
+  }
+
+  @override
+  void didUpdateWidget(covariant FinanceScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialFocus != oldWidget.initialFocus &&
+        widget.initialFocus == FinanceInitialFocus.followUps) {
+      _didApplyInitialFocus = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyInitialFocus());
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _applyInitialFocus() {
+    if (!mounted ||
+        _didApplyInitialFocus ||
+        widget.initialFocus != FinanceInitialFocus.followUps) {
+      return;
+    }
+    final targetContext = _followUpsKey.currentContext;
+    if (targetContext == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyInitialFocus());
+      return;
+    }
+    _didApplyInitialFocus = true;
+    Scrollable.ensureVisible(
+      targetContext,
+      duration: AppMotion.standard,
+      curve: AppMotion.curve,
+      alignment: 0.08,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final invoices = ref.watch(invoicesProvider);
@@ -40,6 +97,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           },
           color: AppColors.green,
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.pageX,
               AppSpacing.lg,
@@ -78,12 +136,52 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 loading: () => const SlateLoadingBlock(height: 240, radius: 22),
                 error: (_, __) =>
                     const SlateErrorState(message: 'Could not load finances'),
-                data: (data) => Column(
-                  children: [
-                    _WeeklyTargetCard(summary: data),
-                    const SizedBox(height: 12),
-                    _MoneySnapshot(summary: data),
-                  ],
+                data: (data) => invoices.when(
+                  loading: () =>
+                      const SlateLoadingBlock(height: 240, radius: 22),
+                  error: (_, __) =>
+                      const SlateErrorState(message: 'Could not load payments'),
+                  data: (payments) => expenses.when(
+                    loading: () =>
+                        const SlateLoadingBlock(height: 240, radius: 22),
+                    error: (_, __) => const SlateErrorState(
+                      message: 'Could not load expenses',
+                    ),
+                    data: (expenseRows) {
+                      final range = _selectedRange();
+                      final periodSummary = PeriodMoneySummary.from(
+                        payments: payments,
+                        expenses: expenseRows,
+                        range: range,
+                      );
+                      return Column(
+                        children: [
+                          _WeeklyTargetCard(
+                            summary: data,
+                            onEditTarget: () => _showTargetSheet(context, data),
+                          ),
+                          const SizedBox(height: 12),
+                          MoneyPeriodSwitcher(
+                            selected: _period,
+                            customLabel: _period == FinancePeriod.custom
+                                ? range.label
+                                : null,
+                            onSelected: (period) async {
+                              if (period == FinancePeriod.custom) {
+                                await _showCustomPeriodSheet(context);
+                                return;
+                              }
+                              setState(() => _period = period);
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          MoneySnapshot(summary: periodSummary),
+                          const SizedBox(height: 12),
+                          ExpenseCategorySummary(summary: periodSummary),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 22),
@@ -92,37 +190,67 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 error: (_, __) =>
                     const SlateErrorState(message: 'Could not load payments'),
                 data: (payments) {
-                  final followUps =
-                      payments.where((p) => p.status != 'paid').toList()
-                        ..sort((a, b) {
-                          const order = {'overdue': 0, 'sent': 1, 'pending': 2};
-                          final aO = order[a.status] ?? 3;
-                          final bO = order[b.status] ?? 3;
-                          if (aO != bO) return aO.compareTo(bO);
-                          return (a.dueDate ?? a.issueDate).compareTo(
+                  final overdue =
+                      payments
+                          .where(
+                            (p) => moneyStatusFor(p) == MoneyStatus.overdue,
+                          )
+                          .toList()
+                        ..sort(
+                          (a, b) => (a.dueDate ?? a.issueDate).compareTo(
                             b.dueDate ?? b.issueDate,
-                          );
-                        });
+                          ),
+                        );
+                  final upcoming =
+                      payments
+                          .where((p) => moneyStatusFor(p) == MoneyStatus.unpaid)
+                          .toList()
+                        ..sort(
+                          (a, b) => (a.dueDate ?? a.issueDate).compareTo(
+                            b.dueDate ?? b.issueDate,
+                          ),
+                        );
                   if (payments.isEmpty) return _emptyState(context);
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SlateSectionHeader(label: 'Needs follow-up'),
+                      KeyedSubtree(
+                        key: _followUpsKey,
+                        child: const SlateSectionHeader(
+                          label: 'Money to collect',
+                        ),
+                      ),
                       const SizedBox(height: 8),
-                      if (followUps.isEmpty)
+                      if (overdue.isEmpty && upcoming.isEmpty)
                         const _QuietMoneyState()
-                      else
-                        ...followUps
-                            .take(4)
-                            .map(
-                              (p) => PaymentCard(
-                                payment: p,
-                                onTap: () =>
-                                    _showPaymentActionsSheet(context, p),
-                                onDelete: () =>
-                                    _confirmDeletePayment(context, p),
-                              ),
+                      else ...[
+                        if (overdue.isNotEmpty) ...[
+                          const _MoneyCollectGroupHeader(label: 'Overdue'),
+                          ...overdue.map(
+                            (p) => PaymentCard(
+                              payment: p,
+                              onTap: () => _showPaymentActionsSheet(context, p),
+                              onDelete: () => _confirmDeletePayment(context, p),
                             ),
+                          ),
+                        ],
+                        if (upcoming.isNotEmpty) ...[
+                          const _MoneyCollectGroupHeader(
+                            label: 'Due soon / Upcoming',
+                          ),
+                          ...upcoming
+                              .take(4)
+                              .map(
+                                (p) => PaymentCard(
+                                  payment: p,
+                                  onTap: () =>
+                                      _showPaymentActionsSheet(context, p),
+                                  onDelete: () =>
+                                      _confirmDeletePayment(context, p),
+                                ),
+                              ),
+                        ],
+                      ],
                       const SizedBox(height: 22),
                       const SlateSectionHeader(label: 'Recent activity'),
                       const SizedBox(height: 8),
@@ -210,6 +338,13 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     ref.invalidate(clientCrmRecordsProvider);
   }
 
+  void _refreshPayment(Payment payment) {
+    _refreshMoney();
+    if (payment.appointmentId != null) {
+      ref.invalidate(appointmentPaymentsProvider(payment.appointmentId!));
+    }
+  }
+
   Widget _activityList(List<Payment> payments, List<Expense> expenses) {
     final activities = <_MoneyActivity>[
       ...payments.map(
@@ -241,18 +376,267 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         final expense = activity.expense!;
         return _ExpenseRow(
           expense: expense,
+          onTap: () => _showExpenseSheet(context, expense: expense),
           onDelete: () => _confirmDeleteExpense(context, expense),
         );
       }).toList(),
     );
   }
 
-  void _showExpenseSheet(BuildContext context) {
-    final amountController = TextEditingController();
-    final notesController = TextEditingController();
-    var category = 'Materials';
-    var date = DateTime.now();
+  MoneyPeriodRange _selectedRange() {
+    final now = DateTime.now();
+    switch (_period) {
+      case FinancePeriod.week:
+        final start = startOfWeek(now);
+        return MoneyPeriodRange(
+          start: start,
+          end: start.add(const Duration(days: 7)),
+          label: 'This week',
+        );
+      case FinancePeriod.month:
+        final start = DateTime(now.year, now.month, 1);
+        return MoneyPeriodRange(
+          start: start,
+          end: DateTime(now.year, now.month + 1, 1),
+          label: 'This month',
+        );
+      case FinancePeriod.custom:
+        final start = _customStart ?? DateTime(now.year, now.month, 1);
+        final end = _customEnd ?? now;
+        return MoneyPeriodRange(
+          start: DateTime(start.year, start.month, start.day),
+          end: DateTime(
+            end.year,
+            end.month,
+            end.day,
+          ).add(const Duration(days: 1)),
+          label: '${_formatDate(start)} - ${_formatDate(end)}',
+        );
+    }
+  }
+
+  Future<void> _showCustomPeriodSheet(BuildContext context) async {
+    var start =
+        _customStart ?? DateTime.now().subtract(const Duration(days: 29));
+    var end = _customEnd ?? DateTime.now();
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          Future<void> pickStart() async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: start,
+              firstDate: DateTime.now().subtract(const Duration(days: 730)),
+              lastDate: end,
+            );
+            if (picked != null) setSheetState(() => start = picked);
+          }
+
+          Future<void> pickEnd() async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: end,
+              firstDate: start,
+              lastDate: DateTime.now().add(const Duration(days: 365)),
+            );
+            if (picked != null) setSheetState(() => end = picked);
+          }
+
+          return SlateSheetFrame(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Custom period',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.t1,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DatePickTile(
+                        label: 'From',
+                        value: _formatDate(start),
+                        onTap: pickStart,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DatePickTile(
+                        label: 'To',
+                        value: _formatDate(end),
+                        onTap: pickEnd,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                SlateButton(
+                  label: 'Apply Period',
+                  icon: LucideIcons.calendarRange,
+                  onPressed: () {
+                    setState(() {
+                      _period = FinancePeriod.custom;
+                      _customStart = start;
+                      _customEnd = end;
+                    });
+                    Navigator.pop(ctx);
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showTargetSheet(BuildContext context, FinanceSummary summary) {
+    final monthlyController = TextEditingController(
+      text: summary.monthlyTarget > 0
+          ? summary.monthlyTarget.toStringAsFixed(0)
+          : '',
+    );
+    final weeklyController = TextEditingController(
+      text: summary.weeklyTarget > 0
+          ? summary.weeklyTarget.toStringAsFixed(0)
+          : '',
+    );
+    var mode = 'monthly';
     var saving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          Future<void> save() async {
+            final raw = mode == 'monthly'
+                ? monthlyController.text.trim()
+                : weeklyController.text.trim();
+            final value = double.tryParse(raw);
+            if (value == null || value < 0) return;
+            final monthlyTarget = mode == 'monthly' ? value : value * 4.345;
+            setSheetState(() => saving = true);
+            final workspaceId = await ref.read(workspaceIdProvider.future);
+            if (workspaceId == null) return;
+            try {
+              await ref.read(workspaceSettingsRepositoryProvider).update(
+                workspaceId,
+                {'revenue_target': monthlyTarget},
+              );
+              ref.invalidate(workspaceSettingsProvider);
+              ref.invalidate(financeSummaryProvider);
+              ref.invalidate(dashboardRevenueProvider);
+              if (context.mounted) Navigator.pop(ctx);
+            } catch (error) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Could not update target: $error'),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            } finally {
+              if (context.mounted) setSheetState(() => saving = false);
+            }
+          }
+
+          return SlateSheetFrame(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Money target',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.t1,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ModePills(
+                    selected: mode,
+                    options: const {'monthly': 'Monthly', 'weekly': 'Weekly'},
+                    onSelected: (value) => setSheetState(() => mode = value),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: mode == 'monthly'
+                        ? monthlyController
+                        : weeklyController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    style: const TextStyle(
+                      color: AppColors.t1,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                    ),
+                    decoration: InputDecoration(
+                      prefixText: '£ ',
+                      hintText: '0',
+                      labelText: mode == 'monthly'
+                          ? 'Monthly target'
+                          : 'Weekly target',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    mode == 'monthly'
+                        ? 'Slate will show a weekly target of roughly one quarter of this.'
+                        : 'Slate will save this as a monthly target for the rest of the app.',
+                    style: const TextStyle(fontSize: 12, color: AppColors.t3),
+                  ),
+                  const SizedBox(height: 18),
+                  SlateButton(
+                    label: saving ? 'Saving...' : 'Save Target',
+                    icon: LucideIcons.target,
+                    onPressed: saving ? null : save,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    ).whenComplete(() {
+      monthlyController.dispose();
+      weeklyController.dispose();
+    });
+  }
+
+  void _showExpenseSheet(BuildContext context, {Expense? expense}) {
+    final amountController = TextEditingController(
+      text: expense == null
+          ? ''
+          : expense.amount.toStringAsFixed(
+              expense.amount.truncateToDouble() == expense.amount ? 0 : 2,
+            ),
+    );
+    final notesController = TextEditingController(text: expense?.notes ?? '');
+    var category = expense?.category ?? 'Materials';
+    var date = expense?.expenseDate ?? DateTime.now();
+    var saving = false;
+    final editing = expense != null;
 
     showModalBottomSheet(
       context: context,
@@ -278,15 +662,27 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             final workspaceId = await ref.read(workspaceIdProvider.future);
             if (workspaceId == null) return;
             try {
-              await ref
-                  .read(expensesRepositoryProvider)
-                  .create(
-                    workspaceId: workspaceId,
-                    amount: amount,
-                    category: category,
-                    date: date,
-                    notes: notesController.text,
-                  );
+              if (editing) {
+                await ref
+                    .read(expensesRepositoryProvider)
+                    .update(
+                      expenseId: expense.id,
+                      amount: amount,
+                      category: category,
+                      date: date,
+                      notes: notesController.text,
+                    );
+              } else {
+                await ref
+                    .read(expensesRepositoryProvider)
+                    .create(
+                      workspaceId: workspaceId,
+                      amount: amount,
+                      category: category,
+                      date: date,
+                      notes: notesController.text,
+                    );
+              }
               _refreshMoney();
               if (context.mounted) Navigator.pop(ctx);
             } catch (error) {
@@ -313,9 +709,9 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Add expense',
-                    style: TextStyle(
+                  Text(
+                    editing ? 'Edit expense' : 'Add expense',
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
                       color: AppColors.t1,
@@ -419,7 +815,11 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                   ),
                   const SizedBox(height: 16),
                   SlateButton(
-                    label: saving ? 'Saving...' : 'Save Expense',
+                    label: saving
+                        ? 'Saving...'
+                        : editing
+                        ? 'Save Expense'
+                        : 'Add Expense',
                     icon: LucideIcons.receipt,
                     onPressed: saving ? null : save,
                   ),
@@ -548,6 +948,41 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                           ),
                         ),
                       ],
+                      if (payment.appointmentId != null) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.bg.withValues(alpha: 0.42),
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            border: Border.all(
+                              color: AppColors.t1.withValues(alpha: 0.08),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                LucideIcons.calendarCheck,
+                                size: 13,
+                                color: AppColors.t2,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Linked to booking',
+                                style: TextStyle(
+                                  color: AppColors.t2,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 10),
                       Text(
                         '£${amount.toStringAsFixed(0)}',
@@ -587,9 +1022,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                           builder: (_) => AddPaymentScreen(payment: payment),
                         ),
                       );
-                      ref.invalidate(invoicesProvider);
-                      ref.invalidate(dashboardRevenueProvider);
-                      ref.invalidate(clientCrmRecordsProvider);
+                      _refreshPayment(payment);
                     });
                   },
                 ),
@@ -631,9 +1064,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               '£${amount.toStringAsFixed(0)} from ${payment.clientName ?? 'a client'} is now paid.',
           deepLink: '/payments',
         );
-    ref.invalidate(invoicesProvider);
-    ref.invalidate(dashboardRevenueProvider);
-    ref.invalidate(clientCrmRecordsProvider);
+    _refreshPayment(payment);
     ref.invalidate(notificationsProvider);
     ref.invalidate(unreadNotificationsProvider);
     if (context.mounted) {
@@ -683,9 +1114,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               onPressed: () async {
                 Navigator.pop(ctx);
                 await ref.read(paymentsRepositoryProvider).delete(payment.id);
-                ref.invalidate(invoicesProvider);
-                ref.invalidate(dashboardRevenueProvider);
-                ref.invalidate(clientCrmRecordsProvider);
+                _refreshPayment(payment);
               },
             ),
             const SizedBox(height: 10),
@@ -734,474 +1163,5 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       'Dec',
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-  }
-}
-
-class _HeaderAction extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _HeaderAction({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.slateLight,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: AppColors.t1.withValues(alpha: 0.14)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.panelInk, size: 14),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: AppColors.panelInk,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _WeeklyTargetCard extends StatelessWidget {
-  final FinanceSummary summary;
-
-  const _WeeklyTargetCard({required this.summary});
-
-  @override
-  Widget build(BuildContext context) {
-    final hasTarget = summary.weeklyTarget > 0;
-    final progress = summary.weeklyProgress;
-    final left = (summary.weeklyTarget - summary.thisWeekPaid).clamp(
-      0,
-      double.infinity,
-    );
-    return SlateSurface(
-      padding: const EdgeInsets.all(22),
-      color: AppColors.panelSoft,
-      borderColor: AppColors.panelSoftRaised,
-      radius: AppRadius.lg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'WEEKLY TARGET',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              color: AppColors.panelMuted,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '£${summary.thisWeekPaid.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 40,
-                  height: 1,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.panelInk,
-                  letterSpacing: 0,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  hasTarget
-                      ? '/ £${summary.weeklyTarget.toStringAsFixed(0)}'
-                      : 'this week',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.panelMuted,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            child: LinearProgressIndicator(
-              minHeight: 8,
-              value: hasTarget ? progress : 0,
-              backgroundColor: AppColors.panelFaint,
-              valueColor: const AlwaysStoppedAnimation(AppColors.panelInk),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _FinanceComparePill(
-                  label: 'vs last week',
-                  value: summary.weekDelta,
-                  percent: summary.weekDeltaPercent,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _TargetLeftPill(
-                  label: hasTarget ? 'left' : 'target',
-                  value: hasTarget
-                      ? '£${left.toStringAsFixed(0)}'
-                      : 'Set monthly target',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MoneySnapshot extends StatelessWidget {
-  final FinanceSummary summary;
-
-  const _MoneySnapshot({required this.summary});
-
-  @override
-  Widget build(BuildContext context) {
-    return SlateSurface(
-      padding: const EdgeInsets.all(16),
-      radius: AppRadius.lg,
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _MoneyMetric(
-                  label: 'Paid',
-                  value: summary.thisWeekPaid,
-                  icon: LucideIcons.checkCircle2,
-                ),
-              ),
-              Expanded(
-                child: _MoneyMetric(
-                  label: 'Unpaid',
-                  value: summary.unpaid,
-                  icon: LucideIcons.clock3,
-                  danger: summary.overdue > 0,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _MoneyMetric(
-                  label: 'Expenses',
-                  value: summary.thisWeekExpenses,
-                  icon: LucideIcons.receipt,
-                  muted: summary.thisWeekExpenses == 0,
-                ),
-              ),
-              Expanded(
-                child: _MoneyMetric(
-                  label: 'Net',
-                  value: summary.thisWeekNet,
-                  icon: LucideIcons.trendingUp,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MoneyMetric extends StatelessWidget {
-  final String label;
-  final double value;
-  final IconData icon;
-  final bool danger;
-  final bool muted;
-
-  const _MoneyMetric({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.danger = false,
-    this.muted = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = danger ? AppColors.error : AppColors.t1;
-    return Row(
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color.withValues(alpha: 0.72), size: 16),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '£${value.toStringAsFixed(0)}',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  color: muted ? AppColors.t3 : color,
-                ),
-              ),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t3,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FinanceComparePill extends StatelessWidget {
-  final String label;
-  final double value;
-  final double percent;
-
-  const _FinanceComparePill({
-    required this.label,
-    required this.value,
-    required this.percent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final positive = value >= 0;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.bgRaised.withValues(alpha: 0.50),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              color: AppColors.panelMuted,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${positive ? '+' : '-'}£${value.abs().toStringAsFixed(0)} · ${(percent.abs() * 100).toStringAsFixed(0)}%',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: positive ? AppColors.success : AppColors.error,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TargetLeftPill extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _TargetLeftPill({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.bgRaised.withValues(alpha: 0.50),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              color: AppColors.panelMuted,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: AppColors.panelInk,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuietMoneyState extends StatelessWidget {
-  const _QuietMoneyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return SlateSurface(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.10),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              LucideIcons.check,
-              color: AppColors.success,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'No unpaid money needs chasing.',
-              style: TextStyle(
-                color: AppColors.t2,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ExpenseRow extends StatelessWidget {
-  final Expense expense;
-  final VoidCallback onDelete;
-
-  const _ExpenseRow({required this.expense, required this.onDelete});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onLongPress: onDelete,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: AppColors.t1.withValues(alpha: 0.06)),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: AppColors.t1.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                LucideIcons.receipt,
-                size: 16,
-                color: AppColors.t2,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    expense.category,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.t1,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    expense.notes?.isNotEmpty == true
-                        ? expense.notes!
-                        : 'Expense · ${expense.expenseDate.day}/${expense.expenseDate.month}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: AppColors.t3),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              '-£${expense.amount.toStringAsFixed(0)}',
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-                color: AppColors.t1,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MoneyActivity {
-  final Payment? payment;
-  final Expense? expense;
-  final DateTime date;
-
-  const _MoneyActivity._({this.payment, this.expense, required this.date});
-
-  factory _MoneyActivity.payment(Payment payment, DateTime date) {
-    return _MoneyActivity._(payment: payment, date: date);
-  }
-
-  factory _MoneyActivity.expense(Expense expense, DateTime date) {
-    return _MoneyActivity._(expense: expense, date: date);
   }
 }
