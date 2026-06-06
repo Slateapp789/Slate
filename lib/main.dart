@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -25,6 +26,7 @@ import 'shared/widgets/slate_ui.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
   SupabaseConfig.validate();
   await Supabase.initialize(
     url: SupabaseConfig.supabaseUrl,
@@ -48,7 +50,6 @@ class SlateApp extends ConsumerWidget {
 }
 
 final _router = GoRouter(
-  initialLocation: '/',
   routes: [
     GoRoute(path: '/', builder: (context, state) => const AuthGate()),
     GoRoute(path: '/auth', builder: (context, state) => const AuthScreen()),
