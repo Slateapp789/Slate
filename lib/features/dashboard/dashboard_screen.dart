@@ -217,87 +217,66 @@ class _DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                greeting,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.t1,
-                  letterSpacing: 0,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                _todayLabel(),
-                style: const TextStyle(
-                  color: AppColors.t3,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                workspaceName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.t3, fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        SlateIconButton(
-          icon: LucideIcons.bell,
-          semanticLabel: 'Open notifications',
-          onTap: onNotifications,
-          badge: unreadNotifications.when(
-            data: (count) => count == 0
-                ? null
-                : Positioned(
-                    right: -4,
-                    top: -4,
-                    child: Container(
-                      constraints: const BoxConstraints(
-                        minWidth: 18,
-                        minHeight: 18,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.error,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                        border: Border.all(color: AppColors.bg, width: 2),
-                      ),
-                      child: Text(
-                        count > 9 ? '9+' : '$count',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
+    return SlateFeatureHeader(
+      icon: LucideIcons.layers,
+      title: '$greeting, $workspaceName',
+      subtitle: workspaceName,
+      color: AppColors.modHome,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SlateIconButton(
+            icon: LucideIcons.bell,
+            semanticLabel: 'Open notifications',
+            onTap: onNotifications,
+            badge: unreadNotifications.when(
+              data: (count) => count == 0
+                  ? null
+                  : Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Container(
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          border: Border.all(color: AppColors.bg, width: 2),
+                        ),
+                        child: Text(
+                          count > 9 ? '9+' : '$count',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-            loading: () => null,
-            error: (_, __) => null,
+              loading: () => null,
+              error: (_, __) => null,
+            ),
           ),
-        ),
-        const SizedBox(width: AppSpacing.xs),
-        SlateIconButton(
-          icon: Icons.settings_rounded,
-          semanticLabel: 'Open settings',
-          onTap: onSettings,
+          const SizedBox(width: AppSpacing.xs),
+          SlateIconButton(
+            icon: Icons.settings_rounded,
+            semanticLabel: 'Open settings',
+            onTap: onSettings,
+          ),
+        ],
+      ),
+      stats: [
+        SlateHeaderStat(
+          value: _todayLabel(),
+          label: 'Today',
+          color: AppColors.modCalendar,
         ),
       ],
     );

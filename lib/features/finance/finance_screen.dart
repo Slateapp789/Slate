@@ -89,6 +89,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
+            SlateHaptics.action();
             ref.invalidate(invoicesProvider);
             ref.invalidate(expensesProvider);
             ref.invalidate(financeSummaryProvider);
@@ -105,31 +106,35 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               110,
             ),
             children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Money',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.t1,
-                        letterSpacing: 0,
+              SlateFeatureHeader(
+                icon: LucideIcons.banknote,
+                title: 'Money',
+                subtitle: 'See income, expenses, net, and what is still due.',
+                color: AppColors.modFinance,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SlateIconButton(
+                      icon: LucideIcons.plus,
+                      semanticLabel: 'Record payment',
+                      color: AppColors.modFinance,
+                      backgroundColor: AppColors.modFinance.withValues(
+                        alpha: 0.10,
                       ),
+                      onTap: () => _recordPayment(context),
                     ),
-                  ),
-                  _HeaderAction(
-                    label: 'Payment',
-                    icon: LucideIcons.plus,
-                    onTap: () => _recordPayment(context),
-                  ),
-                  const SizedBox(width: 8),
-                  _HeaderAction(
-                    label: 'Expense',
-                    icon: LucideIcons.receipt,
-                    onTap: () => _showExpenseSheet(context),
-                  ),
-                ],
+                    const SizedBox(width: AppSpacing.xs),
+                    SlateIconButton(
+                      icon: LucideIcons.receipt,
+                      semanticLabel: 'Add expense',
+                      color: AppColors.modFinance,
+                      backgroundColor: AppColors.modFinance.withValues(
+                        alpha: 0.10,
+                      ),
+                      onTap: () => _showExpenseSheet(context),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 20),
               summary.when(

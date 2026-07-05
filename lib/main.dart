@@ -339,27 +339,31 @@ class _SlatePillNavBar extends StatelessWidget {
   });
 
   static const _tabs = [
-    _NavItem(label: 'Home', icon: LucideIcons.home, color: AppColors.slate),
-    _NavItem(label: 'Clients', icon: LucideIcons.users, color: AppColors.slate),
+    _NavItem(label: 'Home', icon: LucideIcons.home, color: AppColors.modHome),
+    _NavItem(
+      label: 'Clients',
+      icon: LucideIcons.users,
+      color: AppColors.modClients,
+    ),
     _NavItem(
       label: 'Bookings',
       icon: LucideIcons.calendarDays,
-      color: AppColors.slate,
+      color: AppColors.modCalendar,
     ),
     _NavItem(
       label: 'Money',
       icon: LucideIcons.banknote,
-      color: AppColors.slate,
+      color: AppColors.modFinance,
     ),
     _NavItem(
       label: 'Tasks',
       icon: LucideIcons.listChecks,
-      color: AppColors.slate,
+      color: AppColors.modTasks,
     ),
     _NavItem(
       label: 'Notes',
       icon: LucideIcons.stickyNote,
-      color: AppColors.slate,
+      color: AppColors.modNotes,
     ),
   ];
 
@@ -380,7 +384,7 @@ class _SlatePillNavBar extends StatelessWidget {
           Expanded(
             child: SlateGlassSurface(
               blur: 30,
-              color: AppColors.bgRaised.withValues(alpha: 0.40),
+              color: AppColors.bgCard.withValues(alpha: 0.92),
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: SizedBox(
                 height: 70,
@@ -430,7 +434,7 @@ class _SlatePillNavBar extends StatelessWidget {
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
                                   color: _tabs[currentIndex].color.withValues(
-                                    alpha: 0.18,
+                                    alpha: 0.16,
                                   ),
                                   borderRadius: BorderRadius.circular(
                                     AppRadius.pill,
@@ -443,14 +447,14 @@ class _SlatePillNavBar extends StatelessWidget {
                                   boxShadow: [
                                     BoxShadow(
                                       color: AppColors.t1.withValues(
-                                        alpha: 0.07,
+                                        alpha: 0.08,
                                       ),
                                       blurRadius: 20,
                                       offset: const Offset(0, 6),
                                     ),
                                     BoxShadow(
                                       color: AppColors.slateGlow.withValues(
-                                        alpha: 0.18,
+                                        alpha: 0.20,
                                       ),
                                       blurRadius: 26,
                                       offset: const Offset(0, 3),
@@ -478,7 +482,7 @@ class _SlatePillNavBar extends StatelessWidget {
           SlateGlassSurface(
             radius: AppRadius.pill,
             blur: 30,
-            color: AppColors.bgRaised.withValues(alpha: 0.44),
+            color: AppColors.slateLight,
             child: GestureDetector(
               onTap: onAction,
               child: const SizedBox(

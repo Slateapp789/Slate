@@ -60,12 +60,9 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                         0,
                       ),
                       child: _Header(
-                        total: data.length,
-                        leads: data.where((item) => item.isLead).length,
                         attention: data
                             .where((item) => item.needsAttention)
                             .length,
-                        onAdd: _openAddClient,
                       ),
                     ),
                   ),
@@ -191,73 +188,19 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
 }
 
 class _Header extends StatelessWidget {
-  final int total;
-  final int leads;
   final int attention;
-  final VoidCallback onAdd;
 
-  const _Header({
-    required this.total,
-    required this.leads,
-    required this.attention,
-    required this.onAdd,
-  });
+  const _Header({required this.attention});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Clients',
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.t1,
-                  letterSpacing: 0,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                total == 0
-                    ? 'Build your client base'
-                    : '$total clients · $leads leads · $attention to review',
-                style: const TextStyle(color: AppColors.t3, fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-        GestureDetector(
-          onTap: onAdd,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppColors.t1.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-              border: Border.all(color: AppColors.t1.withValues(alpha: 0.08)),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(LucideIcons.userPlus, color: AppColors.t1, size: 16),
-                SizedBox(width: 8),
-                Text(
-                  'New',
-                  style: TextStyle(
-                    color: AppColors.t1,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+    return SlateFeatureHeader(
+      icon: LucideIcons.users,
+      title: 'Clients',
+      subtitle: attention == 0
+          ? 'Keep relationships warm.'
+          : '$attention need a follow-up. Keep relationships warm.',
+      color: AppColors.modClients,
     );
   }
 }
@@ -347,7 +290,10 @@ class _ViewRail extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(right: AppSpacing.xs),
       child: GestureDetector(
-        onTap: () => onChanged(value),
+        onTap: () {
+          SlateHaptics.tap();
+          onChanged(value);
+        },
         child: AnimatedContainer(
           duration: AppMotion.standard,
           curve: AppMotion.curve,

@@ -29,6 +29,17 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   @override
   Widget build(BuildContext context) {
     final tasks = ref.watch(allTasksProvider);
+    final taskCounts = tasks.maybeWhen(
+      data: (data) => _countsForTasks(data),
+      orElse: () => const _TaskCounts(
+        overdue: 0,
+        today: 0,
+        upcoming: 0,
+        noDate: 0,
+        done: 0,
+        open: 0,
+      ),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -43,48 +54,33 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 AppSpacing.pageX,
                 0,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Tasks',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.t1,
-                      letterSpacing: 0,
-                    ),
+              child: SlateFeatureHeader(
+                icon: LucideIcons.listChecks,
+                title: 'Tasks',
+                subtitle: 'Keep follow-ups and admin from slipping.',
+                color: AppColors.modTasks,
+                trailing: SlateIconButton(
+                  icon: LucideIcons.plus,
+                  semanticLabel: 'New task',
+                  color: AppColors.modTasks,
+                  backgroundColor: AppColors.modTasks.withValues(alpha: 0.10),
+                  onTap: () => _showTaskEditor(context),
+                ),
+                stats: [
+                  SlateHeaderStat(
+                    value: '${taskCounts.urgent}',
+                    label: 'Urgent',
+                    color: AppColors.modTasks,
                   ),
-                  GestureDetector(
-                    onTap: () => _showTaskEditor(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.slateLight,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(
-                            LucideIcons.plus,
-                            color: AppColors.panelInk,
-                            size: 14,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'New',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.panelInk,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  SlateHeaderStat(
+                    value: '${taskCounts.upcoming}',
+                    label: 'Upcoming',
+                    color: AppColors.warning,
+                  ),
+                  SlateHeaderStat(
+                    value: '${taskCounts.done}',
+                    label: 'Done',
+                    color: AppColors.statusSuccess,
                   ),
                 ],
               ),

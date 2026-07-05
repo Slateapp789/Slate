@@ -1,46 +1,5 @@
 part of 'finance_screen.dart';
 
-class _HeaderAction extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _HeaderAction({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.slateLight,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: AppColors.t1.withValues(alpha: 0.14)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.panelInk, size: 14),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: AppColors.panelInk,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _WeeklyTargetCard extends StatelessWidget {
   final FinanceSummary summary;
   final VoidCallback onEditTarget;

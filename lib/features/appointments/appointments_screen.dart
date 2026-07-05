@@ -101,87 +101,38 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                 0,
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Bookings',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.t1,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      if (_view == _BookingsView.schedule) ...[
-                        GestureDetector(
-                          onTap: () =>
-                              setState(() => _calendarMode = !_calendarMode),
-                          child: Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: _calendarMode
-                                  ? AppColors.slateLight
-                                  : AppColors.bgCard,
-                              borderRadius: BorderRadius.circular(
-                                AppRadius.pill,
-                              ),
-                              border: Border.all(
-                                color: AppColors.t1.withValues(alpha: 0.12),
-                              ),
-                            ),
-                            child: Icon(
-                              _calendarMode
+                  Expanded(
+                    child: SlateFeatureHeader(
+                      icon: LucideIcons.calendarDays,
+                      title: 'Bookings',
+                      subtitle: 'Plan the day and keep bookings moving.',
+                      color: AppColors.modCalendar,
+                      trailing: _view == _BookingsView.schedule
+                          ? SlateIconButton(
+                              icon: _calendarMode
                                   ? LucideIcons.list
                                   : LucideIcons.calendarDays,
-                              color: _calendarMode
-                                  ? AppColors.panelInk
-                                  : AppColors.t2,
-                              size: 17,
-                            ),
-                          ),
+                              semanticLabel: _calendarMode
+                                  ? 'Show list'
+                                  : 'Show calendar',
+                              color: AppColors.modCalendar,
+                              backgroundColor: AppColors.modCalendar.withValues(
+                                alpha: 0.10,
+                              ),
+                              onTap: () => setState(
+                                () => _calendarMode = !_calendarMode,
+                              ),
+                            )
+                          : null,
+                      stats: [
+                        SlateHeaderStat(
+                          value: _calendarMode ? 'Calendar' : 'List',
+                          label: 'Mode',
+                          color: AppColors.modCalendar,
                         ),
-                        const SizedBox(width: 8),
                       ],
-                      GestureDetector(
-                        onTap: () => _addAppointment(
-                          date: _calendarMode ? _selectedCalendarDate : null,
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.slateLight,
-                            borderRadius: BorderRadius.circular(AppRadius.pill),
-                            border: Border.all(
-                              color: AppColors.t1.withValues(alpha: 0.16),
-                            ),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(
-                                LucideIcons.plus,
-                                color: AppColors.panelInk,
-                                size: 14,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                'New',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.panelInk,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -605,7 +556,10 @@ class _BookingsViewOption extends StatelessWidget {
     final color = warning ? AppColors.warning : AppColors.t1;
     return Expanded(
       child: GestureDetector(
-        onTap: onTap,
+        onTap: () {
+          SlateHaptics.tap();
+          onTap();
+        },
         child: AnimatedContainer(
           duration: AppMotion.fast,
           curve: AppMotion.curve,

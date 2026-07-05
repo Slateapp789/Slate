@@ -20,6 +20,8 @@ final _bulletPattern = RegExp(r'^\s*(?:•|[-*])\s+(?!\[)');
 
 enum _LineFormat { none, checklist, bullet }
 
+enum _NoteFilter { all, pinned, clients, bookings }
+
 class _ChecklistMarkerInfo {
   final int lineStart;
   final double top;
@@ -43,10 +45,16 @@ class NotesScreen extends ConsumerStatefulWidget {
 
 class _NotesScreenState extends ConsumerState<NotesScreen> {
   String _query = '';
+  _NoteFilter _filter = _NoteFilter.all;
 
   @override
   Widget build(BuildContext context) {
     final notes = ref.watch(allNotesProvider);
+    final noteStats = notes.maybeWhen(
+      data: (items) => _NoteStats.from(items),
+      orElse: () =>
+          const _NoteStats(active: 0, pinned: 0, clients: 0, bookings: 0),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -71,23 +79,39 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     ),
                     const SizedBox(width: AppSpacing.sm),
                   ],
-                  const Expanded(
-                    child: Text(
-                      'Notes',
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.t1,
-                        letterSpacing: 0,
+                  Expanded(
+                    child: SlateFeatureHeader(
+                      icon: LucideIcons.fileText,
+                      title: 'Notes',
+                      subtitle: 'Capture context before it disappears.',
+                      color: AppColors.modNotes,
+                      trailing: SlateIconButton(
+                        icon: LucideIcons.edit3,
+                        semanticLabel: 'New note',
+                        color: AppColors.modNotes,
+                        backgroundColor: AppColors.modNotes.withValues(
+                          alpha: 0.10,
+                        ),
+                        onTap: () => _openEditor(),
                       ),
+                      stats: [
+                        SlateHeaderStat(
+                          value: '${noteStats.active}',
+                          label: 'Active',
+                          color: AppColors.modNotes,
+                        ),
+                        SlateHeaderStat(
+                          value: '${noteStats.pinned}',
+                          label: 'Pinned',
+                          color: AppColors.warning,
+                        ),
+                        SlateHeaderStat(
+                          value: '${noteStats.clients}',
+                          label: 'Clients',
+                          color: AppColors.modTasks,
+                        ),
+                      ],
                     ),
-                  ),
-                  SlateIconButton(
-                    icon: LucideIcons.edit3,
-                    semanticLabel: 'New note',
-                    color: AppColors.bg,
-                    backgroundColor: AppColors.slateLight,
-                    onTap: () => _openEditor(),
                   ),
                 ],
               ),
@@ -103,6 +127,15 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                   hintText: 'Search',
                 ),
               ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            notes.maybeWhen(
+              data: (data) => _NoteFilterRail(
+                selected: _filter,
+                stats: _NoteStats.from(data),
+                onChanged: (value) => setState(() => _filter = value),
+              ),
+              orElse: () => const SizedBox.shrink(),
             ),
             const SizedBox(height: AppSpacing.md),
             Expanded(
@@ -128,8 +161,15 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
 
   List<SlateNote> _filteredNotes(List<SlateNote> notes) {
     final term = _query.trim().toLowerCase();
-    if (term.isEmpty) return notes;
     return notes.where((note) {
+      final matchesFilter = switch (_filter) {
+        _NoteFilter.all => true,
+        _NoteFilter.pinned => note.pinned,
+        _NoteFilter.clients => note.contactId != null,
+        _NoteFilter.bookings => note.appointmentId != null,
+      };
+      if (!matchesFilter) return false;
+      if (term.isEmpty) return true;
       return note.title.toLowerCase().contains(term) ||
           note.body.toLowerCase().contains(term) ||
           (note.clientName ?? '').toLowerCase().contains(term);
@@ -156,6 +196,96 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       MaterialPageRoute(builder: (_) => _NoteEditorScreen(note: note)),
     );
     if (mounted) ref.invalidate(allNotesProvider);
+  }
+}
+
+class _NoteStats {
+  final int active;
+  final int pinned;
+  final int clients;
+  final int bookings;
+
+  const _NoteStats({
+    required this.active,
+    required this.pinned,
+    required this.clients,
+    required this.bookings,
+  });
+
+  factory _NoteStats.from(List<SlateNote> notes) {
+    return _NoteStats(
+      active: notes.length,
+      pinned: notes.where((note) => note.pinned).length,
+      clients: notes.where((note) => note.contactId != null).length,
+      bookings: notes.where((note) => note.appointmentId != null).length,
+    );
+  }
+}
+
+class _NoteFilterRail extends StatelessWidget {
+  final _NoteFilter selected;
+  final _NoteStats stats;
+  final ValueChanged<_NoteFilter> onChanged;
+
+  const _NoteFilterRail({
+    required this.selected,
+    required this.stats,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 42,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
+        children: [
+          _chip(_NoteFilter.all, 'All', stats.active),
+          _chip(_NoteFilter.pinned, 'Pinned', stats.pinned),
+          _chip(_NoteFilter.clients, 'Clients', stats.clients),
+          _chip(_NoteFilter.bookings, 'Bookings', stats.bookings),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(_NoteFilter value, String label, int count) {
+    final active = selected == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: AppSpacing.xs),
+      child: GestureDetector(
+        onTap: () {
+          SlateHaptics.tap();
+          onChanged(value);
+        },
+        child: AnimatedContainer(
+          duration: AppMotion.standard,
+          curve: AppMotion.curve,
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active
+                ? AppColors.modNotes.withValues(alpha: 0.15)
+                : AppColors.bgCard,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            border: Border.all(
+              color: active
+                  ? AppColors.modNotes.withValues(alpha: 0.26)
+                  : AppColors.border,
+            ),
+          ),
+          child: Text(
+            '$label $count',
+            style: TextStyle(
+              color: active ? AppColors.modNotes : AppColors.t2,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

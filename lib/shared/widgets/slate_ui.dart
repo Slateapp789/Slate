@@ -56,9 +56,7 @@ class SlateSurface extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? AppColors.bgCard,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(
-          color: borderColor ?? AppColors.t1.withValues(alpha: 0.07),
-        ),
+        border: Border.all(color: borderColor ?? AppColors.border),
         boxShadow: elevated ? AppShadows.soft : null,
       ),
       child: child,
@@ -107,7 +105,7 @@ class SlateGlassSurface extends StatelessWidget {
           decoration: BoxDecoration(
             color: color ?? AppColors.bgRaised.withValues(alpha: 0.62),
             borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: AppColors.t1.withValues(alpha: 0.09)),
+            border: Border.all(color: AppColors.border),
             boxShadow: AppShadows.glass,
           ),
           child: child,
@@ -170,13 +168,9 @@ class _SlateIconButtonState extends State<SlateIconButton> {
                 width: widget.size,
                 height: widget.size,
                 decoration: BoxDecoration(
-                  color:
-                      widget.backgroundColor ??
-                      AppColors.t1.withValues(alpha: 0.06),
+                  color: widget.backgroundColor ?? AppColors.bgInteract,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
-                  border: Border.all(
-                    color: AppColors.t1.withValues(alpha: 0.08),
-                  ),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Icon(
                   widget.icon,
@@ -240,6 +234,155 @@ class SlateSectionHeader extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class SlateFeatureHeader extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final Widget? trailing;
+  final List<Widget> stats;
+
+  const SlateFeatureHeader({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    this.trailing,
+    this.stats = const [],
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateSurface(
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      color: color.withValues(alpha: 0.08),
+      borderColor: color.withValues(alpha: 0.20),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  border: Border.all(color: color.withValues(alpha: 0.22)),
+                ),
+                child: Icon(icon, color: color, size: 28),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.t1,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                        height: 1.02,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.t3,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: AppSpacing.sm),
+                trailing!,
+              ],
+            ],
+          ),
+          if (stats.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Row(
+              children: [
+                for (var index = 0; index < stats.length; index++) ...[
+                  Expanded(child: stats[index]),
+                  if (index != stats.length - 1)
+                    const SizedBox(width: AppSpacing.xs),
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class SlateHeaderStat extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color color;
+
+  const SlateHeaderStat({
+    super.key,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 74),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard.withValues(alpha: 0.66),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.t3,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
