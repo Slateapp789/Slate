@@ -181,6 +181,7 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _showFabSheet() {
+    SlateHaptics.action();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -313,10 +314,13 @@ class _MainShellState extends State<MainShell> {
       ),
       bottomNavigationBar: _SlatePillNavBar(
         currentIndex: _currentIndex,
-        onTap: (i) => setState(() {
-          _financeInitialFocus = FinanceInitialFocus.top;
-          _currentIndex = i;
-        }),
+        onTap: (i) {
+          if (i == _currentIndex) return;
+          setState(() {
+            _financeInitialFocus = FinanceInitialFocus.top;
+            _currentIndex = i;
+          });
+        },
         onAction: _showFabSheet,
       ),
     );
@@ -395,13 +399,19 @@ class _SlatePillNavBar extends StatelessWidget {
                         final index = indexForPosition(
                           details.localPosition.dx,
                         );
-                        if (index != currentIndex) onTap(index);
+                        if (index != currentIndex) {
+                          SlateHaptics.tap();
+                          onTap(index);
+                        }
                       },
                       onHorizontalDragUpdate: (details) {
                         final index = indexForPosition(
                           details.localPosition.dx,
                         );
-                        if (index != currentIndex) onTap(index);
+                        if (index != currentIndex) {
+                          SlateHaptics.tap();
+                          onTap(index);
+                        }
                       },
                       child: Stack(
                         alignment: Alignment.center,
@@ -488,7 +498,10 @@ class _SlatePillNavBar extends StatelessWidget {
     final active = index == currentIndex;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => onTap(index),
+      onTap: () {
+        if (index != currentIndex) SlateHaptics.tap();
+        onTap(index);
+      },
       child: Container(
         height: 70,
         margin: const EdgeInsets.symmetric(horizontal: 2),

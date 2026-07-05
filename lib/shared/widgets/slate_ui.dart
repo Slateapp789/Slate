@@ -1,9 +1,30 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/theme/app_theme.dart';
+
+class SlateHaptics {
+  const SlateHaptics._();
+
+  static void tap() {
+    HapticFeedback.selectionClick();
+  }
+
+  static void action() {
+    HapticFeedback.lightImpact();
+  }
+
+  static void confirm() {
+    HapticFeedback.mediumImpact();
+  }
+
+  static void warning() {
+    HapticFeedback.heavyImpact();
+  }
+}
 
 class SlateSurface extends StatelessWidget {
   final Widget child;
@@ -49,7 +70,10 @@ class SlateSurface extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(radius),
-        onTap: onTap,
+        onTap: () {
+          SlateHaptics.tap();
+          onTap!();
+        },
         child: content,
       ),
     );
@@ -120,6 +144,11 @@ class SlateIconButton extends StatefulWidget {
 class _SlateIconButtonState extends State<SlateIconButton> {
   bool _pressed = false;
 
+  void _handleTap() {
+    SlateHaptics.action();
+    widget.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Semantics(
@@ -129,7 +158,7 @@ class _SlateIconButtonState extends State<SlateIconButton> {
         onTapDown: (_) => setState(() => _pressed = true),
         onTapCancel: () => setState(() => _pressed = false),
         onTapUp: (_) => setState(() => _pressed = false),
-        onTap: widget.onTap,
+        onTap: _handleTap,
         child: AnimatedScale(
           scale: _pressed ? 0.94 : 1,
           duration: AppMotion.fast,
@@ -192,7 +221,12 @@ class SlateSectionHeader extends StatelessWidget {
         ),
         if (actionLabel != null)
           TextButton(
-            onPressed: onAction,
+            onPressed: onAction == null
+                ? null
+                : () {
+                    SlateHaptics.tap();
+                    onAction!();
+                  },
             style: TextButton.styleFrom(
               foregroundColor: AppColors.slateLight,
               minimumSize: const Size(0, 34),
@@ -360,6 +394,11 @@ class SlateDisclosure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    void handleToggle() {
+      SlateHaptics.tap();
+      onToggle();
+    }
+
     return SlateSurface(
       padding: EdgeInsets.zero,
       radius: AppRadius.lg,
@@ -367,7 +406,7 @@ class SlateDisclosure extends StatelessWidget {
         children: [
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: onToggle,
+            onTap: handleToggle,
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
               child: Row(
@@ -466,6 +505,19 @@ class SlateButton extends StatefulWidget {
 class _SlateButtonState extends State<SlateButton> {
   bool _pressed = false;
 
+  void _handleTap() {
+    final onPressed = widget.onPressed;
+    if (onPressed == null) return;
+    if (widget.destructive) {
+      SlateHaptics.warning();
+    } else if (widget.secondary) {
+      SlateHaptics.tap();
+    } else {
+      SlateHaptics.confirm();
+    }
+    onPressed();
+  }
+
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onPressed != null;
@@ -484,7 +536,7 @@ class _SlateButtonState extends State<SlateButton> {
       onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
       onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
       onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
-      onTap: widget.onPressed,
+      onTap: enabled ? _handleTap : null,
       child: AnimatedScale(
         scale: _pressed ? 0.985 : 1,
         duration: AppMotion.fast,
