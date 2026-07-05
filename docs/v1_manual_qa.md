@@ -1,4 +1,4 @@
-# Slate V1 Manual QA
+# Workloop V1 Manual QA
 
 Use this checklist before treating a V1 build as ready for test users.
 

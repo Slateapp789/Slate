@@ -1,16 +1,16 @@
-# Slate Product Vision
+# Workloop Product Vision
 
 Last updated: 2026-06-07
 
-## What Slate Is
+## What Workloop Is
 
-Slate is the headquarters for solo appointment-based business owners.
+Workloop is the headquarters for solo appointment-based business owners.
 
 It is a premium, calm, mobile-first business operating system that helps solo service businesses run their daily operations from one connected app. The core product loop is:
 
 `Client -> Booking -> Work -> Payment -> Repeat`
 
-Slate currently supports the main operating surfaces needed for that loop:
+Workloop currently supports the main operating surfaces needed for that loop:
 
 - Dashboard / HQ
 - Clients / CRM
@@ -21,9 +21,9 @@ Slate currently supports the main operating surfaces needed for that loop:
 - Notifications centre and preferences
 - Settings, business profile, services, working hours, privacy export/request deletion
 
-## Who Slate Serves
+## Who Workloop Serves
 
-Slate is designed for solo appointment-based service businesses:
+Workloop is designed for solo appointment-based service businesses:
 
 - Barbers and hairdressers
 - Beauty and aesthetics professionals
@@ -37,7 +37,7 @@ The target customer runs the business from their phone, has limited time for adm
 
 ## Core Product Philosophy
 
-Slate should reduce mental load. It should feel like a calm command centre, not another admin burden.
+Workloop should reduce mental load. It should feel like a calm command centre, not another admin burden.
 
 Product principles from Notion and current implementation:
 
@@ -53,13 +53,13 @@ Product principles from Notion and current implementation:
 
 ## Business Goals
 
-Slate should become the first app a solo business owner opens each day.
+Workloop should become the first app a solo business owner opens each day.
 
 Success looks like:
 
-- Users manage most daily admin inside Slate.
+- Users manage most daily admin inside Workloop.
 - Users cancel or reduce reliance on fragmented tools.
-- Users trust Slate for schedule, clients, money, tasks, and follow-ups.
+- Users trust Workloop for schedule, clients, money, tasks, and follow-ups.
 - V1 proves retention through daily operational value before expanding into heavier modules.
 
 ## Current Scope
@@ -85,7 +85,7 @@ Current code scope includes:
 
 ## Future Vision
 
-Future Slate should deepen the V1 operating loop before expanding sideways.
+Future Workloop should deepen the V1 operating loop before expanding sideways.
 
 Likely future directions:
 
@@ -99,9 +99,9 @@ Likely future directions:
 - Lightweight analytics where they directly support daily decisions.
 - Team/staff support later, not V1.
 
-## What Slate Is Not
+## What Workloop Is Not
 
-Slate is not:
+Workloop is not:
 
 - Generic project management software.
 - A generic business operating system for every company type.
@@ -122,8 +122,8 @@ If a feature does not materially improve bookings, clients, payments, daily cont
 
 Primary product truth comes from Notion pages:
 
-- What Slate Is
-- What Slate Is Not
+- What Workloop Is
+- What Workloop Is Not
 - V1 Scope Lock
 - Product Vision
 - Features Index

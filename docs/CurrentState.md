@@ -1,4 +1,4 @@
-# Slate Current State
+# Workloop Current State
 
 Last updated: 2026-06-07
 

@@ -1,8 +1,8 @@
-# Slate Security Notes
+# Workloop Security Notes
 
 ## Local Configuration
 
-Slate reads Supabase client configuration from Dart defines:
+Workloop reads Supabase client configuration from Dart defines:
 
 ```bash
 flutter run --dart-define-from-file=.env
