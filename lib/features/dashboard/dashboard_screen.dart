@@ -51,6 +51,7 @@ class DashboardScreen extends ConsumerWidget {
       body: RefreshIndicator(
         color: AppColors.green,
         onRefresh: () async {
+          SlateHaptics.action();
           ref.invalidate(workspaceProvider);
           ref.invalidate(todayAppointmentsProvider);
           ref.invalidate(appointmentsProvider);
@@ -355,6 +356,9 @@ class _GlanceZone extends StatelessWidget {
 
     final rows = _sortedToday(appointments.value ?? const []);
     final next = _nextUpcoming(rows);
+    final appointmentCount = _activeAppointmentCount(rows);
+    final expected = _expectedToday(rows);
+    final taskCount = _tasksDueToday(tasks.value ?? const []);
     final summary = _summarySentence(
       appointments: rows,
       finance: finance.value!,
@@ -368,6 +372,41 @@ class _GlanceZone extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Row(
+            children: [
+              Icon(LucideIcons.sparkles, size: 15, color: AppColors.green),
+              SizedBox(width: AppSpacing.xs),
+              Text(
+                'AT A GLANCE',
+                style: TextStyle(
+                  color: AppColors.t3,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              _GlanceMetric(
+                icon: LucideIcons.calendarDays,
+                label: '$appointmentCount today',
+              ),
+              _GlanceMetric(
+                icon: LucideIcons.banknote,
+                label: '£${expected.toStringAsFixed(0)} expected',
+              ),
+              _GlanceMetric(
+                icon: LucideIcons.listChecks,
+                label: '$taskCount due',
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
           if (summary.isNotEmpty) ...[
             Text(
               summary,
@@ -386,6 +425,41 @@ class _GlanceZone extends StatelessWidget {
               appointment: next,
               onTap: () => onOpenAppointment(next),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GlanceMetric extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _GlanceMetric({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.t1.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: AppColors.t1.withValues(alpha: 0.07)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.t3),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.t2,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ],
       ),
     );
@@ -589,7 +663,10 @@ class _ScheduleRow extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          onTap: onTap,
+          onTap: () {
+            SlateHaptics.tap();
+            onTap();
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             decoration: BoxDecoration(
@@ -730,7 +807,10 @@ class _AttentionRow extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          SlateHaptics.action();
+          onTap();
+        },
         borderRadius: BorderRadius.circular(AppRadius.lg),
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.md),
@@ -1007,6 +1087,13 @@ String _summarySentence({
     parts.add('$taskCount task${taskCount == 1 ? '' : 's'} due');
   }
   return parts.join(' · ');
+}
+
+int _activeAppointmentCount(List<Map<String, dynamic>> appointments) {
+  return appointments.where((row) {
+    final status = row['status']?.toString() ?? 'scheduled';
+    return status != 'cancelled' && status != 'no_show';
+  }).length;
 }
 
 double _expectedToday(List<Map<String, dynamic>> appointments) {
