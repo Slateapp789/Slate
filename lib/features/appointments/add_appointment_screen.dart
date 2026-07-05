@@ -148,9 +148,23 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
           ? serviceName!
           : 'Booking';
       final settings = await ref.read(workspaceSettingsProvider.future);
+      final workingHours = settings?['working_hours'] is Map
+          ? Map<String, dynamic>.from(settings!['working_hours'] as Map)
+          : <String, dynamic>{};
       final location = _locationTextWithDefault(
         settings?['business_address'] as String?,
       );
+
+      await ref
+          .read(appointmentsRepositoryProvider)
+          .ensureScheduleAvailable(
+            workspaceId: workspaceId,
+            startTime: startTime,
+            endTime: endTime,
+            workingHours: workingHours,
+            recurrenceRule: recurrenceRule,
+            repeatOccurrences: repeatOccurrences,
+          );
 
       final bookingIds = await ref
           .read(appointmentsRepositoryProvider)
@@ -1015,7 +1029,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'This overlaps ${conflicts.length} existing booking${conflicts.length == 1 ? '' : 's'}. You can still book it, but it may create a clash.',
+                                'This overlaps ${conflicts.length} existing booking${conflicts.length == 1 ? '' : 's'}. Move it to another time before saving.',
                                 style: const TextStyle(
                                   color: AppColors.t2,
                                   fontSize: 13,

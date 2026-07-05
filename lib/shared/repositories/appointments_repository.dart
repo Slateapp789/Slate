@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/slate_models.dart';
+import '../utils/working_hours.dart';
 import 'supabase_client_provider.dart';
 
 final appointmentsRepositoryProvider = Provider<AppointmentsRepository>((ref) {
@@ -11,6 +12,53 @@ final appointmentsRepositoryProvider = Provider<AppointmentsRepository>((ref) {
 class AppointmentsRepository {
   final SupabaseClient _client;
   const AppointmentsRepository(this._client);
+
+  Future<void> ensureScheduleAvailable({
+    required String workspaceId,
+    required DateTime startTime,
+    required DateTime endTime,
+    Map<String, dynamic>? workingHours,
+    String? excludeAppointmentId,
+    String? recurrenceRule,
+    int repeatOccurrences = 1,
+  }) async {
+    final duration = endTime.difference(startTime);
+    for (var index = 0; index < repeatOccurrences.clamp(1, 24); index++) {
+      final occurrenceStart = _occurrenceStart(
+        startTime,
+        recurrenceRule,
+        index,
+      );
+      final occurrenceEnd = occurrenceStart.add(duration);
+      if (workingHours != null && workingHours.isNotEmpty) {
+        final localStart = occurrenceStart.toLocal();
+        final localEnd = occurrenceEnd.toLocal();
+        if (!isWithinWorkingHours(
+          hours: workingHours,
+          start: localStart,
+          end: localEnd,
+        )) {
+          throw AppointmentScheduleException(
+            '${weekdayName(localStart)} is outside your working hours.',
+          );
+        }
+      }
+
+      final rows = await conflicts(
+        workspaceId: workspaceId,
+        startTime: occurrenceStart,
+        endTime: occurrenceEnd,
+        excludeAppointmentId: excludeAppointmentId,
+      );
+      if (rows.isNotEmpty) {
+        throw AppointmentScheduleException(
+          rows.length == 1
+              ? 'This overlaps an existing booking.'
+              : 'This overlaps ${rows.length} existing bookings.',
+        );
+      }
+    }
+  }
 
   Future<List<Appointment>> list(String workspaceId) async {
     final rows = await _client
@@ -38,15 +86,19 @@ class AppointmentsRepository {
     required String workspaceId,
     required DateTime startTime,
     required DateTime endTime,
+    String? excludeAppointmentId,
   }) async {
-    final rows = await _client
+    var query = _client
         .from('appointments')
         .select('*, contacts(name), services(name)')
         .eq('workspace_id', workspaceId)
         .neq('status', 'cancelled')
         .lt('start_time', endTime.toUtc().toIso8601String())
-        .gt('end_time', startTime.toUtc().toIso8601String())
-        .order('start_time', ascending: true);
+        .gt('end_time', startTime.toUtc().toIso8601String());
+    if (excludeAppointmentId != null) {
+      query = query.neq('id', excludeAppointmentId);
+    }
+    final rows = await query.order('start_time', ascending: true);
     return List<Map<String, dynamic>>.from(rows);
   }
 
@@ -173,4 +225,12 @@ class AppointmentsRepository {
     final interval = rule.contains('INTERVAL=2') ? 2 : 1;
     return startTime.add(Duration(days: 7 * interval * index));
   }
+}
+
+class AppointmentScheduleException implements Exception {
+  final String message;
+  const AppointmentScheduleException(this.message);
+
+  @override
+  String toString() => message;
 }

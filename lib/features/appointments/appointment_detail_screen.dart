@@ -8,6 +8,7 @@ import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
+import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/repositories/slate_repositories.dart';
@@ -300,7 +301,7 @@ class _AppointmentDetailScreenState
                   : hasPaidLinkedPayment
                   ? 'This booking already has a paid Money item linked.'
                   : amount > 0
-                  ? 'How should Slate handle the £${amount.toStringAsFixed(0)} payment?'
+                  ? 'How should Workloop handle the £${amount.toStringAsFixed(0)} payment?'
                   : 'No booking price is set, so you can complete it without recording money.',
               style: const TextStyle(fontSize: 13, color: AppColors.t3),
             ),
@@ -373,6 +374,25 @@ class _AppointmentDetailScreenState
             (svc['duration_mins'] as int? ?? 60);
       }
       final endTime = startTime.add(Duration(minutes: durationMins));
+      final workspaceId =
+          _appt['workspace_id'] as String? ??
+          await ref.read(workspaceIdProvider.future);
+      if (workspaceId == null) {
+        throw const AppointmentScheduleException('Workspace unavailable.');
+      }
+      final settings = await ref.read(workspaceSettingsProvider.future);
+      final workingHours = settings?['working_hours'] is Map
+          ? Map<String, dynamic>.from(settings!['working_hours'] as Map)
+          : <String, dynamic>{};
+      await ref
+          .read(appointmentsRepositoryProvider)
+          .ensureScheduleAvailable(
+            workspaceId: workspaceId,
+            startTime: startTime,
+            endTime: endTime,
+            workingHours: workingHours,
+            excludeAppointmentId: _appt['id'] as String?,
+          );
       final updates = {
         'contact_id': _selectedClientId,
         'service_id': _selectedServiceId == '__custom__'

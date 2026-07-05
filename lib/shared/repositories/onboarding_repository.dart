@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:math';
 
 import 'supabase_client_provider.dart';
 
@@ -23,12 +24,12 @@ class OnboardingRepository {
     final user = _client.auth.currentUser;
     if (user == null) return;
 
-    final workspace = await _client
-        .from('workspaces')
-        .insert({'name': businessName, 'industry': industry})
-        .select()
-        .single();
-    final workspaceId = workspace['id'] as String;
+    final workspaceId = _uuidV4();
+    await _client.from('workspaces').insert({
+      'id': workspaceId,
+      'name': businessName,
+      'industry': industry,
+    });
 
     await _client.from('workspace_members').insert({
       'workspace_id': workspaceId,
@@ -110,5 +111,20 @@ class OnboardingRepository {
       'price': price,
       'status': 'scheduled',
     });
+  }
+
+  String _uuidV4() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    String hex(int value) => value.toRadixString(16).padLeft(2, '0');
+    final chars = bytes.map(hex).join();
+    return '${chars.substring(0, 8)}-'
+        '${chars.substring(8, 12)}-'
+        '${chars.substring(12, 16)}-'
+        '${chars.substring(16, 20)}-'
+        '${chars.substring(20)}';
   }
 }
