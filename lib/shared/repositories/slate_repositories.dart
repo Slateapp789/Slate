@@ -6,6 +6,7 @@ export 'dashboard_repository.dart';
 export 'debug_demo_data_repository.dart';
 export 'expenses_repository.dart';
 export 'notifications_repository.dart';
+export 'notes_repository.dart';
 export 'onboarding_repository.dart';
 export 'payments_repository.dart';
 export 'privacy_repository.dart';

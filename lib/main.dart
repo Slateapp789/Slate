@@ -14,6 +14,7 @@ import 'features/appointments/appointments_screen.dart';
 import 'features/appointments/add_appointment_screen.dart';
 import 'features/finance/finance_screen.dart';
 import 'features/finance/add_payment_screen.dart';
+import 'features/notes/notes_screen.dart';
 import 'features/tasks/tasks_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/calendar_sync/calendar_sync_screen.dart';
@@ -77,6 +78,10 @@ final _router = GoRouter(
     GoRoute(
       path: '/notifications',
       builder: (context, state) => const NotificationsScreen(),
+    ),
+    GoRoute(
+      path: '/notes',
+      builder: (context, state) => const MainShell(initialIndex: 5),
     ),
     GoRoute(
       path: '/booking-requests',
@@ -166,36 +171,6 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
-  }
-
-  // Tabs: 0=Home, 1=Clients, 2=Bookings, 3=Money, 4=Tasks
-  Widget getScreen() {
-    switch (_currentIndex) {
-      case 0:
-        return DashboardScreen(
-          onNavigate: (i) => setState(() => _currentIndex = i),
-          onOpenMoneyFollowUps: () => setState(() {
-            _financeInitialFocus = FinanceInitialFocus.followUps;
-            _currentIndex = 3;
-          }),
-        );
-      case 1:
-        return const ClientsScreen();
-      case 2:
-        return const AppointmentsScreen();
-      case 3:
-        return FinanceScreen(initialFocus: _financeInitialFocus);
-      case 4:
-        return const TasksScreen();
-      default:
-        return DashboardScreen(
-          onNavigate: (i) => setState(() => _currentIndex = i),
-          onOpenMoneyFollowUps: () => setState(() {
-            _financeInitialFocus = FinanceInitialFocus.followUps;
-            _currentIndex = 3;
-          }),
-        );
-    }
   }
 
   void _showFabSheet() {
@@ -310,25 +285,24 @@ class _MainShellState extends State<MainShell> {
       extendBody: true,
       body: AnimatedSwitcher(
         duration: AppMotion.standard,
-        switchInCurve: AppMotion.curve,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: AppMotion.curve,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.025, 0),
-                end: Offset.zero,
-              ).animate(curved),
-              child: child,
+        child: IndexedStack(
+          key: const ValueKey('main-shell-tabs'),
+          index: _currentIndex,
+          children: [
+            DashboardScreen(
+              onNavigate: (i) => setState(() => _currentIndex = i),
+              onOpenMoneyFollowUps: () => setState(() {
+                _financeInitialFocus = FinanceInitialFocus.followUps;
+                _currentIndex = 3;
+              }),
             ),
-          );
-        },
-        child: KeyedSubtree(key: ValueKey(_currentIndex), child: getScreen()),
+            const ClientsScreen(),
+            const AppointmentsScreen(),
+            FinanceScreen(initialFocus: _financeInitialFocus),
+            const TasksScreen(),
+            const NotesScreen(showBackButton: false),
+          ],
+        ),
       ),
       bottomNavigationBar: _SlatePillNavBar(
         currentIndex: _currentIndex,
@@ -369,6 +343,11 @@ class _SlatePillNavBar extends StatelessWidget {
     _NavItem(
       label: 'Tasks',
       icon: LucideIcons.listChecks,
+      color: AppColors.slate,
+    ),
+    _NavItem(
+      label: 'Notes',
+      icon: LucideIcons.stickyNote,
       color: AppColors.slate,
     ),
   ];
