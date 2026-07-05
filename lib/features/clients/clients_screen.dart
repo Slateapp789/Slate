@@ -60,6 +60,8 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                         0,
                       ),
                       child: _Header(
+                        total: data.length,
+                        leads: data.where((item) => item.isLead).length,
                         attention: data
                             .where((item) => item.needsAttention)
                             .length,
@@ -188,9 +190,15 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
 }
 
 class _Header extends StatelessWidget {
+  final int total;
+  final int leads;
   final int attention;
 
-  const _Header({required this.attention});
+  const _Header({
+    required this.total,
+    required this.leads,
+    required this.attention,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -201,6 +209,23 @@ class _Header extends StatelessWidget {
           ? 'Keep relationships warm.'
           : '$attention need a follow-up. Keep relationships warm.',
       color: AppColors.modClients,
+      stats: [
+        SlateHeaderStat(
+          value: '$total',
+          label: 'Active',
+          color: AppColors.modClients,
+        ),
+        SlateHeaderStat(
+          value: '$leads',
+          label: 'Leads',
+          color: AppColors.warning,
+        ),
+        SlateHeaderStat(
+          value: '$attention',
+          label: 'Follow-ups',
+          color: AppColors.modTasks,
+        ),
+      ],
     );
   }
 }
@@ -228,18 +253,22 @@ class _SearchAndSort extends StatelessWidget {
           size: 16,
         ),
         filled: true,
-        fillColor: AppColors.bgCard,
+        fillColor: AppColors.modClients.withValues(alpha: 0.06),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(
+            color: AppColors.modClients.withValues(alpha: 0.18),
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(
+            color: AppColors.modClients.withValues(alpha: 0.18),
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.modClients, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
@@ -301,19 +330,19 @@ class _ViewRail extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: active
-                ? AppColors.t1.withValues(alpha: 0.12)
+                ? AppColors.modClients.withValues(alpha: 0.14)
                 : AppColors.bgCard,
             borderRadius: BorderRadius.circular(AppRadius.pill),
             border: Border.all(
               color: active
-                  ? AppColors.t1.withValues(alpha: 0.16)
+                  ? AppColors.modClients.withValues(alpha: 0.28)
                   : AppColors.border,
             ),
           ),
           child: Text(
             '$label $count',
             style: TextStyle(
-              color: active ? AppColors.t1 : AppColors.t3,
+              color: active ? AppColors.modClients : AppColors.t2,
               fontSize: 13,
               fontWeight: FontWeight.w800,
             ),
@@ -341,14 +370,15 @@ class _ClientRow extends StatelessWidget {
         .join()
         .toUpperCase();
     final signal = _clientSignal(record);
+    final statusColor = _clientStatusColor(record);
 
     return SlateSurface(
       onTap: onTap,
       radius: AppRadius.lg,
-      color: AppColors.bgCard,
-      borderColor: record.overdueTaskCount > 0
-          ? AppColors.error.withValues(alpha: 0.20)
-          : AppColors.border,
+      color: statusColor.withValues(alpha: 0.045),
+      borderColor: statusColor.withValues(
+        alpha: record.needsAttention ? 0.28 : 0.12,
+      ),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
@@ -359,14 +389,17 @@ class _ClientRow extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: AppColors.t1.withValues(alpha: 0.08),
+              color: AppColors.modClients.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.modClients.withValues(alpha: 0.18),
+              ),
             ),
             child: Center(
               child: Text(
                 initials.isEmpty ? '?' : initials,
                 style: const TextStyle(
-                  color: AppColors.t2,
+                  color: AppColors.t1,
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
                 ),
@@ -394,9 +427,7 @@ class _ClientRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: record.needsAttention
-                        ? AppColors.warning
-                        : AppColors.t3,
+                    color: record.needsAttention ? statusColor : AppColors.t3,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -406,7 +437,11 @@ class _ClientRow extends StatelessWidget {
           ),
           if (record.isLead) ...[
             const SizedBox(width: AppSpacing.xs),
-            const _StatusPill(label: 'Lead'),
+            _StatusPill(label: 'Lead', color: AppColors.warning),
+          ],
+          if (record.openTaskCount > 0 && !record.isLead) ...[
+            const SizedBox(width: AppSpacing.xs),
+            _StatusPill(label: '${record.openTaskCount}', color: statusColor),
           ],
           const SizedBox(width: AppSpacing.xs),
           const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
@@ -431,25 +466,34 @@ class _ClientRow extends StatelessWidget {
     if (record.client.status == 'lead') return 'Lead';
     return 'No upcoming activity';
   }
+
+  Color _clientStatusColor(ClientCrmRecord record) {
+    if (record.overdueTaskCount > 0) return AppColors.error;
+    if (record.openTaskCount > 0) return AppColors.warning;
+    if (record.outstandingBalance > 0) return AppColors.warning;
+    if (record.isLead) return AppColors.warning;
+    return AppColors.modClients;
+  }
 }
 
 class _StatusPill extends StatelessWidget {
   final String label;
+  final Color color;
 
-  const _StatusPill({required this.label});
+  const _StatusPill({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.warning.withValues(alpha: 0.11),
+        color: color.withValues(alpha: 0.11),
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: AppColors.warning,
+        style: TextStyle(
+          color: color,
           fontSize: 10,
           fontWeight: FontWeight.w900,
         ),

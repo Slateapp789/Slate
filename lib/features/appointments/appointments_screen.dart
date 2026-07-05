@@ -86,6 +86,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
       data: (items) => _activeRequests(items).length,
       orElse: () => 0,
     );
+    final headerStats = appointments.maybeWhen(
+      data: (items) => _BookingStats.from(items),
+      orElse: () => const _BookingStats.empty(),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -130,6 +134,16 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                           value: _calendarMode ? 'Calendar' : 'List',
                           label: 'Mode',
                           color: AppColors.modCalendar,
+                        ),
+                        SlateHeaderStat(
+                          value: '${headerStats.todayRemaining}',
+                          label: 'Today',
+                          color: AppColors.modCalendar,
+                        ),
+                        SlateHeaderStat(
+                          value: '${headerStats.weekBookings}',
+                          label: 'Week',
+                          color: AppColors.warning,
                         ),
                       ],
                     ),
@@ -217,11 +231,22 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                       AppSpacing.pageX,
                       AppSpacing.md,
                     ),
-                    child: _NextBookingCard(
-                      booking: stats.nextBooking,
-                      onTap: stats.nextBooking == null
-                          ? () => _addAppointment()
-                          : () => _openDetail(stats.nextBooking!),
+                    child: Column(
+                      children: [
+                        _BookingModePanel(
+                          calendarMode: _calendarMode,
+                          stats: stats,
+                          onToggle: () =>
+                              setState(() => _calendarMode = !_calendarMode),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        _NextBookingCard(
+                          booking: stats.nextBooking,
+                          onTap: stats.nextBooking == null
+                              ? () => _addAppointment()
+                              : () => _openDetail(stats.nextBooking!),
+                        ),
+                      ],
                     ),
                   );
                 },
@@ -451,6 +476,16 @@ class _BookingStats {
     required this.nextBooking,
   });
 
+  const _BookingStats.empty()
+    : todayTotal = 0,
+      todayCompleted = 0,
+      todayRemaining = 0,
+      overdueUnfinished = 0,
+      weekBookings = 0,
+      todayRevenue = 0,
+      weekValue = 0,
+      nextBooking = null;
+
   factory _BookingStats.from(List<Map<String, dynamic>> appointments) {
     final now = DateTime.now();
     final today = _dateOnly(now);
@@ -497,6 +532,75 @@ class _BookingStats {
         (sum, appt) => sum + _price(appt),
       ),
       nextBooking: selectNextBooking(appointments, now: now),
+    );
+  }
+}
+
+class _BookingModePanel extends StatelessWidget {
+  final bool calendarMode;
+  final _BookingStats stats;
+  final VoidCallback onToggle;
+
+  const _BookingModePanel({
+    required this.calendarMode,
+    required this.stats,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateSurface(
+      onTap: onToggle,
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      color: AppColors.modCalendar.withValues(alpha: 0.08),
+      borderColor: AppColors.modCalendar.withValues(alpha: 0.18),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: AppColors.modCalendar.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Icon(
+              calendarMode ? LucideIcons.calendarDays : LucideIcons.list,
+              color: AppColors.modCalendar,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  calendarMode ? 'Calendar' : 'List',
+                  style: const TextStyle(
+                    color: AppColors.modCalendar,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  '${stats.todayRemaining} left today · £${stats.weekValue.toStringAsFixed(0)} this week',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.t3,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(LucideIcons.repeat2, color: AppColors.t3, size: 18),
+        ],
+      ),
     );
   }
 }
@@ -717,11 +821,14 @@ class _NextBookingCard extends StatelessWidget {
     final price = booking == null ? null : _price(booking!);
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        SlateHaptics.action();
+        onTap();
+      },
       child: SlateSurface(
         radius: AppRadius.xl,
-        color: AppColors.panelSoft,
-        borderColor: AppColors.t1.withValues(alpha: 0.06),
+        color: AppColors.modCalendar.withValues(alpha: 0.08),
+        borderColor: AppColors.modCalendar.withValues(alpha: 0.20),
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
@@ -731,7 +838,9 @@ class _NextBookingCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.slateLight,
                 borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: AppColors.t1.withValues(alpha: 0.08)),
+                border: Border.all(
+                  color: AppColors.modCalendar.withValues(alpha: 0.18),
+                ),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -799,7 +908,7 @@ class _NextBookingCard extends StatelessWidget {
             ),
             Icon(
               booking == null ? LucideIcons.plus : LucideIcons.chevronRight,
-              color: AppColors.t3,
+              color: AppColors.modCalendar,
               size: 18,
             ),
           ],

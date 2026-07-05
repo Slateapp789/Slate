@@ -241,6 +241,15 @@ class _MainShellState extends State<MainShell> {
                   setState(() => _currentIndex = 4);
                 },
               ),
+              const SizedBox(height: AppSpacing.xs),
+              _fabOption(
+                icon: LucideIcons.stickyNote,
+                label: 'New Note',
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() => _currentIndex = 5);
+                },
+              ),
             ],
           ),
         );

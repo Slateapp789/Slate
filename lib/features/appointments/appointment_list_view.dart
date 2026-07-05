@@ -352,7 +352,10 @@ class _MonthCalendar extends StatelessWidget {
               final inMonth = date.month == month.month;
               final count = countForDay(date);
               return GestureDetector(
-                onTap: () => onDateSelected(_dateOnly(date)),
+                onTap: () {
+                  SlateHaptics.tap();
+                  onDateSelected(_dateOnly(date));
+                },
                 child: AnimatedContainer(
                   duration: AppMotion.fast,
                   curve: AppMotion.curve,
