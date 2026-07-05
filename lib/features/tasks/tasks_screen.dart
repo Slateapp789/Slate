@@ -846,7 +846,10 @@ class _TaskViewSwitcher extends StatelessWidget {
           final active = value == view;
           final count = _viewCount(view, counts);
           return GestureDetector(
-            onTap: () => onChanged(view),
+            onTap: () {
+              SlateHaptics.tap();
+              onChanged(view);
+            },
             child: Container(
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),

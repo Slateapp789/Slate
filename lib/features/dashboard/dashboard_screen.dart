@@ -96,24 +96,13 @@ class DashboardScreen extends ConsumerWidget {
                     _openAppointment(context, ref, appointment),
               ),
               const SizedBox(height: AppSpacing.lg),
-              _TodayScheduleSection(
+              _DailyCommandSection(
                 appointments: todayAppointments,
-                onOpenAppointment: (appointment) =>
-                    _openAppointment(context, ref, appointment),
-              ),
-              attention.when(
-                data: (items) => items.isEmpty
-                    ? const SizedBox.shrink()
-                    : Padding(
-                        padding: const EdgeInsets.only(top: AppSpacing.lg),
-                        child: _NeedsAttentionSection(
-                          items: items,
-                          onOpenItem: (item) =>
-                              _openAttentionItem(context, ref, item),
-                        ),
-                      ),
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
+                finance: finance,
+                tasks: tasks,
+                attention: attention,
+                onOpenAttentionItem: (item) =>
+                    _openAttentionItem(context, ref, item),
               ),
               const SizedBox(height: AppSpacing.lg),
               _QuickActionsSection(
@@ -561,281 +550,338 @@ class _NoMoreAppointments extends StatelessWidget {
   }
 }
 
-class _TodayScheduleSection extends StatelessWidget {
+class _DailyCommandSection extends StatelessWidget {
   final AsyncValue<List<Map<String, dynamic>>> appointments;
-  final ValueChanged<Map<String, dynamic>> onOpenAppointment;
+  final AsyncValue<FinanceSummary> finance;
+  final AsyncValue<List<SlateTask>> tasks;
+  final AsyncValue<List<DashboardAttentionItem>> attention;
+  final ValueChanged<DashboardAttentionItem> onOpenAttentionItem;
 
-  const _TodayScheduleSection({
+  const _DailyCommandSection({
     required this.appointments,
-    required this.onOpenAppointment,
+    required this.finance,
+    required this.tasks,
+    required this.attention,
+    required this.onOpenAttentionItem,
   });
 
   @override
   Widget build(BuildContext context) {
-    return appointments.when(
-      loading: () => const SlateLoadingBlock(height: 160, radius: AppRadius.lg),
-      error: (_, __) =>
-          const SlateErrorState(message: 'Could not load schedule'),
-      data: (rows) {
-        final sorted = _sortedToday(rows);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SlateSectionHeader(label: "TODAY'S SCHEDULE"),
-            const SizedBox(height: AppSpacing.xs),
-            if (sorted.isEmpty)
-              const SlateEmptyState(
-                icon: LucideIcons.calendar,
-                title: 'No appointments today',
-                subtitle: 'Use quick actions to add one.',
-              )
-            else
-              SlateSurface(
-                radius: AppRadius.lg,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.xxs,
-                ),
-                child: Column(
-                  children: sorted.asMap().entries.map((entry) {
-                    return _ScheduleRow(
-                      appointment: entry.value,
-                      isLast: entry.key == sorted.length - 1,
-                      onTap: () => onOpenAppointment(entry.value),
-                    );
-                  }).toList(),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
+    if (appointments.isLoading || finance.isLoading || tasks.isLoading) {
+      return const SlateLoadingBlock(height: 280, radius: AppRadius.xl);
+    }
+    if (appointments.hasError || finance.hasError || tasks.hasError) {
+      return const SlateErrorState(message: 'Could not load daily command');
+    }
 
-class _ScheduleRow extends StatelessWidget {
-  final Map<String, dynamic> appointment;
-  final bool isLast;
-  final VoidCallback onTap;
+    final rows = _sortedToday(appointments.value ?? const []);
+    final openTasks = (tasks.value ?? const [])
+        .where((task) => task.status != 'done')
+        .length;
+    final expected = _expectedToday(rows);
+    final weekPaid = finance.value!.thisWeekSummary.paid;
+    final focusItems = attention.value ?? const <DashboardAttentionItem>[];
 
-  const _ScheduleRow({
-    required this.appointment,
-    required this.isLast,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final start = _startTime(appointment);
-    final end = _endTime(appointment);
-    final location = _location(appointment);
-    final status = appointment['status']?.toString() ?? 'scheduled';
-    final isPast =
-        status == 'completed' ||
-        status == 'cancelled' ||
-        (end ?? start)?.isBefore(DateTime.now()) == true;
-    final alpha = isPast ? 0.48 : 1.0;
-
-    return Opacity(
-      opacity: alpha,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          onTap: () {
-            SlateHaptics.tap();
-            onTap();
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: isLast
-                    ? BorderSide.none
-                    : BorderSide(
-                        color: AppColors.border.withValues(alpha: 0.7),
-                      ),
-              ),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 96,
-                  child: Text(
-                    start == null ? '--:--' : slateTimeRange(start, end),
-                    style: const TextStyle(
-                      color: AppColors.t1,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.green,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _clientName(appointment),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.t1,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        [
-                          _serviceName(appointment),
-                          if (location != null) location,
-                        ].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.t3,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  LucideIcons.chevronRight,
-                  color: AppColors.t3,
-                  size: 16,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NeedsAttentionSection extends StatelessWidget {
-  final List<DashboardAttentionItem> items;
-  final ValueChanged<DashboardAttentionItem> onOpenItem;
-
-  const _NeedsAttentionSection({required this.items, required this.onOpenItem});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SlateSectionHeader(label: 'NEEDS ATTENTION'),
-        const SizedBox(height: AppSpacing.xs),
-        SlateSurface(
-          radius: AppRadius.lg,
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: items.take(4).toList().asMap().entries.map((entry) {
-              return _AttentionRow(
-                item: entry.value,
-                isLast: entry.key == items.take(4).length - 1,
-                onTap: () => onOpenItem(entry.value),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _AttentionRow extends StatelessWidget {
-  final DashboardAttentionItem item;
-  final bool isLast;
-  final VoidCallback onTap;
-
-  const _AttentionRow({
-    required this.item,
-    required this.isLast,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final (icon, color) = switch (item.type) {
-      DashboardAttentionType.unpaid => (LucideIcons.banknote, AppColors.error),
-      DashboardAttentionType.unconfirmedAppointment => (
-        LucideIcons.calendarClock,
-        AppColors.warning,
-      ),
-      DashboardAttentionType.overdueTask => (
-        LucideIcons.listChecks,
-        AppColors.warning,
-      ),
-      DashboardAttentionType.uncontactedLead => (
-        LucideIcons.user,
-        AppColors.green,
-      ),
-    };
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          SlateHaptics.action();
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: isLast
-                  ? BorderSide.none
-                  : BorderSide(color: AppColors.border.withValues(alpha: 0.7)),
-            ),
-          ),
-          child: Row(
+    return SlateSurface(
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      color: AppColors.modHome.withValues(alpha: 0.08),
+      borderColor: AppColors.modHome.withValues(alpha: 0.22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      'Daily command',
+                      style: TextStyle(
                         color: AppColors.t1,
-                        fontSize: 14,
+                        fontSize: 22,
                         fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xxs),
+                    SizedBox(height: AppSpacing.xxs),
                     Text(
-                      item.detail,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.t3, fontSize: 12),
+                      'Your next best moves',
+                      style: TextStyle(
+                        color: AppColors.t3,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
-                LucideIcons.chevronRight,
-                color: AppColors.t3,
-                size: 16,
+              _FocusPill(count: focusItems.length),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Expanded(
+                child: _CommandMetric(
+                  label: 'TO GO',
+                  value: '$openTasks',
+                  detail: 'open',
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: _CommandMetric(
+                  label: 'TODAY',
+                  value: '£${expected.toStringAsFixed(0)}',
+                  detail: 'expected',
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: _CommandMetric(
+                  label: 'WEEK',
+                  value: '£${weekPaid.toStringAsFixed(0)}',
+                  detail: 'paid',
+                ),
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.lg),
+          _CommandAttentionPanel(
+            items: focusItems,
+            onOpenItem: onOpenAttentionItem,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FocusPill extends StatelessWidget {
+  final int count;
+
+  const _FocusPill({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.warningDim,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
+      ),
+      child: Text(
+        '$count focus',
+        style: const TextStyle(
+          color: AppColors.warning,
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
         ),
+      ),
+    );
+  }
+}
+
+class _CommandMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final String detail;
+
+  const _CommandMetric({
+    required this.label,
+    required this.value,
+    required this.detail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 86),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard.withValues(alpha: 0.46),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.t3,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.t1,
+              fontSize: 25,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0,
+            ),
+          ),
+          Text(
+            detail,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.t3,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommandAttentionPanel extends StatelessWidget {
+  final List<DashboardAttentionItem> items;
+  final ValueChanged<DashboardAttentionItem> onOpenItem;
+
+  const _CommandAttentionPanel({required this.items, required this.onOpenItem});
+
+  @override
+  Widget build(BuildContext context) {
+    final topItems = items.take(3).toList();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.modHome.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.modHome.withValues(alpha: 0.22)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(
+                LucideIcons.alertCircle,
+                color: AppColors.warning,
+                size: 18,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              const Expanded(
+                child: Text(
+                  'Needs attention',
+                  style: TextStyle(
+                    color: AppColors.t1,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                '${items.length}',
+                style: const TextStyle(
+                  color: AppColors.t3,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (topItems.isEmpty)
+            const _CommandClearState()
+          else
+            for (final item in topItems) ...[
+              _CommandAttentionRow(item: item, onTap: () => onOpenItem(item)),
+              if (item != topItems.last) const SizedBox(height: AppSpacing.xs),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CommandClearState extends StatelessWidget {
+  const _CommandClearState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: const Row(
+        children: [
+          Icon(LucideIcons.checkCircle2, color: AppColors.statusSuccess),
+          SizedBox(width: AppSpacing.sm),
+          Text(
+            'Nothing needs attention',
+            style: TextStyle(
+              color: AppColors.t2,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommandAttentionRow extends StatelessWidget {
+  final DashboardAttentionItem item;
+  final VoidCallback onTap;
+
+  const _CommandAttentionRow({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (item.type) {
+      DashboardAttentionType.unpaid => LucideIcons.banknote,
+      DashboardAttentionType.unconfirmedAppointment =>
+        LucideIcons.calendarClock,
+      DashboardAttentionType.overdueTask => LucideIcons.listChecks,
+      DashboardAttentionType.uncontactedLead => LucideIcons.user,
+    };
+
+    return SlateSurface(
+      onTap: onTap,
+      radius: AppRadius.pill,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      color: AppColors.bgCard.withValues(alpha: 0.78),
+      borderColor: AppColors.border.withValues(alpha: 0.72),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.warning, size: 17),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.t1,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
+        ],
       ),
     );
   }
