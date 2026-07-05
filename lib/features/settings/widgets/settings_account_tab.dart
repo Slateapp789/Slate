@@ -165,7 +165,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'This includes the workspace data Slate currently stores for your account.',
+                'This includes the workspace data Workloop currently stores for your account.',
                 style: TextStyle(color: AppColors.t3, height: 1.4),
               ),
               const SizedBox(height: 14),

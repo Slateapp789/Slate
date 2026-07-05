@@ -116,7 +116,7 @@ class _ObHandleState extends ConsumerState<ObHandle> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     children: [
                       TextSpan(
-                        text: 'slate.app/',
+                        text: 'workloop.app/',
                         style: TextStyle(color: AppColors.t3),
                       ),
                       TextSpan(
@@ -157,7 +157,7 @@ class _ObHandleState extends ConsumerState<ObHandle> {
             decoration: InputDecoration(
               hintText: 'yourname',
               hintStyle: TextStyle(color: AppColors.t3),
-              prefixText: 'slate.app/',
+              prefixText: 'workloop.app/',
               prefixStyle: TextStyle(color: AppColors.t3, fontSize: 15),
               filled: true,
               fillColor: AppColors.bgCard,

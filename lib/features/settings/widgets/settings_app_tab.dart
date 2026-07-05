@@ -25,7 +25,7 @@ class SettingsAppTab extends ConsumerWidget {
           ),
           child: Column(
             children: [
-              infoRow('App', 'Slate'),
+              infoRow('App', 'Workloop'),
               Divider(height: 1, color: AppColors.border),
               infoRow('Version', '1.0.0 (MVP)'),
               Divider(height: 1, color: AppColors.border),

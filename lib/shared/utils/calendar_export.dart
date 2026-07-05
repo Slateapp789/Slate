@@ -9,7 +9,7 @@ String buildSlateIcs(List<Map<String, dynamic>> appointments) {
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Slate//Appointments//EN',
+    'PRODID:-//Workloop//Appointments//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     if (events.isNotEmpty) events,
@@ -23,7 +23,7 @@ String _event(Map<String, dynamic> row, String stamp) {
   final end =
       DateTime.tryParse(row['end_time']?.toString() ?? '')?.toUtc() ??
       start.add(const Duration(hours: 1));
-  final title = _clean(row['title']?.toString() ?? 'Slate appointment');
+  final title = _clean(row['title']?.toString() ?? 'Workloop appointment');
   final contact = _nestedName(row['contacts']);
   final service = _nestedName(row['services']);
   final description = _clean(
@@ -34,7 +34,7 @@ String _event(Map<String, dynamic> row, String stamp) {
         row['notes'].toString(),
     ].join('\\n'),
   );
-  final uid = _clean('${row['id'] ?? start.toIso8601String()}@slate');
+  final uid = _clean('${row['id'] ?? start.toIso8601String()}@workloop');
 
   return [
     'BEGIN:VEVENT',

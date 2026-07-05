@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slate/shared/models/slate_models.dart';
-import 'package:slate/shared/utils/calendar_export.dart';
-import 'package:slate/shared/utils/working_hours.dart';
+import 'package:workloop/shared/models/slate_models.dart';
+import 'package:workloop/shared/utils/calendar_export.dart';
+import 'package:workloop/shared/utils/working_hours.dart';
 
 void main() {
   group('Slate models', () {

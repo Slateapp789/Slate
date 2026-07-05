@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slate/shared/utils/date_format.dart';
+import 'package:workloop/shared/utils/date_format.dart';
 
 void main() {
   test('slate date labels are relative then explicit', () {

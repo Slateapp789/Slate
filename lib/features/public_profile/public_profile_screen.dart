@@ -109,7 +109,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
           if (data == null) {
             return const _ProfileMessage(
               title: 'Profile not found',
-              body: 'This Slate profile is not available.',
+              body: 'This Workloop profile is not available.',
             );
           }
           return _ProfileContent(
@@ -404,7 +404,7 @@ class _Hero extends StatelessWidget {
             const Icon(LucideIcons.link, color: AppColors.t3, size: 15),
             const SizedBox(width: 6),
             Text(
-              'slate.app/${profile.profile.handle}',
+              'workloop.app/${profile.profile.handle}',
               style: const TextStyle(color: AppColors.t3, fontSize: 13),
             ),
           ],

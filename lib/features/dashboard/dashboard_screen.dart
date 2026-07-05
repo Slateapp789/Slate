@@ -77,7 +77,7 @@ class DashboardScreen extends ConsumerWidget {
                 workspaceName: workspace.when(
                   data: (ws) => ws?['name']?.toString() ?? 'Your Business',
                   loading: () => '...',
-                  error: (_, __) => 'Slate',
+                  error: (_, __) => 'Workloop',
                 ),
                 unreadNotifications: unreadNotifications,
                 onNotifications: () => context.push('/notifications'),

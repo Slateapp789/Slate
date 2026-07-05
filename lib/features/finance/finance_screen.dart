@@ -602,8 +602,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                   const SizedBox(height: 12),
                   Text(
                     mode == 'monthly'
-                        ? 'Slate will show a weekly target of roughly one quarter of this.'
-                        : 'Slate will save this as a monthly target for the rest of the app.',
+                        ? 'Workloop will show a weekly target of roughly one quarter of this.'
+                        : 'Workloop will save this as a monthly target for the rest of the app.',
                     style: const TextStyle(fontSize: 12, color: AppColors.t3),
                   ),
                   const SizedBox(height: 18),

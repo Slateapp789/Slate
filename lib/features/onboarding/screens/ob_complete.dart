@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/onboarding_provider.dart';
+import '../../../shared/providers/workspace_provider.dart';
 import '../../../shared/repositories/slate_repositories.dart';
-import '../../../main.dart';
 
 class ObComplete extends ConsumerStatefulWidget {
   const ObComplete({super.key});
@@ -18,6 +19,8 @@ class _ObCompleteState extends ConsumerState<ObComplete>
   late Animation<double> _fadeIn;
   late Animation<double> _slideUp;
   bool _saving = false;
+  bool _saved = false;
+  String? _saveError;
 
   @override
   void initState() {
@@ -42,7 +45,11 @@ class _ObCompleteState extends ConsumerState<ObComplete>
   }
 
   Future<void> _saveWorkspace() async {
-    setState(() => _saving = true);
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
     try {
       final onboarding = ref.read(onboardingProvider);
       await ref
@@ -56,19 +63,26 @@ class _ObCompleteState extends ConsumerState<ObComplete>
             revenueTarget: onboarding.revenueTarget,
             firstBooking: onboarding.firstBooking,
           );
+      ref.invalidate(workspaceProvider);
+      if (!mounted) return;
+      setState(() => _saved = true);
     } catch (e, stack) {
       debugPrint('Error saving workspace: $e');
       debugPrint('Stack: $stack');
+      if (!mounted) return;
+      setState(() {
+        _saved = false;
+        _saveError =
+            'We could not finish setting up your workspace. Try again.';
+      });
     } finally {
-      setState(() => _saving = false);
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   void _goToDashboard() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const MainShell()),
-      (route) => false,
-    );
+    if (!_saved) return;
+    context.go('/');
   }
 
   @override
@@ -92,14 +106,22 @@ class _ObCompleteState extends ConsumerState<ObComplete>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Spacer(),
-            const Text('🎉', style: TextStyle(fontSize: 64)),
+            Icon(
+              _saveError == null
+                  ? Icons.celebration_rounded
+                  : Icons.error_outline_rounded,
+              size: 64,
+              color: _saveError == null ? AppColors.green : AppColors.error,
+            ),
             const SizedBox(height: 24),
-            const Text(
-              'Your workspace\nis ready.',
+            Text(
+              _saveError == null
+                  ? 'Your workspace\nis ready.'
+                  : 'Setup needs\none more try.',
               style: TextStyle(
                 fontSize: 36,
                 fontWeight: FontWeight.w900,
-                color: AppColors.t1,
+                color: _saveError == null ? AppColors.t1 : AppColors.error,
                 letterSpacing: 0,
                 height: 1.1,
               ),
@@ -112,7 +134,7 @@ class _ObCompleteState extends ConsumerState<ObComplete>
             const SizedBox(height: 10),
             _SummaryRow(
               icon: Icons.link_rounded,
-              label: 'slate.app/${onboarding.handle}',
+              label: 'workloop.app/${onboarding.handle}',
               color: AppColors.green,
             ),
             const SizedBox(height: 10),
@@ -129,12 +151,29 @@ class _ObCompleteState extends ConsumerState<ObComplete>
                 color: AppColors.green,
               ),
             ],
+            if (_saveError != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                _saveError!,
+                style: const TextStyle(
+                  color: AppColors.t2,
+                  fontSize: 15,
+                  height: 1.4,
+                ),
+              ),
+            ],
             const Spacer(),
             SizedBox(
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: _saving ? null : _goToDashboard,
+                onPressed: _saving
+                    ? null
+                    : _saveError != null
+                    ? _saveWorkspace
+                    : _saved
+                    ? _goToDashboard
+                    : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.green,
                   disabledBackgroundColor: AppColors.bgInteract,
@@ -153,8 +192,12 @@ class _ObCompleteState extends ConsumerState<ObComplete>
                           strokeWidth: 2,
                         ),
                       )
-                    : const Text(
-                        'Go to my Dashboard',
+                    : Text(
+                        _saveError != null
+                            ? 'Try again'
+                            : _saved
+                            ? 'Go to my Dashboard'
+                            : 'Setting up workspace...',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,

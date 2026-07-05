@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slate/features/appointments/appointments_screen.dart';
+import 'package:workloop/features/appointments/appointments_screen.dart';
 
 void main() {
   test('selectNextBooking returns the soonest active booking from now', () {

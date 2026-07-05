@@ -42,7 +42,7 @@ class SlateApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'Slate',
+      title: 'Workloop',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       routerConfig: _router,
@@ -142,7 +142,14 @@ class WorkspaceGate extends ConsumerWidget {
     final workspace = ref.watch(workspaceProvider);
     return workspace.when(
       loading: () => const _LoadingScreen(),
-      error: (e, _) => const AuthScreen(),
+      error: (e, _) => _WorkspaceErrorScreen(
+        message: e.toString(),
+        onRetry: () => ref.invalidate(workspaceProvider),
+        onSignOut: () async {
+          await Supabase.instance.client.auth.signOut();
+          ref.invalidate(workspaceProvider);
+        },
+      ),
       data: (ws) {
         if (ws == null) return const OnboardingScreen();
         const seedDemoData = bool.fromEnvironment('SEED_DEMO_DATA');
@@ -544,6 +551,89 @@ class _NavItem {
   });
 }
 
+class _WorkspaceErrorScreen extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  final Future<void> Function() onSignOut;
+
+  const _WorkspaceErrorScreen({
+    required this.message,
+    required this.onRetry,
+    required this.onSignOut,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Center(
+            child: SlateSurface(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    LucideIcons.alertTriangle,
+                    color: AppColors.warning,
+                    size: 32,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  const Text(
+                    'Could not open your workspace',
+                    style: TextStyle(
+                      color: AppColors.t1,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    message,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SlateButton(
+                          label: 'Try again',
+                          icon: LucideIcons.refreshCcw,
+                          onPressed: onRetry,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: SlateButton(
+                          label: 'Sign out',
+                          icon: LucideIcons.logOut,
+                          secondary: true,
+                          onPressed: () {
+                            onSignOut();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _LoadingScreen extends StatelessWidget {
   const _LoadingScreen();
 
@@ -575,7 +665,7 @@ class _LoadingScreen extends StatelessWidget {
               ),
               SizedBox(height: AppSpacing.md),
               Text(
-                'Opening Slate',
+                'Opening Workloop',
                 style: TextStyle(
                   color: AppColors.t3,
                   fontWeight: FontWeight.w700,

@@ -190,7 +190,7 @@ class _SyncInfoCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             enabled
-                ? '${_providerLabel(provider)} export is enabled. Copy the feed into your calendar app to see Slate bookings outside the app.'
+                ? '${_providerLabel(provider)} export is enabled. Copy the feed into your calendar app to see Workloop bookings outside the app.'
                 : 'Start with a safe calendar export feed. Google and Apple two-way sync can come later without mixing provider logic into bookings.',
             style: const TextStyle(
               color: AppColors.t3,
