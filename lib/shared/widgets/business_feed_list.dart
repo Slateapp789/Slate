@@ -11,6 +11,7 @@ class BusinessFeedList extends StatelessWidget {
   final int? limit;
   final ValueChanged<BusinessFeedItem>? onItemTap;
   final VoidCallback? onViewAll;
+  final String? emptyMessage;
 
   const BusinessFeedList({
     super.key,
@@ -19,13 +20,14 @@ class BusinessFeedList extends StatelessWidget {
     this.limit,
     this.onItemTap,
     this.onViewAll,
+    this.emptyMessage,
   });
 
   @override
   Widget build(BuildContext context) {
     final visibleItems = limit == null ? items : items.take(limit!).toList();
     if (visibleItems.isEmpty) {
-      return const _BusinessFeedEmptyState();
+      return _BusinessFeedEmptyState(message: emptyMessage);
     }
 
     final sections = _groupItems(visibleItems);
@@ -267,7 +269,9 @@ class _FeedSectionLabel extends StatelessWidget {
 }
 
 class _BusinessFeedEmptyState extends StatelessWidget {
-  const _BusinessFeedEmptyState();
+  final String? message;
+
+  const _BusinessFeedEmptyState({this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -279,15 +283,16 @@ class _BusinessFeedEmptyState extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.border),
       ),
-      child: const Row(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(LucideIcons.activity, color: AppColors.modHome, size: 18),
-          SizedBox(width: AppSpacing.sm),
+          const Icon(LucideIcons.activity, color: AppColors.modHome, size: 18),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              'Your business feed will appear here as bookings, payments, tasks and notes happen.',
-              style: TextStyle(
+              message ??
+                  'Your business feed will appear here as bookings, payments, tasks and notes happen.',
+              style: const TextStyle(
                 color: AppColors.t3,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,

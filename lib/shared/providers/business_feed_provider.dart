@@ -13,17 +13,42 @@ import 'workspace_provider.dart';
 final businessFeedProvider = FutureProvider<List<BusinessFeedItem>>((
   ref,
 ) async {
-  final workspaceId = await ref.watch(workspaceIdProvider.future);
-  final appointments = await ref.watch(appointmentsProvider.future);
-  final payments = await ref.watch(invoicesProvider.future);
-  final expenses = await ref.watch(expensesProvider.future);
-  final tasks = await ref.watch(allTasksProvider.future);
-  final notes = await ref.watch(allNotesProvider.future);
-  final clients = await ref.watch(clientsProvider.future);
-  final finance = await ref.watch(financeSummaryProvider.future);
-  final bookingRequests = workspaceId == null
-      ? <BookingRequest>[]
-      : await ref.watch(profileRepositoryProvider).bookingRequests(workspaceId);
+  final workspaceIdFuture = ref.watch(workspaceIdProvider.future);
+  final appointmentsFuture = ref.watch(appointmentsProvider.future);
+  final paymentsFuture = ref.watch(invoicesProvider.future);
+  final expensesFuture = ref.watch(expensesProvider.future);
+  final tasksFuture = ref.watch(allTasksProvider.future);
+  final notesFuture = ref.watch(allNotesProvider.future);
+  final clientsFuture = ref.watch(clientsProvider.future);
+  final financeFuture = ref.watch(financeSummaryProvider.future);
+
+  final workspaceId = await workspaceIdFuture;
+  final appointments = await safeBusinessFeedSource(
+    appointmentsFuture,
+    const <Map<String, dynamic>>[],
+  );
+  final payments = await safeBusinessFeedSource(
+    paymentsFuture,
+    const <Payment>[],
+  );
+  final expenses = await safeBusinessFeedSource(
+    expensesFuture,
+    const <Expense>[],
+  );
+  final tasks = await safeBusinessFeedSource(tasksFuture, const <SlateTask>[]);
+  final notes = await safeBusinessFeedSource(notesFuture, const <SlateNote>[]);
+  final clients = await safeBusinessFeedSource(clientsFuture, const <Client>[]);
+  final finance = await safeBusinessFeedSource(
+    financeFuture,
+    _emptyFinanceSummary(),
+  );
+  var bookingRequests = <BookingRequest>[];
+  if (workspaceId != null && ref.mounted) {
+    bookingRequests = await safeBusinessFeedSource(
+      ref.read(profileRepositoryProvider).bookingRequests(workspaceId),
+      const <BookingRequest>[],
+    );
+  }
 
   return buildBusinessFeedItems(
     appointments: appointments,
@@ -135,7 +160,7 @@ List<BusinessFeedItem> buildBusinessFeedItems({
 
   _addBookingItems(items, typedAppointments, current, today, tomorrow);
   _addPaymentItems(items, payments, current, today, weekAgo);
-  _addExpenseItems(items, expenses, weekAgo);
+  _addExpenseItems(items, expenses, weekAgo, today);
   _addTaskItems(items, tasks, today);
   _addNoteItems(items, notes, weekAgo);
   _addClientFollowUps(items, clients, upcomingContactIds, current);
@@ -219,9 +244,9 @@ void _addPaymentItems(
         BusinessFeedItem(
           id: 'payment-paid-${payment.id}',
           type: BusinessFeedItemType.paymentReceived,
-          title:
-              '£${payment.total.toStringAsFixed(0)} received${payment.clientName == null ? '' : ' from ${payment.clientName}'}',
-          subtitle: 'Paid ${_relativeDay(paidDay, today)}',
+          title: 'Paid payment',
+          subtitle:
+              '£${payment.total.toStringAsFixed(0)}${payment.clientName == null ? '' : ' from ${payment.clientName}'} · Business date ${_businessDateLabel(paidDay, today)}',
           timestamp: payment.issueDate,
           priority: BusinessFeedPriority.positive,
           sourceType: BusinessFeedSourceType.payment,
@@ -280,15 +305,19 @@ void _addExpenseItems(
   List<BusinessFeedItem> items,
   List<Expense> expenses,
   DateTime weekAgo,
+  DateTime today,
 ) {
-  for (final expense in expenses.take(12)) {
-    if (expense.expenseDate.isBefore(weekAgo)) continue;
+  final recentExpenses = expenses
+      .where((expense) => !expense.expenseDate.isBefore(weekAgo))
+      .take(12);
+  for (final expense in recentExpenses) {
     items.add(
       BusinessFeedItem(
         id: 'expense-${expense.id}',
         type: BusinessFeedItemType.expenseRecorded,
-        title: '£${expense.amount.toStringAsFixed(0)} expense recorded',
-        subtitle: expense.category,
+        title: 'Expense logged',
+        subtitle:
+            '£${expense.amount.toStringAsFixed(0)} · ${expense.category} · Business date ${_businessDateLabel(expense.expenseDate, today)}',
         timestamp: expense.expenseDate,
         priority: BusinessFeedPriority.normal,
         sourceType: BusinessFeedSourceType.expense,
@@ -344,9 +373,24 @@ void _addNoteItems(
   List<SlateNote> notes,
   DateTime weekAgo,
 ) {
-  for (final note in notes.take(10)) {
-    final timestamp = note.updatedAt ?? note.createdAt;
-    if (timestamp == null || timestamp.isBefore(weekAgo)) continue;
+  final recentNotes =
+      notes
+          .map(
+            (note) => _FeedNote(
+              note: note,
+              timestamp: note.updatedAt ?? note.createdAt,
+            ),
+          )
+          .where(
+            (entry) =>
+                entry.timestamp != null && !entry.timestamp!.isBefore(weekAgo),
+          )
+          .toList()
+        ..sort((a, b) => b.timestamp!.compareTo(a.timestamp!));
+
+  for (final entry in recentNotes.take(10)) {
+    final note = entry.note;
+    final timestamp = entry.timestamp!;
     items.add(
       BusinessFeedItem(
         id: 'note-${note.id}',
@@ -437,7 +481,7 @@ void _addQuietDayItem(
 ) {
   final afternoonStart = DateTime(today.year, today.month, today.day, 14);
   final hasAfternoonBooking = activeToday.any(
-    (item) => item.startTime.toLocal().isAfter(afternoonStart),
+    (item) => !item.startTime.toLocal().isBefore(afternoonStart),
   );
   if (current.isAfter(afternoonStart) || hasAfternoonBooking) return;
   items.add(
@@ -541,6 +585,62 @@ String _relativeDay(DateTime date, DateTime today) {
   if (day == today.subtract(const Duration(days: 1))) return 'yesterday';
   if (day == today.add(const Duration(days: 1))) return 'tomorrow';
   return _dateKey(day);
+}
+
+String _businessDateLabel(DateTime date, DateTime today) {
+  final day = _startOfDay(date);
+  if (day == today) return 'today';
+  if (day == today.subtract(const Duration(days: 1))) return 'yesterday';
+  if (day == today.add(const Duration(days: 1))) return 'tomorrow';
+  return _dateKey(day);
+}
+
+Future<T> safeBusinessFeedSource<T>(Future<T> future, T fallback) async {
+  try {
+    return await future;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+FinanceSummary _emptyFinanceSummary() {
+  return const FinanceSummary(
+    monthlyTarget: 0,
+    weeklyTarget: 0,
+    thisWeekPaid: 0,
+    lastWeekPaid: 0,
+    thisMonthPaid: 0,
+    lastMonthPaid: 0,
+    unpaid: 0,
+    overdue: 0,
+    thisWeekExpenses: 0,
+    thisMonthExpenses: 0,
+    thisWeekNet: 0,
+    thisMonthNet: 0,
+    thisWeekSummary: PeriodMoneySummary(
+      label: 'This week',
+      paid: 0,
+      unpaid: 0,
+      overdue: 0,
+      expenses: 0,
+      categoryTotals: {},
+    ),
+    thisMonthSummary: PeriodMoneySummary(
+      label: 'This month',
+      paid: 0,
+      unpaid: 0,
+      overdue: 0,
+      expenses: 0,
+      categoryTotals: {},
+    ),
+  );
+}
+
+class _FeedNote {
+  final SlateNote note;
+  final DateTime? timestamp;
+
+  const _FeedNote({required this.note, required this.timestamp});
 }
 
 int _priorityRank(BusinessFeedPriority priority) {

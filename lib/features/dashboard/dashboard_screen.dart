@@ -213,7 +213,12 @@ class DashboardScreen extends ConsumerWidget {
       return;
     }
     if (route == '/payments') {
-      onOpenMoneyFollowUps();
+      if (item.type == BusinessFeedItemType.invoiceOverdue ||
+          item.type == BusinessFeedItemType.invoiceUnpaid) {
+        onOpenMoneyFollowUps();
+      } else {
+        onNavigate(3);
+      }
       return;
     }
     if (route == '/tasks') {

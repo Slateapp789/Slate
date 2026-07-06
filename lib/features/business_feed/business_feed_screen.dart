@@ -89,6 +89,7 @@ class _BusinessFeedScreenState extends ConsumerState<BusinessFeedScreen> {
                         const SlateErrorState(message: 'Could not load feed'),
                     data: (items) => BusinessFeedList(
                       items: filteredBusinessFeedItems(items, _filter),
+                      emptyMessage: _emptyMessageFor(_filter),
                       onItemTap: _openFeedItem,
                     ),
                   ),
@@ -134,6 +135,23 @@ class _BusinessFeedScreenState extends ConsumerState<BusinessFeedScreen> {
       return;
     }
     context.go(route);
+  }
+
+  String _emptyMessageFor(BusinessFeedFilter filter) {
+    return switch (filter) {
+      BusinessFeedFilter.all =>
+        'Your business feed will appear here as bookings, payments, tasks and notes happen.',
+      BusinessFeedFilter.attention =>
+        'Nothing needs attention right now. New follow-ups, overdue tasks and payment reminders will appear here.',
+      BusinessFeedFilter.money =>
+        'Money activity will appear here as payments and expenses are logged.',
+      BusinessFeedFilter.bookings =>
+        'Booking activity will appear here as bookings and requests come in.',
+      BusinessFeedFilter.tasks =>
+        'Task activity will appear here when tasks are due or overdue.',
+      BusinessFeedFilter.clients =>
+        'Client follow-ups will appear here when a customer or lead needs attention.',
+    };
   }
 }
 
