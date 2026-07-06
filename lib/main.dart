@@ -7,6 +7,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'core/theme/app_theme.dart';
 import 'core/supabase/supabase_config.dart';
 import 'features/auth/auth_screen.dart';
+import 'features/business_feed/business_feed_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/clients/clients_screen.dart';
 import 'features/clients/add_client_screen.dart';
@@ -59,6 +60,10 @@ final _router = GoRouter(
       builder: (context, state) => const OnboardingScreen(),
     ),
     GoRoute(path: '/home', builder: (context, state) => const MainShell()),
+    GoRoute(
+      path: '/business-feed',
+      builder: (context, state) => const BusinessFeedScreen(),
+    ),
     GoRoute(
       path: '/clients',
       builder: (context, state) => const MainShell(initialIndex: 1),

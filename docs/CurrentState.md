@@ -1,6 +1,6 @@
 # Workloop Current State
 
-Last updated: 2026-06-07
+Last updated: 2026-07-06
 
 ## Completed / Mostly Working Features
 
@@ -31,17 +31,29 @@ Last updated: 2026-06-07
 - Tabs: Home, Clients, Bookings, Money, Tasks.
 - Floating action button with creation sheet.
 - Tasks, Work/Bookings, and Payments routes can deep-link to shell indexes.
+- Business Feed route opens from Home without adding a bottom navigation tab.
 
 ### Dashboard
 
 - Revenue card.
 - Today pulse / business pulse.
+- Morning Briefing with rules-based next-action recommendation.
 - Today schedule.
 - Tasks section.
+- Daily Command preview of computed Business Feed activity.
 - Notification access and unread count.
 - Booking request visibility.
 - Pull-to-refresh.
 - Navigation callbacks into core modules.
+
+### Business Feed
+
+- Computed feed generated from existing bookings, clients, payments, expenses, tasks, notes, booking requests, and weekly target progress.
+- Feed item types include today's bookings, upcoming bookings, payment received, unpaid/overdue invoices, expenses, due/overdue tasks, notes, client follow-ups, booking requests, quiet-day detection, daily summary, and weekly target progress.
+- Home preview appears inside Daily Command with a View all action.
+- Full Business Feed screen includes All, Needs attention, Money, Bookings, Tasks, and Clients filters.
+- Feed row taps route to the most useful existing module or booking request screen where exact detail routes do not yet exist.
+- No persisted feed table or AI dependency has been introduced.
 
 ### Clients / CRM
 

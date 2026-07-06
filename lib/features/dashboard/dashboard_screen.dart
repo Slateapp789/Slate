@@ -4,14 +4,19 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../shared/models/business_feed_item.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/providers/appointments_provider.dart';
+import '../../shared/providers/business_feed_provider.dart';
+import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/finance_provider.dart';
+import '../../shared/providers/notes_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/utils/date_format.dart';
+import '../../shared/widgets/business_feed_list.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../appointments/add_appointment_screen.dart';
 import '../appointments/appointment_detail_screen.dart';
@@ -44,6 +49,7 @@ class DashboardScreen extends ConsumerWidget {
     final finance = ref.watch(financeSummaryProvider);
     final tasks = ref.watch(allTasksProvider);
     final attention = ref.watch(dashboardAttentionProvider);
+    final feed = ref.watch(businessFeedProvider);
     final unreadNotifications = ref.watch(unreadNotificationsProvider);
 
     return Scaffold(
@@ -55,11 +61,15 @@ class DashboardScreen extends ConsumerWidget {
           ref.invalidate(workspaceProvider);
           ref.invalidate(todayAppointmentsProvider);
           ref.invalidate(appointmentsProvider);
+          ref.invalidate(clientsProvider);
           ref.invalidate(financeSummaryProvider);
           ref.invalidate(invoicesProvider);
+          ref.invalidate(expensesProvider);
           ref.invalidate(allTasksProvider);
           ref.invalidate(tasksProvider);
+          ref.invalidate(allNotesProvider);
           ref.invalidate(dashboardAttentionProvider);
+          ref.invalidate(businessFeedProvider);
           ref.invalidate(unreadNotificationsProvider);
         },
         child: SingleChildScrollView(
@@ -101,8 +111,11 @@ class DashboardScreen extends ConsumerWidget {
                 finance: finance,
                 tasks: tasks,
                 attention: attention,
+                feed: feed,
                 onOpenAttentionItem: (item) =>
                     _openAttentionItem(context, ref, item),
+                onOpenFeedItem: (item) => _openFeedItem(context, item),
+                onViewAllFeed: () => context.push('/business-feed'),
               ),
               const SizedBox(height: AppSpacing.lg),
               _QuickActionsSection(
@@ -186,6 +199,32 @@ class DashboardScreen extends ConsumerWidget {
           );
         }
     }
+  }
+
+  void _openFeedItem(BuildContext context, BusinessFeedItem item) {
+    final route = item.routeTarget;
+    if (route == null) return;
+    if (route == '/clients') {
+      onNavigate(1);
+      return;
+    }
+    if (route == '/work') {
+      onNavigate(2);
+      return;
+    }
+    if (route == '/payments') {
+      onOpenMoneyFollowUps();
+      return;
+    }
+    if (route == '/tasks') {
+      onNavigate(4);
+      return;
+    }
+    if (route == '/notes') {
+      onNavigate(5);
+      return;
+    }
+    context.push(route);
   }
 }
 
@@ -332,6 +371,11 @@ class _GlanceZone extends StatelessWidget {
       finance: finance.value!,
       tasks: tasks.value ?? const [],
     );
+    final recommendation = _briefingRecommendation(
+      appointments: rows,
+      finance: finance.value!,
+      tasks: tasks.value ?? const [],
+    );
 
     return SlateSurface(
       radius: AppRadius.xl,
@@ -345,7 +389,7 @@ class _GlanceZone extends StatelessWidget {
               Icon(LucideIcons.sparkles, size: 15, color: AppColors.green),
               SizedBox(width: AppSpacing.xs),
               Text(
-                'AT A GLANCE',
+                'MORNING BRIEFING',
                 style: TextStyle(
                   color: AppColors.t3,
                   fontSize: 10,
@@ -386,6 +430,8 @@ class _GlanceZone extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
           ],
+          _BriefingRecommendation(label: recommendation),
+          const SizedBox(height: AppSpacing.md),
           if (next == null)
             const _NoMoreAppointments()
           else
@@ -426,6 +472,53 @@ class _GlanceMetric extends StatelessWidget {
               color: AppColors.t2,
               fontSize: 12,
               fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BriefingRecommendation extends StatelessWidget {
+  final String label;
+
+  const _BriefingRecommendation({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.modHome.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.modHome.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.bgCard.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: const Icon(
+              LucideIcons.arrowRight,
+              color: AppColors.modHome,
+              size: 17,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.t1,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
@@ -555,14 +648,20 @@ class _DailyCommandSection extends StatelessWidget {
   final AsyncValue<FinanceSummary> finance;
   final AsyncValue<List<SlateTask>> tasks;
   final AsyncValue<List<DashboardAttentionItem>> attention;
+  final AsyncValue<List<BusinessFeedItem>> feed;
   final ValueChanged<DashboardAttentionItem> onOpenAttentionItem;
+  final ValueChanged<BusinessFeedItem> onOpenFeedItem;
+  final VoidCallback onViewAllFeed;
 
   const _DailyCommandSection({
     required this.appointments,
     required this.finance,
     required this.tasks,
     required this.attention,
+    required this.feed,
     required this.onOpenAttentionItem,
+    required this.onOpenFeedItem,
+    required this.onViewAllFeed,
   });
 
   @override
@@ -652,6 +751,72 @@ class _DailyCommandSection extends StatelessWidget {
           _CommandAttentionPanel(
             items: focusItems,
             onOpenItem: onOpenAttentionItem,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _CommandFeedPreview(
+            feed: feed,
+            onOpenFeedItem: onOpenFeedItem,
+            onViewAllFeed: onViewAllFeed,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommandFeedPreview extends StatelessWidget {
+  final AsyncValue<List<BusinessFeedItem>> feed;
+  final ValueChanged<BusinessFeedItem> onOpenFeedItem;
+  final VoidCallback onViewAllFeed;
+
+  const _CommandFeedPreview({
+    required this.feed,
+    required this.onOpenFeedItem,
+    required this.onViewAllFeed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard.withValues(alpha: 0.56),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.86)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(LucideIcons.activity, color: AppColors.modHome, size: 18),
+              SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Business Feed',
+                  style: TextStyle(
+                    color: AppColors.t1,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          feed.when(
+            loading: () =>
+                const SlateLoadingBlock(height: 116, radius: AppRadius.lg),
+            error: (_, __) =>
+                const SlateErrorState(message: 'Could not load feed'),
+            data: (items) => BusinessFeedList(
+              items: items,
+              compact: true,
+              limit: 4,
+              onItemTap: onOpenFeedItem,
+              onViewAll: onViewAllFeed,
+            ),
           ),
         ],
       ),
@@ -1112,6 +1277,26 @@ String _summarySentence({
     parts.add('$taskCount task${taskCount == 1 ? '' : 's'} due');
   }
   return parts.join(' · ');
+}
+
+String _briefingRecommendation({
+  required List<Map<String, dynamic>> appointments,
+  required FinanceSummary finance,
+  required List<SlateTask> tasks,
+}) {
+  final overdueTasks = tasks.where((task) {
+    final due = task.dueDate;
+    if (task.status == 'done' || due == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(due.year, due.month, due.day);
+    return dueDay.isBefore(today);
+  }).length;
+  final appointmentCount = _activeAppointmentCount(appointments);
+  if (finance.overdue > 0) return 'Send overdue payment reminder';
+  if (overdueTasks > 0) return 'Clear overdue tasks before the day moves on';
+  if (appointmentCount > 0) return 'Review today\'s bookings';
+  return 'No urgent actions today';
 }
 
 int _activeAppointmentCount(List<Map<String, dynamic>> appointments) {
