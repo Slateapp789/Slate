@@ -130,11 +130,7 @@ class _BusinessFeedScreenState extends ConsumerState<BusinessFeedScreen> {
     final route = item.routeTarget;
     if (route == null) return;
     SlateHaptics.action();
-    if (route == '/booking-requests') {
-      context.push(route);
-      return;
-    }
-    context.go(route);
+    context.push(route);
   }
 
   String _emptyMessageFor(BusinessFeedFilter filter) {
