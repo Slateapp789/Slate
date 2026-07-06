@@ -225,83 +225,118 @@ class DashboardAttentionItem {
 
 final dashboardAttentionProvider = FutureProvider<List<DashboardAttentionItem>>(
   (ref) async {
-    final payments = await ref.watch(invoicesProvider.future);
-    final tasks = await ref.watch(allTasksProvider.future);
-    final appointments = await ref.watch(todayAppointmentsProvider.future);
-    final clients = await ref.watch(clientsProvider.future);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final items = <DashboardAttentionItem>[];
+    final paymentsFuture = ref.watch(invoicesProvider.future);
+    final tasksFuture = ref.watch(allTasksProvider.future);
+    final appointmentsFuture = ref.watch(todayAppointmentsProvider.future);
+    final clientsFuture = ref.watch(clientsProvider.future);
 
-    for (final payment in payments) {
-      if (payment.status == 'paid') continue;
-      final dueDate = payment.dueDate ?? payment.issueDate;
-      final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
-      if (today.difference(dueDay) <= dashboardUnpaidThreshold) continue;
-      items.add(
-        DashboardAttentionItem(
-          type: DashboardAttentionType.unpaid,
-          title: 'Collect £${payment.total.toStringAsFixed(0)}',
-          detail: payment.clientName ?? payment.number,
-          source: payment,
-          sortTime: dueDate,
-        ),
-      );
-    }
+    final payments = await safeDashboardSource(
+      paymentsFuture,
+      const <Payment>[],
+    );
+    final tasks = await safeDashboardSource(tasksFuture, const <SlateTask>[]);
+    final appointments = await safeDashboardSource(
+      appointmentsFuture,
+      const <Map<String, dynamic>>[],
+    );
+    final clients = await safeDashboardSource(clientsFuture, const <Client>[]);
 
-    for (final row in appointments) {
-      final appointment = Appointment.fromMap(row);
-      final status = appointment.status.toLowerCase();
-      final isUnconfirmed = status == 'unconfirmed' || status == 'pending';
-      final startsSoon =
-          appointment.startTime.isAfter(now) &&
-          appointment.startTime.difference(now) <=
-              dashboardUnconfirmedThreshold;
-      if (!isUnconfirmed || !startsSoon) continue;
-      items.add(
-        DashboardAttentionItem(
-          type: DashboardAttentionType.unconfirmedAppointment,
-          title: 'Confirm ${appointment.clientName ?? 'appointment'}',
-          detail: appointment.serviceName ?? appointment.title ?? 'Today',
-          source: row,
-          sortTime: appointment.startTime,
-        ),
-      );
-    }
-
-    for (final task in tasks) {
-      final due = task.dueDate;
-      if (task.status == 'done' || due == null) continue;
-      final dueDay = DateTime(due.year, due.month, due.day);
-      if (!dueDay.isBefore(today)) continue;
-      items.add(
-        DashboardAttentionItem(
-          type: DashboardAttentionType.overdueTask,
-          title: task.title,
-          detail: task.clientName ?? 'Overdue task',
-          source: task,
-          sortTime: due,
-        ),
-      );
-    }
-
-    for (final client in clients) {
-      if (client.status != 'lead') continue;
-      final latest = client.lastActivityAt ?? client.createdAt;
-      if (latest == null) continue;
-      if (now.difference(latest) <= dashboardUncontactedThreshold) continue;
-      items.add(
-        DashboardAttentionItem(
-          type: DashboardAttentionType.uncontactedLead,
-          title: 'Contact ${client.name}',
-          detail: 'Lead waiting ${now.difference(latest).inDays}d',
-          source: client,
-          sortTime: latest,
-        ),
-      );
-    }
-
-    items.sort((a, b) => a.sortTime.compareTo(b.sortTime));
-    return items;
+    return buildDashboardAttentionItems(
+      payments: payments,
+      tasks: tasks,
+      appointments: appointments,
+      clients: clients,
+    );
   },
 );
+
+Future<T> safeDashboardSource<T>(Future<T> future, T fallback) async {
+  try {
+    return await future;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+List<DashboardAttentionItem> buildDashboardAttentionItems({
+  required List<Payment> payments,
+  required List<SlateTask> tasks,
+  required List<Map<String, dynamic>> appointments,
+  required List<Client> clients,
+  DateTime? now,
+}) {
+  final current = now ?? DateTime.now();
+  final today = DateTime(current.year, current.month, current.day);
+  final items = <DashboardAttentionItem>[];
+
+  for (final payment in payments) {
+    if (payment.status == 'paid') continue;
+    final dueDate = payment.dueDate ?? payment.issueDate;
+    final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    if (today.difference(dueDay) <= dashboardUnpaidThreshold) continue;
+    items.add(
+      DashboardAttentionItem(
+        type: DashboardAttentionType.unpaid,
+        title: 'Collect £${payment.total.toStringAsFixed(0)}',
+        detail: payment.clientName ?? payment.number,
+        source: payment,
+        sortTime: dueDate,
+      ),
+    );
+  }
+
+  for (final row in appointments) {
+    final appointment = Appointment.fromMap(row);
+    final status = appointment.status.toLowerCase();
+    final isUnconfirmed = status == 'unconfirmed' || status == 'pending';
+    final startsSoon =
+        appointment.startTime.isAfter(current) &&
+        appointment.startTime.difference(current) <=
+            dashboardUnconfirmedThreshold;
+    if (!isUnconfirmed || !startsSoon) continue;
+    items.add(
+      DashboardAttentionItem(
+        type: DashboardAttentionType.unconfirmedAppointment,
+        title: 'Confirm ${appointment.clientName ?? 'appointment'}',
+        detail: appointment.serviceName ?? appointment.title ?? 'Today',
+        source: row,
+        sortTime: appointment.startTime,
+      ),
+    );
+  }
+
+  for (final task in tasks) {
+    final due = task.dueDate;
+    if (task.status == 'done' || due == null) continue;
+    final dueDay = DateTime(due.year, due.month, due.day);
+    if (!dueDay.isBefore(today)) continue;
+    items.add(
+      DashboardAttentionItem(
+        type: DashboardAttentionType.overdueTask,
+        title: task.title,
+        detail: task.clientName ?? 'Overdue task',
+        source: task,
+        sortTime: due,
+      ),
+    );
+  }
+
+  for (final client in clients) {
+    if (client.status != 'lead') continue;
+    final latest = client.lastActivityAt ?? client.createdAt;
+    if (latest == null) continue;
+    if (current.difference(latest) <= dashboardUncontactedThreshold) continue;
+    items.add(
+      DashboardAttentionItem(
+        type: DashboardAttentionType.uncontactedLead,
+        title: 'Contact ${client.name}',
+        detail: 'Lead waiting ${current.difference(latest).inDays}d',
+        source: client,
+        sortTime: latest,
+      ),
+    );
+  }
+
+  items.sort((a, b) => a.sortTime.compareTo(b.sortTime));
+  return items;
+}

@@ -685,6 +685,8 @@ class _DailyCommandSection extends StatelessWidget {
     final expected = _expectedToday(rows);
     final weekPaid = finance.value!.thisWeekSummary.paid;
     final focusItems = attention.value ?? const <DashboardAttentionItem>[];
+    final isCheckingAttention = attention.isLoading && !attention.hasValue;
+    final attentionFailed = attention.hasError && !attention.hasValue;
 
     return SlateSurface(
       radius: AppRadius.xl,
@@ -721,7 +723,11 @@ class _DailyCommandSection extends StatelessWidget {
                   ],
                 ),
               ),
-              _FocusPill(count: focusItems.length),
+              _FocusPill(
+                count: focusItems.length,
+                isLoading: isCheckingAttention,
+                hasError: attentionFailed,
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -755,6 +761,8 @@ class _DailyCommandSection extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg),
           _CommandAttentionPanel(
             items: focusItems,
+            isLoading: isCheckingAttention,
+            hasError: attentionFailed,
             onOpenItem: onOpenAttentionItem,
           ),
           const SizedBox(height: AppSpacing.md),
@@ -831,25 +839,50 @@ class _CommandFeedPreview extends StatelessWidget {
 
 class _FocusPill extends StatelessWidget {
   final int count;
+  final bool isLoading;
+  final bool hasError;
 
-  const _FocusPill({required this.count});
+  const _FocusPill({
+    required this.count,
+    this.isLoading = false,
+    this.hasError = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final hasAttention = count > 0;
+    final color = hasError
+        ? AppColors.error
+        : hasAttention
+        ? AppColors.warning
+        : AppColors.statusSuccess;
+    final background = hasError
+        ? AppColors.error.withValues(alpha: 0.10)
+        : hasAttention
+        ? AppColors.warningDim
+        : AppColors.statusSuccess.withValues(alpha: 0.10);
+    final label = isLoading
+        ? 'Checking'
+        : hasError
+        ? 'Review'
+        : hasAttention
+        ? '$count focus'
+        : 'Clear';
+
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: AppColors.warningDim,
+        color: background,
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Text(
-        '$count focus',
-        style: const TextStyle(
-          color: AppColors.warning,
+        label,
+        style: TextStyle(
+          color: color,
           fontSize: 13,
           fontWeight: FontWeight.w900,
         ),
@@ -920,9 +953,16 @@ class _CommandMetric extends StatelessWidget {
 
 class _CommandAttentionPanel extends StatelessWidget {
   final List<DashboardAttentionItem> items;
+  final bool isLoading;
+  final bool hasError;
   final ValueChanged<DashboardAttentionItem> onOpenItem;
 
-  const _CommandAttentionPanel({required this.items, required this.onOpenItem});
+  const _CommandAttentionPanel({
+    required this.items,
+    required this.onOpenItem,
+    this.isLoading = false,
+    this.hasError = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -966,13 +1006,61 @@ class _CommandAttentionPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          if (topItems.isEmpty)
+          if (isLoading)
+            const SlateLoadingBlock(height: 52, radius: AppRadius.pill)
+          else if (hasError)
+            const _CommandAttentionStatus(
+              icon: LucideIcons.alertTriangle,
+              iconColor: AppColors.error,
+              label: 'Could not check attention items',
+            )
+          else if (topItems.isEmpty)
             const _CommandClearState()
           else
             for (final item in topItems) ...[
               _CommandAttentionRow(item: item, onTap: () => onOpenItem(item)),
               if (item != topItems.last) const SizedBox(height: AppSpacing.xs),
             ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CommandAttentionStatus extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+
+  const _CommandAttentionStatus({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.t2,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
         ],
       ),
     );
