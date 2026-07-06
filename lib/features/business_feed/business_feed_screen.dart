@@ -50,7 +50,13 @@ class _BusinessFeedScreenState extends ConsumerState<BusinessFeedScreen> {
                       SlateIconButton(
                         icon: LucideIcons.chevronLeft,
                         semanticLabel: 'Back',
-                        onTap: () => Navigator.maybePop(context),
+                        onTap: () {
+                          if (Navigator.canPop(context)) {
+                            Navigator.pop(context);
+                            return;
+                          }
+                          context.go('/home');
+                        },
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       const Expanded(
