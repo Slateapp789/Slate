@@ -2,31 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  // Backgrounds - warm paper with soft operational green surfaces.
-  static const bg = Color(0xFFF4F8F0);
+  // Backgrounds - pure paper with very quiet operational surfaces.
+  static const bg = Color(0xFFFFFFFF);
   static const bgCard = Color(0xFFFFFFFF);
-  static const bgRaised = Color(0xFFF8FBF4);
-  static const bgInteract = Color(0xFFEDF4E8);
-  static const border = Color(0xFFDCE8D6);
-  static const borderStrong = Color(0xFFBFD5B8);
+  static const bgRaised = Color(0xFFF8F9F6);
+  static const bgInteract = Color(0xFFF4F6F1);
+  static const border = Color(0xFFE8EDE3);
+  static const borderStrong = Color(0xFFD6DFCE);
 
   // Text
-  static const t1 = Color(0xFF121811);
-  static const t2 = Color(0xCC121811);
-  static const t3 = Color(0x8C121811);
-  static const t4 = Color(0x3D121811);
+  static const t1 = Color(0xFF11130F);
+  static const t2 = Color(0xCC11130F);
+  static const t3 = Color(0x8C11130F);
+  static const t4 = Color(0x3D11130F);
 
   // Accent. Green aliases remain for existing code.
-  static const slate = Color(0xFF416300);
+  static const slate = Color(0xFF7FB500);
   static const slateLight = Color(0xFFD9FF57);
-  static const slateDim = Color(0x33416300);
+  static const slateDim = Color(0x337FB500);
   static const slateGlow = Color(0x55D9FF57);
-  static const accentPrimary = Color(0xFF416300);
+  static const accentPrimary = Color(0xFF7FB500);
   static const accentPrimaryStrong = Color(0xFFD9FF57);
-  static const green = Color(0xFF17845F);
-  static const greenLight = Color(0xFFDDF3E7);
-  static const greenDim = Color(0x2417845F);
-  static const greenGlow = Color(0x3317845F);
+  static const green = Color(0xFF2E7D5B);
+  static const greenLight = Color(0xFFE7F4EC);
+  static const greenDim = Color(0x242E7D5B);
+  static const greenGlow = Color(0x332E7D5B);
 
   // Aliases so existing code doesn't break
   static const violet = Color(0xFFB05884);
@@ -52,14 +52,14 @@ class AppColors {
   static const modNotes = Color(0xFF09789A);
 
   // Module icon backgrounds.
-  static const modBg = Color(0xFFE7F0E1);
+  static const modBg = Color(0xFFF2F5EE);
 
   // Hero/summary panels used for financial and high-trust information.
-  static const panelSoft = Color(0xFFEAF4E4);
-  static const panelSoftRaised = Color(0xFFCFE2C8);
-  static const panelInk = Color(0xFF121811);
-  static const panelMuted = Color(0x99121811);
-  static const panelFaint = Color(0x24BFD5B8);
+  static const panelSoft = Color(0xFFF7FAF1);
+  static const panelSoftRaised = Color(0xFFE4ECD9);
+  static const panelInk = Color(0xFF11130F);
+  static const panelMuted = Color(0x9911130F);
+  static const panelFaint = Color(0x24D6DFCE);
 }
 
 class AppSpacing {
@@ -95,22 +95,17 @@ class AppMotion {
 class AppShadows {
   static List<BoxShadow> get soft => [
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.06),
-      blurRadius: 24,
-      offset: const Offset(0, 14),
+      color: Colors.black.withValues(alpha: 0.035),
+      blurRadius: 18,
+      offset: const Offset(0, 10),
     ),
   ];
 
   static List<BoxShadow> get glass => [
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.08),
-      blurRadius: 34,
-      offset: const Offset(0, 16),
-    ),
-    BoxShadow(
-      color: AppColors.slateGlow.withValues(alpha: 0.10),
-      blurRadius: 36,
-      offset: const Offset(0, 5),
+      color: Colors.black.withValues(alpha: 0.07),
+      blurRadius: 28,
+      offset: const Offset(0, 12),
     ),
   ];
 }
@@ -128,7 +123,7 @@ class AppTheme {
         },
       ),
       colorScheme: const ColorScheme.light(
-        primary: AppColors.green,
+        primary: AppColors.accentPrimary,
         surface: AppColors.bgCard,
         onSurface: AppColors.t1,
         error: AppColors.error,
@@ -136,27 +131,31 @@ class AppTheme {
       textTheme: GoogleFonts.interTextTheme(
         const TextTheme(
           displayLarge: TextStyle(
-            fontSize: 52,
-            fontWeight: FontWeight.w900,
+            fontSize: 48,
+            fontWeight: FontWeight.w800,
             letterSpacing: 0,
+            height: 1.02,
             color: AppColors.t1,
           ),
           displayMedium: TextStyle(
-            fontSize: 36,
-            fontWeight: FontWeight.w900,
+            fontSize: 34,
+            fontWeight: FontWeight.w800,
             letterSpacing: 0,
+            height: 1.04,
             color: AppColors.t1,
           ),
           headlineLarge: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w900,
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
             letterSpacing: 0,
+            height: 1.08,
             color: AppColors.t1,
           ),
           headlineMedium: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w700,
             letterSpacing: 0,
+            height: 1.12,
             color: AppColors.t1,
           ),
           titleLarge: TextStyle(
@@ -172,11 +171,13 @@ class AppTheme {
           bodyLarge: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w400,
+            height: 1.38,
             color: AppColors.t1,
           ),
           bodyMedium: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w400,
+            height: 1.36,
             color: AppColors.t2,
           ),
           labelLarge: TextStyle(
@@ -206,7 +207,10 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+          borderSide: const BorderSide(
+            color: AppColors.accentPrimary,
+            width: 1.5,
+          ),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
@@ -215,8 +219,8 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.green,
-          foregroundColor: AppColors.bg,
+          backgroundColor: AppColors.accentPrimaryStrong,
+          foregroundColor: AppColors.t1,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),

@@ -97,7 +97,7 @@ class DashboardScreen extends ConsumerWidget {
                   MaterialPageRoute(builder: (_) => const SettingsScreen()),
                 ),
               ),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.xxl),
               _GlanceZone(
                 appointments: todayAppointments,
                 finance: finance,
@@ -105,7 +105,7 @@ class DashboardScreen extends ConsumerWidget {
                 onOpenAppointment: (appointment) =>
                     _openAppointment(context, ref, appointment),
               ),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.xxl),
               _DailyCommandSection(
                 appointments: todayAppointments,
                 finance: finance,
@@ -117,7 +117,7 @@ class DashboardScreen extends ConsumerWidget {
                 onOpenFeedItem: (item) => _openFeedItem(context, item),
                 onViewAllFeed: () => context.push('/business-feed'),
               ),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.xxl),
               _QuickActionsSection(
                 onAddClient: () => Navigator.push(
                   context,
@@ -143,7 +143,7 @@ class DashboardScreen extends ConsumerWidget {
                     }),
                 onAddTask: () => onNavigate(4),
               ),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.xl),
               _CompactMoneySection(
                 appointments: todayAppointments,
                 finance: finance,
@@ -252,7 +252,7 @@ class _DashboardHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return SlateFeatureHeader(
       icon: LucideIcons.layers,
-      title: '$greeting, $workspaceName',
+      title: greeting,
       subtitle: workspaceName,
       color: AppColors.modHome,
       trailing: Row(
@@ -382,70 +382,70 @@ class _GlanceZone extends StatelessWidget {
       tasks: tasks.value ?? const [],
     );
 
-    return SlateSurface(
-      radius: AppRadius.xl,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      color: AppColors.bgCard.withValues(alpha: 0.82),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(LucideIcons.sparkles, size: 15, color: AppColors.green),
-              SizedBox(width: AppSpacing.xs),
-              Text(
-                'MORNING BRIEFING',
-                style: TextStyle(
-                  color: AppColors.t3,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            children: [
-              _GlanceMetric(
-                icon: LucideIcons.calendarDays,
-                label: '$appointmentCount today',
-              ),
-              _GlanceMetric(
-                icon: LucideIcons.banknote,
-                label: '£${expected.toStringAsFixed(0)} expected',
-              ),
-              _GlanceMetric(
-                icon: LucideIcons.listChecks,
-                label: '$taskCount due',
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          if (summary.isNotEmpty) ...[
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(
+              LucideIcons.sparkles,
+              size: 15,
+              color: AppColors.accentPrimary,
+            ),
+            SizedBox(width: AppSpacing.xs),
             Text(
-              summary,
-              style: const TextStyle(
-                color: AppColors.t2,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
+              'MORNING BRIEFING',
+              style: TextStyle(
+                color: AppColors.t3,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
           ],
-          _BriefingRecommendation(label: recommendation),
-          const SizedBox(height: AppSpacing.md),
-          if (next == null)
-            const _NoMoreAppointments()
-          else
-            _NextAppointmentCard(
-              appointment: next,
-              onTap: () => onOpenAppointment(next),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            _GlanceMetric(
+              icon: LucideIcons.calendarDays,
+              label: '$appointmentCount today',
             ),
+            _GlanceMetric(
+              icon: LucideIcons.banknote,
+              label: '£${expected.toStringAsFixed(0)} expected',
+            ),
+            _GlanceMetric(
+              icon: LucideIcons.listChecks,
+              label: '$taskCount due',
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (summary.isNotEmpty) ...[
+          Text(
+            summary,
+            style: const TextStyle(
+              color: AppColors.t1,
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+              height: 1.16,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
         ],
-      ),
+        _BriefingRecommendation(label: recommendation),
+        const SizedBox(height: AppSpacing.md),
+        if (next == null)
+          const _NoMoreAppointments()
+        else
+          _NextAppointmentCard(
+            appointment: next,
+            onTap: () => onOpenAppointment(next),
+          ),
+      ],
     );
   }
 }
@@ -462,9 +462,8 @@ class _GlanceMetric extends StatelessWidget {
       height: 32,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       decoration: BoxDecoration(
-        color: AppColors.t1.withValues(alpha: 0.045),
+        color: AppColors.t1.withValues(alpha: 0.035),
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        border: Border.all(color: AppColors.t1.withValues(alpha: 0.07)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -494,35 +493,23 @@ class _BriefingRecommendation extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       decoration: BoxDecoration(
-        color: AppColors.modHome.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.modHome.withValues(alpha: 0.18)),
+        border: Border(
+          left: BorderSide(color: AppColors.accentPrimaryStrong, width: 3),
+        ),
       ),
       child: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: AppColors.bgCard.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: const Icon(
-              LucideIcons.arrowRight,
-              color: AppColors.modHome,
-              size: 17,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Text(
               label,
               style: const TextStyle(
                 color: AppColors.t1,
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                height: 1.28,
               ),
             ),
           ),
@@ -550,20 +537,20 @@ class _NextAppointmentCard extends StatelessWidget {
       onTap: onTap,
       radius: AppRadius.lg,
       padding: const EdgeInsets.all(AppSpacing.md),
-      color: AppColors.t1.withValues(alpha: 0.045),
-      borderColor: AppColors.green.withValues(alpha: 0.22),
+      color: AppColors.t1.withValues(alpha: 0.028),
+      borderColor: AppColors.border.withValues(alpha: 0.72),
       child: Row(
         children: [
           Container(
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: AppColors.green.withValues(alpha: 0.14),
+              color: AppColors.accentPrimaryStrong.withValues(alpha: 0.34),
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: const Icon(
               LucideIcons.calendarClock,
-              color: AppColors.green,
+              color: AppColors.accentPrimary,
               size: 22,
             ),
           ),
@@ -577,7 +564,7 @@ class _NextAppointmentCard extends StatelessWidget {
                       ? 'Next appointment'
                       : slateTimeRange(start, end),
                   style: const TextStyle(
-                    color: AppColors.green,
+                    color: AppColors.accentPrimary,
                     fontSize: 13,
                     fontWeight: FontWeight.w900,
                   ),
@@ -622,7 +609,7 @@ class _NoMoreAppointments extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.t1.withValues(alpha: 0.035),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.56)),
       ),
       child: const Row(
         children: [
@@ -688,91 +675,86 @@ class _DailyCommandSection extends StatelessWidget {
     final isCheckingAttention = attention.isLoading && !attention.hasValue;
     final attentionFailed = attention.hasError && !attention.hasValue;
 
-    return SlateSurface(
-      radius: AppRadius.xl,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      color: AppColors.modHome.withValues(alpha: 0.08),
-      borderColor: AppColors.modHome.withValues(alpha: 0.22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Daily command',
-                      style: TextStyle(
-                        color: AppColors.t1,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0,
-                      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Daily command',
+                    style: TextStyle(
+                      color: AppColors.t1,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0,
+                      height: 1.08,
                     ),
-                    SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      'Your next best moves',
-                      style: TextStyle(
-                        color: AppColors.t3,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  ),
+                  SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    'Your next best moves',
+                    style: TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              _FocusPill(
-                count: focusItems.length,
-                isLoading: isCheckingAttention,
-                hasError: attentionFailed,
+            ),
+            _FocusPill(
+              count: focusItems.length,
+              isLoading: isCheckingAttention,
+              hasError: attentionFailed,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: _CommandMetric(
+                label: 'TO GO',
+                value: '$openTasks',
+                detail: 'open',
               ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              Expanded(
-                child: _CommandMetric(
-                  label: 'TO GO',
-                  value: '$openTasks',
-                  detail: 'open',
-                ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: _CommandMetric(
+                label: 'TODAY',
+                value: '£${expected.toStringAsFixed(0)}',
+                detail: 'expected',
               ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: _CommandMetric(
-                  label: 'TODAY',
-                  value: '£${expected.toStringAsFixed(0)}',
-                  detail: 'expected',
-                ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: _CommandMetric(
+                label: 'WEEK',
+                value: '£${weekPaid.toStringAsFixed(0)}',
+                detail: 'paid',
               ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: _CommandMetric(
-                  label: 'WEEK',
-                  value: '£${weekPaid.toStringAsFixed(0)}',
-                  detail: 'paid',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _CommandAttentionPanel(
-            items: focusItems,
-            isLoading: isCheckingAttention,
-            hasError: attentionFailed,
-            onOpenItem: onOpenAttentionItem,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _CommandFeedPreview(
-            feed: feed,
-            onOpenFeedItem: onOpenFeedItem,
-            onViewAllFeed: onViewAllFeed,
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        _CommandAttentionPanel(
+          items: focusItems,
+          isLoading: isCheckingAttention,
+          hasError: attentionFailed,
+          onOpenItem: onOpenAttentionItem,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _CommandFeedPreview(
+          feed: feed,
+          onOpenFeedItem: onOpenFeedItem,
+          onViewAllFeed: onViewAllFeed,
+        ),
+      ],
     );
   }
 }
@@ -794,9 +776,9 @@ class _CommandFeedPreview extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.bgCard.withValues(alpha: 0.56),
+        color: AppColors.t1.withValues(alpha: 0.028),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.86)),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.62)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -908,8 +890,8 @@ class _CommandMetric extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 86),
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-        color: AppColors.bgCard.withValues(alpha: 0.46),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
+        color: AppColors.t1.withValues(alpha: 0.028),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -930,8 +912,8 @@ class _CommandMetric extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: AppColors.t1,
-              fontSize: 25,
-              fontWeight: FontWeight.w900,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
               letterSpacing: 0,
             ),
           ),
@@ -971,9 +953,9 @@ class _CommandAttentionPanel extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.modHome.withValues(alpha: 0.12),
+        color: AppColors.t1.withValues(alpha: 0.028),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.modHome.withValues(alpha: 0.22)),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.62)),
       ),
       child: Column(
         children: [
@@ -1044,7 +1026,7 @@ class _CommandAttentionStatus extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.bgCard.withValues(alpha: 0.62),
+        color: AppColors.bg,
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Row(
@@ -1076,7 +1058,7 @@ class _CommandClearState extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.bgCard.withValues(alpha: 0.62),
+        color: AppColors.bg,
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: const Row(
@@ -1120,7 +1102,7 @@ class _CommandAttentionRow extends StatelessWidget {
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
       ),
-      color: AppColors.bgCard.withValues(alpha: 0.78),
+      color: AppColors.bg,
       borderColor: AppColors.border.withValues(alpha: 0.72),
       child: Row(
         children: [
@@ -1227,6 +1209,7 @@ class _QuickActionButton extends StatelessWidget {
       radius: AppRadius.lg,
       padding: const EdgeInsets.all(AppSpacing.sm),
       color: AppColors.t1.withValues(alpha: 0.045),
+      borderColor: AppColors.border.withValues(alpha: 0.54),
       child: Row(
         children: [
           Icon(icon, color: AppColors.t2, size: 17),
