@@ -44,7 +44,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
           data: (data) {
             final filtered = _filterAndSort(data);
             return RefreshIndicator(
-              color: AppColors.green,
+              color: AppColors.accentPrimary,
               onRefresh: () async {
                 ref.invalidate(clientsProvider);
                 ref.invalidate(clientCrmRecordsProvider);
@@ -109,13 +109,13 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                     SliverList.separated(
                       itemCount: filtered.length,
                       separatorBuilder: (_, __) =>
-                          const SizedBox(height: AppSpacing.xs),
+                          const SizedBox(height: AppSpacing.sm),
                       itemBuilder: (context, index) {
                         final record = filtered[index];
                         return Padding(
                           padding: EdgeInsets.fromLTRB(
                             AppSpacing.pageX,
-                            index == 0 ? AppSpacing.sm : 0,
+                            index == 0 ? AppSpacing.md : 0,
                             AppSpacing.pageX,
                             index == filtered.length - 1 ? 132 : 0,
                           ),
@@ -253,22 +253,25 @@ class _SearchAndSort extends StatelessWidget {
           size: 16,
         ),
         filled: true,
-        fillColor: AppColors.modClients.withValues(alpha: 0.06),
+        fillColor: AppColors.t1.withValues(alpha: 0.028),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.pill),
           borderSide: BorderSide(
-            color: AppColors.modClients.withValues(alpha: 0.18),
+            color: AppColors.border.withValues(alpha: 0.62),
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.pill),
           borderSide: BorderSide(
-            color: AppColors.modClients.withValues(alpha: 0.18),
+            color: AppColors.border.withValues(alpha: 0.62),
           ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: const BorderSide(color: AppColors.modClients, width: 1.5),
+          borderSide: const BorderSide(
+            color: AppColors.accentPrimary,
+            width: 1.5,
+          ),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
@@ -330,19 +333,19 @@ class _ViewRail extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: active
-                ? AppColors.modClients.withValues(alpha: 0.14)
-                : AppColors.bgCard,
+                ? AppColors.accentPrimaryStrong.withValues(alpha: 0.34)
+                : AppColors.t1.withValues(alpha: 0.028),
             borderRadius: BorderRadius.circular(AppRadius.pill),
             border: Border.all(
               color: active
-                  ? AppColors.modClients.withValues(alpha: 0.28)
-                  : AppColors.border,
+                  ? AppColors.accentPrimaryStrong.withValues(alpha: 0.54)
+                  : AppColors.border.withValues(alpha: 0.46),
             ),
           ),
           child: Text(
             '$label $count',
             style: TextStyle(
-              color: active ? AppColors.modClients : AppColors.t2,
+              color: active ? AppColors.t1 : AppColors.t2,
               fontSize: 13,
               fontWeight: FontWeight.w800,
             ),
@@ -374,14 +377,14 @@ class _ClientRow extends StatelessWidget {
 
     return SlateSurface(
       onTap: onTap,
-      radius: AppRadius.lg,
-      color: statusColor.withValues(alpha: 0.045),
-      borderColor: statusColor.withValues(
-        alpha: record.needsAttention ? 0.28 : 0.12,
-      ),
+      radius: AppRadius.md,
+      color: AppColors.bg,
+      borderColor: record.needsAttention
+          ? statusColor.withValues(alpha: 0.24)
+          : AppColors.border.withValues(alpha: 0.52),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+        vertical: AppSpacing.md,
       ),
       child: Row(
         children: [
@@ -390,10 +393,7 @@ class _ClientRow extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               color: AppColors.modClients.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: AppColors.modClients.withValues(alpha: 0.18),
-              ),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: Center(
               child: Text(
@@ -401,7 +401,7 @@ class _ClientRow extends StatelessWidget {
                 style: const TextStyle(
                   color: AppColors.t1,
                   fontSize: 14,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
@@ -418,7 +418,7 @@ class _ClientRow extends StatelessWidget {
                   style: const TextStyle(
                     color: AppColors.t1,
                     fontSize: 16,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -429,7 +429,7 @@ class _ClientRow extends StatelessWidget {
                   style: TextStyle(
                     color: record.needsAttention ? statusColor : AppColors.t3,
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
