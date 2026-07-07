@@ -35,14 +35,10 @@ Last updated: 2026-07-06
 
 ### Dashboard
 
-- Revenue card.
-- Today pulse / business pulse.
-- Morning Briefing with rules-based next-action recommendation.
-- Today schedule.
-- Tasks section.
-- Daily Command preview of computed Business Feed activity.
-- Notification access and unread count.
-- Booking request visibility.
+- Calm daily overview with a greeting, income this month, upcoming jobs, and feed.
+- Income this month shows paid/received income only.
+- Upcoming jobs shows the next scheduled bookings from existing booking data.
+- Feed shows neutral recent business activity while excluding attention/overdue/unpaid warning states.
 - Pull-to-refresh.
 - Navigation callbacks into core modules.
 
