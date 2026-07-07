@@ -17,90 +17,76 @@ class SettingsAppTab extends ConsumerWidget {
       children: [
         sectionLabel('About'),
         const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              infoRow('App', 'Workloop'),
-              Divider(height: 1, color: AppColors.border),
-              infoRow('Version', '1.0.0 (MVP)'),
-              Divider(height: 1, color: AppColors.border),
-              infoRow('Built with', 'Flutter + Supabase'),
-            ],
-          ),
+        Column(
+          children: [
+            infoRow('App', 'Workloop'),
+            Divider(height: 1, color: AppColors.border),
+            infoRow('Version', '1.0.0 (MVP)'),
+            Divider(height: 1, color: AppColors.border),
+            infoRow('Built with', 'Flutter + Supabase'),
+          ],
         ),
         const SizedBox(height: 28),
 
         sectionLabel('V1 Foundations'),
         const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              _actionRow(
-                context,
-                LucideIcons.bell,
-                'Notification Centre',
-                'Bell centre and V1 alert preferences',
-                '/notifications',
-              ),
-              Divider(height: 1, color: AppColors.border),
-              _actionRow(
-                context,
-                LucideIcons.inbox,
-                'Booking Requests',
-                'Requests from your public profile',
-                '/booking-requests',
-              ),
-              Divider(height: 1, color: AppColors.border),
-              profile.maybeWhen(
-                data: (value) {
-                  final handle = value?.handle.trim();
-                  if (handle == null || handle.isEmpty) {
-                    return _comingSoonRow(
-                      LucideIcons.globe,
-                      'Public Profile Page',
-                      'Set a handle in Business settings',
-                    );
-                  }
-                  return _actionRow(
-                    context,
+        Column(
+          children: [
+            _actionRow(
+              context,
+              LucideIcons.bell,
+              'Notification Centre',
+              'Bell centre and V1 alert preferences',
+              '/notifications',
+            ),
+            Divider(height: 1, color: AppColors.border),
+            _actionRow(
+              context,
+              LucideIcons.inbox,
+              'Booking Requests',
+              'Requests from your public profile',
+              '/booking-requests',
+            ),
+            Divider(height: 1, color: AppColors.border),
+            profile.maybeWhen(
+              data: (value) {
+                final handle = value?.handle.trim();
+                if (handle == null || handle.isEmpty) {
+                  return _comingSoonRow(
                     LucideIcons.globe,
                     'Public Profile Page',
-                    '/p/$handle',
-                    '/p/$handle',
+                    'Set a handle in Business settings',
                   );
-                },
-                orElse: () => _comingSoonRow(
+                }
+                return _actionRow(
+                  context,
                   LucideIcons.globe,
                   'Public Profile Page',
-                  'Set a handle in Business settings',
-                ),
+                  '/p/$handle',
+                  '/p/$handle',
+                );
+              },
+              orElse: () => _comingSoonRow(
+                LucideIcons.globe,
+                'Public Profile Page',
+                'Set a handle in Business settings',
               ),
-              Divider(height: 1, color: AppColors.border),
-              _actionRow(
-                context,
-                LucideIcons.calendarClock,
-                'Calendar Sync',
-                'Contained sync module',
-                '/calendar-sync',
-              ),
-              Divider(height: 1, color: AppColors.border),
-              _comingSoonRow(
-                LucideIcons.creditCard,
-                'Online Payments',
-                'Accept card payments via Stripe',
-              ),
-            ],
-          ),
+            ),
+            Divider(height: 1, color: AppColors.border),
+            _actionRow(
+              context,
+              LucideIcons.calendarClock,
+              'Calendar Sync',
+              'Contained sync module',
+              '/calendar-sync',
+            ),
+            Divider(height: 1, color: AppColors.border),
+            _comingSoonRow(
+              LucideIcons.creditCard,
+              'Online Payments',
+              'Accept card payments via Stripe',
+            ),
+          ],
         ),
       ],
     );

@@ -256,3 +256,21 @@ Consequences:
 
 - Future feature work should start from these docs.
 - Notion remains product truth unless code has clearly superseded it.
+
+## 2026-07-07 - UI Refounded Around Whitespace First
+
+Decision:
+
+Workloop's visual system should use whitespace, typography, alignment, and subtle dividers as the default grouping tools. Cards and heavy surfaces should become exceptions, not the default layout primitive.
+
+Reasoning:
+
+Real-device review showed that even after polish, the app still felt too boxed, too card-heavy, and too visually equal-weighted for the premium Apple/Linear/Notion-inspired product target.
+
+Consequences:
+
+- Shared UI primitives now include token-aware list rows and filter chips.
+- Header stats should read as inline metrics rather than boxed mini cards.
+- Activity feeds, clients, notes, bookings, tasks, and money summaries should prefer row/divider layouts.
+- Lime is the active/accent system; module colours should be secondary semantic hints only.
+- A light/dark token foundation exists, but full dark mode remains gated on migrating static `AppColors` usage.

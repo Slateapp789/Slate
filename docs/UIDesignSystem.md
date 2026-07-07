@@ -214,3 +214,28 @@ Rules:
 - Large screens still contain local UI variants that should be consolidated.
 - Money and Bookings have evolved quickly and need a final consistency pass.
 - Current palette is intentionally dark graphite with a single bright accent; future colour experiments should be done as a deliberate theme pass, not piecemeal.
+
+## 2026-07-07 Minimal Refoundation
+
+Workloop's active UI direction is now whitespace-first rather than container-first.
+
+Design rule:
+
+- Typography, spacing, alignment, and subtle dividers should solve grouping before any card or surface is introduced.
+- Cards are exceptions for sheets, modal contexts, true controls, and dense framed tools.
+- Lists should generally be `Row -> Divider -> Row`, not repeated rounded cards.
+- Header stats should read as inline metrics, not boxed dashboard tiles.
+- Empty states should be calm inline guidance, not placeholder cards.
+- Lime remains the signature accent and should be reserved for primary actions, active navigation, progress, selected state, and important highlights.
+
+Implementation changes:
+
+- `WorkloopThemeTokens` now defines explicit light and OLED-dark token sets.
+- Shared primitives in `lib/shared/widgets/slate_ui.dart` include token-aware surfaces, icon buttons, empty states, list rows, and filter chips.
+- Main navigation active state uses lime rather than module colours.
+- High-traffic screens have started moving from card-heavy rows to divider/list rhythm.
+
+Current dark-mode status:
+
+- The dark token foundation exists, but the app still runs in light mode while static `AppColors` usages are migrated.
+- Do not enable system dark mode until major screens, forms, sheets, dialogs, and local feature widgets read from theme tokens instead of static light colours.

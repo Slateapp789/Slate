@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/slate_ui.dart';
 import 'settings_helpers.dart';
 
 class SettingsServicesSection extends StatelessWidget {
@@ -26,26 +27,33 @@ class SettingsServicesSection extends StatelessWidget {
           children: [
             sectionLabel('Services'),
             GestureDetector(
-              onTap: onAdd,
+              onTap: () {
+                SlateHaptics.tap();
+                onAdd();
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.greenDim,
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.accentPrimaryStrong.withValues(alpha: 0.30),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: const Row(
                   children: [
-                    Icon(LucideIcons.plus, size: 13, color: AppColors.green),
+                    Icon(
+                      LucideIcons.plus,
+                      size: 13,
+                      color: AppColors.accentPrimary,
+                    ),
                     SizedBox(width: 4),
                     Text(
                       'Add',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.green,
+                        color: AppColors.accentPrimary,
                       ),
                     ),
                   ],
@@ -74,14 +82,8 @@ class _EmptyServices extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
       child: Column(
         children: [
           const Icon(LucideIcons.scissors, color: AppColors.t3, size: 24),
@@ -98,7 +100,7 @@ class _EmptyServices extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.green,
+                color: AppColors.accentPrimary,
               ),
             ),
           ),
@@ -116,82 +118,52 @@ class _ServicesList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: services.asMap().entries.map((entry) {
-          final index = entry.key;
-          final service = entry.value;
-          final isLast = index == services.length - 1;
-          final price = service['price'] is num
-              ? (service['price'] as num).toStringAsFixed(0)
-              : '0';
+    return Column(
+      children: services.asMap().entries.map((entry) {
+        final index = entry.key;
+        final service = entry.value;
+        final isLast = index == services.length - 1;
+        final price = service['price'] is num
+            ? (service['price'] as num).toStringAsFixed(0)
+            : '0';
 
-          return Column(
+        return SlateListRow(
+          onTap: () => onEdit(service),
+          showDivider: !isLast,
+          leading: const Icon(
+            LucideIcons.scissors,
+            size: 17,
+            color: AppColors.t3,
+          ),
+          title: Text(
+            service['name'] as String? ?? 'Service',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.t1,
+            ),
+          ),
+          subtitle: Text(
+            '${service['duration_mins'] ?? 60} min',
+            style: const TextStyle(fontSize: 12, color: AppColors.t3),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => onEdit(service),
-                  borderRadius: BorderRadius.circular(isLast ? 16 : 0),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 14,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                service['name'] as String? ?? 'Service',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.t1,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                '${service['duration_mins'] ?? 60} min',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.t3,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          '£$price',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.t1,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Icon(
-                          LucideIcons.pencil,
-                          size: 14,
-                          color: AppColors.t3,
-                        ),
-                      ],
-                    ),
-                  ),
+              Text(
+                '£$price',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.t1,
                 ),
               ),
-              if (!isLast) Divider(height: 1, color: AppColors.border),
+              const SizedBox(width: 10),
+              const Icon(LucideIcons.pencil, size: 14, color: AppColors.t3),
             ],
-          );
-        }).toList(),
-      ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
