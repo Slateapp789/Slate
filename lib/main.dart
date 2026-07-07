@@ -178,6 +178,8 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   late int _currentIndex;
   FinanceInitialFocus _financeInitialFocus = FinanceInitialFocus.top;
+  int _taskCreateRequest = 0;
+  int _noteCreateRequest = 0;
 
   @override
   void initState() {
@@ -243,7 +245,10 @@ class _MainShellState extends State<MainShell> {
                 label: 'New Task',
                 onTap: () {
                   Navigator.pop(context);
-                  setState(() => _currentIndex = 4);
+                  setState(() {
+                    _taskCreateRequest++;
+                    _currentIndex = 4;
+                  });
                 },
               ),
               const SizedBox(height: AppSpacing.xs),
@@ -252,7 +257,10 @@ class _MainShellState extends State<MainShell> {
                 label: 'New Note',
                 onTap: () {
                   Navigator.pop(context);
-                  setState(() => _currentIndex = 5);
+                  setState(() {
+                    _noteCreateRequest++;
+                    _currentIndex = 5;
+                  });
                 },
               ),
             ],
@@ -321,8 +329,11 @@ class _MainShellState extends State<MainShell> {
             const ClientsScreen(),
             const AppointmentsScreen(),
             FinanceScreen(initialFocus: _financeInitialFocus),
-            const TasksScreen(),
-            const NotesScreen(showBackButton: false),
+            TasksScreen(createRequest: _taskCreateRequest),
+            NotesScreen(
+              showBackButton: false,
+              createRequest: _noteCreateRequest,
+            ),
           ],
         ),
       ),

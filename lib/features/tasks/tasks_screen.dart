@@ -17,7 +17,9 @@ part 'task_detail_widgets.dart';
 part 'task_editor_widgets.dart';
 
 class TasksScreen extends ConsumerStatefulWidget {
-  const TasksScreen({super.key});
+  final int createRequest;
+
+  const TasksScreen({super.key, this.createRequest = 0});
 
   @override
   ConsumerState<TasksScreen> createState() => _TasksScreenState();
@@ -25,6 +27,19 @@ class TasksScreen extends ConsumerStatefulWidget {
 
 class _TasksScreenState extends ConsumerState<TasksScreen> {
   _TaskView _view = _TaskView.urgent;
+
+  @override
+  void didUpdateWidget(covariant TasksScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.createRequest == oldWidget.createRequest ||
+        widget.createRequest == 0) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showTaskEditor(context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

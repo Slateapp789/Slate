@@ -36,8 +36,13 @@ class _ChecklistMarkerInfo {
 
 class NotesScreen extends ConsumerStatefulWidget {
   final bool showBackButton;
+  final int createRequest;
 
-  const NotesScreen({super.key, this.showBackButton = true});
+  const NotesScreen({
+    super.key,
+    this.showBackButton = true,
+    this.createRequest = 0,
+  });
 
   @override
   ConsumerState<NotesScreen> createState() => _NotesScreenState();
@@ -46,6 +51,19 @@ class NotesScreen extends ConsumerStatefulWidget {
 class _NotesScreenState extends ConsumerState<NotesScreen> {
   String _query = '';
   _NoteFilter _filter = _NoteFilter.all;
+
+  @override
+  void didUpdateWidget(covariant NotesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.createRequest == oldWidget.createRequest ||
+        widget.createRequest == 0) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _openEditor();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
