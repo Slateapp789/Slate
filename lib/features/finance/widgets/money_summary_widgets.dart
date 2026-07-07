@@ -24,7 +24,8 @@ class MoneyPeriodSwitcher extends StatelessWidget {
     return SlateSurface(
       padding: const EdgeInsets.all(6),
       radius: AppRadius.pill,
-      color: AppColors.bgInteract,
+      color: AppColors.t1.withValues(alpha: 0.028),
+      borderColor: AppColors.border.withValues(alpha: 0.54),
       child: Row(
         children: [
           _periodOption('Week', FinancePeriod.week),
@@ -46,11 +47,13 @@ class MoneyPeriodSwitcher extends StatelessWidget {
           height: 36,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: active ? AppColors.bgRaised : Colors.transparent,
+            color: active
+                ? AppColors.accentPrimaryStrong.withValues(alpha: 0.34)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.pill),
             border: Border.all(
               color: active
-                  ? AppColors.t1.withValues(alpha: 0.08)
+                  ? AppColors.accentPrimaryStrong.withValues(alpha: 0.54)
                   : Colors.transparent,
             ),
           ),
@@ -60,7 +63,7 @@ class MoneyPeriodSwitcher extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               color: active ? AppColors.t1 : AppColors.t3,
             ),
           ),
@@ -80,9 +83,9 @@ class MoneySnapshot extends StatelessWidget {
     final netPositive = summary.profit >= 0;
     return SlateSurface(
       padding: const EdgeInsets.all(AppSpacing.lg),
-      radius: AppRadius.xl,
-      color: AppColors.modFinance.withValues(alpha: 0.08),
-      borderColor: AppColors.modFinance.withValues(alpha: 0.22),
+      radius: AppRadius.lg,
+      color: AppColors.t1.withValues(alpha: 0.028),
+      borderColor: AppColors.border.withValues(alpha: 0.54),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -92,11 +95,8 @@ class MoneySnapshot extends StatelessWidget {
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: AppColors.modFinance.withValues(alpha: 0.12),
+                  color: AppColors.modFinance.withValues(alpha: 0.09),
                   borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(
-                    color: AppColors.modFinance.withValues(alpha: 0.22),
-                  ),
                 ),
                 child: const Icon(
                   LucideIcons.walletCards,
@@ -114,7 +114,7 @@ class MoneySnapshot extends StatelessWidget {
                       style: TextStyle(
                         color: AppColors.t1,
                         fontSize: 22,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                         letterSpacing: 0,
                       ),
                     ),
@@ -123,7 +123,7 @@ class MoneySnapshot extends StatelessWidget {
                       style: const TextStyle(
                         color: AppColors.t3,
                         fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -157,15 +157,15 @@ class MoneySnapshot extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               color: netPositive
-                  ? AppColors.green.withValues(alpha: 0.10)
+                  ? AppColors.success.withValues(alpha: 0.08)
                   : AppColors.error.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(AppRadius.lg),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
                 color: netPositive
-                    ? AppColors.green.withValues(alpha: 0.18)
+                    ? AppColors.success.withValues(alpha: 0.14)
                     : AppColors.error.withValues(alpha: 0.16),
               ),
             ),
@@ -176,14 +176,14 @@ class MoneySnapshot extends StatelessWidget {
                     label: 'Net',
                     value: summary.profit,
                     size: 40,
-                    color: netPositive ? AppColors.green : AppColors.error,
+                    color: netPositive ? AppColors.success : AppColors.error,
                   ),
                 ),
                 Icon(
                   netPositive
                       ? LucideIcons.arrowUpRight
                       : LucideIcons.arrowDownRight,
-                  color: netPositive ? AppColors.green : AppColors.error,
+                  color: netPositive ? AppColors.success : AppColors.error,
                   size: 30,
                 ),
               ],
@@ -197,7 +197,7 @@ class MoneySnapshot extends StatelessWidget {
                   icon: LucideIcons.trendingUp,
                   label: 'Income',
                   value: summary.paid,
-                  color: AppColors.green,
+                  color: AppColors.success,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -291,9 +291,9 @@ class _CashflowTile extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 92),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.bgCard.withValues(alpha: 0.68),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: color.withValues(alpha: 0.14)),
+        color: AppColors.bg,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.54)),
       ),
       child: Row(
         children: [

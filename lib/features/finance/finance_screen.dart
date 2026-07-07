@@ -96,7 +96,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             ref.invalidate(dashboardRevenueProvider);
             ref.invalidate(clientCrmRecordsProvider);
           },
-          color: AppColors.green,
+          color: AppColors.accentPrimary,
           child: ListView(
             controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(
