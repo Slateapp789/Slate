@@ -47,7 +47,7 @@ class _BusinessFeedScreenState extends ConsumerState<BusinessFeedScreen> {
                 sliver: SliverToBoxAdapter(
                   child: Row(
                     children: [
-                      SlateIconButton(
+                      WorkloopIconButton(
                         icon: LucideIcons.chevronLeft,
                         semanticLabel: 'Back',
                         onTap: () {
@@ -60,7 +60,7 @@ class _BusinessFeedScreenState extends ConsumerState<BusinessFeedScreen> {
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       const Expanded(
-                        child: SlateFeatureHeader(
+                        child: WorkloopPageHeader(
                           icon: LucideIcons.activity,
                           title: 'Business Feed',
                           subtitle:
@@ -208,6 +208,6 @@ class _FeedFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateFilterChip(label: label, selected: selected, onTap: onTap);
+    return WorkloopFilterChip(label: label, selected: selected, onTap: onTap);
   }
 }

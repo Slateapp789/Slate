@@ -250,7 +250,7 @@ class _DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateFeatureHeader(
+    return WorkloopPageHeader(
       icon: LucideIcons.layers,
       title: greeting,
       subtitle: workspaceName,
@@ -258,7 +258,7 @@ class _DashboardHeader extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SlateIconButton(
+          WorkloopIconButton(
             icon: LucideIcons.bell,
             semanticLabel: 'Open notifications',
             onTap: onNotifications,
@@ -298,15 +298,15 @@ class _DashboardHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.xs),
-          SlateIconButton(
+          WorkloopIconButton(
             icon: Icons.settings_rounded,
             semanticLabel: 'Open settings',
             onTap: onSettings,
           ),
         ],
       ),
-      stats: [
-        SlateHeaderStat(
+      metrics: [
+        WorkloopMetricItem(
           value: _todayLabel(),
           label: 'Today',
           color: AppColors.modCalendar,
@@ -533,7 +533,7 @@ class _NextAppointmentCard extends StatelessWidget {
     final service = _serviceName(appointment);
     final location = _location(appointment);
 
-    return SlateListRow(
+    return WorkloopListRow(
       onTap: onTap,
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       leading: Container(
@@ -1053,7 +1053,7 @@ class _CommandAttentionRow extends StatelessWidget {
       DashboardAttentionType.uncontactedLead => LucideIcons.user,
     };
 
-    return SlateListRow(
+    return WorkloopListRow(
       onTap: onTap,
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       leading: Icon(icon, color: AppColors.warning, size: 17),
@@ -1094,7 +1094,7 @@ class _QuickActionsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SlateSectionHeader(label: 'QUICK ACTIONS'),
+        const WorkloopSectionHeader(label: 'QUICK ACTIONS'),
         const SizedBox(height: AppSpacing.xs),
         Row(
           children: [

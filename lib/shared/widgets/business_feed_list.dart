@@ -116,7 +116,7 @@ class _BusinessFeedRow extends StatelessWidget {
     final icon = _iconFor(item.icon);
     final priorityLabel = _priorityLabel(item.priority);
 
-    return SlateListRow(
+    return WorkloopListRow(
       onTap: onTap,
       padding: EdgeInsets.symmetric(
         vertical: compact ? AppSpacing.sm : AppSpacing.md,

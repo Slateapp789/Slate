@@ -106,7 +106,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               110,
             ),
             children: [
-              SlateFeatureHeader(
+              WorkloopPageHeader(
                 icon: LucideIcons.banknote,
                 title: 'Money',
                 subtitle: 'See income, expenses, net, and what is still due.',
@@ -114,7 +114,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SlateIconButton(
+                    WorkloopIconButton(
                       icon: LucideIcons.plus,
                       semanticLabel: 'Record payment',
                       color: AppColors.modFinance,
@@ -124,7 +124,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                       onTap: () => _recordPayment(context),
                     ),
                     const SizedBox(width: AppSpacing.xs),
-                    SlateIconButton(
+                    WorkloopIconButton(
                       icon: LucideIcons.receipt,
                       semanticLabel: 'Add expense',
                       color: AppColors.modFinance,
@@ -221,7 +221,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     children: [
                       KeyedSubtree(
                         key: _followUpsKey,
-                        child: const SlateSectionHeader(
+                        child: const WorkloopSectionHeader(
                           label: 'Money to collect',
                         ),
                       ),
@@ -257,7 +257,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                         ],
                       ],
                       const SizedBox(height: 22),
-                      const SlateSectionHeader(label: 'Recent activity'),
+                      const WorkloopSectionHeader(label: 'Recent activity'),
                       const SizedBox(height: 8),
                       expenses.when(
                         loading: () =>
@@ -296,7 +296,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SlateEmptyState(
+            const WorkloopEmptyState(
               icon: LucideIcons.banknote,
               title: 'No payments yet',
               subtitle: 'Record your first payment to get started',
@@ -361,7 +361,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     ]..sort((a, b) => b.date.compareTo(a.date));
 
     if (activities.isEmpty) {
-      return const SlateEmptyState(
+      return const WorkloopEmptyState(
         icon: LucideIcons.receipt,
         title: 'No money activity yet',
         subtitle: 'Payments and expenses will appear here.',

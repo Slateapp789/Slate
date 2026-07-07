@@ -239,3 +239,40 @@ Current dark-mode status:
 
 - The dark token foundation exists, but the app still runs in light mode while static `AppColors` usages are migrated.
 - Do not enable system dark mode until major screens, forms, sheets, dialogs, and local feature widgets read from theme tokens instead of static light colours.
+
+## 2026-07-07 Final UI System Implementation
+
+Canonical screen-facing primitives now use `Workloop*` names in `lib/shared/widgets/slate_ui.dart`.
+
+Core primitives:
+
+- `WorkloopPage`
+- `WorkloopPageHeader`
+- `WorkloopMetricRow`
+- `WorkloopMetricItem`
+- `WorkloopSectionHeader`
+- `WorkloopListRow`
+- `WorkloopDivider`
+- `WorkloopEmptyState`
+- `WorkloopPrimaryButton`
+- `WorkloopTextButton`
+- `WorkloopIconButton`
+- `WorkloopSegmentedControl`
+- `WorkloopFilterChip`
+- `WorkloopBottomNav`
+- `WorkloopFAB`
+- `WorkloopSurface`
+
+Rules:
+
+- New screen UI should use `Workloop*` primitives first.
+- Existing `Slate*` primitives remain as compatibility foundations while older widgets migrate.
+- Bottom navigation, FAB, feature headers, header metrics, filters, list rows, empty states, and primary actions should not be reimplemented locally.
+- Use `AppSpacing.bottomNavClearance` for scrollable primary screens that sit behind the floating bottom navigation.
+- `WorkloopSegmentedControl` is the preferred control for two-to-four peer filters or tabs when the content is already managed in the screen.
+
+Current scope:
+
+- Dashboard, Business Feed, Clients, Bookings, Money, Tasks, Notes, Settings, Onboarding, bottom navigation, and global workspace error chrome now reference the canonical primitives where they touch shared system UI.
+- Bookings and Settings use the shared segmented control instead of local pill-tab containers.
+- Full dark mode is still intentionally disabled until local feature widgets stop depending on static light `AppColors`.

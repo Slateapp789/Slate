@@ -21,18 +21,26 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  int _selectedTab = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(_handleTabChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.invalidate(settingsServicesProvider);
     });
   }
 
+  void _handleTabChanged() {
+    if (_selectedTab == _tabController.index) return;
+    setState(() => _selectedTab = _tabController.index);
+  }
+
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -48,7 +56,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Row(
                 children: [
-                  SlateIconButton(
+                  WorkloopIconButton(
                     icon: LucideIcons.chevronLeft,
                     semanticLabel: 'Back',
                     onTap: () => Navigator.pop(context),
@@ -70,43 +78,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.t1.withValues(alpha: 0.028),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(
-                    color: AppColors.border.withValues(alpha: 0.54),
-                  ),
-                ),
-                child: TabBar(
-                  controller: _tabController,
-                  indicator: BoxDecoration(
-                    color: AppColors.accentPrimaryStrong.withValues(
-                      alpha: 0.34,
-                    ),
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                    border: Border.all(
-                      color: AppColors.accentPrimaryStrong.withValues(
-                        alpha: 0.54,
-                      ),
-                    ),
-                  ),
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  indicatorPadding: const EdgeInsets.all(3),
-                  dividerColor: Colors.transparent,
-                  labelColor: AppColors.t1,
-                  unselectedLabelColor: AppColors.t3,
-                  labelStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                  tabs: const [
-                    Tab(text: 'Business'),
-                    Tab(text: 'Alerts'),
-                    Tab(text: 'Account'),
-                    Tab(text: 'App'),
-                  ],
-                ),
+              child: WorkloopSegmentedControl<int>(
+                selected: _selectedTab,
+                onChanged: (index) => _tabController.animateTo(index),
+                segments: const [
+                  WorkloopSegment(value: 0, label: 'Business'),
+                  WorkloopSegment(value: 1, label: 'Alerts'),
+                  WorkloopSegment(value: 2, label: 'Account'),
+                  WorkloopSegment(value: 3, label: 'App'),
+                ],
               ),
             ),
             const SizedBox(height: 16),

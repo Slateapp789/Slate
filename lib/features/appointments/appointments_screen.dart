@@ -107,13 +107,13 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
               child: Row(
                 children: [
                   Expanded(
-                    child: SlateFeatureHeader(
+                    child: WorkloopPageHeader(
                       icon: LucideIcons.calendarDays,
                       title: 'Bookings',
                       subtitle: 'Plan the day and keep bookings moving.',
                       color: AppColors.modCalendar,
                       trailing: _view == _BookingsView.schedule
-                          ? SlateIconButton(
+                          ? WorkloopIconButton(
                               icon: _calendarMode
                                   ? LucideIcons.list
                                   : LucideIcons.calendarDays,
@@ -129,18 +129,18 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                               ),
                             )
                           : null,
-                      stats: [
-                        SlateHeaderStat(
+                      metrics: [
+                        WorkloopMetricItem(
                           value: _calendarMode ? 'Calendar' : 'List',
                           label: 'Mode',
                           color: AppColors.modCalendar,
                         ),
-                        SlateHeaderStat(
+                        WorkloopMetricItem(
                           value: '${headerStats.todayRemaining}',
                           label: 'Today',
                           color: AppColors.modCalendar,
                         ),
-                        SlateHeaderStat(
+                        WorkloopMetricItem(
                           value: '${headerStats.weekBookings}',
                           label: 'Week',
                           color: AppColors.warning,
@@ -183,7 +183,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                         padding: EdgeInsets.symmetric(
                           horizontal: AppSpacing.pageX,
                         ),
-                        child: SlateEmptyState(
+                        child: WorkloopEmptyState(
                           icon: LucideIcons.inbox,
                           title: 'No active requests',
                           subtitle:
@@ -553,7 +553,7 @@ class _BookingModePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateListRow(
+    return WorkloopListRow(
       onTap: onToggle,
       leading: Icon(
         calendarMode ? LucideIcons.calendarDays : LucideIcons.list,
@@ -597,84 +597,17 @@ class _BookingsViewSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateSurface(
-      padding: const EdgeInsets.all(5),
-      radius: AppRadius.pill,
-      color: AppColors.t1.withValues(alpha: 0.028),
-      borderColor: AppColors.border.withValues(alpha: 0.54),
-      child: Row(
-        children: [
-          _BookingsViewOption(
-            label: 'Schedule',
-            selected: selected == _BookingsView.schedule,
-            onTap: () => onSelected(_BookingsView.schedule),
-          ),
-          _BookingsViewOption(
-            label: requestCount > 0 ? 'Requests $requestCount' : 'Requests',
-            selected: selected == _BookingsView.requests,
-            warning: requestCount > 0,
-            onTap: () => onSelected(_BookingsView.requests),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BookingsViewOption extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final bool warning;
-  final VoidCallback onTap;
-
-  const _BookingsViewOption({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.warning = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = warning ? AppColors.warning : AppColors.t1;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          SlateHaptics.tap();
-          onTap();
-        },
-        child: AnimatedContainer(
-          duration: AppMotion.fast,
-          curve: AppMotion.curve,
-          height: 36,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected
-                ? (warning
-                      ? color.withValues(alpha: 0.14)
-                      : AppColors.accentPrimaryStrong.withValues(alpha: 0.34))
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            border: Border.all(
-              color: selected
-                  ? (warning
-                        ? color.withValues(alpha: 0.22)
-                        : AppColors.accentPrimaryStrong.withValues(alpha: 0.54))
-                  : Colors.transparent,
-            ),
-          ),
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: selected ? (warning ? color : AppColors.t1) : AppColors.t3,
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+    return WorkloopSegmentedControl<_BookingsView>(
+      selected: selected,
+      onChanged: onSelected,
+      segments: [
+        const WorkloopSegment(value: _BookingsView.schedule, label: 'Schedule'),
+        WorkloopSegment(
+          value: _BookingsView.requests,
+          label: 'Requests',
+          badge: requestCount > 0 ? '$requestCount' : null,
         ),
-      ),
+      ],
     );
   }
 }
@@ -699,7 +632,7 @@ class _InlineRequestCard extends StatelessWidget {
         ? AppColors.warning
         : AppColors.green;
 
-    return SlateListRow(
+    return WorkloopListRow(
       onTap: onTap,
       leading: Icon(LucideIcons.inbox, color: statusColor, size: 18),
       title: Row(
@@ -782,7 +715,7 @@ class _NextBookingCard extends StatelessWidget {
     final location = booking?['location'] as String?;
     final price = booking == null ? null : _price(booking!);
 
-    return SlateListRow(
+    return WorkloopListRow(
       onTap: onTap,
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       leading: SizedBox(

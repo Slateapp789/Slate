@@ -69,30 +69,30 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 AppSpacing.pageX,
                 0,
               ),
-              child: SlateFeatureHeader(
+              child: WorkloopPageHeader(
                 icon: LucideIcons.listChecks,
                 title: 'Tasks',
                 subtitle: 'Keep follow-ups and admin from slipping.',
                 color: AppColors.modTasks,
-                trailing: SlateIconButton(
+                trailing: WorkloopIconButton(
                   icon: LucideIcons.plus,
                   semanticLabel: 'New task',
                   color: AppColors.modTasks,
                   backgroundColor: AppColors.modTasks.withValues(alpha: 0.10),
                   onTap: () => _showTaskEditor(context),
                 ),
-                stats: [
-                  SlateHeaderStat(
+                metrics: [
+                  WorkloopMetricItem(
                     value: '${taskCounts.urgent}',
                     label: 'Urgent',
                     color: AppColors.modTasks,
                   ),
-                  SlateHeaderStat(
+                  WorkloopMetricItem(
                     value: '${taskCounts.upcoming}',
                     label: 'Upcoming',
                     color: AppColors.warning,
                   ),
-                  SlateHeaderStat(
+                  WorkloopMetricItem(
                     value: '${taskCounts.done}',
                     label: 'Done',
                     color: AppColors.statusSuccess,
@@ -188,7 +188,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     };
     return Padding(
       padding: const EdgeInsets.only(top: 42),
-      child: SlateEmptyState(
+      child: WorkloopEmptyState(
         icon: Icons.check_circle_outline_rounded,
         title: title,
         subtitle: subtitle,
@@ -862,7 +862,7 @@ class _TaskViewSwitcher extends StatelessWidget {
           final count = _viewCount(view, counts);
           return Padding(
             padding: const EdgeInsets.only(right: AppSpacing.xs),
-            child: SlateFilterChip(
+            child: WorkloopFilterChip(
               label: '${_viewLabel(view)} $count',
               selected: active,
               onTap: () => onChanged(view),

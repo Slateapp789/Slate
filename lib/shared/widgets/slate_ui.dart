@@ -35,6 +35,742 @@ class SlateHaptics {
   }
 }
 
+class WorkloopPage extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final bool safeArea;
+  final bool scrollable;
+  final ScrollController? controller;
+  final Future<void> Function()? onRefresh;
+
+  const WorkloopPage({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.fromLTRB(
+      AppSpacing.pageX,
+      AppSpacing.lg,
+      AppSpacing.pageX,
+      AppSpacing.bottomNavClearance,
+    ),
+    this.safeArea = true,
+    this.scrollable = true,
+    this.controller,
+    this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget content = scrollable
+        ? ListView(controller: controller, padding: padding, children: [child])
+        : Padding(padding: padding, child: child);
+
+    if (onRefresh != null) {
+      content = RefreshIndicator(
+        color: AppColors.accentPrimary,
+        onRefresh: onRefresh!,
+        child: content,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: safeArea ? SafeArea(child: content) : content,
+    );
+  }
+}
+
+class WorkloopSurface extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final Color? color;
+  final Color? borderColor;
+  final double radius;
+  final bool elevated;
+  final VoidCallback? onTap;
+
+  const WorkloopSurface({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(AppSpacing.md),
+    this.color,
+    this.borderColor,
+    this.radius = AppRadius.md,
+    this.elevated = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateSurface(
+      padding: padding,
+      color: color,
+      borderColor: borderColor,
+      radius: radius,
+      elevated: elevated,
+      onTap: onTap,
+      child: child,
+    );
+  }
+}
+
+class WorkloopPageHeader extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final Widget? trailing;
+  final List<Widget> metrics;
+
+  const WorkloopPageHeader({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    this.trailing,
+    this.metrics = const [],
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateFeatureHeader(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      color: color,
+      trailing: trailing,
+      stats: metrics,
+    );
+  }
+}
+
+class WorkloopMetricRow extends StatelessWidget {
+  final List<Widget> children;
+
+  const WorkloopMetricRow({super.key, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: tokens.divider.withValues(alpha: 0.62)),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.sm),
+        child: Row(
+          children: [
+            for (var index = 0; index < children.length; index++) ...[
+              Expanded(child: children[index]),
+              if (index != children.length - 1)
+                Container(
+                  width: 1,
+                  height: 34,
+                  margin: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                  color: tokens.divider.withValues(alpha: 0.62),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class WorkloopMetricItem extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color color;
+
+  const WorkloopMetricItem({
+    super.key,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateHeaderStat(value: value, label: label, color: color);
+  }
+}
+
+class WorkloopSectionHeader extends StatelessWidget {
+  final String label;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const WorkloopSectionHeader({
+    super.key,
+    required this.label,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateSectionHeader(
+      label: label,
+      actionLabel: actionLabel,
+      onAction: onAction,
+    );
+  }
+}
+
+class WorkloopDivider extends StatelessWidget {
+  final EdgeInsetsGeometry margin;
+
+  const WorkloopDivider({
+    super.key,
+    this.margin = const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    return Padding(
+      padding: margin,
+      child: Divider(
+        height: 1,
+        thickness: 1,
+        color: tokens.divider.withValues(alpha: 0.66),
+      ),
+    );
+  }
+}
+
+class WorkloopListRow extends StatelessWidget {
+  final Widget leading;
+  final Widget title;
+  final Widget? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final EdgeInsetsGeometry padding;
+  final bool showDivider;
+
+  const WorkloopListRow({
+    super.key,
+    required this.leading,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+    this.padding = const EdgeInsets.symmetric(vertical: 14),
+    this.showDivider = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateListRow(
+      leading: leading,
+      title: title,
+      subtitle: subtitle,
+      trailing: trailing,
+      onTap: onTap,
+      padding: padding,
+      showDivider: showDivider,
+    );
+  }
+}
+
+class WorkloopEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget? action;
+
+  const WorkloopEmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.action,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (action == null) {
+      return SlateEmptyState(icon: icon, title: title, subtitle: subtitle);
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SlateEmptyState(icon: icon, title: title, subtitle: subtitle),
+        const SizedBox(height: AppSpacing.sm),
+        action!,
+      ],
+    );
+  }
+}
+
+class WorkloopPrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final bool destructive;
+  final bool secondary;
+
+  const WorkloopPrimaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.destructive = false,
+    this.secondary = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateButton(
+      label: label,
+      onPressed: onPressed,
+      icon: icon,
+      destructive: destructive,
+      secondary: secondary,
+    );
+  }
+}
+
+class WorkloopTextButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool destructive;
+
+  const WorkloopTextButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.destructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onPressed == null
+          ? null
+          : () {
+              SlateHaptics.tap();
+              onPressed!();
+            },
+      style: TextButton.styleFrom(
+        foregroundColor: destructive ? AppColors.error : AppColors.t2,
+        minimumSize: const Size(0, 42),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+        shape: const StadiumBorder(),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+class WorkloopIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color? color;
+  final Color? backgroundColor;
+  final double size;
+  final Widget? badge;
+  final String? semanticLabel;
+
+  const WorkloopIconButton({
+    super.key,
+    required this.icon,
+    required this.onTap,
+    this.color,
+    this.backgroundColor,
+    this.size = AppSpacing.minTouch,
+    this.badge,
+    this.semanticLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateIconButton(
+      icon: icon,
+      onTap: onTap,
+      color: color,
+      backgroundColor: backgroundColor,
+      size: size,
+      badge: badge,
+      semanticLabel: semanticLabel,
+    );
+  }
+}
+
+class WorkloopSegment<T> {
+  final T value;
+  final String label;
+  final String? badge;
+
+  const WorkloopSegment({required this.value, required this.label, this.badge});
+}
+
+class WorkloopSegmentedControl<T> extends StatelessWidget {
+  final List<WorkloopSegment<T>> segments;
+  final T selected;
+  final ValueChanged<T> onChanged;
+
+  const WorkloopSegmentedControl({
+    super.key,
+    required this.segments,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    final selectedIndex = segments.indexWhere(
+      (segment) => segment.value == selected,
+    );
+
+    return Container(
+      height: 42,
+      decoration: BoxDecoration(
+        color: tokens.textPrimary.withValues(alpha: 0.028),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: tokens.divider.withValues(alpha: 0.54)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth / segments.length;
+          return Stack(
+            children: [
+              AnimatedPositioned(
+                duration: AppMotion.deliberate,
+                curve: AppMotion.emphasized,
+                left: (selectedIndex < 0 ? 0 : selectedIndex) * width,
+                top: 3,
+                bottom: 3,
+                width: width,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: tokens.accentStrong.withValues(alpha: 0.34),
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      border: Border.all(
+                        color: tokens.accentStrong.withValues(alpha: 0.54),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  for (final segment in segments)
+                    Expanded(
+                      child: _WorkloopSegmentButton<T>(
+                        segment: segment,
+                        selected: segment.value == selected,
+                        onTap: () {
+                          SlateHaptics.tap();
+                          onChanged(segment.value);
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WorkloopSegmentButton<T> extends StatelessWidget {
+  final WorkloopSegment<T> segment;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _WorkloopSegmentButton({
+    required this.segment,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+          child: Text(
+            segment.badge == null
+                ? segment.label
+                : '${segment.label} ${segment.badge}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: selected ? tokens.textPrimary : tokens.textTertiary,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class WorkloopFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const WorkloopFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateFilterChip(label: label, selected: selected, onTap: onTap);
+  }
+}
+
+class WorkloopNavItem {
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  const WorkloopNavItem({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+}
+
+class WorkloopBottomNav extends StatelessWidget {
+  final int currentIndex;
+  final List<WorkloopNavItem> items;
+  final ValueChanged<int> onTap;
+  final VoidCallback onAction;
+
+  const WorkloopBottomNav({
+    super.key,
+    required this.currentIndex,
+    required this.items,
+    required this.onTap,
+    required this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
+    final tabCount = items.length;
+    return SafeArea(
+      top: false,
+      minimum: EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        bottom > 0 ? 2 : AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: SlateGlassSurface(
+              blur: 26,
+              color: AppColors.bgCard.withValues(alpha: 0.90),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: SizedBox(
+                height: 62,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final tabWidth = constraints.maxWidth / tabCount;
+                    final left = currentIndex * tabWidth;
+
+                    int indexForPosition(double dx) {
+                      return (dx / tabWidth).floor().clamp(0, tabCount - 1);
+                    }
+
+                    void handleDrag(double dx) {
+                      final index = indexForPosition(dx);
+                      if (index != currentIndex) {
+                        SlateHaptics.tap();
+                        onTap(index);
+                      }
+                    }
+
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onHorizontalDragStart: (details) {
+                        handleDrag(details.localPosition.dx);
+                      },
+                      onHorizontalDragUpdate: (details) {
+                        handleDrag(details.localPosition.dx);
+                      },
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          AnimatedPositioned(
+                            duration: AppMotion.deliberate,
+                            curve: AppMotion.emphasized,
+                            left: left,
+                            top: 9,
+                            width: tabWidth,
+                            height: 44,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                              ),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: items[currentIndex].color.withValues(
+                                    alpha: 0.14,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.pill,
+                                  ),
+                                  border: Border.all(
+                                    color: items[currentIndex].color.withValues(
+                                      alpha: 0.22,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Row(
+                            children: List.generate(
+                              tabCount,
+                              (index) => Expanded(child: _buildTab(index)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          WorkloopFAB(onTap: onAction),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTab(int index) {
+    final tab = items[index];
+    final active = index == currentIndex;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (index != currentIndex) SlateHaptics.tap();
+        onTap(index);
+      },
+      child: Container(
+        height: 62,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedScale(
+              scale: active ? 1.08 : 1,
+              duration: AppMotion.standard,
+              curve: AppMotion.curve,
+              child: Icon(
+                tab.icon,
+                color: active ? tab.color : AppColors.t3,
+                size: 18,
+              ),
+            ),
+            AnimatedSize(
+              duration: AppMotion.standard,
+              curve: AppMotion.curve,
+              alignment: Alignment.topCenter,
+              child: active
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          tab.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.fade,
+                          softWrap: false,
+                          style: TextStyle(
+                            color: tab.color,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class WorkloopFAB extends StatefulWidget {
+  final VoidCallback onTap;
+  final IconData icon;
+
+  const WorkloopFAB({
+    super.key,
+    required this.onTap,
+    this.icon = LucideIcons.plus,
+  });
+
+  @override
+  State<WorkloopFAB> createState() => _WorkloopFABState();
+}
+
+class _WorkloopFABState extends State<WorkloopFAB> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateGlassSurface(
+      radius: AppRadius.pill,
+      blur: 24,
+      color: AppColors.accentPrimaryStrong,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTap: () {
+          SlateHaptics.confirm();
+          widget.onTap();
+        },
+        child: AnimatedScale(
+          duration: AppMotion.fast,
+          curve: AppMotion.curve,
+          scale: _pressed ? 0.96 : 1,
+          child: SizedBox(
+            width: 60,
+            height: 60,
+            child: Icon(widget.icon, color: AppColors.t1, size: 26),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class SlateSurface extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;

@@ -90,7 +90,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
               child: Row(
                 children: [
                   if (widget.showBackButton) ...[
-                    SlateIconButton(
+                    WorkloopIconButton(
                       icon: LucideIcons.chevronLeft,
                       semanticLabel: 'Back',
                       onTap: () => Navigator.maybePop(context),
@@ -98,12 +98,12 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     const SizedBox(width: AppSpacing.sm),
                   ],
                   Expanded(
-                    child: SlateFeatureHeader(
+                    child: WorkloopPageHeader(
                       icon: LucideIcons.fileText,
                       title: 'Notes',
                       subtitle: 'Capture context before it disappears.',
                       color: AppColors.modNotes,
-                      trailing: SlateIconButton(
+                      trailing: WorkloopIconButton(
                         icon: LucideIcons.edit3,
                         semanticLabel: 'New note',
                         color: AppColors.modNotes,
@@ -112,18 +112,18 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                         ),
                         onTap: () => _openEditor(),
                       ),
-                      stats: [
-                        SlateHeaderStat(
+                      metrics: [
+                        WorkloopMetricItem(
                           value: '${noteStats.active}',
                           label: 'Active',
                           color: AppColors.modNotes,
                         ),
-                        SlateHeaderStat(
+                        WorkloopMetricItem(
                           value: '${noteStats.pinned}',
                           label: 'Pinned',
                           color: AppColors.warning,
                         ),
-                        SlateHeaderStat(
+                        WorkloopMetricItem(
                           value: '${noteStats.clients}',
                           label: 'Clients',
                           color: AppColors.modTasks,
@@ -272,7 +272,7 @@ class _NoteFilterRail extends StatelessWidget {
     final active = selected == value;
     return Padding(
       padding: const EdgeInsets.only(right: AppSpacing.xs),
-      child: SlateFilterChip(
+      child: WorkloopFilterChip(
         label: '$label $count',
         selected: active,
         onTap: () => onChanged(value),
@@ -314,7 +314,7 @@ class _NotesList extends StatelessWidget {
           if (notes.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 42),
-              child: SlateEmptyState(
+              child: WorkloopEmptyState(
                 icon: LucideIcons.stickyNote,
                 title: hasSearch ? 'No matching notes' : 'No notes',
                 subtitle: hasSearch
@@ -395,7 +395,7 @@ class _NoteListRow extends StatelessWidget {
         ? 'No additional text'
         : _oneLine(note.body);
 
-    return SlateListRow(
+    return WorkloopListRow(
       onTap: () => onOpen(note),
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       leading: Icon(
@@ -532,7 +532,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
                     ),
                   ),
                   const Spacer(),
-                  SlateIconButton(
+                  WorkloopIconButton(
                     icon: _pinned ? LucideIcons.pinOff : LucideIcons.pin,
                     semanticLabel: _pinned ? 'Unpin note' : 'Pin note',
                     color: _pinned ? AppColors.slateLight : AppColors.t2,
@@ -541,7 +541,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
                   ),
                   if (isEditing) ...[
                     const SizedBox(width: AppSpacing.xs),
-                    SlateIconButton(
+                    WorkloopIconButton(
                       icon: LucideIcons.trash2,
                       semanticLabel: 'Delete note',
                       color: AppColors.error,

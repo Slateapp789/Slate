@@ -226,7 +226,7 @@ Post-V1 / V2:
 
 ## Technical Debt
 
-- UI system: the 2026-07-07 whitespace-first refoundation has begun, but some settings, onboarding, auth, notification, public profile, form, sheet, and detail widgets still contain local `Container`/`AppColors` styling that should be migrated to shared theme tokens and row/divider primitives.
+- UI system: the 2026-07-07 whitespace-first refoundation now has canonical `Workloop*` screen primitives for headers, metrics, rows, filters, segmented controls, empty states, buttons, bottom nav, FAB, and surfaces. Some settings child tabs, onboarding steps, auth, notification, public profile, form, sheet, and detail widgets still contain local `Container`/`AppColors` styling that should be migrated to shared theme tokens and row/divider primitives before enabling real dark mode.
 - Large files:
   - `lib/features/tasks/tasks_screen.dart` ~946 lines after extracting task card, task logic, task detail, and task editor parts.
   - `lib/features/tasks/task_logic.dart` ~280 lines.

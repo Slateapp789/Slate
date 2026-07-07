@@ -202,25 +202,25 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateFeatureHeader(
+    return WorkloopPageHeader(
       icon: LucideIcons.users,
       title: 'Clients',
       subtitle: attention == 0
           ? 'Keep relationships warm.'
           : '$attention need a follow-up. Keep relationships warm.',
       color: AppColors.modClients,
-      stats: [
-        SlateHeaderStat(
+      metrics: [
+        WorkloopMetricItem(
           value: '$total',
           label: 'Active',
           color: AppColors.modClients,
         ),
-        SlateHeaderStat(
+        WorkloopMetricItem(
           value: '$leads',
           label: 'Leads',
           color: AppColors.warning,
         ),
-        SlateHeaderStat(
+        WorkloopMetricItem(
           value: '$attention',
           label: 'Follow-ups',
           color: AppColors.modTasks,
@@ -321,7 +321,7 @@ class _ViewRail extends StatelessWidget {
     final active = selected == value;
     return Padding(
       padding: const EdgeInsets.only(right: AppSpacing.xs),
-      child: SlateFilterChip(
+      child: WorkloopFilterChip(
         label: '$label $count',
         selected: active,
         onTap: () => onChanged(value),
@@ -349,7 +349,7 @@ class _ClientRow extends StatelessWidget {
     final signal = _clientSignal(record);
     final statusColor = _clientStatusColor(record);
 
-    return SlateListRow(
+    return WorkloopListRow(
       onTap: onTap,
       leading: Container(
         width: 40,
@@ -489,7 +489,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SlateEmptyState(
+            const WorkloopEmptyState(
               icon: LucideIcons.users,
               title: 'No clients yet',
               subtitle:

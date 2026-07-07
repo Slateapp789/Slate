@@ -55,7 +55,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   children: [
                     Row(
                       children: [
-                        SlateIconButton(
+                        WorkloopIconButton(
                           icon: Icons.arrow_back_ios_new_rounded,
                           onTap: prevPage,
                           size: 38,

@@ -274,3 +274,20 @@ Consequences:
 - Activity feeds, clients, notes, bookings, tasks, and money summaries should prefer row/divider layouts.
 - Lime is the active/accent system; module colours should be secondary semantic hints only.
 - A light/dark token foundation exists, but full dark mode remains gated on migrating static `AppColors` usage.
+
+## 2026-07-07 - Workloop Primitives Become Canonical
+
+Decision:
+
+Use `Workloop*` as the canonical screen-facing UI primitive layer for the final minimal premium system while keeping existing `Slate*` classes as compatibility foundations.
+
+Reasoning:
+
+The product needs one durable UI vocabulary across primary screens, bottom navigation, filters, metrics, rows, empty states, and actions. Renaming the screen-facing layer to Workloop makes the design system explicit without rewriting the app architecture or changing workflows.
+
+Consequences:
+
+- `lib/shared/widgets/slate_ui.dart` now exposes `WorkloopPage`, `WorkloopPageHeader`, `WorkloopMetricItem`, `WorkloopListRow`, `WorkloopSegmentedControl`, `WorkloopBottomNav`, `WorkloopFAB`, and related primitives.
+- Primary screens now reference the canonical primitives for shared UI patterns.
+- Locally hand-built segmented controls in Bookings and Settings have been replaced by `WorkloopSegmentedControl`.
+- Dark mode remains staged, not enabled, until local static-colour widgets are migrated.

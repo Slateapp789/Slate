@@ -209,6 +209,7 @@ class AppSpacing {
   static const double pageX = 24;
   static const double pageTop = 60;
   static const double minTouch = 44;
+  static const double bottomNavClearance = 118;
 }
 
 class AppRadius {
