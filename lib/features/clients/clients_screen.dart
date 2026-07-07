@@ -8,7 +8,7 @@ import '../../shared/widgets/slate_ui.dart';
 import 'add_client_screen.dart';
 import 'client_detail_screen.dart';
 
-enum _ClientView { all, leads, followUps }
+enum _ClientView { all, leads, active }
 
 class ClientsScreen extends ConsumerStatefulWidget {
   const ClientsScreen({super.key});
@@ -59,13 +59,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                         AppSpacing.pageX,
                         0,
                       ),
-                      child: _Header(
-                        total: data.length,
-                        leads: data.where((item) => item.isLead).length,
-                        attention: data
-                            .where((item) => item.needsAttention)
-                            .length,
-                      ),
+                      child: const _Header(),
                     ),
                   ),
                   if (data.isNotEmpty) ...[
@@ -149,7 +143,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
       final matchesView = switch (_view) {
         _ClientView.all => true,
         _ClientView.leads => record.isLead,
-        _ClientView.followUps => record.openTaskCount > 0,
+        _ClientView.active => !record.isLead,
       };
       return matchesQuery && matchesView;
     }).toList();
@@ -157,8 +151,6 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
     filtered.sort((a, b) {
       final nextComparison = _nextDate(a).compareTo(_nextDate(b));
       if (nextComparison != 0) return nextComparison;
-      final taskComparison = b.openTaskCount.compareTo(a.openTaskCount);
-      if (taskComparison != 0) return taskComparison;
       return a.client.name.compareTo(b.client.name);
     });
     return filtered;
@@ -190,42 +182,15 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
 }
 
 class _Header extends StatelessWidget {
-  final int total;
-  final int leads;
-  final int attention;
-
-  const _Header({
-    required this.total,
-    required this.leads,
-    required this.attention,
-  });
+  const _Header();
 
   @override
   Widget build(BuildContext context) {
-    return WorkloopPageHeader(
+    return const WorkloopPageHeader(
       icon: LucideIcons.users,
       title: 'Clients',
-      subtitle: attention == 0
-          ? 'Keep relationships warm.'
-          : '$attention need a follow-up. Keep relationships warm.',
+      subtitle: 'People you work with.',
       color: AppColors.modClients,
-      metrics: [
-        WorkloopMetricItem(
-          value: '$total',
-          label: 'Active',
-          color: AppColors.modClients,
-        ),
-        WorkloopMetricItem(
-          value: '$leads',
-          label: 'Leads',
-          color: AppColors.warning,
-        ),
-        WorkloopMetricItem(
-          value: '$attention',
-          label: 'Follow-ups',
-          color: AppColors.modTasks,
-        ),
-      ],
     );
   }
 }
@@ -308,9 +273,9 @@ class _ViewRail extends StatelessWidget {
             records.where((item) => item.isLead).length,
           ),
           _chip(
-            _ClientView.followUps,
-            'Follow-ups',
-            records.where((item) => item.openTaskCount > 0).length,
+            _ClientView.active,
+            'Active',
+            records.where((item) => !item.isLead).length,
           ),
         ],
       ),
@@ -347,7 +312,6 @@ class _ClientRow extends StatelessWidget {
         .join()
         .toUpperCase();
     final signal = _clientSignal(record);
-    final statusColor = _clientStatusColor(record);
 
     return WorkloopListRow(
       onTap: onTap,
@@ -383,22 +347,16 @@ class _ClientRow extends StatelessWidget {
         signal,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: record.needsAttention ? statusColor : AppColors.t3,
+        style: const TextStyle(
+          color: AppColors.t3,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (record.isLead)
-            _StatusPill(label: 'Lead', color: AppColors.warning)
-          else if (record.openTaskCount > 0)
-            _StatusPill(label: '${record.openTaskCount}', color: statusColor),
-          const SizedBox(width: AppSpacing.xs),
-          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
-        ],
+      trailing: const Icon(
+        LucideIcons.chevronRight,
+        color: AppColors.t3,
+        size: 16,
       ),
     );
   }
@@ -406,52 +364,16 @@ class _ClientRow extends StatelessWidget {
   String _clientSignal(ClientCrmRecord record) {
     final next = record.nextBooking;
     if (next != null) return 'Next booking ${_friendlyDate(next.startTime)}';
-    if (record.outstandingBalance > 0) {
-      return '£${record.outstandingBalance.toStringAsFixed(0)} unpaid';
-    }
-    if (record.overdueTaskCount > 0) {
-      return '${record.overdueTaskCount} overdue task${record.overdueTaskCount == 1 ? '' : 's'}';
-    }
-    if (record.openTaskCount > 0) {
-      return '${record.openTaskCount} open task${record.openTaskCount == 1 ? '' : 's'}';
+    final last = record.lastBooking;
+    if (last != null) {
+      final days = DateTime.now().difference(last.startTime).inDays;
+      if (days <= 0) return 'Last job today';
+      if (days == 1) return 'Last job yesterday';
+      return 'Last job $days days ago';
     }
     if (record.client.tags.isNotEmpty) return record.client.tags.first;
     if (record.client.status == 'lead') return 'Lead';
-    return 'No upcoming activity';
-  }
-
-  Color _clientStatusColor(ClientCrmRecord record) {
-    if (record.overdueTaskCount > 0) return AppColors.error;
-    if (record.openTaskCount > 0) return AppColors.warning;
-    if (record.outstandingBalance > 0) return AppColors.warning;
-    if (record.isLead) return AppColors.warning;
-    return AppColors.modClients;
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _StatusPill({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.11),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
+    return 'No bookings yet';
   }
 }
 
@@ -496,16 +418,10 @@ class _EmptyState extends StatelessWidget {
                   'Add a client, capture their preferences, then build bookings, payments, and tasks around them.',
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: onAdd,
-                icon: const Icon(LucideIcons.userPlus, size: 17),
-                label: const Text(
-                  'Add Client',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                ),
-              ),
+            WorkloopPrimaryButton(
+              label: 'Add client',
+              icon: LucideIcons.userPlus,
+              onPressed: onAdd,
             ),
           ],
         ),
@@ -526,8 +442,13 @@ class _NoMatches extends StatelessWidget {
           Icon(LucideIcons.searchX, color: AppColors.t3, size: 32),
           SizedBox(height: 12),
           Text(
-            'No clients match that view',
+            'No clients found',
             style: TextStyle(color: AppColors.t3, fontSize: 14),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Try a different search or filter.',
+            style: TextStyle(color: AppColors.t3, fontSize: 12),
           ),
         ],
       ),

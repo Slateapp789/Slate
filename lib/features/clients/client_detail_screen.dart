@@ -6,7 +6,6 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
-import 'providers/client_detail_providers.dart';
 import 'widgets/client_appointments_tab.dart';
 import 'widgets/client_overview_tab.dart';
 import 'widgets/client_payments_tab.dart';
@@ -230,9 +229,6 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   @override
   Widget build(BuildContext context) {
     final clientId = _client['id'] as String;
-    final appointments = ref.watch(clientAppointmentsProvider(clientId));
-    final tasks = ref.watch(clientTasksProvider(clientId));
-    final payments = ref.watch(clientPaymentsProvider(clientId));
     final phone = _client['phone'] as String? ?? '';
     final email = _client['email'] as String? ?? '';
     final address = _client['address'] as String? ?? '';
@@ -351,14 +347,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.bgCard,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: _editForm(),
-                  ),
+                  child: _editForm(),
                 ),
               ),
 
@@ -383,36 +372,28 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
               // ── Tabs ─────────────────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.bgCard,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: AppColors.accentPrimary,
+                  indicatorWeight: 2,
+                  indicatorSize: TabBarIndicatorSize.label,
+                  dividerColor: AppColors.border.withValues(alpha: 0.7),
+                  labelColor: AppColors.t1,
+                  unselectedLabelColor: AppColors.t3,
+                  labelStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
                   ),
-                  child: TabBar(
-                    controller: _tabController,
-                    indicator: BoxDecoration(
-                      color: AppColors.green,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicatorPadding: const EdgeInsets.all(3),
-                    dividerColor: Colors.transparent,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: AppColors.t3,
-                    labelStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    tabs: [
-                      const Tab(text: 'Overview'),
-                      Tab(
-                        text: 'Bookings (${appointments.value?.length ?? 0})',
-                      ),
-                      Tab(text: 'Payments (${payments.value?.length ?? 0})'),
-                      Tab(text: 'Tasks (${tasks.value?.length ?? 0})'),
-                    ],
+                  unselectedLabelStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
+                  tabs: const [
+                    Tab(text: 'Overview'),
+                    Tab(text: 'Bookings'),
+                    Tab(text: 'Payments'),
+                    Tab(text: 'Tasks'),
+                  ],
                 ),
               ),
               const SizedBox(height: 8),
@@ -424,7 +405,6 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                   children: [
                     ClientOverviewTab(
                       clientId: clientId,
-                      clientName: name,
                       client: _client,
                       notes: _client['notes'] as String? ?? '',
                     ),
@@ -444,93 +424,121 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   // ── Edit form ─────────────────────────────────────────────────────────────
 
   Widget _editForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _editSectionTitle('Basic details'),
+        _editField('Name', _nameController),
+        const SizedBox(height: 12),
+        _editField(
+          'Phone',
+          _phoneController,
+          keyboardType: TextInputType.phone,
+        ),
+        const SizedBox(height: 12),
+        _editField(
+          'Email',
+          _emailController,
+          keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: 24),
+        _editSectionTitle('Work details'),
+        _editField('Address', _addressController, maxLines: 2),
+        const SizedBox(height: 12),
+        _contactMethodEditor(),
+        const SizedBox(height: 12),
+        _statusEditor(),
+        const SizedBox(height: 12),
+        SlateDisclosure(
+          title: 'More client details',
+          subtitle: 'Source, birthday and tags',
+          icon: LucideIcons.listPlus,
+          expanded: _moreDetailsExpanded,
+          onToggle: () =>
+              setState(() => _moreDetailsExpanded = !_moreDetailsExpanded),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _editField('Source', _sourceController),
+              const SizedBox(height: 12),
+              _editField('Tags', _tagsController),
+              const SizedBox(height: 12),
+              _dateEditor(),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        _editSectionTitle('Notes'),
+        _editField('Notes', _notesController, maxLines: 4),
+        const SizedBox(height: 12),
+        _editField('Important notes', _importantNotesController, maxLines: 2),
+      ],
+    );
+  }
+
+  Widget _editSectionTitle(String label) {
     return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _editField('Name', _nameController),
-          const SizedBox(height: 12),
-          _editField(
-            'Phone',
-            _phoneController,
-            keyboardType: TextInputType.phone,
+      padding: const EdgeInsets.only(left: 4, bottom: 10),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 18,
+          fontWeight: FontWeight.w900,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
+
+  Widget _statusEditor() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Status',
+          style: TextStyle(
+            fontSize: 12,
+            color: AppColors.t3,
+            fontWeight: FontWeight.w600,
           ),
-          const SizedBox(height: 12),
-          _editField(
-            'Email',
-            _emailController,
-            keyboardType: TextInputType.emailAddress,
-          ),
-          const SizedBox(height: 12),
-          _editField('Address', _addressController, maxLines: 2),
-          const SizedBox(height: 12),
-          _contactMethodEditor(),
-          const SizedBox(height: 12),
-          const Text(
-            'Status',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.t3,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: ['active', 'lead', 'inactive'].map((s) {
-              final active = _status == s;
-              return GestureDetector(
-                onTap: () => setState(() => _status = s),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: active ? AppColors.green : AppColors.bgInteract,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: active ? AppColors.green : AppColors.border,
-                    ),
-                  ),
-                  child: Text(
-                    s,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: active ? Colors.white : AppColors.t3,
-                    ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: ['active', 'lead', 'inactive'].map((s) {
+            final active = _status == s;
+            return GestureDetector(
+              onTap: () => setState(() => _status = s),
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: active
+                      ? AppColors.accentPrimaryStrong.withValues(alpha: 0.32)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: active
+                        ? AppColors.accentPrimaryStrong.withValues(alpha: 0.64)
+                        : AppColors.border,
                   ),
                 ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 16),
-          SlateDisclosure(
-            title: 'More client details',
-            subtitle: 'Source, birthday, tags and notes',
-            icon: LucideIcons.listPlus,
-            expanded: _moreDetailsExpanded,
-            onToggle: () =>
-                setState(() => _moreDetailsExpanded = !_moreDetailsExpanded),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _editField('Source', _sourceController),
-                const SizedBox(height: 12),
-                _editField('Tags', _tagsController),
-                const SizedBox(height: 12),
-                _dateEditor(),
-                const SizedBox(height: 12),
-                _editField('Important', _importantNotesController, maxLines: 2),
-                const SizedBox(height: 12),
-                _editField('Notes', _notesController, maxLines: 3),
-              ],
-            ),
-          ),
-        ],
-      ),
+                child: Text(
+                  s,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: active ? AppColors.t1 : AppColors.t3,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -708,9 +716,9 @@ class _ClientCompactHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
+        color: AppColors.t1.withValues(alpha: 0.028),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.72)),
       ),
       child: Row(
         children: [

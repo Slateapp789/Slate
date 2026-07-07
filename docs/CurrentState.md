@@ -1,6 +1,6 @@
 # Workloop Current State
 
-Last updated: 2026-07-06
+Last updated: 2026-07-07
 
 ## Completed / Mostly Working Features
 
@@ -53,19 +53,18 @@ Last updated: 2026-07-06
 
 ### Clients / CRM
 
-- Client list.
+- Calm, whitespace-first client list with title, subtitle, search, simple All/Leads/Active filters, and useful single-line relationship signals.
 - Search and filtering/sorting.
-- Simplified rows showing useful business signals rather than contact clutter.
-- Add client.
-- Edit client.
+- Add client flow organized around Basic details, Work details, and Notes.
+- Edit client flow mirrors the calmer section hierarchy.
 - Delete client with confirmation.
-- Client detail with call/email actions.
+- Client detail with compact profile header, call/email actions, soft tabs, and reduced visual weight.
 - Notes and important notes.
 - Status/source/tags/birthday/preferred contact method fields.
-- Client booking history.
-- Client payment history.
-- Client task history.
-- Client overview timeline and follow-up task creation.
+- Client overview focused on contact details, notes, next booking, and recent history.
+- Client booking history as a simple client-specific list.
+- Client payment history with neutral Paid/Unpaid language and no debt/overdue summary block.
+- Client task history as a simple client-specific list.
 
 ### Bookings
 

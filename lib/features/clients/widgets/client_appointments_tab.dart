@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/slate_ui.dart';
 import '../../appointments/appointment_detail_screen.dart';
 import '../../appointments/add_appointment_screen.dart';
 import '../providers/client_detail_providers.dart';
@@ -48,8 +49,9 @@ class ClientAppointmentsTab extends ConsumerWidget {
       data: (appts) => appts.isEmpty
           ? _EmptyStateWithAction(
               icon: LucideIcons.calendar,
-              message: 'No bookings yet',
-              actionLabel: '+ Add Booking',
+              title: 'No bookings yet.',
+              message: 'Bookings for this client will appear here.',
+              actionLabel: 'Add booking',
               onAction: () async {
                 await Navigator.push(
                   context,
@@ -65,7 +67,7 @@ class ClientAppointmentsTab extends ConsumerWidget {
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
                 itemCount: appts.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                separatorBuilder: (_, __) => const SizedBox.shrink(),
                 itemBuilder: (context, i) {
                   final appt = appts[i];
                   final dt = DateTime.tryParse(
@@ -75,16 +77,11 @@ class ClientAppointmentsTab extends ConsumerWidget {
                     appt['end_time'] as String? ?? '',
                   )?.toLocal();
                   final status = appt['status'] as String? ?? 'scheduled';
-                  final isScheduled = status == 'scheduled';
                   final statusColor = status == 'completed'
                       ? AppColors.success
-                      : status == 'cancelled'
-                      ? AppColors.error
-                      : status == 'no_show'
-                      ? AppColors.warning
-                      : AppColors.green;
+                      : AppColors.t3;
 
-                  return GestureDetector(
+                  return WorkloopListRow(
                     onTap: () async {
                       await Navigator.push(
                         context,
@@ -95,88 +92,59 @@ class ClientAppointmentsTab extends ConsumerWidget {
                       );
                       ref.invalidate(clientAppointmentsProvider(clientId));
                     },
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isScheduled
-                              ? AppColors.green.withValues(alpha: 0.3)
-                              : AppColors.border,
-                        ),
+                    leading: Icon(
+                      LucideIcons.calendar,
+                      color: statusColor,
+                      size: 18,
+                    ),
+                    title: Text(
+                      appt['services']?['name'] as String? ?? 'Booking',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.t1,
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  appt['services']?['name'] as String? ??
-                                      'Booking',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.t1,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  dt != null
-                                      ? endDt != null
-                                            ? '${_formatDate(dt)} · ${_fmtTime(dt)} – ${_fmtTime(endDt)}'
-                                            : '${_formatDate(dt)} · ${_fmtTime(dt)}'
-                                      : '—',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.t3,
-                                  ),
-                                ),
-                              ],
+                    ),
+                    subtitle: Text(
+                      dt != null
+                          ? endDt != null
+                                ? '${_formatDate(dt)} · ${_fmtTime(dt)} - ${_fmtTime(endDt)}'
+                                : '${_formatDate(dt)} · ${_fmtTime(dt)}'
+                          : 'No date set',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: AppColors.t3),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (appt['price'] != null)
+                          Text(
+                            '£${(appt['price'] as num).toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.t2,
                             ),
                           ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              if (appt['price'] != null)
-                                Text(
-                                  '£${(appt['price'] as num).toStringAsFixed(0)}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.t1,
-                                  ),
-                                ),
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  status.replaceAll('_', ' '),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: statusColor,
-                                  ),
-                                ),
-                              ),
-                            ],
+                        const SizedBox(width: 10),
+                        Text(
+                          status.replaceAll('_', ' '),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: statusColor,
                           ),
-                          const SizedBox(width: 8),
-                          const Icon(
-                            LucideIcons.chevronRight,
-                            color: AppColors.t3,
-                            size: 14,
-                          ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          LucideIcons.chevronRight,
+                          color: AppColors.t3,
+                          size: 14,
+                        ),
+                      ],
                     ),
                   );
                 },
@@ -189,12 +157,14 @@ class ClientAppointmentsTab extends ConsumerWidget {
 // ── Empty state with action button ────────────────────────────────────────────
 class _EmptyStateWithAction extends StatelessWidget {
   final IconData icon;
+  final String title;
   final String message;
   final String actionLabel;
   final VoidCallback onAction;
 
   const _EmptyStateWithAction({
     required this.icon,
+    required this.title,
     required this.message,
     required this.actionLabel,
     required this.onAction,
@@ -206,31 +176,9 @@ class _EmptyStateWithAction extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: AppColors.t3, size: 32),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: const TextStyle(fontSize: 14, color: AppColors.t3),
-          ),
+          WorkloopEmptyState(icon: icon, title: title, subtitle: message),
           const SizedBox(height: 16),
-          GestureDetector(
-            onTap: onAction,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.green,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                actionLabel,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
+          WorkloopPrimaryButton(label: actionLabel, onPressed: onAction),
         ],
       ),
     );

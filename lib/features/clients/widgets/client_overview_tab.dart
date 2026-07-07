@@ -12,14 +12,12 @@ import '../providers/client_detail_providers.dart';
 
 class ClientOverviewTab extends ConsumerWidget {
   final String clientId;
-  final String clientName;
   final Map<String, dynamic> client;
   final String notes;
 
   const ClientOverviewTab({
     super.key,
     required this.clientId,
-    required this.clientName,
     required this.client,
     required this.notes,
   });
@@ -41,17 +39,11 @@ class ClientOverviewTab extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
         children: [
           _DetailsSection(client: client),
-          const SizedBox(height: 12),
-          _PulseSection(
-            appointments: appointments.value ?? const [],
-            payments: payments.value ?? const [],
-            tasks: tasks.value ?? const [],
-          ),
-          const SizedBox(height: 12),
-          _NotesSection(notes: notes, clientName: clientName),
-          const SizedBox(height: 12),
-          _FollowUpSection(clientId: clientId, clientName: clientName),
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
+          _NotesSection(notes: notes),
+          const SizedBox(height: 20),
+          _NextBookingSection(appointments: appointments.value ?? const []),
+          const SizedBox(height: 20),
           _TimelineSection(
             appointments: appointments.value ?? const [],
             payments: payments.value ?? const [],
@@ -65,136 +57,77 @@ class ClientOverviewTab extends ConsumerWidget {
   }
 }
 
-class _PulseSection extends StatelessWidget {
+class _NextBookingSection extends StatelessWidget {
   final List<Map<String, dynamic>> appointments;
-  final List<Payment> payments;
-  final List<SlateTask> tasks;
 
-  const _PulseSection({
-    required this.appointments,
-    required this.payments,
-    required this.tasks,
-  });
+  const _NextBookingSection({required this.appointments});
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final nextAppointment = appointments
-        .map(_appointmentDate)
-        .whereType<DateTime>()
-        .where((date) => date.isAfter(now))
-        .fold<DateTime?>(null, (next, date) {
-          if (next == null || date.isBefore(next)) return date;
-          return next;
-        });
-    final openTasks = tasks.where((task) => task.status != 'done').length;
-    final outstanding = payments
-        .where((payment) => payment.status != 'paid')
-        .fold<double>(0, (sum, payment) => sum + payment.total);
+    final upcoming =
+        appointments.where((row) {
+          final date = _appointmentDate(row);
+          final status = row['status'] as String? ?? 'scheduled';
+          return date != null && date.isAfter(now) && status != 'cancelled';
+        }).toList()..sort(
+          (a, b) => _appointmentDate(a)!.compareTo(_appointmentDate(b)!),
+        );
+    final next = upcoming.isEmpty ? null : upcoming.first;
+    final date = next == null ? null : _appointmentDate(next);
+    final service =
+        next?['services']?['name'] as String? ??
+        next?['title'] as String? ??
+        'Booking';
+    final address = next?['location'] as String? ?? '';
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(15),
       decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'CLIENT SUMMARY',
+            'Next booking',
             style: TextStyle(
-              color: AppColors.t3,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _MetricTile(
-                  icon: LucideIcons.calendarClock,
-                  label: 'Next',
-                  value: nextAppointment == null
-                      ? 'None'
-                      : _formatShortDate(nextAppointment),
-                  color: AppColors.green,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _MetricTile(
-                  icon: LucideIcons.banknote,
-                  label: 'Owes',
-                  value: '£${outstanding.toStringAsFixed(0)}',
-                  color: outstanding > 0 ? AppColors.warning : AppColors.t3,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _MetricTile(
-                  icon: LucideIcons.checkSquare,
-                  label: 'Tasks',
-                  value: '$openTasks open',
-                  color: openTasks > 0 ? AppColors.warning : AppColors.t3,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetricTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _MetricTile({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.bgInteract,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 17),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
               color: AppColors.t1,
               fontSize: 15,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            label.toUpperCase(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.t3,
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0,
+          const SizedBox(height: 8),
+          if (next == null || date == null)
+            const Text(
+              'No upcoming booking.',
+              style: TextStyle(color: AppColors.t3, fontSize: 13),
+            )
+          else ...[
+            Text(
+              service,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.t1,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
+            const SizedBox(height: 4),
+            Text(
+              [
+                _formatLongDate(date),
+                '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}',
+                if (address.isNotEmpty) address,
+              ].join(' · '),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.t3,
+                fontSize: 13,
+                height: 1.3,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -250,12 +183,11 @@ class _DetailsSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'DETAILS',
+            'Contact details',
             style: TextStyle(
-              color: AppColors.t3,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0,
+              color: AppColors.t1,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 12),
@@ -301,26 +233,20 @@ class _DetailsSection extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.errorDim,
+                  color: AppColors.bgInteract,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: AppColors.error.withValues(alpha: 0.18),
-                  ),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
-                      LucideIcons.alertCircle,
-                      color: AppColors.error,
-                      size: 16,
-                    ),
+                    const Icon(LucideIcons.info, color: AppColors.t3, size: 16),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         important,
                         style: const TextStyle(
-                          color: AppColors.error,
+                          color: AppColors.t2,
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                           height: 1.3,
@@ -388,9 +314,8 @@ class _DetailRow extends StatelessWidget {
 
 class _NotesSection extends StatelessWidget {
   final String notes;
-  final String clientName;
 
-  const _NotesSection({required this.notes, required this.clientName});
+  const _NotesSection({required this.notes});
 
   @override
   Widget build(BuildContext context) {
@@ -420,7 +345,7 @@ class _NotesSection extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Client Notes',
+                  'Notes',
                   style: TextStyle(
                     color: AppColors.t1,
                     fontSize: 14,
@@ -429,9 +354,7 @@ class _NotesSection extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  hasNotes
-                      ? notes
-                      : 'No notes yet. Add preferences, booking notes, or anything worth remembering about $clientName.',
+                  hasNotes ? notes : 'No notes yet.',
                   style: TextStyle(
                     color: hasNotes ? AppColors.t2 : AppColors.t3,
                     fontSize: 13,
@@ -679,12 +602,11 @@ class _TimelineSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'RECENT HISTORY',
+            'Recent history',
             style: TextStyle(
-              color: AppColors.t3,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0,
+              color: AppColors.t1,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 14),
@@ -814,11 +736,7 @@ class _TimelineItem {
     return _TimelineItem(
       date: date,
       icon: LucideIcons.calendar,
-      color: status == 'cancelled'
-          ? AppColors.error
-          : status == 'completed'
-          ? AppColors.success
-          : AppColors.green,
+      color: status == 'completed' ? AppColors.success : AppColors.t3,
       title: service,
       subtitle:
           '${_formatLongDate(date)} · ${status.replaceAll('_', ' ')}$price',
@@ -826,16 +744,12 @@ class _TimelineItem {
   }
 
   factory _TimelineItem.fromPayment(Payment payment) {
-    final color = switch (payment.status) {
-      'paid' => AppColors.success,
-      'overdue' => AppColors.error,
-      _ => AppColors.warning,
-    };
+    final color = payment.status == 'paid' ? AppColors.success : AppColors.t3;
     return _TimelineItem(
       date: payment.issueDate,
       icon: LucideIcons.banknote,
       color: color,
-      title: 'Payment ${payment.status}',
+      title: payment.status == 'paid' ? 'Payment received' : 'Invoice unpaid',
       subtitle:
           '£${payment.total.toStringAsFixed(0)} · ${_formatLongDate(payment.issueDate)}',
     );
@@ -843,7 +757,7 @@ class _TimelineItem {
 
   factory _TimelineItem.fromTask(SlateTask task) {
     final date = task.dueDate ?? DateTime.fromMillisecondsSinceEpoch(0);
-    final color = task.status == 'done' ? AppColors.success : AppColors.warning;
+    final color = task.status == 'done' ? AppColors.success : AppColors.t3;
     return _TimelineItem(
       date: date,
       icon: LucideIcons.checkSquare,
@@ -857,8 +771,8 @@ class _TimelineItem {
 
 BoxDecoration _cardDecoration() => BoxDecoration(
   color: AppColors.bgCard,
-  borderRadius: BorderRadius.circular(18),
-  border: Border.all(color: AppColors.border),
+  borderRadius: BorderRadius.circular(16),
+  border: Border.all(color: AppColors.border.withValues(alpha: 0.76)),
 );
 
 DateTime? _appointmentDate(Map<String, dynamic> row) =>

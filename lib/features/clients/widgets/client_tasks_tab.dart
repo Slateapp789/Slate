@@ -396,11 +396,9 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.bgCard,
+                  color: AppColors.t1.withValues(alpha: 0.028),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.green.withValues(alpha: 0.3),
-                  ),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -431,98 +429,72 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
                   itemCount: tks.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, __) => const SizedBox.shrink(),
                   itemBuilder: (context, i) {
                     final task = tks[i];
-                    final priority = task.priority;
                     final isDone = task.status == 'done';
                     final dueDate = task.dueDate;
-                    final priorityColor = priority == 'high'
-                        ? AppColors.error
-                        : priority == 'medium'
-                        ? AppColors.warning
-                        : AppColors.t3;
 
-                    return GestureDetector(
+                    return WorkloopListRow(
                       onTap: () => _showTaskActions(task),
-                      onLongPress: () => _confirmDeleteTask(task),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
+                      leading: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 22,
+                        height: 22,
                         decoration: BoxDecoration(
-                          color: AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
+                          shape: BoxShape.circle,
+                          color: isDone
+                              ? AppColors.success
+                              : Colors.transparent,
+                          border: Border.all(
+                            color: isDone
+                                ? AppColors.success
+                                : AppColors.border,
+                            width: 2,
+                          ),
                         ),
-                        child: Row(
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isDone
-                                    ? AppColors.green
-                                    : Colors.transparent,
-                                border: Border.all(
-                                  color: isDone
-                                      ? AppColors.green
-                                      : AppColors.border,
-                                  width: 2,
-                                ),
+                        child: isDone
+                            ? const Icon(
+                                Icons.check_rounded,
+                                color: Colors.white,
+                                size: 13,
+                              )
+                            : null,
+                      ),
+                      title: Text(
+                        task.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: isDone ? AppColors.t3 : AppColors.t1,
+                          decoration: isDone
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                      subtitle: dueDate == null
+                          ? const Text(
+                              'No due date',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.t3,
                               ),
-                              child: isDone
-                                  ? const Icon(
-                                      Icons.check_rounded,
-                                      color: Colors.white,
-                                      size: 12,
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    task.title,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDone
-                                          ? AppColors.t3
-                                          : AppColors.t1,
-                                      decoration: isDone
-                                          ? TextDecoration.lineThrough
-                                          : null,
-                                    ),
-                                  ),
-                                  if (dueDate != null) ...[
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      _formatDue(dueDate),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: _isOverdue(dueDate) && !isDone
-                                            ? AppColors.error
-                                            : _isDueToday(dueDate) && !isDone
-                                            ? AppColors.warning
-                                            : AppColors.t3,
-                                      ),
-                                    ),
-                                  ],
-                                ],
+                            )
+                          : Text(
+                              _formatDue(dueDate),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.t3,
                               ),
                             ),
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: isDone ? AppColors.t3 : priorityColor,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
+                      trailing: Text(
+                        isDone ? 'Done' : 'Open',
+                        style: const TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     );
@@ -562,7 +534,6 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
     if (diff == 0) return 'Due today';
     if (diff == 1) return 'Due tomorrow';
     if (diff == -1) return 'Due yesterday';
-    if (diff < 0) return 'Overdue ${-diff}d';
     const months = [
       'Jan',
       'Feb',
@@ -578,16 +549,6 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
       'Dec',
     ];
     return '${dt.day} ${months[dt.month - 1]}';
-  }
-
-  bool _isDueToday(DateTime dt) {
-    final now = DateTime.now();
-    return dt.year == now.year && dt.month == now.month && dt.day == now.day;
-  }
-
-  bool _isOverdue(DateTime dt) {
-    final today = DateTime.now();
-    return dt.isBefore(DateTime(today.year, today.month, today.day));
   }
 }
 
@@ -642,11 +603,10 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(LucideIcons.checkSquare, color: AppColors.t3, size: 32),
-          SizedBox(height: 12),
-          Text(
-            'No tasks linked to this client',
-            style: TextStyle(fontSize: 14, color: AppColors.t3),
+          WorkloopEmptyState(
+            icon: LucideIcons.checkSquare,
+            title: 'No tasks yet.',
+            subtitle: 'Client tasks will appear here.',
           ),
         ],
       ),

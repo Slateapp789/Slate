@@ -149,7 +149,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _sectionTitle('Core details'),
+                    _sectionTitle('Basic details'),
                     _field(
                       label: 'NAME',
                       controller: _nameController,
@@ -158,31 +158,21 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                       onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 12),
-                    _statusRow(),
-                    const SizedBox(height: 20),
-                    _sectionTitle('Contact'),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _field(
-                            label: 'PHONE',
-                            controller: _phoneController,
-                            hint: 'Mobile number',
-                            keyboardType: TextInputType.phone,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _field(
-                            label: 'EMAIL',
-                            controller: _emailController,
-                            hint: 'Email address',
-                            keyboardType: TextInputType.emailAddress,
-                          ),
-                        ),
-                      ],
+                    _field(
+                      label: 'PHONE',
+                      controller: _phoneController,
+                      hint: 'Mobile number',
+                      keyboardType: TextInputType.phone,
                     ),
                     const SizedBox(height: 12),
+                    _field(
+                      label: 'EMAIL',
+                      controller: _emailController,
+                      hint: 'Email address',
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 24),
+                    _sectionTitle('Work details'),
                     _field(
                       label: 'ADDRESS',
                       controller: _addressController,
@@ -202,10 +192,33 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                       onChanged: (value) =>
                           setState(() => _preferredContactMethod = value),
                     ),
+                    const SizedBox(height: 12),
+                    _statusRow(),
+                    const SizedBox(height: 12),
+                    _field(
+                      label: 'TAGS',
+                      controller: _tagsController,
+                      hint: 'Regular, monthly, commercial',
+                    ),
+                    const SizedBox(height: 24),
+                    _sectionTitle('Notes'),
+                    _field(
+                      label: 'NOTES',
+                      controller: _notesController,
+                      hint: 'Preferences, access notes, useful details...',
+                      maxLines: 4,
+                    ),
+                    const SizedBox(height: 12),
+                    _field(
+                      label: 'IMPORTANT',
+                      controller: _importantNotesController,
+                      hint: 'Must-know details...',
+                      maxLines: 2,
+                    ),
                     const SizedBox(height: 20),
                     SlateDisclosure(
-                      title: 'Add more details',
-                      subtitle: 'Source, birthday, tags and notes',
+                      title: 'More details',
+                      subtitle: 'Source and birthday',
                       icon: LucideIcons.listPlus,
                       expanded: _moreDetailsExpanded,
                       onToggle: () => setState(
@@ -217,32 +230,10 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                           _field(
                             label: 'SOURCE',
                             controller: _sourceController,
-                            hint: 'Instagram, referral, walk-in, website...',
+                            hint: 'Referral, website, Instagram...',
                           ),
                           const SizedBox(height: 12),
                           _dateTile(),
-                          const SizedBox(height: 12),
-                          _field(
-                            label: 'TAGS',
-                            controller: _tagsController,
-                            hint: 'VIP, monthly, mobile, colour',
-                          ),
-                          const SizedBox(height: 12),
-                          _field(
-                            label: 'NOTES',
-                            controller: _notesController,
-                            hint:
-                                'Preferences, booking context, useful details...',
-                            maxLines: 3,
-                          ),
-                          const SizedBox(height: 12),
-                          _field(
-                            label: 'IMPORTANT',
-                            controller: _importantNotesController,
-                            hint:
-                                'Allergies, access notes, must-know details...',
-                            maxLines: 2,
-                          ),
                         ],
                       ),
                     ),
@@ -253,7 +244,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                       child: ElevatedButton(
                         onPressed: _canSave && !_saving ? _save : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.green,
+                          backgroundColor: AppColors.accentPrimary,
                           disabledBackgroundColor: AppColors.bgInteract,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
@@ -271,7 +262,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                                 ),
                               )
                             : const Text(
-                                'Add Client',
+                                'Add client',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -293,12 +284,12 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 10),
       child: Text(
-        label.toUpperCase(),
+        label,
         style: const TextStyle(
-          color: AppColors.t3,
-          fontSize: 10,
+          color: AppColors.t1,
+          fontSize: 18,
           fontWeight: FontWeight.w900,
-          letterSpacing: 0,
+          height: 1.1,
         ),
       ),
     );
@@ -316,9 +307,9 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        color: AppColors.t1.withValues(alpha: 0.028),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.76)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,9 +349,9 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        color: AppColors.t1.withValues(alpha: 0.028),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.76)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,11 +368,11 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _statusChip('active', 'Active', AppColors.green),
+              _statusChip('active', 'Active'),
               const SizedBox(width: 8),
-              _statusChip('lead', 'Lead', AppColors.warning),
+              _statusChip('lead', 'Lead'),
               const SizedBox(width: 8),
-              _statusChip('inactive', 'Inactive', AppColors.t3),
+              _statusChip('inactive', 'Inactive'),
             ],
           ),
         ],
@@ -389,23 +380,29 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
     );
   }
 
-  Widget _statusChip(String value, String label, Color color) {
+  Widget _statusChip(String value, String label) {
     final active = _status == value;
     return GestureDetector(
       onTap: () => setState(() => _status = value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? color.withValues(alpha: 0.15) : AppColors.bgInteract,
+          color: active
+              ? AppColors.accentPrimaryStrong.withValues(alpha: 0.32)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: active ? color : AppColors.border),
+          border: Border.all(
+            color: active
+                ? AppColors.accentPrimaryStrong.withValues(alpha: 0.64)
+                : AppColors.border,
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: active ? color : AppColors.t3,
+            fontWeight: FontWeight.w800,
+            color: active ? AppColors.t1 : AppColors.t3,
           ),
         ),
       ),
@@ -419,8 +416,8 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
     required ValueChanged<String> onChanged,
   }) {
     return SlateSurface(
-      color: AppColors.bgCard,
-      borderColor: AppColors.border,
+      color: AppColors.t1.withValues(alpha: 0.028),
+      borderColor: AppColors.border.withValues(alpha: 0.76),
       radius: AppRadius.md,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -450,17 +447,21 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: active
-                        ? AppColors.green.withValues(alpha: 0.14)
-                        : AppColors.bgInteract,
+                        ? AppColors.accentPrimaryStrong.withValues(alpha: 0.32)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(AppRadius.pill),
                     border: Border.all(
-                      color: active ? AppColors.green : AppColors.border,
+                      color: active
+                          ? AppColors.accentPrimaryStrong.withValues(
+                              alpha: 0.64,
+                            )
+                          : AppColors.border,
                     ),
                   ),
                   child: Text(
                     entry.value,
                     style: TextStyle(
-                      color: active ? AppColors.green : AppColors.t3,
+                      color: active ? AppColors.t1 : AppColors.t3,
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
                     ),
