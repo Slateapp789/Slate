@@ -117,7 +117,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
                   return RefreshIndicator(
                     onRefresh: () async => ref.invalidate(allTasksProvider),
-                    color: AppColors.green,
+                    color: AppColors.accentPrimary,
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(
                         AppSpacing.pageX,

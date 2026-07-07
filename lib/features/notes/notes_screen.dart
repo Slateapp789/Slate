@@ -284,19 +284,19 @@ class _NoteFilterRail extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: active
-                ? AppColors.modNotes.withValues(alpha: 0.15)
-                : AppColors.bgCard,
+                ? AppColors.accentPrimaryStrong.withValues(alpha: 0.34)
+                : AppColors.t1.withValues(alpha: 0.028),
             borderRadius: BorderRadius.circular(AppRadius.pill),
             border: Border.all(
               color: active
-                  ? AppColors.modNotes.withValues(alpha: 0.26)
-                  : AppColors.border,
+                  ? AppColors.accentPrimaryStrong.withValues(alpha: 0.54)
+                  : AppColors.border.withValues(alpha: 0.46),
             ),
           ),
           child: Text(
             '$label $count',
             style: TextStyle(
-              color: active ? AppColors.modNotes : AppColors.t2,
+              color: active ? AppColors.t1 : AppColors.t2,
               fontSize: 13,
               fontWeight: FontWeight.w800,
             ),
@@ -327,7 +327,7 @@ class _NotesList extends StatelessWidget {
     final groups = _groupNotesByDate(unpinned);
 
     return RefreshIndicator(
-      color: AppColors.green,
+      color: AppColors.accentPrimary,
       onRefresh: onRefresh,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(
@@ -380,7 +380,7 @@ class _NoteDateHeader extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t1,
           fontSize: 24,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w800,
           letterSpacing: 0,
         ),
       ),
@@ -398,9 +398,9 @@ class _NoteGroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return SlateSurface(
       padding: EdgeInsets.zero,
-      color: AppColors.bgCard.withValues(alpha: 0.9),
-      borderColor: AppColors.t1.withValues(alpha: 0.06),
-      radius: AppRadius.lg,
+      color: AppColors.bg,
+      borderColor: AppColors.border.withValues(alpha: 0.54),
+      radius: AppRadius.md,
       child: Column(
         children: [
           for (var index = 0; index < notes.length; index++) ...[
@@ -408,7 +408,7 @@ class _NoteGroupCard extends StatelessWidget {
             if (index != notes.length - 1)
               const Padding(
                 padding: EdgeInsets.only(left: AppSpacing.lg),
-                child: Divider(height: 1, color: Color(0x1FFFFFFF)),
+                child: Divider(height: 1, color: AppColors.border),
               ),
           ],
         ],
