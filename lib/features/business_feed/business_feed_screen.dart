@@ -32,7 +32,7 @@ class _BusinessFeedScreenState extends ConsumerState<BusinessFeedScreen> {
       backgroundColor: AppColors.bg,
       body: SafeArea(
         child: RefreshIndicator(
-          color: AppColors.green,
+          color: AppColors.accentPrimary,
           onRefresh: _refreshFeed,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -221,18 +221,22 @@ class _FeedFilterChip extends StatelessWidget {
           vertical: AppSpacing.sm,
         ),
         decoration: BoxDecoration(
-          color: selected ? AppColors.modHome : AppColors.bgCard,
+          color: selected
+              ? AppColors.accentPrimaryStrong.withValues(alpha: 0.34)
+              : AppColors.t1.withValues(alpha: 0.028),
           borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(
-            color: selected ? AppColors.modHome : AppColors.border,
+            color: selected
+                ? AppColors.accentPrimaryStrong.withValues(alpha: 0.54)
+                : AppColors.border.withValues(alpha: 0.46),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? AppColors.bgCard : AppColors.t2,
+            color: selected ? AppColors.t1 : AppColors.t2,
             fontSize: 13,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),

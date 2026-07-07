@@ -63,7 +63,7 @@ class _AppointmentListView extends StatelessWidget {
     if (!groupByDate) {
       return RefreshIndicator(
         onRefresh: () async => onRefresh(),
-        color: AppColors.green,
+        color: AppColors.accentPrimary,
         child: ListView.separated(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.pageX,
@@ -95,7 +95,7 @@ class _AppointmentListView extends StatelessWidget {
 
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
-      color: AppColors.green,
+      color: AppColors.accentPrimary,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.pageX,
@@ -194,7 +194,7 @@ class _BookingCalendarView extends StatelessWidget {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
-      color: AppColors.green,
+      color: AppColors.accentPrimary,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.pageX,
@@ -283,9 +283,9 @@ class _MonthCalendar extends StatelessWidget {
     const weekdayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
     return SlateSurface(
-      radius: AppRadius.xl,
-      color: AppColors.panelSoft,
-      borderColor: AppColors.t1.withValues(alpha: 0.06),
+      radius: AppRadius.lg,
+      color: AppColors.t1.withValues(alpha: 0.022),
+      borderColor: AppColors.border.withValues(alpha: 0.54),
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
@@ -304,7 +304,7 @@ class _MonthCalendar extends StatelessWidget {
                   style: const TextStyle(
                     color: AppColors.t1,
                     fontSize: 17,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
@@ -362,14 +362,16 @@ class _MonthCalendar extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 5),
                   decoration: BoxDecoration(
                     color: selected
-                        ? AppColors.slateLight
+                        ? AppColors.accentPrimaryStrong.withValues(alpha: 0.72)
                         : count > 0
-                        ? AppColors.greenDim
+                        ? AppColors.accentPrimaryStrong.withValues(alpha: 0.20)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(AppRadius.md),
                     border: Border.all(
                       color: selected
-                          ? AppColors.borderStrong
+                          ? AppColors.accentPrimaryStrong.withValues(
+                              alpha: 0.74,
+                            )
                           : AppColors.t1.withValues(alpha: 0.05),
                     ),
                   ),
@@ -384,7 +386,7 @@ class _MonthCalendar extends StatelessWidget {
                               ? AppColors.t1
                               : AppColors.t3.withValues(alpha: 0.42),
                           fontSize: 14,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                       const Spacer(),
@@ -395,7 +397,7 @@ class _MonthCalendar extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: selected
                                 ? AppColors.panelInk
-                                : AppColors.green,
+                                : AppColors.accentPrimary,
                             shape: BoxShape.circle,
                           ),
                         ),

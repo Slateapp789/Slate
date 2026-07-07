@@ -119,12 +119,12 @@ class _BusinessFeedRow extends StatelessWidget {
 
     return SlateSurface(
       onTap: onTap,
-      radius: AppRadius.lg,
+      radius: AppRadius.md,
       padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
-      color: AppColors.bgCard.withValues(alpha: compact ? 0.74 : 0.92),
+      color: AppColors.t1.withValues(alpha: compact ? 0.022 : 0.028),
       borderColor: item.priority == BusinessFeedPriority.attention
-          ? AppColors.warning.withValues(alpha: 0.22)
-          : AppColors.border,
+          ? AppColors.warning.withValues(alpha: 0.20)
+          : AppColors.border.withValues(alpha: 0.54),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -134,7 +134,6 @@ class _BusinessFeedRow extends StatelessWidget {
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.11),
               borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(color: color.withValues(alpha: 0.18)),
             ),
             child: Icon(icon, color: color, size: compact ? 16 : 18),
           ),
@@ -154,7 +153,7 @@ class _BusinessFeedRow extends StatelessWidget {
                         style: TextStyle(
                           color: AppColors.t1,
                           fontSize: compact ? 13 : 14,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
@@ -172,7 +171,7 @@ class _BusinessFeedRow extends StatelessWidget {
                   style: TextStyle(
                     color: AppColors.t3,
                     fontSize: compact ? 12 : 13,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 if (!compact) ...[
@@ -281,7 +280,7 @@ class _BusinessFeedEmptyState extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.bgCard.withValues(alpha: 0.70),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.54)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

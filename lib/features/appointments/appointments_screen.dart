@@ -193,7 +193,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                     }
 
                     return RefreshIndicator(
-                      color: AppColors.green,
+                      color: AppColors.accentPrimary,
                       onRefresh: () async =>
                           ref.invalidate(bookingRequestsProvider),
                       child: ListView.separated(
@@ -261,19 +261,23 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                   ),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: AppColors.t1.withValues(alpha: 0.05),
+                      color: AppColors.t1.withValues(alpha: 0.028),
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                       border: Border.all(
-                        color: AppColors.t1.withValues(alpha: 0.08),
+                        color: AppColors.border.withValues(alpha: 0.54),
                       ),
                     ),
                     child: TabBar(
                       controller: _tabController,
                       indicator: BoxDecoration(
-                        color: AppColors.t1.withValues(alpha: 0.12),
+                        color: AppColors.accentPrimaryStrong.withValues(
+                          alpha: 0.34,
+                        ),
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
-                          color: AppColors.t1.withValues(alpha: 0.14),
+                          color: AppColors.accentPrimaryStrong.withValues(
+                            alpha: 0.54,
+                          ),
                         ),
                       ),
                       indicatorSize: TabBarIndicatorSize.tab,
@@ -283,7 +287,7 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                       unselectedLabelColor: AppColors.t3,
                       labelStyle: const TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                       ),
                       tabs: const [
                         Tab(text: 'Today'),
@@ -551,17 +555,17 @@ class _BookingModePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return SlateSurface(
       onTap: onToggle,
-      radius: AppRadius.xl,
+      radius: AppRadius.lg,
       padding: const EdgeInsets.all(AppSpacing.md),
-      color: AppColors.modCalendar.withValues(alpha: 0.08),
-      borderColor: AppColors.modCalendar.withValues(alpha: 0.18),
+      color: AppColors.t1.withValues(alpha: 0.028),
+      borderColor: AppColors.border.withValues(alpha: 0.54),
       child: Row(
         children: [
           Container(
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: AppColors.modCalendar.withValues(alpha: 0.12),
+              color: AppColors.modCalendar.withValues(alpha: 0.09),
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: Icon(
@@ -579,8 +583,8 @@ class _BookingModePanel extends StatelessWidget {
                   calendarMode ? 'Calendar' : 'List',
                   style: const TextStyle(
                     color: AppColors.modCalendar,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
                     letterSpacing: 0,
                   ),
                 ),
@@ -621,8 +625,8 @@ class _BookingsViewSwitch extends StatelessWidget {
     return SlateSurface(
       padding: const EdgeInsets.all(5),
       radius: AppRadius.pill,
-      color: AppColors.t1.withValues(alpha: 0.05),
-      borderColor: AppColors.t1.withValues(alpha: 0.08),
+      color: AppColors.t1.withValues(alpha: 0.028),
+      borderColor: AppColors.border.withValues(alpha: 0.54),
       child: Row(
         children: [
           _BookingsViewOption(
@@ -671,12 +675,16 @@ class _BookingsViewOption extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: selected
-                ? color.withValues(alpha: warning ? 0.16 : 0.12)
+                ? (warning
+                      ? color.withValues(alpha: 0.14)
+                      : AppColors.accentPrimaryStrong.withValues(alpha: 0.34))
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.pill),
             border: Border.all(
               color: selected
-                  ? color.withValues(alpha: warning ? 0.24 : 0.14)
+                  ? (warning
+                        ? color.withValues(alpha: 0.22)
+                        : AppColors.accentPrimaryStrong.withValues(alpha: 0.54))
                   : Colors.transparent,
             ),
           ),
@@ -685,7 +693,7 @@ class _BookingsViewOption extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: selected ? color : AppColors.t3,
+              color: selected ? (warning ? color : AppColors.t1) : AppColors.t3,
               fontSize: 12,
               fontWeight: FontWeight.w900,
             ),
@@ -718,9 +726,10 @@ class _InlineRequestCard extends StatelessWidget {
 
     return SlateSurface(
       onTap: onTap,
-      radius: AppRadius.lg,
+      radius: AppRadius.md,
       padding: const EdgeInsets.all(14),
-      borderColor: AppColors.t1.withValues(alpha: 0.08),
+      color: AppColors.bg,
+      borderColor: AppColors.border.withValues(alpha: 0.54),
       child: Row(
         children: [
           Container(
@@ -728,7 +737,7 @@ class _InlineRequestCard extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               color: statusColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: Icon(LucideIcons.inbox, color: statusColor, size: 17),
           ),
@@ -747,7 +756,7 @@ class _InlineRequestCard extends StatelessWidget {
                         style: const TextStyle(
                           color: AppColors.t1,
                           fontSize: 15,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
@@ -826,9 +835,9 @@ class _NextBookingCard extends StatelessWidget {
         onTap();
       },
       child: SlateSurface(
-        radius: AppRadius.xl,
-        color: AppColors.modCalendar.withValues(alpha: 0.08),
-        borderColor: AppColors.modCalendar.withValues(alpha: 0.20),
+        radius: AppRadius.lg,
+        color: AppColors.t1.withValues(alpha: 0.028),
+        borderColor: AppColors.border.withValues(alpha: 0.54),
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
@@ -837,10 +846,7 @@ class _NextBookingCard extends StatelessWidget {
               height: 68,
               decoration: BoxDecoration(
                 color: AppColors.slateLight,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(
-                  color: AppColors.modCalendar.withValues(alpha: 0.18),
-                ),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -888,7 +894,7 @@ class _NextBookingCard extends StatelessWidget {
                     style: const TextStyle(
                       color: AppColors.t1,
                       fontSize: 18,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 3),
