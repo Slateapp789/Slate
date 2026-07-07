@@ -553,58 +553,33 @@ class _BookingModePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateSurface(
+    return SlateListRow(
       onTap: onToggle,
-      radius: AppRadius.lg,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      color: AppColors.t1.withValues(alpha: 0.028),
-      borderColor: AppColors.border.withValues(alpha: 0.54),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: AppColors.modCalendar.withValues(alpha: 0.09),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: Icon(
-              calendarMode ? LucideIcons.calendarDays : LucideIcons.list,
-              color: AppColors.modCalendar,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  calendarMode ? 'Calendar' : 'List',
-                  style: const TextStyle(
-                    color: AppColors.modCalendar,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  '${stats.todayRemaining} left today · £${stats.weekValue.toStringAsFixed(0)} this week',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.t3,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(LucideIcons.repeat2, color: AppColors.t3, size: 18),
-        ],
+      leading: Icon(
+        calendarMode ? LucideIcons.calendarDays : LucideIcons.list,
+        color: AppColors.modCalendar,
+        size: 22,
       ),
+      title: Text(
+        calendarMode ? 'Calendar' : 'List',
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 19,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0,
+        ),
+      ),
+      subtitle: Text(
+        '${stats.todayRemaining} left today · £${stats.weekValue.toStringAsFixed(0)} this week',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t3,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      trailing: const Icon(LucideIcons.repeat2, color: AppColors.t3, size: 18),
     );
   }
 }
@@ -724,62 +699,40 @@ class _InlineRequestCard extends StatelessWidget {
         ? AppColors.warning
         : AppColors.green;
 
-    return SlateSurface(
+    return SlateListRow(
       onTap: onTap,
-      radius: AppRadius.md,
-      padding: const EdgeInsets.all(14),
-      color: AppColors.bg,
-      borderColor: AppColors.border.withValues(alpha: 0.54),
-      child: Row(
+      leading: Icon(LucideIcons.inbox, color: statusColor, size: 18),
+      title: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: Icon(LucideIcons.inbox, color: statusColor, size: 17),
-          ),
-          const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        request.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.t1,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _RequestStatusBadge(
-                      label: request.status == 'pending' ? 'New' : 'Contacted',
-                      color: statusColor,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.t3, fontSize: 12),
-                ),
-              ],
+            child: Text(
+              request.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.t1,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-          const SizedBox(width: 10),
-          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 17),
+          const SizedBox(width: 8),
+          _RequestStatusBadge(
+            label: request.status == 'pending' ? 'New' : 'Contacted',
+            color: statusColor,
+          ),
         ],
+      ),
+      subtitle: Text(
+        subtitle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: AppColors.t3, fontSize: 12),
+      ),
+      trailing: const Icon(
+        LucideIcons.chevronRight,
+        color: AppColors.t3,
+        size: 17,
       ),
     );
   }
@@ -829,96 +782,75 @@ class _NextBookingCard extends StatelessWidget {
     final location = booking?['location'] as String?;
     final price = booking == null ? null : _price(booking!);
 
-    return GestureDetector(
-      onTap: () {
-        SlateHaptics.action();
-        onTap();
-      },
-      child: SlateSurface(
-        radius: AppRadius.lg,
-        color: AppColors.t1.withValues(alpha: 0.028),
-        borderColor: AppColors.border.withValues(alpha: 0.54),
-        padding: const EdgeInsets.all(16),
-        child: Row(
+    return SlateListRow(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      leading: SizedBox(
+        width: 58,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 58,
-              height: 68,
-              decoration: BoxDecoration(
-                color: AppColors.slateLight,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    start == null ? '--' : _shortTime(start),
-                    style: const TextStyle(
-                      color: AppColors.panelInk,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    start == null || end == null
-                        ? 'new'
-                        : '${end.difference(start).inMinutes}m',
-                    style: TextStyle(
-                      color: AppColors.panelInk.withValues(alpha: 0.62),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
+            Text(
+              start == null ? '--' : _shortTime(start),
+              style: const TextStyle(
+                color: AppColors.t1,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
               ),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'NEXT BOOKING',
-                    style: TextStyle(
-                      color: AppColors.t3,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Text(
-                    client,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.t1,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    [
-                      service,
-                      if (location?.isNotEmpty == true) location!,
-                      if (price != null && price > 0)
-                        '£${price.toStringAsFixed(0)}',
-                    ].join(' · '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppColors.t3, fontSize: 12),
-                  ),
-                ],
+            const SizedBox(height: 4),
+            Text(
+              start == null || end == null
+                  ? 'new'
+                  : '${end.difference(start).inMinutes}m',
+              style: TextStyle(
+                color: AppColors.t1.withValues(alpha: 0.62),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
               ),
-            ),
-            Icon(
-              booking == null ? LucideIcons.plus : LucideIcons.chevronRight,
-              color: AppColors.modCalendar,
-              size: 18,
             ),
           ],
         ),
+      ),
+      title: const Text(
+        'NEXT BOOKING',
+        style: TextStyle(
+          color: AppColors.t3,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            client,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.t1,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            [
+              service,
+              if (location?.isNotEmpty == true) location!,
+              if (price != null && price > 0) '£${price.toStringAsFixed(0)}',
+            ].join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppColors.t3, fontSize: 12),
+          ),
+        ],
+      ),
+      trailing: Icon(
+        booking == null ? LucideIcons.plus : LucideIcons.chevronRight,
+        color: AppColors.modCalendar,
+        size: 18,
       ),
     );
   }

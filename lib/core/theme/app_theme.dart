@@ -62,6 +62,142 @@ class AppColors {
   static const panelFaint = Color(0x24D6DFCE);
 }
 
+@immutable
+class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
+  final Color background;
+  final Color surface;
+  final Color surfaceRaised;
+  final Color surfaceSubtle;
+  final Color divider;
+  final Color dividerStrong;
+  final Color textPrimary;
+  final Color textSecondary;
+  final Color textTertiary;
+  final Color textDisabled;
+  final Color accent;
+  final Color accentStrong;
+  final Color success;
+  final Color warning;
+  final Color error;
+
+  const WorkloopThemeTokens({
+    required this.background,
+    required this.surface,
+    required this.surfaceRaised,
+    required this.surfaceSubtle,
+    required this.divider,
+    required this.dividerStrong,
+    required this.textPrimary,
+    required this.textSecondary,
+    required this.textTertiary,
+    required this.textDisabled,
+    required this.accent,
+    required this.accentStrong,
+    required this.success,
+    required this.warning,
+    required this.error,
+  });
+
+  static const light = WorkloopThemeTokens(
+    background: Color(0xFFFFFFFF),
+    surface: Color(0xFFFFFFFF),
+    surfaceRaised: Color(0xFFF8F9F6),
+    surfaceSubtle: Color(0xFFF4F6F1),
+    divider: Color(0xFFE8EDE3),
+    dividerStrong: Color(0xFFD6DFCE),
+    textPrimary: Color(0xFF11130F),
+    textSecondary: Color(0xCC11130F),
+    textTertiary: Color(0x8C11130F),
+    textDisabled: Color(0x3D11130F),
+    accent: Color(0xFF7FB500),
+    accentStrong: Color(0xFFD9FF57),
+    success: Color(0xFF5C8F25),
+    warning: Color(0xFFA67300),
+    error: Color(0xFFC94A42),
+  );
+
+  static const dark = WorkloopThemeTokens(
+    background: Color(0xFF050604),
+    surface: Color(0xFF090B08),
+    surfaceRaised: Color(0xFF10130E),
+    surfaceSubtle: Color(0xFF151A12),
+    divider: Color(0xFF20261D),
+    dividerStrong: Color(0xFF313A2C),
+    textPrimary: Color(0xFFF7F8F3),
+    textSecondary: Color(0xCCF7F8F3),
+    textTertiary: Color(0x8CF7F8F3),
+    textDisabled: Color(0x3DF7F8F3),
+    accent: Color(0xFF9BDE18),
+    accentStrong: Color(0xFFD9FF57),
+    success: Color(0xFF8CBF39),
+    warning: Color(0xFFE2AC38),
+    error: Color(0xFFFF6961),
+  );
+
+  @override
+  WorkloopThemeTokens copyWith({
+    Color? background,
+    Color? surface,
+    Color? surfaceRaised,
+    Color? surfaceSubtle,
+    Color? divider,
+    Color? dividerStrong,
+    Color? textPrimary,
+    Color? textSecondary,
+    Color? textTertiary,
+    Color? textDisabled,
+    Color? accent,
+    Color? accentStrong,
+    Color? success,
+    Color? warning,
+    Color? error,
+  }) {
+    return WorkloopThemeTokens(
+      background: background ?? this.background,
+      surface: surface ?? this.surface,
+      surfaceRaised: surfaceRaised ?? this.surfaceRaised,
+      surfaceSubtle: surfaceSubtle ?? this.surfaceSubtle,
+      divider: divider ?? this.divider,
+      dividerStrong: dividerStrong ?? this.dividerStrong,
+      textPrimary: textPrimary ?? this.textPrimary,
+      textSecondary: textSecondary ?? this.textSecondary,
+      textTertiary: textTertiary ?? this.textTertiary,
+      textDisabled: textDisabled ?? this.textDisabled,
+      accent: accent ?? this.accent,
+      accentStrong: accentStrong ?? this.accentStrong,
+      success: success ?? this.success,
+      warning: warning ?? this.warning,
+      error: error ?? this.error,
+    );
+  }
+
+  @override
+  WorkloopThemeTokens lerp(
+    ThemeExtension<WorkloopThemeTokens>? other,
+    double t,
+  ) {
+    if (other is! WorkloopThemeTokens) return this;
+    Color blend(Color a, Color b) => Color.lerp(a, b, t) ?? a;
+    return WorkloopThemeTokens(
+      background: blend(background, other.background),
+      surface: blend(surface, other.surface),
+      surfaceRaised: blend(surfaceRaised, other.surfaceRaised),
+      surfaceSubtle: blend(surfaceSubtle, other.surfaceSubtle),
+      divider: blend(divider, other.divider),
+      dividerStrong: blend(dividerStrong, other.dividerStrong),
+      textPrimary: blend(textPrimary, other.textPrimary),
+      textSecondary: blend(textSecondary, other.textSecondary),
+      textTertiary: blend(textTertiary, other.textTertiary),
+      textDisabled: blend(textDisabled, other.textDisabled),
+      accent: blend(accent, other.accent),
+      accentStrong: blend(accentStrong, other.accentStrong),
+      success: blend(success, other.success),
+      warning: blend(warning, other.warning),
+      error: blend(error, other.error),
+    );
+  }
+}
+
 class AppSpacing {
   static const double xxs = 4;
   static const double xs = 8;
@@ -111,9 +247,12 @@ class AppShadows {
 }
 
 class AppTheme {
-  static ThemeData get dark {
+  static ThemeData get dark => light;
+
+  static ThemeData get light {
     return ThemeData(
       brightness: Brightness.light,
+      extensions: const [WorkloopThemeTokens.light],
       scaffoldBackgroundColor: AppColors.bg,
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
@@ -231,6 +370,131 @@ class AppTheme {
       dividerColor: AppColors.border,
       dividerTheme: const DividerThemeData(
         color: AppColors.border,
+        thickness: 1,
+        space: 1,
+      ),
+    );
+  }
+
+  static ThemeData get oledDark {
+    const tokens = WorkloopThemeTokens.dark;
+    return ThemeData(
+      brightness: Brightness.dark,
+      extensions: const [tokens],
+      scaffoldBackgroundColor: tokens.background,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: _SlatePageTransitionsBuilder(),
+          TargetPlatform.iOS: _SlatePageTransitionsBuilder(),
+          TargetPlatform.macOS: _SlatePageTransitionsBuilder(),
+        },
+      ),
+      colorScheme: ColorScheme.dark(
+        primary: tokens.accent,
+        surface: tokens.surface,
+        onSurface: tokens.textPrimary,
+        error: tokens.error,
+      ),
+      textTheme: GoogleFonts.interTextTheme(
+        TextTheme(
+          displayLarge: TextStyle(
+            fontSize: 48,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+            height: 1.02,
+            color: tokens.textPrimary,
+          ),
+          displayMedium: TextStyle(
+            fontSize: 34,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+            height: 1.04,
+            color: tokens.textPrimary,
+          ),
+          headlineLarge: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+            height: 1.08,
+            color: tokens.textPrimary,
+          ),
+          headlineMedium: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+            height: 1.12,
+            color: tokens.textPrimary,
+          ),
+          titleLarge: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: tokens.textPrimary,
+          ),
+          titleMedium: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: tokens.textPrimary,
+          ),
+          bodyLarge: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w400,
+            height: 1.38,
+            color: tokens.textPrimary,
+          ),
+          bodyMedium: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+            height: 1.36,
+            color: tokens.textSecondary,
+          ),
+          labelLarge: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: tokens.textPrimary,
+          ),
+          labelSmall: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+            color: tokens.textTertiary,
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: tokens.surfaceSubtle,
+        hintStyle: TextStyle(color: tokens.textTertiary),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide(color: tokens.divider),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide(color: tokens.divider),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide(color: tokens.accent, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 16,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: tokens.accentStrong,
+          foregroundColor: const Color(0xFF11130F),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+      ),
+      dividerColor: tokens.divider,
+      dividerTheme: DividerThemeData(
+        color: tokens.divider,
         thickness: 1,
         space: 1,
       ),

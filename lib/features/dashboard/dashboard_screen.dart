@@ -533,66 +533,46 @@ class _NextAppointmentCard extends StatelessWidget {
     final service = _serviceName(appointment);
     final location = _location(appointment);
 
-    return SlateSurface(
+    return SlateListRow(
       onTap: onTap,
-      radius: AppRadius.lg,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      color: AppColors.t1.withValues(alpha: 0.028),
-      borderColor: AppColors.border.withValues(alpha: 0.72),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppColors.accentPrimaryStrong.withValues(alpha: 0.34),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: const Icon(
-              LucideIcons.calendarClock,
-              color: AppColors.accentPrimary,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  start == null
-                      ? 'Next appointment'
-                      : slateTimeRange(start, end),
-                  style: const TextStyle(
-                    color: AppColors.accentPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  client,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  [service, if (location != null) location].join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.t3, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 18),
-        ],
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      leading: Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          color: AppColors.accentPrimaryStrong.withValues(alpha: 0.28),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          LucideIcons.calendarClock,
+          color: AppColors.accentPrimary,
+          size: 20,
+        ),
+      ),
+      title: Text(
+        client,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 18,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      subtitle: Text(
+        [
+          start == null ? 'Next appointment' : slateTimeRange(start, end),
+          service,
+          if (location != null) location,
+        ].join(' · '),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: AppColors.t3, fontSize: 13),
+      ),
+      trailing: const Icon(
+        LucideIcons.chevronRight,
+        color: AppColors.t3,
+        size: 18,
       ),
     );
   }
@@ -603,15 +583,9 @@ class _NoMoreAppointments extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.t1.withValues(alpha: 0.035),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.56)),
-      ),
-      child: const Row(
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Row(
         children: [
           Icon(
             LucideIcons.checkCircle2,
@@ -772,49 +746,40 @@ class _CommandFeedPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.t1.withValues(alpha: 0.028),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.62)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(LucideIcons.activity, color: AppColors.modHome, size: 18),
-              SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  'Business Feed',
-                  style: TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(LucideIcons.activity, color: AppColors.modHome, size: 18),
+            SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                'Business Feed',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          feed.when(
-            loading: () =>
-                const SlateLoadingBlock(height: 116, radius: AppRadius.lg),
-            error: (_, __) =>
-                const SlateErrorState(message: 'Could not load feed'),
-            data: (items) => BusinessFeedList(
-              items: items,
-              compact: true,
-              limit: 4,
-              onItemTap: onOpenFeedItem,
-              onViewAll: onViewAllFeed,
             ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        feed.when(
+          loading: () =>
+              const SlateLoadingBlock(height: 116, radius: AppRadius.lg),
+          error: (_, __) =>
+              const SlateErrorState(message: 'Could not load feed'),
+          data: (items) => BusinessFeedList(
+            items: items,
+            compact: true,
+            limit: 4,
+            onItemTap: onOpenFeedItem,
+            onViewAll: onViewAllFeed,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -887,11 +852,12 @@ class _CommandMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 86),
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      constraints: const BoxConstraints(minHeight: 72),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       decoration: BoxDecoration(
-        color: AppColors.t1.withValues(alpha: 0.028),
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border(
+          top: BorderSide(color: AppColors.border.withValues(alpha: 0.58)),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -949,62 +915,54 @@ class _CommandAttentionPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final topItems = items.take(3).toList();
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.t1.withValues(alpha: 0.028),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.62)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Icon(
-                LucideIcons.alertCircle,
-                color: AppColors.warning,
-                size: 18,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              const Expanded(
-                child: Text(
-                  'Needs attention',
-                  style: TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              Text(
-                '${items.length}',
-                style: const TextStyle(
-                  color: AppColors.t3,
-                  fontSize: 14,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              LucideIcons.alertCircle,
+              color: AppColors.warning,
+              size: 18,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            const Expanded(
+              child: Text(
+                'Needs attention',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 15,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (isLoading)
-            const SlateLoadingBlock(height: 52, radius: AppRadius.pill)
-          else if (hasError)
-            const _CommandAttentionStatus(
-              icon: LucideIcons.alertTriangle,
-              iconColor: AppColors.error,
-              label: 'Could not check attention items',
-            )
-          else if (topItems.isEmpty)
-            const _CommandClearState()
-          else
-            for (final item in topItems) ...[
-              _CommandAttentionRow(item: item, onTap: () => onOpenItem(item)),
-              if (item != topItems.last) const SizedBox(height: AppSpacing.xs),
-            ],
-        ],
-      ),
+            ),
+            Text(
+              '${items.length}',
+              style: const TextStyle(
+                color: AppColors.t3,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        if (isLoading)
+          const SlateLoadingBlock(height: 52, radius: AppRadius.pill)
+        else if (hasError)
+          const _CommandAttentionStatus(
+            icon: LucideIcons.alertTriangle,
+            iconColor: AppColors.error,
+            label: 'Could not check attention items',
+          )
+        else if (topItems.isEmpty)
+          const _CommandClearState()
+        else
+          for (final item in topItems) ...[
+            _CommandAttentionRow(item: item, onTap: () => onOpenItem(item)),
+            if (item != topItems.last) const SizedBox(height: AppSpacing.xs),
+          ],
+      ],
     );
   }
 }
@@ -1095,33 +1053,24 @@ class _CommandAttentionRow extends StatelessWidget {
       DashboardAttentionType.uncontactedLead => LucideIcons.user,
     };
 
-    return SlateSurface(
+    return SlateListRow(
       onTap: onTap,
-      radius: AppRadius.pill,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      leading: Icon(icon, color: AppColors.warning, size: 17),
+      title: Text(
+        item.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+        ),
       ),
-      color: AppColors.bg,
-      borderColor: AppColors.border.withValues(alpha: 0.72),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.warning, size: 17),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              item.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.t1,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
-        ],
+      trailing: const Icon(
+        LucideIcons.chevronRight,
+        color: AppColors.t3,
+        size: 16,
       ),
     );
   }

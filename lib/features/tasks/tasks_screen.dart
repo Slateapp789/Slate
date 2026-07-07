@@ -860,33 +860,12 @@ class _TaskViewSwitcher extends StatelessWidget {
         children: _TaskView.values.map((view) {
           final active = value == view;
           final count = _viewCount(view, counts);
-          return GestureDetector(
-            onTap: () {
-              SlateHaptics.tap();
-              onChanged(view);
-            },
-            child: Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-              decoration: BoxDecoration(
-                color: active
-                    ? AppColors.t1.withValues(alpha: 0.12)
-                    : AppColors.t1.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                border: Border.all(
-                  color: active
-                      ? AppColors.t1.withValues(alpha: 0.18)
-                      : AppColors.t1.withValues(alpha: 0.07),
-                ),
-              ),
-              child: Text(
-                '${_viewLabel(view)} $count',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: active ? AppColors.t1 : AppColors.t2,
-                ),
-              ),
+          return Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.xs),
+            child: SlateFilterChip(
+              label: '${_viewLabel(view)} $count',
+              selected: active,
+              onTap: () => onChanged(view),
             ),
           );
         }).toList(),

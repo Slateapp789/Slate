@@ -93,7 +93,6 @@ class _FeedSection extends StatelessWidget {
             compact: compact,
             onTap: onItemTap == null ? null : () => onItemTap!(item),
           ),
-          if (item != items.last) const SizedBox(height: AppSpacing.xs),
         ],
       ],
     );
@@ -117,105 +116,87 @@ class _BusinessFeedRow extends StatelessWidget {
     final icon = _iconFor(item.icon);
     final priorityLabel = _priorityLabel(item.priority);
 
-    return SlateSurface(
+    return SlateListRow(
       onTap: onTap,
-      radius: AppRadius.md,
-      padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
-      color: AppColors.t1.withValues(alpha: compact ? 0.022 : 0.028),
-      borderColor: item.priority == BusinessFeedPriority.attention
-          ? AppColors.warning.withValues(alpha: 0.20)
-          : AppColors.border.withValues(alpha: 0.54),
-      child: Row(
+      padding: EdgeInsets.symmetric(
+        vertical: compact ? AppSpacing.sm : AppSpacing.md,
+      ),
+      leading: Container(
+        width: compact ? 32 : 38,
+        height: compact ? 32 : 38,
+        decoration: BoxDecoration(
+          color: item.priority == BusinessFeedPriority.attention
+              ? AppColors.warning.withValues(alpha: 0.09)
+              : color.withValues(alpha: 0.08),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: color, size: compact ? 15 : 17),
+      ),
+      title: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: compact ? 34 : 40,
-            height: compact ? 34 : 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.11),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: Icon(icon, color: color, size: compact ? 16 : 18),
-          ),
-          const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Text(
+              item.title,
+              maxLines: compact ? 1 : 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.t1,
+                fontSize: compact ? 13 : 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          if (priorityLabel != null) ...[
+            const SizedBox(width: AppSpacing.xs),
+            _FeedPill(label: priorityLabel, priority: item.priority),
+          ],
+        ],
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            item.subtitle,
+            maxLines: compact ? 1 : 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: AppColors.t3,
+              fontSize: compact ? 12 : 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (!compact) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Row(
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item.title,
-                        maxLines: compact ? 1 : 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.t1,
-                          fontSize: compact ? 13 : 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    if (priorityLabel != null) ...[
-                      const SizedBox(width: AppSpacing.xs),
-                      _FeedPill(label: priorityLabel, priority: item.priority),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xxs),
                 Text(
-                  item.subtitle,
-                  maxLines: compact ? 1 : 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.t3,
-                    fontSize: compact ? 12 : 13,
-                    fontWeight: FontWeight.w600,
+                  _timeAgo(item.timestamp),
+                  style: const TextStyle(
+                    color: AppColors.t4,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                if (!compact) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  Row(
-                    children: [
-                      Text(
-                        _timeAgo(item.timestamp),
-                        style: const TextStyle(
-                          color: AppColors.t4,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      if (item.actionLabel != null) ...[
-                        const SizedBox(width: AppSpacing.sm),
-                        Text(
-                          item.actionLabel!,
-                          style: TextStyle(
-                            color: color,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ],
+                if (item.actionLabel != null) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    item.actionLabel!,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ],
               ],
             ),
-          ),
-          if (onTap != null) ...[
-            const SizedBox(width: AppSpacing.xs),
-            const Padding(
-              padding: EdgeInsets.only(top: 10),
-              child: Icon(
-                LucideIcons.chevronRight,
-                color: AppColors.t3,
-                size: 16,
-              ),
-            ),
           ],
         ],
       ),
+      trailing: onTap == null
+          ? null
+          : const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
     );
   }
 }

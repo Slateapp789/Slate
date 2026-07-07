@@ -81,146 +81,132 @@ class MoneySnapshot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final netPositive = summary.profit >= 0;
-    return SlateSurface(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      radius: AppRadius.lg,
-      color: AppColors.t1.withValues(alpha: 0.028),
-      borderColor: AppColors.border.withValues(alpha: 0.54),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: AppColors.modFinance.withValues(alpha: 0.09),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: const Icon(
-                  LucideIcons.walletCards,
-                  color: AppColors.modFinance,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Cashflow',
-                      style: TextStyle(
-                        color: AppColors.t1,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0,
-                      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              LucideIcons.walletCards,
+              color: AppColors.modFinance,
+              size: 24,
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Cashflow',
+                    style: TextStyle(
+                      color: AppColors.t1,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0,
                     ),
-                    Text(
-                      summary.label,
-                      style: const TextStyle(
-                        color: AppColors.t3,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  ),
+                  Text(
+                    summary.label,
+                    style: const TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: netPositive ? AppColors.greenDim : AppColors.errorDim,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(
+                  color: netPositive
+                      ? AppColors.green.withValues(alpha: 0.22)
+                      : AppColors.error.withValues(alpha: 0.22),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.xs,
-                ),
-                decoration: BoxDecoration(
-                  color: netPositive ? AppColors.greenDim : AppColors.errorDim,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(
-                    color: netPositive
-                        ? AppColors.green.withValues(alpha: 0.22)
-                        : AppColors.error.withValues(alpha: 0.22),
-                  ),
-                ),
-                child: Text(
-                  netPositive ? 'Net positive' : 'Net down',
-                  style: TextStyle(
-                    color: netPositive ? AppColors.green : AppColors.error,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
+              child: Text(
+                netPositive ? 'Net positive' : 'Net down',
+                style: TextStyle(
+                  color: netPositive ? AppColors.green : AppColors.error,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: netPositive
-                  ? AppColors.success.withValues(alpha: 0.08)
-                  : AppColors.error.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
                 color: netPositive
                     ? AppColors.success.withValues(alpha: 0.14)
                     : AppColors.error.withValues(alpha: 0.16),
+                width: 3,
               ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _CashflowValue(
-                    label: 'Net',
-                    value: summary.profit,
-                    size: 40,
-                    color: netPositive ? AppColors.success : AppColors.error,
-                  ),
-                ),
-                Icon(
-                  netPositive
-                      ? LucideIcons.arrowUpRight
-                      : LucideIcons.arrowDownRight,
-                  color: netPositive ? AppColors.success : AppColors.error,
-                  size: 30,
-                ),
-              ],
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
+          child: Row(
             children: [
+              const SizedBox(width: AppSpacing.md),
               Expanded(
-                child: _CashflowTile(
-                  icon: LucideIcons.trendingUp,
-                  label: 'Income',
-                  value: summary.paid,
-                  color: AppColors.success,
+                child: _CashflowValue(
+                  label: 'Net',
+                  value: summary.profit,
+                  size: 40,
+                  color: netPositive ? AppColors.success : AppColors.error,
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _CashflowTile(
-                  icon: LucideIcons.receipt,
-                  label: 'Expenses',
-                  value: summary.expenses,
-                  color: AppColors.error,
-                ),
+              Icon(
+                netPositive
+                    ? LucideIcons.arrowUpRight
+                    : LucideIcons.arrowDownRight,
+                color: netPositive ? AppColors.success : AppColors.error,
+                size: 30,
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          _CashflowTile(
-            icon: LucideIcons.clock3,
-            label: 'To collect',
-            value: summary.toCollect,
-            color: summary.toCollect > 0 ? AppColors.warning : AppColors.t3,
-            fullWidth: true,
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: _CashflowTile(
+                icon: LucideIcons.trendingUp,
+                label: 'Income',
+                value: summary.paid,
+                color: AppColors.success,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: _CashflowTile(
+                icon: LucideIcons.receipt,
+                label: 'Expenses',
+                value: summary.expenses,
+                color: AppColors.error,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _CashflowTile(
+          icon: LucideIcons.clock3,
+          label: 'To collect',
+          value: summary.toCollect,
+          color: summary.toCollect > 0 ? AppColors.warning : AppColors.t3,
+          fullWidth: true,
+        ),
+      ],
     );
   }
 }
@@ -288,24 +274,16 @@ class _CashflowTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: fullWidth ? double.infinity : null,
-      constraints: const BoxConstraints(minHeight: 92),
-      padding: const EdgeInsets.all(AppSpacing.md),
+      constraints: const BoxConstraints(minHeight: 78),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       decoration: BoxDecoration(
-        color: AppColors.bg,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.54)),
+        border: Border(
+          top: BorderSide(color: AppColors.border.withValues(alpha: 0.58)),
+        ),
       ),
       child: Row(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
+          Icon(icon, color: color, size: 20),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: _CashflowValue(
@@ -331,59 +309,55 @@ class ExpenseCategorySummary extends StatelessWidget {
     final categories = summary.categoryTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    return SlateSurface(
-      padding: const EdgeInsets.all(16),
-      radius: AppRadius.lg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'EXPENSE CATEGORIES',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.t3,
-                  ),
-                ),
-              ),
-              Text(
-                summary.label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'EXPENSE CATEGORIES',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
                   color: AppColors.t3,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (categories.isEmpty)
-            const Text(
-              'No expenses in this period.',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+            ),
+            Text(
+              summary.label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
                 color: AppColors.t3,
               ),
-            )
-          else
-            ...categories
-                .take(4)
-                .map(
-                  (entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _CategoryBar(
-                      label: entry.key,
-                      amount: entry.value,
-                      total: summary.expenses,
-                    ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (categories.isEmpty)
+          const Text(
+            'No expenses in this period.',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.t3,
+            ),
+          )
+        else
+          ...categories
+              .take(4)
+              .map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _CategoryBar(
+                    label: entry.key,
+                    amount: entry.value,
+                    total: summary.expenses,
                   ),
                 ),
-        ],
-      ),
+              ),
+      ],
     );
   }
 }

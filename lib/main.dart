@@ -45,7 +45,9 @@ class SlateApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Workloop',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.oledDark,
+      themeMode: ThemeMode.light,
       routerConfig: _router,
     );
   }
@@ -364,31 +366,35 @@ class _SlatePillNavBar extends StatelessWidget {
   });
 
   static const _tabs = [
-    _NavItem(label: 'Home', icon: LucideIcons.home, color: AppColors.modHome),
+    _NavItem(
+      label: 'Home',
+      icon: LucideIcons.home,
+      color: AppColors.accentPrimary,
+    ),
     _NavItem(
       label: 'Clients',
       icon: LucideIcons.users,
-      color: AppColors.modClients,
+      color: AppColors.accentPrimary,
     ),
     _NavItem(
       label: 'Bookings',
       icon: LucideIcons.calendarDays,
-      color: AppColors.modCalendar,
+      color: AppColors.accentPrimary,
     ),
     _NavItem(
       label: 'Money',
       icon: LucideIcons.banknote,
-      color: AppColors.modFinance,
+      color: AppColors.accentPrimary,
     ),
     _NavItem(
       label: 'Tasks',
       icon: LucideIcons.listChecks,
-      color: AppColors.modTasks,
+      color: AppColors.accentPrimary,
     ),
     _NavItem(
       label: 'Notes',
       icon: LucideIcons.stickyNote,
-      color: AppColors.modNotes,
+      color: AppColors.accentPrimary,
     ),
   ];
 
@@ -408,11 +414,11 @@ class _SlatePillNavBar extends StatelessWidget {
         children: [
           Expanded(
             child: SlateGlassSurface(
-              blur: 30,
-              color: AppColors.bgCard.withValues(alpha: 0.92),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              blur: 26,
+              color: AppColors.bgCard.withValues(alpha: 0.90),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: SizedBox(
-                height: 70,
+                height: 62,
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final tabWidth = constraints.maxWidth / tabCount;
@@ -451,7 +457,7 @@ class _SlatePillNavBar extends StatelessWidget {
                             left: left,
                             top: 9,
                             width: tabWidth,
-                            height: 52,
+                            height: 44,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 2,
@@ -459,7 +465,7 @@ class _SlatePillNavBar extends StatelessWidget {
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
                                   color: _tabs[currentIndex].color.withValues(
-                                    alpha: 0.16,
+                                    alpha: 0.14,
                                   ),
                                   borderRadius: BorderRadius.circular(
                                     AppRadius.pill,
@@ -469,22 +475,6 @@ class _SlatePillNavBar extends StatelessWidget {
                                       alpha: 0.22,
                                     ),
                                   ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.t1.withValues(
-                                        alpha: 0.08,
-                                      ),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 6),
-                                    ),
-                                    BoxShadow(
-                                      color: AppColors.slateGlow.withValues(
-                                        alpha: 0.20,
-                                      ),
-                                      blurRadius: 26,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
                                 ),
                               ),
                             ),
@@ -506,14 +496,14 @@ class _SlatePillNavBar extends StatelessWidget {
           const SizedBox(width: 12),
           SlateGlassSurface(
             radius: AppRadius.pill,
-            blur: 30,
+            blur: 24,
             color: AppColors.accentPrimaryStrong,
             child: GestureDetector(
               onTap: onAction,
               child: const SizedBox(
-                width: 68,
-                height: 68,
-                child: Icon(LucideIcons.plus, color: AppColors.t1, size: 28),
+                width: 60,
+                height: 60,
+                child: Icon(LucideIcons.plus, color: AppColors.t1, size: 26),
               ),
             ),
           ),
@@ -532,7 +522,7 @@ class _SlatePillNavBar extends StatelessWidget {
         onTap(index);
       },
       child: Container(
-        height: 70,
+        height: 62,
         margin: const EdgeInsets.symmetric(horizontal: 2),
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Column(
@@ -540,13 +530,13 @@ class _SlatePillNavBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedScale(
-              scale: active ? 1.15 : 1,
+              scale: active ? 1.08 : 1,
               duration: AppMotion.standard,
               curve: AppMotion.curve,
               child: Icon(
                 tab.icon,
                 color: active ? tab.color : AppColors.t3,
-                size: 19,
+                size: 18,
               ),
             ),
             AnimatedSize(

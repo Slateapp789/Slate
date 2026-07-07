@@ -6,6 +6,15 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/theme/app_theme.dart';
 
+class SlateTheme {
+  const SlateTheme._();
+
+  static WorkloopThemeTokens of(BuildContext context) {
+    return Theme.of(context).extension<WorkloopThemeTokens>() ??
+        WorkloopThemeTokens.light;
+  }
+}
+
 class SlateHaptics {
   const SlateHaptics._();
 
@@ -48,16 +57,17 @@ class SlateSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     final content = AnimatedContainer(
       duration: AppMotion.standard,
       curve: AppMotion.curve,
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: color ?? AppColors.bgCard,
+        color: color ?? tokens.surface,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(
-          color: borderColor ?? AppColors.border.withValues(alpha: 0.62),
+          color: borderColor ?? tokens.divider.withValues(alpha: 0.42),
         ),
         boxShadow: elevated ? AppShadows.soft : null,
       ),
@@ -98,6 +108,7 @@ class SlateGlassSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: BackdropFilter(
@@ -105,9 +116,9 @@ class SlateGlassSurface extends StatelessWidget {
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: color ?? AppColors.bgRaised.withValues(alpha: 0.62),
+            color: color ?? tokens.surfaceRaised.withValues(alpha: 0.78),
             borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: AppColors.border.withValues(alpha: 0.72)),
+            border: Border.all(color: tokens.divider.withValues(alpha: 0.52)),
             boxShadow: AppShadows.glass,
           ),
           child: child,
@@ -151,6 +162,7 @@ class _SlateIconButtonState extends State<SlateIconButton> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return Semantics(
       button: true,
       label: widget.semanticLabel,
@@ -172,16 +184,16 @@ class _SlateIconButtonState extends State<SlateIconButton> {
                 decoration: BoxDecoration(
                   color:
                       widget.backgroundColor ??
-                      AppColors.t1.withValues(alpha: 0.045),
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                      tokens.textPrimary.withValues(alpha: 0.035),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                   border: Border.all(
-                    color: AppColors.border.withValues(alpha: 0.62),
+                    color: tokens.divider.withValues(alpha: 0.46),
                   ),
                 ),
                 child: Icon(
                   widget.icon,
-                  color: widget.color ?? AppColors.t2,
-                  size: 20,
+                  color: widget.color ?? tokens.textSecondary,
+                  size: 19,
                 ),
               ),
               if (widget.badge != null) widget.badge!,
@@ -207,16 +219,17 @@ class SlateSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w800,
             letterSpacing: 0,
-            color: AppColors.t3,
+            color: tokens.textTertiary,
           ),
         ),
         if (actionLabel != null)
@@ -264,6 +277,7 @@ class SlateFeatureHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -275,7 +289,7 @@ class SlateFeatureHeader extends StatelessWidget {
               height: 42,
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.09),
-                borderRadius: BorderRadius.circular(AppRadius.md),
+                shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 22),
             ),
@@ -288,8 +302,8 @@ class SlateFeatureHeader extends StatelessWidget {
                     title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.t1,
+                    style: TextStyle(
+                      color: tokens.textPrimary,
                       fontSize: 31,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0,
@@ -301,8 +315,8 @@ class SlateFeatureHeader extends StatelessWidget {
                     subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.t3,
+                    style: TextStyle(
+                      color: tokens.textTertiary,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       height: 1.28,
@@ -319,14 +333,31 @@ class SlateFeatureHeader extends StatelessWidget {
         ),
         if (stats.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              for (var index = 0; index < stats.length; index++) ...[
-                Expanded(child: stats[index]),
-                if (index != stats.length - 1)
-                  const SizedBox(width: AppSpacing.xs),
-              ],
-            ],
+          DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: tokens.divider.withValues(alpha: 0.62)),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Row(
+                children: [
+                  for (var index = 0; index < stats.length; index++) ...[
+                    Expanded(child: stats[index]),
+                    if (index != stats.length - 1)
+                      Container(
+                        width: 1,
+                        height: 34,
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                        ),
+                        color: tokens.divider.withValues(alpha: 0.62),
+                      ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ],
       ],
@@ -348,13 +379,9 @@ class SlateHeaderStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 74),
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: AppColors.t1.withValues(alpha: 0.035),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
+    final tokens = SlateTheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -365,9 +392,10 @@ class SlateHeaderStat extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: color,
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: FontWeight.w800,
               letterSpacing: 0,
+              height: 1.05,
             ),
           ),
           const SizedBox(height: AppSpacing.xxs),
@@ -375,10 +403,10 @@ class SlateHeaderStat extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.t3,
+            style: TextStyle(
+              color: tokens.textTertiary,
               fontSize: 12,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -401,9 +429,8 @@ class SlateEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateSurface(
-      color: AppColors.t1.withValues(alpha: 0.025),
-      borderColor: AppColors.border.withValues(alpha: 0.54),
+    final tokens = SlateTheme.of(context);
+    return Padding(
       padding: const EdgeInsets.symmetric(
         vertical: AppSpacing.xl,
         horizontal: AppSpacing.lg,
@@ -421,31 +448,155 @@ class SlateEmptyState extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              width: 46,
-              height: 46,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                color: AppColors.t1.withValues(alpha: 0.06),
+                color: tokens.textPrimary.withValues(alpha: 0.045),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: AppColors.t3, size: 23),
+              child: Icon(icon, color: tokens.textTertiary, size: 23),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
-                color: AppColors.t2,
+                color: tokens.textSecondary,
               ),
             ),
             const SizedBox(height: AppSpacing.xxs),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: AppColors.t3),
+              style: TextStyle(fontSize: 12, color: tokens.textTertiary),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class SlateListRow extends StatelessWidget {
+  final Widget leading;
+  final Widget title;
+  final Widget? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final EdgeInsetsGeometry padding;
+  final bool showDivider;
+
+  const SlateListRow({
+    super.key,
+    required this.leading,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+    this.padding = const EdgeInsets.symmetric(vertical: 14),
+    this.showDivider = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    final row = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        border: showDivider
+            ? Border(
+                bottom: BorderSide(
+                  color: tokens.divider.withValues(alpha: 0.66),
+                ),
+              )
+            : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          leading,
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                title,
+                if (subtitle != null) ...[
+                  const SizedBox(height: AppSpacing.xxs),
+                  subtitle!,
+                ],
+              ],
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: AppSpacing.sm),
+            trailing!,
+          ],
+        ],
+      ),
+    );
+
+    if (onTap == null) return row;
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      onTap: () {
+        SlateHaptics.tap();
+        onTap!();
+      },
+      child: row,
+    );
+  }
+}
+
+class SlateFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const SlateFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    return GestureDetector(
+      onTap: () {
+        SlateHaptics.tap();
+        onTap();
+      },
+      child: AnimatedContainer(
+        duration: AppMotion.fast,
+        curve: AppMotion.curve,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? tokens.accentStrong.withValues(alpha: 0.34)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(
+            color: selected
+                ? tokens.accentStrong.withValues(alpha: 0.54)
+                : tokens.divider.withValues(alpha: 0.58),
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: selected ? tokens.textPrimary : tokens.textSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );

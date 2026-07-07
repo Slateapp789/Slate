@@ -321,36 +321,10 @@ class _ViewRail extends StatelessWidget {
     final active = selected == value;
     return Padding(
       padding: const EdgeInsets.only(right: AppSpacing.xs),
-      child: GestureDetector(
-        onTap: () {
-          SlateHaptics.tap();
-          onChanged(value);
-        },
-        child: AnimatedContainer(
-          duration: AppMotion.standard,
-          curve: AppMotion.curve,
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: active
-                ? AppColors.accentPrimaryStrong.withValues(alpha: 0.34)
-                : AppColors.t1.withValues(alpha: 0.028),
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            border: Border.all(
-              color: active
-                  ? AppColors.accentPrimaryStrong.withValues(alpha: 0.54)
-                  : AppColors.border.withValues(alpha: 0.46),
-            ),
-          ),
-          child: Text(
-            '$label $count',
-            style: TextStyle(
-              color: active ? AppColors.t1 : AppColors.t2,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
+      child: SlateFilterChip(
+        label: '$label $count',
+        selected: active,
+        onTap: () => onChanged(value),
       ),
     );
   }
@@ -375,74 +349,53 @@ class _ClientRow extends StatelessWidget {
     final signal = _clientSignal(record);
     final statusColor = _clientStatusColor(record);
 
-    return SlateSurface(
+    return SlateListRow(
       onTap: onTap,
-      radius: AppRadius.md,
-      color: AppColors.bg,
-      borderColor: record.needsAttention
-          ? statusColor.withValues(alpha: 0.24)
-          : AppColors.border.withValues(alpha: 0.52),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.md,
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: AppColors.modClients.withValues(alpha: 0.08),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Text(
+            initials.isEmpty ? '?' : initials,
+            style: const TextStyle(
+              color: AppColors.t1,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
       ),
-      child: Row(
+      title: Text(
+        client.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      subtitle: Text(
+        signal,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: record.needsAttention ? statusColor : AppColors.t3,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.modClients.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: Center(
-              child: Text(
-                initials.isEmpty ? '?' : initials,
-                style: const TextStyle(
-                  color: AppColors.t1,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  client.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  signal,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: record.needsAttention ? statusColor : AppColors.t3,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (record.isLead) ...[
-            const SizedBox(width: AppSpacing.xs),
-            _StatusPill(label: 'Lead', color: AppColors.warning),
-          ],
-          if (record.openTaskCount > 0 && !record.isLead) ...[
-            const SizedBox(width: AppSpacing.xs),
+          if (record.isLead)
+            _StatusPill(label: 'Lead', color: AppColors.warning)
+          else if (record.openTaskCount > 0)
             _StatusPill(label: '${record.openTaskCount}', color: statusColor),
-          ],
           const SizedBox(width: AppSpacing.xs),
           const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
         ],

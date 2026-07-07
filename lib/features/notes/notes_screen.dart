@@ -272,36 +272,10 @@ class _NoteFilterRail extends StatelessWidget {
     final active = selected == value;
     return Padding(
       padding: const EdgeInsets.only(right: AppSpacing.xs),
-      child: GestureDetector(
-        onTap: () {
-          SlateHaptics.tap();
-          onChanged(value);
-        },
-        child: AnimatedContainer(
-          duration: AppMotion.standard,
-          curve: AppMotion.curve,
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: active
-                ? AppColors.accentPrimaryStrong.withValues(alpha: 0.34)
-                : AppColors.t1.withValues(alpha: 0.028),
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            border: Border.all(
-              color: active
-                  ? AppColors.accentPrimaryStrong.withValues(alpha: 0.54)
-                  : AppColors.border.withValues(alpha: 0.46),
-            ),
-          ),
-          child: Text(
-            '$label $count',
-            style: TextStyle(
-              color: active ? AppColors.t1 : AppColors.t2,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
+      child: SlateFilterChip(
+        label: '$label $count',
+        selected: active,
+        onTap: () => onChanged(value),
       ),
     );
   }
@@ -396,23 +370,12 @@ class _NoteGroupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateSurface(
-      padding: EdgeInsets.zero,
-      color: AppColors.bg,
-      borderColor: AppColors.border.withValues(alpha: 0.54),
-      radius: AppRadius.md,
-      child: Column(
-        children: [
-          for (var index = 0; index < notes.length; index++) ...[
-            _NoteListRow(note: notes[index], onOpen: onOpen),
-            if (index != notes.length - 1)
-              const Padding(
-                padding: EdgeInsets.only(left: AppSpacing.lg),
-                child: Divider(height: 1, color: AppColors.border),
-              ),
-          ],
+    return Column(
+      children: [
+        for (var index = 0; index < notes.length; index++) ...[
+          _NoteListRow(note: notes[index], onOpen: onOpen),
         ],
-      ),
+      ],
     );
   }
 }
@@ -432,90 +395,65 @@ class _NoteListRow extends StatelessWidget {
         ? 'No additional text'
         : _oneLine(note.body);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => onOpen(note),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.sm,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        if (note.pinned) ...[
-                          const Icon(
-                            LucideIcons.pin,
-                            size: 13,
-                            color: AppColors.slateLight,
-                          ),
-                          const SizedBox(width: AppSpacing.xxs),
-                        ],
-                        Expanded(
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.t1,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: _noteDateLabel(note),
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                          const TextSpan(text: '  '),
-                          TextSpan(text: preview),
-                        ],
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.t3,
-                        fontSize: 13,
-                        height: 1.3,
-                      ),
-                    ),
-                    if (note.clientName != null) ...[
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        note.clientName!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.t3,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              const Icon(
-                LucideIcons.chevronRight,
-                color: AppColors.t3,
-                size: 18,
-              ),
-            ],
-          ),
+    return SlateListRow(
+      onTap: () => onOpen(note),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      leading: Icon(
+        note.pinned ? LucideIcons.pin : LucideIcons.fileText,
+        size: 17,
+        color: note.pinned ? AppColors.accentPrimary : AppColors.t3,
+      ),
+      title: Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 16,
+          fontWeight: FontWeight.w900,
         ),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: _noteDateLabel(note),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const TextSpan(text: '  '),
+                TextSpan(text: preview),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.t3,
+              fontSize: 13,
+              height: 1.3,
+            ),
+          ),
+          if (note.clientName != null) ...[
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              note.clientName!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.t3,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+      trailing: const Icon(
+        LucideIcons.chevronRight,
+        color: AppColors.t3,
+        size: 18,
       ),
     );
   }

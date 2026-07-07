@@ -208,38 +208,6 @@ class _FeedFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        SlateHaptics.tap();
-        onTap();
-      },
-      child: AnimatedContainer(
-        duration: AppMotion.fast,
-        curve: AppMotion.curve,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accentPrimaryStrong.withValues(alpha: 0.34)
-              : AppColors.t1.withValues(alpha: 0.028),
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: selected
-                ? AppColors.accentPrimaryStrong.withValues(alpha: 0.54)
-                : AppColors.border.withValues(alpha: 0.46),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? AppColors.t1 : AppColors.t2,
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
+    return SlateFilterChip(label: label, selected: selected, onTap: onTap);
   }
 }
