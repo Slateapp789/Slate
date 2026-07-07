@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/slate_ui.dart';
 import 'providers/settings_providers.dart';
 import 'widgets/settings_business_tab.dart';
 import 'widgets/settings_account_tab.dart';
@@ -43,34 +44,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header ──────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Row(
                 children: [
-                  GestureDetector(
+                  SlateIconButton(
+                    icon: LucideIcons.chevronLeft,
+                    semanticLabel: 'Back',
                     onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Icon(
-                        LucideIcons.chevronLeft,
-                        color: AppColors.t2,
-                        size: 18,
-                      ),
-                    ),
                   ),
                   const SizedBox(width: 16),
                   const Text(
                     'Settings',
                     style: TextStyle(
                       fontSize: 24,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                       color: AppColors.t1,
                       letterSpacing: 0,
                     ),
@@ -80,29 +68,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             ),
             const SizedBox(height: 20),
 
-            // ── Tab bar ──────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
+                  color: AppColors.t1.withValues(alpha: 0.028),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  border: Border.all(
+                    color: AppColors.border.withValues(alpha: 0.54),
+                  ),
                 ),
                 child: TabBar(
                   controller: _tabController,
                   indicator: BoxDecoration(
-                    color: AppColors.green,
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppColors.accentPrimaryStrong.withValues(
+                      alpha: 0.34,
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    border: Border.all(
+                      color: AppColors.accentPrimaryStrong.withValues(
+                        alpha: 0.54,
+                      ),
+                    ),
                   ),
                   indicatorSize: TabBarIndicatorSize.tab,
                   indicatorPadding: const EdgeInsets.all(3),
                   dividerColor: Colors.transparent,
-                  labelColor: Colors.white,
+                  labelColor: AppColors.t1,
                   unselectedLabelColor: AppColors.t3,
                   labelStyle: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
                   ),
                   tabs: const [
                     Tab(text: 'Business'),
@@ -115,7 +111,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             ),
             const SizedBox(height: 16),
 
-            // ── Tab content ──────────────────────────────────────────────
             Expanded(
               child: TabBarView(
                 controller: _tabController,

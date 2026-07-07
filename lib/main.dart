@@ -507,7 +507,7 @@ class _SlatePillNavBar extends StatelessWidget {
           SlateGlassSurface(
             radius: AppRadius.pill,
             blur: 30,
-            color: AppColors.slateLight,
+            color: AppColors.accentPrimaryStrong,
             child: GestureDetector(
               onTap: onAction,
               child: const SizedBox(
@@ -701,7 +701,7 @@ class _LoadingScreen extends StatelessWidget {
                 width: 30,
                 height: 30,
                 child: CircularProgressIndicator(
-                  color: AppColors.slateLight,
+                  color: AppColors.accentPrimaryStrong,
                   strokeWidth: 2.4,
                 ),
               ),
