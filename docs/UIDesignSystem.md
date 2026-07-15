@@ -1,6 +1,6 @@
 # Slate UI Design System
 
-Last updated: 2026-06-04
+Last updated: 2026-07-15
 
 ## Design Intent
 
@@ -175,8 +175,9 @@ Current main navigation:
 
 - Bottom pill/glass nav.
 - Labels appear under icons.
-- Tabs: Home, Clients, Bookings, Money, Tasks.
-- Floating action button opens contextual creation actions.
+- Tabs: Home, Clients, Bookings, More.
+- More contains Money, Tasks, Notes, Profile, and Settings.
+- Create-capable feature screens use a compact top-right `+` action instead of a detached global floating action.
 - Body extends behind nav for blur/transparency.
 
 Rules:

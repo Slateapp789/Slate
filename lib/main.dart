@@ -10,13 +10,11 @@ import 'features/auth/auth_screen.dart';
 import 'features/business_feed/business_feed_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/clients/clients_screen.dart';
-import 'features/clients/add_client_screen.dart';
 import 'features/appointments/appointments_screen.dart';
-import 'features/appointments/add_appointment_screen.dart';
 import 'features/finance/finance_screen.dart';
-import 'features/finance/add_payment_screen.dart';
 import 'features/notes/notes_screen.dart';
 import 'features/tasks/tasks_screen.dart';
+import 'features/more/more_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/calendar_sync/calendar_sync_screen.dart';
 import 'features/notifications/notifications_screen.dart';
@@ -180,134 +178,11 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   late int _currentIndex;
   FinanceInitialFocus _financeInitialFocus = FinanceInitialFocus.top;
-  int _taskCreateRequest = 0;
-  int _noteCreateRequest = 0;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
-  }
-
-  void _showFabSheet() {
-    SlateHaptics.action();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (context) {
-        return SlateSheetFrame(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _fabOption(
-                icon: LucideIcons.calendarPlus,
-                label: 'New Booking',
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => AddAppointmentScreen()),
-                  ).then((_) {
-                    if (mounted) setState(() => _currentIndex = 2);
-                  });
-                },
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              _fabOption(
-                icon: LucideIcons.userPlus,
-                label: 'New Client',
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AddClientScreen()),
-                  ).then((_) {
-                    if (mounted) setState(() => _currentIndex = 1);
-                  });
-                },
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              _fabOption(
-                icon: LucideIcons.banknote,
-                label: 'Record Payment',
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AddPaymentScreen()),
-                  ).then((_) {
-                    if (mounted) setState(() => _currentIndex = 3);
-                  });
-                },
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              _fabOption(
-                icon: LucideIcons.checkSquare,
-                label: 'New Task',
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    _taskCreateRequest++;
-                    _currentIndex = 4;
-                  });
-                },
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              _fabOption(
-                icon: LucideIcons.stickyNote,
-                label: 'New Note',
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    _noteCreateRequest++;
-                    _currentIndex = 5;
-                  });
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _fabOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return WorkloopSurface(
-      onTap: onTap,
-      color: AppColors.t1.withValues(alpha: 0.06),
-      borderColor: AppColors.t1.withValues(alpha: 0.08),
-      radius: AppRadius.lg,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.t1.withValues(alpha: 0.07),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: Icon(icon, color: AppColors.t2, size: 20),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppColors.t1,
-            ),
-          ),
-          const Spacer(),
-          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
-        ],
-      ),
-    );
   }
 
   @override
@@ -331,16 +206,18 @@ class _MainShellState extends State<MainShell> {
             const ClientsScreen(),
             const AppointmentsScreen(),
             FinanceScreen(initialFocus: _financeInitialFocus),
-            TasksScreen(createRequest: _taskCreateRequest),
-            NotesScreen(
-              showBackButton: false,
-              createRequest: _noteCreateRequest,
+            const TasksScreen(),
+            const NotesScreen(showBackButton: false),
+            MoreScreen(
+              onOpenMoney: () => setState(() => _currentIndex = 3),
+              onOpenTasks: () => setState(() => _currentIndex = 4),
+              onOpenNotes: () => setState(() => _currentIndex = 5),
             ),
           ],
         ),
       ),
       bottomNavigationBar: WorkloopBottomNav(
-        currentIndex: _currentIndex,
+        currentIndex: _currentIndex <= 2 ? _currentIndex : 3,
         items: const [
           WorkloopNavItem(
             label: 'Home',
@@ -358,29 +235,19 @@ class _MainShellState extends State<MainShell> {
             color: AppColors.accentPrimary,
           ),
           WorkloopNavItem(
-            label: 'Money',
-            icon: LucideIcons.banknote,
-            color: AppColors.accentPrimary,
-          ),
-          WorkloopNavItem(
-            label: 'Tasks',
-            icon: LucideIcons.listChecks,
-            color: AppColors.accentPrimary,
-          ),
-          WorkloopNavItem(
-            label: 'Notes',
-            icon: LucideIcons.stickyNote,
+            label: 'More',
+            icon: LucideIcons.menu,
             color: AppColors.accentPrimary,
           ),
         ],
         onTap: (i) {
-          if (i == _currentIndex) return;
+          final destination = i == 3 ? 6 : i;
+          if (destination == _currentIndex) return;
           setState(() {
             _financeInitialFocus = FinanceInitialFocus.top;
-            _currentIndex = i;
+            _currentIndex = destination;
           });
         },
-        onAction: _showFabSheet,
       ),
     );
   }

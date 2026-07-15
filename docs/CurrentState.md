@@ -1,6 +1,6 @@
 # Workloop Current State
 
-Last updated: 2026-07-07
+Last updated: 2026-07-15
 
 ## Completed / Mostly Working Features
 
@@ -27,10 +27,10 @@ Last updated: 2026-07-07
 ### Navigation
 
 - GoRouter top-level routes.
-- Main shell with glass/pill bottom navigation.
-- Tabs: Home, Clients, Bookings, Money, Tasks.
-- Floating action button with creation sheet.
-- Tasks, Work/Bookings, and Payments routes can deep-link to shell indexes.
+- Main shell with a four-item glass/pill bottom navigation: Home, Clients, Bookings, More.
+- More keeps Money, Tasks, Notes, Profile, and Settings one tap away without crowding the primary navigation.
+- The oversized global create button has been removed; Clients, Bookings, Money, Tasks, and Notes expose a consistent compact create action in each feature header.
+- Tasks, Notes, Work/Bookings, and Payments routes can deep-link to their shell screens while More remains the active navigation destination for secondary modules.
 - Business Feed route opens from Home without adding a bottom navigation tab.
 
 ### Dashboard
@@ -39,6 +39,7 @@ Last updated: 2026-07-07
 - Income this month shows paid/received income only.
 - Upcoming jobs shows the next scheduled bookings from existing booking data.
 - Feed shows neutral recent business activity while excluding attention/overdue/unpaid warning states.
+- Subtle inline shortcuts provide direct access to open Tasks and Notes without adding more dashboard cards.
 - Pull-to-refresh.
 - Navigation callbacks into core modules.
 

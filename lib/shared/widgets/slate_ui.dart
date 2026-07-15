@@ -558,14 +558,12 @@ class WorkloopBottomNav extends StatelessWidget {
   final int currentIndex;
   final List<WorkloopNavItem> items;
   final ValueChanged<int> onTap;
-  final VoidCallback onAction;
 
   const WorkloopBottomNav({
     super.key,
     required this.currentIndex,
     required this.items,
     required this.onTap,
-    required this.onAction,
   });
 
   @override
@@ -659,8 +657,6 @@ class WorkloopBottomNav extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          WorkloopFAB(onTap: onAction),
         ],
       ),
     );

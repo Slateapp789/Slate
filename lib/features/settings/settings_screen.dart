@@ -12,7 +12,9 @@ import '../notifications/notifications_screen.dart';
 export 'providers/settings_providers.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  final int initialTab;
+
+  const SettingsScreen({super.key, this.initialTab = 0});
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -21,12 +23,17 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  int _selectedTab = 0;
+  late int _selectedTab;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _selectedTab = widget.initialTab.clamp(0, 3);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: _selectedTab,
+    );
     _tabController.addListener(_handleTabChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.invalidate(settingsServicesProvider);

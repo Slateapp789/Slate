@@ -1,6 +1,6 @@
 # Slate Decisions Log
 
-Last updated: 2026-05-31
+Last updated: 2026-07-15
 
 This log consolidates Notion decisions, Git history, and codebase reality.
 
@@ -291,3 +291,20 @@ Consequences:
 - Primary screens now reference the canonical primitives for shared UI patterns.
 - Locally hand-built segmented controls in Bookings and Settings have been replaced by `WorkloopSegmentedControl`.
 - Dark mode remains staged, not enabled, until local static-colour widgets are migrated.
+
+## 2026-07-15 - Primary Navigation Reduced To Four Destinations
+
+Decision:
+
+Use Home, Clients, Bookings, and More as the four bottom-navigation destinations. Move Money, Tasks, Notes, Profile, and Settings into More, remove the global floating create action, and place creation at the top of each create-capable feature.
+
+Reasoning:
+
+The six-destination navigation plus detached floating action was visually crowded and made creation feel disconnected from its feature context. A four-item navigation keeps the operating core legible while More preserves one-tap access to secondary modules. Feature-local creation makes the destination and resulting workflow unambiguous.
+
+Consequences:
+
+- Money, Tasks, and Notes retain their full existing screens and deep links, with More highlighted in the bottom navigation.
+- Clients, Bookings, Money, Tasks, and Notes use the shared compact top action pattern.
+- Dashboard provides minimal Tasks and Notes shortcuts so frequent capture and follow-up remain close at hand.
+- No database, repository, provider, or package changes are required.

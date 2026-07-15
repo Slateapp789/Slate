@@ -112,8 +112,21 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                       title: 'Bookings',
                       subtitle: 'Plan the day and keep bookings moving.',
                       color: AppColors.modCalendar,
-                      trailing: _view == _BookingsView.schedule
-                          ? WorkloopIconButton(
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          WorkloopIconButton(
+                            icon: LucideIcons.plus,
+                            semanticLabel: 'New booking',
+                            color: AppColors.modCalendar,
+                            backgroundColor: AppColors.modCalendar.withValues(
+                              alpha: 0.10,
+                            ),
+                            onTap: _addAppointment,
+                          ),
+                          if (_view == _BookingsView.schedule) ...[
+                            const SizedBox(width: AppSpacing.xs),
+                            WorkloopIconButton(
                               icon: _calendarMode
                                   ? LucideIcons.list
                                   : LucideIcons.calendarDays,
@@ -127,8 +140,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
                               onTap: () => setState(
                                 () => _calendarMode = !_calendarMode,
                               ),
-                            )
-                          : null,
+                            ),
+                          ],
+                        ],
+                      ),
                       metrics: [
                         WorkloopMetricItem(
                           value: _calendarMode ? 'Calendar' : 'List',

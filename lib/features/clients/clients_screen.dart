@@ -59,7 +59,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                         AppSpacing.pageX,
                         0,
                       ),
-                      child: const _Header(),
+                      child: _Header(onAdd: _openAddClient),
                     ),
                   ),
                   if (data.isNotEmpty) ...[
@@ -182,15 +182,24 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header();
+  final VoidCallback onAdd;
+
+  const _Header({required this.onAdd});
 
   @override
   Widget build(BuildContext context) {
-    return const WorkloopPageHeader(
+    return WorkloopPageHeader(
       icon: LucideIcons.users,
       title: 'Clients',
       subtitle: 'People you work with.',
       color: AppColors.modClients,
+      trailing: WorkloopIconButton(
+        icon: LucideIcons.plus,
+        semanticLabel: 'New client',
+        color: AppColors.modClients,
+        backgroundColor: AppColors.modClients.withValues(alpha: 0.10),
+        onTap: onAdd,
+      ),
     );
   }
 }

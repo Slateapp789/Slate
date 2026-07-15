@@ -1,6 +1,6 @@
 # Workloop Product Vision
 
-Last updated: 2026-06-07
+Last updated: 2026-07-15
 
 ## What Workloop Is
 
@@ -70,7 +70,7 @@ Current code scope includes:
 
 - Email/password authentication through Supabase.
 - Workspace onboarding with services, working hours, profile handle, revenue target, and first booking.
-- Main shell with bottom pill navigation: Home, Clients, Bookings, Money, Tasks.
+- Main shell with four-item bottom pill navigation: Home, Clients, Bookings, More. More contains Money, Tasks, Notes, Profile, and Settings.
 - Dashboard with revenue, pulse, schedule, tasks, notification access, and booking requests.
 - CRM with client records, contact actions, notes, follow-ups, timeline, booking history, payment history, and tasks.
 - Bookings with today/upcoming/past views, calendar view, next booking, date selection, location type, custom services, inline client creation, edit flow, status control, linked tasks, and calendar export.

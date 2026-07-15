@@ -41,6 +41,8 @@ class DashboardScreen extends ConsumerWidget {
     final appointments = ref.watch(appointmentsProvider);
     final finance = ref.watch(financeSummaryProvider);
     final feed = ref.watch(businessFeedProvider);
+    final tasks = ref.watch(allTasksProvider);
+    final notes = ref.watch(allNotesProvider);
     final displayName = _displayName();
 
     return Scaffold(
@@ -75,6 +77,28 @@ class DashboardScreen extends ConsumerWidget {
                   ? _greeting
                   : '$_greeting, $displayName',
               subtitle: 'Here\'s what\'s happening today.',
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _QuickAccessRow(
+              taskSummary: tasks.maybeWhen(
+                data: (items) {
+                  final open = items
+                      .where(
+                        (task) =>
+                            task.status != 'done' && task.status != 'completed',
+                      )
+                      .length;
+                  return open == 1 ? '1 open' : '$open open';
+                },
+                orElse: () => 'View tasks',
+              ),
+              noteSummary: notes.maybeWhen(
+                data: (items) =>
+                    items.length == 1 ? '1 note' : '${items.length} notes',
+                orElse: () => 'View notes',
+              ),
+              onOpenTasks: () => onNavigate(4),
+              onOpenNotes: () => onNavigate(5),
             ),
             const SizedBox(height: AppSpacing.xxl),
             _IncomeThisMonthCard(finance: finance),
@@ -189,6 +213,119 @@ class _DashboardGreeting extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _QuickAccessRow extends StatelessWidget {
+  final String taskSummary;
+  final String noteSummary;
+  final VoidCallback onOpenTasks;
+  final VoidCallback onOpenNotes;
+
+  const _QuickAccessRow({
+    required this.taskSummary,
+    required this.noteSummary,
+    required this.onOpenTasks,
+    required this.onOpenNotes,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _QuickAccessItem(
+            icon: LucideIcons.listChecks,
+            label: 'Tasks',
+            summary: taskSummary,
+            onTap: onOpenTasks,
+          ),
+        ),
+        Container(
+          width: 1,
+          height: 34,
+          margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          color: AppColors.border.withValues(alpha: 0.58),
+        ),
+        Expanded(
+          child: _QuickAccessItem(
+            icon: LucideIcons.stickyNote,
+            label: 'Notes',
+            summary: noteSummary,
+            onTap: onOpenNotes,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickAccessItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String summary;
+  final VoidCallback onTap;
+
+  const _QuickAccessItem({
+    required this.icon,
+    required this.label,
+    required this.summary,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '$label, $summary',
+      child: InkWell(
+        onTap: () {
+          SlateHaptics.tap();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          child: Row(
+            children: [
+              Icon(icon, size: 17, color: AppColors.t3),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: AppColors.t1,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      summary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.t3,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                LucideIcons.chevronRight,
+                size: 14,
+                color: AppColors.t3,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -104,7 +104,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                       subtitle: 'Capture context before it disappears.',
                       color: AppColors.modNotes,
                       trailing: WorkloopIconButton(
-                        icon: LucideIcons.edit3,
+                        icon: LucideIcons.plus,
                         semanticLabel: 'New note',
                         color: AppColors.modNotes,
                         backgroundColor: AppColors.modNotes.withValues(
