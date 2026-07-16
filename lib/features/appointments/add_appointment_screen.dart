@@ -16,8 +16,13 @@ part 'add_appointment_widgets.dart';
 
 class AddAppointmentScreen extends ConsumerStatefulWidget {
   final DateTime? initialDate;
+  final String? initialClientId;
 
-  const AddAppointmentScreen({super.key, this.initialDate});
+  const AddAppointmentScreen({
+    super.key,
+    this.initialDate,
+    this.initialClientId,
+  });
 
   @override
   ConsumerState<AddAppointmentScreen> createState() =>
@@ -54,6 +59,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedClientId = widget.initialClientId;
     if (widget.initialDate != null) {
       _selectedDate = widget.initialDate!;
     }

@@ -17,6 +17,7 @@ Last updated: 2026-07-15
 
 - Multi-step onboarding.
 - Captures business profile basics.
+- Persists the owner's preferred first name in Supabase Auth metadata for personalised app greetings.
 - Captures public handle.
 - Captures services.
 - Captures working hours, including split working blocks with breaks.
@@ -32,14 +33,19 @@ Last updated: 2026-07-15
 - The oversized global create button has been removed; Clients, Bookings, Money, Tasks, and Notes expose a consistent compact create action in each feature header.
 - Tasks, Notes, Work/Bookings, and Payments routes can deep-link to their shell screens while More remains the active navigation destination for secondary modules.
 - Business Feed route opens from Home without adding a bottom navigation tab.
+- Tapping outside an active text field dismisses the keyboard consistently across every route while taps within the field keep editing active.
 
 ### Dashboard
 
-- Calm daily overview with a greeting, income this month, upcoming jobs, and feed.
-- Income this month shows paid/received income only.
-- Upcoming jobs shows the next scheduled bookings from existing booking data.
-- Feed shows neutral recent business activity while excluding attention/overdue/unpaid warning states.
-- Subtle inline shortcuts provide direct access to open Tasks and Notes without adding more dashboard cards.
+- Calm daily overview ordered around Today, Worth a look, Money, quick access, Coming up, and Recent activity.
+- Visual hierarchy stays close to the original flat dashboard, with a very quiet paper-like backdrop, a stronger Today heading, and higher-contrast operational metadata adding depth without more cards or decorative colour markers.
+- Time-aware personalised greeting includes the current date.
+- Today shows only the next remaining booking plus a quiet count of later bookings; Coming up excludes today and is capped at three rows.
+- Worth a look is optional, neutrally worded, capped at two rows, and uses no alarming totals, badges, or urgency colours.
+- Money is a compact received-this-month row rather than a dominant hero card.
+- Tasks and Notes use two small, low-contrast utility cards so they read separately from Money without adding visual noise.
+- Recent activity is capped at three calm items and excludes attention/overdue/unpaid warning states.
+- Dashboard rows and section actions open the related booking detail or owning feature.
 - Pull-to-refresh.
 - Navigation callbacks into core modules.
 
@@ -54,18 +60,22 @@ Last updated: 2026-07-15
 
 ### Clients / CRM
 
-- Calm, whitespace-first client list with title, subtitle, search, simple All/Leads/Active filters, and useful single-line relationship signals.
-- Search and filtering/sorting.
+- Calm, whitespace-first client list aligned with the dashboard's title scale, top spacing, paper-like backdrop, text hierarchy, and continuous divider-led rows.
+- Client sorting supports Next booking, A–Z, Recently booked, Recently added, and Most booked without additional database queries.
+- Client sorting is presented as a compact single-line choice menu with a quiet selected state rather than a second list of full record-style rows.
+- Search across client names, contact details, and tags, with bottom-navigation-inspired All/Active/Leads/Inactive views that can be changed by tapping, dragging the selected capsule across the selector, or swiping horizontally across the screen.
+- Active and Inactive remain distinct status views; inactive contacts also carry a quiet neutral label inside All.
+- Changing client views returns the portfolio to the top, and each empty category has calm, contextual guidance.
 - Add client flow organized around Basic details, Work details, and Notes.
 - Edit client flow mirrors the calmer section hierarchy.
 - Delete client with confirmation.
-- Client detail with compact profile header, call/email actions, soft tabs, and reduced visual weight.
+- Client workspace with a compact relationship header, call/email actions, textured backdrop, and draggable Overview/Bookings/Money/Tasks navigation aligned with the app shell.
 - Notes and important notes.
 - Status/source/tags/birthday/preferred contact method fields.
-- Client overview focused on contact details, notes, next booking, and recent history.
-- Client booking history as a simple client-specific list.
-- Client payment history with neutral Paid/Unpaid language and no debt/overdue summary block.
-- Client task history as a simple client-specific list.
+- Client overview prioritises the next booking, a restrained relationship snapshot, calm follow-up rows, useful context, and three recent activities rather than repeating full module histories.
+- Client booking history is repository-backed, opens canonical booking details, and creates bookings with the client preselected.
+- Client payment history is repository-backed, supports direct recording/editing, and distinguishes received, remaining, paid, part-paid, and unpaid amounts without alarm styling.
+- Client task history uses the shared task repository and contact relationship, invalidates the main Tasks state, and links directly to the full Tasks workspace.
 
 ### Bookings
 
@@ -161,6 +171,7 @@ Last updated: 2026-07-15
 - Notification settings.
 - Calendar sync entry point.
 - Account email/password/sign out.
+- Editable preferred first name for personalised greetings.
 - Privacy export and account deletion request flow.
 
 ### Security / Foundation

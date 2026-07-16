@@ -308,3 +308,89 @@ Consequences:
 - Clients, Bookings, Money, Tasks, and Notes use the shared compact top action pattern.
 - Dashboard provides minimal Tasks and Notes shortcuts so frequent capture and follow-up remain close at hand.
 - No database, repository, provider, or package changes are required.
+
+## 2026-07-15 - Dashboard Prioritises Calm Daily Awareness
+
+Decision:
+
+Order the dashboard around the owner's day rather than large performance figures: Today first, an optional and softly worded Worth a look section, compact Money and utility access, then Coming up and Recent activity.
+
+Reasoning:
+
+The dashboard should clarify the day without creating anxiety. Large financial heroes, urgency language, warning colours, long lists, and repeated module previews increase cognitive load even when the underlying information is useful.
+
+Consequences:
+
+- Worth a look is hidden when empty and capped at two neutral rows.
+- The dashboard does not surface alarming totals, red badges, or labels such as urgent.
+- Today and Coming up do not duplicate bookings, and Coming up is capped at three.
+- Money remains informative but visually subordinate to the day's work.
+- Every actionable row opens its booking detail or owning feature.
+
+## 2026-07-16 - Keyboard Dismissal Is App-Wide Interaction Behaviour
+
+Decision:
+
+Override Flutter's mobile tap-outside editing intent once at the app boundary so tapping outside any active text field dismisses the keyboard, while tapping within the field preserves focus.
+
+Reasoning:
+
+Search, forms, notes, tasks, bookings, settings, and onboarding should all respond consistently. Screen-specific unfocus handlers are easy to miss and make a basic mobile interaction feel unreliable.
+
+Consequences:
+
+- All current and future editable fields inherit the same tap-away behaviour without feature-level wiring.
+- Existing field tap regions remain authoritative, so selection, cursor movement, and editing inside a field are preserved.
+- Widget tests protect both outside dismissal and inside focus retention.
+
+## 2026-07-16 - Client Portfolio Uses Three Calm Views
+
+Decision:
+
+Keep All, Active, and Leads as the permanent client-list views, ordered from broadest to most specific. Present them as one bottom-navigation-inspired pill control and allow horizontal screen swipes to move between adjacent views.
+
+Reasoning:
+
+These three views answer distinct daily questions without turning the client screen into a CRM dashboard. Inactive contacts still need to remain discoverable, but they do not justify a fourth permanent destination for most solo operators.
+
+Consequences:
+
+- All contains every contact, Active contains only contacts explicitly marked active, and Leads contains contacts marked as leads.
+- Inactive contacts remain accessible through All and search.
+- Left and right swipes change one adjacent view at a time, while short incidental horizontal movements do nothing.
+- The selector shares the floating glass surface, draggable animated capsule, stepped haptics, restrained accent, and rounded geometry of the main bottom navigation.
+
+## 2026-07-16 - Inactive Becomes A First-Class Client View
+
+Decision:
+
+Supersede the three-view client portfolio with All, Active, Leads, and Inactive. Keep Inactive visually neutral and make it the final adjacent destination.
+
+Reasoning:
+
+Inactive is already an intentional, user-maintained client status rather than an inferred segment. Giving it a dedicated view makes paused relationships reliably retrievable and keeps Active semantically accurate.
+
+Consequences:
+
+- The draggable selector and full-screen swipe order are All, Active, Leads, then Inactive.
+- Changing views returns the screen to the top instead of retaining an irrelevant position from the previous list.
+- Empty views explain their category calmly, while active searches use search-specific no-results guidance.
+- Inactive rows receive a quiet text marker inside All without warning colours or attention styling.
+
+## 2026-07-16 - Client Detail Becomes A Relationship Workspace
+
+Decision:
+
+Organise client detail around the next booking, relationship context, calm follow-up signals, and short recent activity. Keep bookings, money, and tasks as linked views backed by their existing repositories rather than duplicating client-only records.
+
+Reasoning:
+
+A long contact-details card followed by repeated module histories gives every field equal weight and hides what helps the owner act. The client workspace should answer who this is, what happens next, and whether a small follow-up is useful without behaving like a dense CRM dashboard.
+
+Consequences:
+
+- The overview caps recent activity and progressively discloses secondary contact metadata.
+- New bookings and payments begin with the current client selected.
+- Client tasks remain canonical Tasks records through `contact_id`, and the client view provides an explicit route to the full Tasks workspace.
+- Financial summaries use received and remaining amounts, including partial payments, with neutral language and colour.
+- The workspace reuses the dashboard backdrop, typography, spacing, dividers, and draggable capsule navigation.

@@ -55,101 +55,161 @@ class ClientAppointmentsTab extends ConsumerWidget {
               onAction: () async {
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => AddAppointmentScreen()),
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        AddAppointmentScreen(initialClientId: clientId),
+                  ),
                 );
                 ref.invalidate(clientAppointmentsProvider(clientId));
               },
             )
-          : RefreshIndicator(
-              onRefresh: () async =>
-                  ref.invalidate(clientAppointmentsProvider(clientId)),
-              color: AppColors.green,
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-                itemCount: appts.length,
-                separatorBuilder: (_, __) => const SizedBox.shrink(),
-                itemBuilder: (context, i) {
-                  final appt = appts[i];
-                  final dt = DateTime.tryParse(
-                    appt['start_time'] as String? ?? '',
-                  )?.toLocal();
-                  final endDt = DateTime.tryParse(
-                    appt['end_time'] as String? ?? '',
-                  )?.toLocal();
-                  final status = appt['status'] as String? ?? 'scheduled';
-                  final statusColor = status == 'completed'
-                      ? AppColors.success
-                      : AppColors.t3;
-
-                  return WorkloopListRow(
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              AppointmentDetailScreen(appointment: appt),
-                        ),
-                      );
-                      ref.invalidate(clientAppointmentsProvider(clientId));
-                    },
-                    leading: Icon(
-                      LucideIcons.calendar,
-                      color: statusColor,
-                      size: 18,
-                    ),
-                    title: Text(
-                      appt['services']?['name'] as String? ?? 'Booking',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.t1,
+          : Column(
+              children: [
+                _AppointmentsToolbar(
+                  count: appts.length,
+                  onAdd: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            AddAppointmentScreen(initialClientId: clientId),
                       ),
-                    ),
-                    subtitle: Text(
-                      dt != null
-                          ? endDt != null
-                                ? '${_formatDate(dt)} · ${_fmtTime(dt)} - ${_fmtTime(endDt)}'
-                                : '${_formatDate(dt)} · ${_fmtTime(dt)}'
-                          : 'No date set',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: AppColors.t3),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (appt['price'] != null)
-                          Text(
-                            '£${(appt['price'] as num).toStringAsFixed(0)}',
+                    );
+                    ref.invalidate(clientAppointmentsProvider(clientId));
+                  },
+                ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () async =>
+                        ref.invalidate(clientAppointmentsProvider(clientId)),
+                    color: AppColors.green,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                      itemCount: appts.length,
+                      separatorBuilder: (_, __) => const SizedBox.shrink(),
+                      itemBuilder: (context, i) {
+                        final appt = appts[i];
+                        final dt = DateTime.tryParse(
+                          appt['start_time'] as String? ?? '',
+                        )?.toLocal();
+                        final endDt = DateTime.tryParse(
+                          appt['end_time'] as String? ?? '',
+                        )?.toLocal();
+                        final status = appt['status'] as String? ?? 'scheduled';
+                        final statusColor = status == 'completed'
+                            ? AppColors.success
+                            : AppColors.t3;
+
+                        return WorkloopListRow(
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    AppointmentDetailScreen(appointment: appt),
+                              ),
+                            );
+                            ref.invalidate(
+                              clientAppointmentsProvider(clientId),
+                            );
+                          },
+                          leading: Icon(
+                            LucideIcons.calendar,
+                            color: statusColor,
+                            size: 18,
+                          ),
+                          title: Text(
+                            appt['services']?['name'] as String? ?? 'Booking',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 14,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.t2,
+                              color: AppColors.t1,
                             ),
                           ),
-                        const SizedBox(width: 10),
-                        Text(
-                          status.replaceAll('_', ' '),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: statusColor,
+                          subtitle: Text(
+                            dt != null
+                                ? endDt != null
+                                      ? '${_formatDate(dt)} · ${_fmtTime(dt)} - ${_fmtTime(endDt)}'
+                                      : '${_formatDate(dt)} · ${_fmtTime(dt)}'
+                                : 'No date set',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.t3,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          LucideIcons.chevronRight,
-                          color: AppColors.t3,
-                          size: 14,
-                        ),
-                      ],
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (appt['price'] != null)
+                                Text(
+                                  '£${(appt['price'] as num).toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.t2,
+                                  ),
+                                ),
+                              const SizedBox(width: 10),
+                              Text(
+                                status.replaceAll('_', ' '),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: statusColor,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(
+                                LucideIcons.chevronRight,
+                                color: AppColors.t3,
+                                size: 14,
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
+    );
+  }
+}
+
+class _AppointmentsToolbar extends StatelessWidget {
+  final int count;
+  final VoidCallback onAdd;
+
+  const _AppointmentsToolbar({required this.count, required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pageX,
+        AppSpacing.xs,
+        AppSpacing.pageX,
+        AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Text(
+            '$count ${count == 1 ? 'booking' : 'bookings'}',
+            style: const TextStyle(
+              color: AppColors.t2,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Spacer(),
+          WorkloopTextButton(label: 'New booking', onPressed: onAdd),
+        ],
+      ),
     );
   }
 }

@@ -35,49 +35,70 @@ class ClientPaymentsTab extends ConsumerWidget {
         ),
       ),
       data: (items) {
-        if (items.isEmpty) {
-          return _EmptyPayments(
-            onAction: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AddPaymentScreen(initialClientId: clientId),
-                ),
-              );
-              ref.invalidate(clientPaymentsProvider(clientId));
-              ref.invalidate(invoicesProvider);
-              ref.invalidate(dashboardRevenueProvider);
-              ref.invalidate(clientCrmRecordsProvider);
-            },
+        Future<void> recordPayment() async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AddPaymentScreen(initialClientId: clientId),
+            ),
           );
+          ref.invalidate(clientPaymentsProvider(clientId));
+          ref.invalidate(invoicesProvider);
+          ref.invalidate(dashboardRevenueProvider);
+          ref.invalidate(clientCrmRecordsProvider);
         }
-        return RefreshIndicator(
-          color: AppColors.green,
-          onRefresh: () async =>
-              ref.invalidate(clientPaymentsProvider(clientId)),
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox.shrink(),
-            itemBuilder: (context, index) {
-              final payment = items[index];
-              return _PaymentRow(
-                payment: payment,
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AddPaymentScreen(payment: payment),
-                    ),
-                  );
-                  ref.invalidate(clientPaymentsProvider(clientId));
-                  ref.invalidate(invoicesProvider);
-                  ref.invalidate(dashboardRevenueProvider);
-                  ref.invalidate(clientCrmRecordsProvider);
-                },
-              );
-            },
-          ),
+
+        if (items.isEmpty) {
+          return _EmptyPayments(onAction: recordPayment);
+        }
+        final received = items.fold<double>(
+          0,
+          (sum, payment) => sum + payment.amountPaid,
+        );
+        final remaining = items.fold<double>(
+          0,
+          (sum, payment) =>
+              sum +
+              (payment.total - payment.amountPaid).clamp(0, double.infinity),
+        );
+        return Column(
+          children: [
+            _PaymentsToolbar(
+              received: received,
+              remaining: remaining,
+              onRecord: recordPayment,
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                color: AppColors.green,
+                onRefresh: () async =>
+                    ref.invalidate(clientPaymentsProvider(clientId)),
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const SizedBox.shrink(),
+                  itemBuilder: (context, index) {
+                    final payment = items[index];
+                    return _PaymentRow(
+                      payment: payment,
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AddPaymentScreen(payment: payment),
+                          ),
+                        );
+                        ref.invalidate(clientPaymentsProvider(clientId));
+                        ref.invalidate(invoicesProvider);
+                        ref.invalidate(dashboardRevenueProvider);
+                        ref.invalidate(clientCrmRecordsProvider);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -91,10 +112,19 @@ class _PaymentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = payment.status;
     final amount = payment.total;
-    final color = status == 'paid' ? AppColors.success : AppColors.t3;
-    final label = status == 'paid' ? 'Paid' : 'Unpaid';
+    final remaining = (payment.total - payment.amountPaid).clamp(
+      0,
+      double.infinity,
+    );
+    final paid = remaining <= 0;
+    final partPaid = !paid && payment.amountPaid > 0;
+    final color = paid ? AppColors.success : AppColors.t3;
+    final label = paid
+        ? 'Paid'
+        : partPaid
+        ? 'Part paid'
+        : 'Unpaid';
     return WorkloopListRow(
       onTap: onTap,
       leading: Icon(LucideIcons.banknote, color: color, size: 18),
@@ -132,6 +162,51 @@ class _PaymentRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentsToolbar extends StatelessWidget {
+  final double received;
+  final double remaining;
+  final VoidCallback onRecord;
+
+  const _PaymentsToolbar({
+    required this.received,
+    required this.remaining,
+    required this.onRecord,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pageX,
+        AppSpacing.xs,
+        AppSpacing.pageX,
+        AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Text(
+            '£${received.toStringAsFixed(0)} received',
+            style: const TextStyle(
+              color: AppColors.t1,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          if (remaining > 0) ...[
+            const SizedBox(width: 8),
+            Text(
+              '· £${remaining.toStringAsFixed(0)} left',
+              style: const TextStyle(color: AppColors.t3, fontSize: 13),
+            ),
+          ],
+          const Spacer(),
+          WorkloopTextButton(label: 'Record', onPressed: onRecord),
         ],
       ),
     );

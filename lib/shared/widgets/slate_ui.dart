@@ -35,6 +35,33 @@ class SlateHaptics {
   }
 }
 
+/// Applies Workloop's tap-away keyboard behaviour to every editable field.
+///
+/// Flutter intentionally keeps the keyboard open for touch taps outside an
+/// [EditableText] on mobile. Overriding the standard intent here preserves the
+/// field's own tap region while making the rest of the app dismiss focus.
+class WorkloopKeyboardDismissRegion extends StatelessWidget {
+  final Widget child;
+
+  const WorkloopKeyboardDismissRegion({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Actions(
+      actions: <Type, Action<Intent>>{
+        EditableTextTapOutsideIntent:
+            CallbackAction<EditableTextTapOutsideIntent>(
+              onInvoke: (intent) {
+                intent.focusNode.unfocus();
+                return null;
+              },
+            ),
+      },
+      child: child,
+    );
+  }
+}
+
 class WorkloopPage extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -77,6 +104,67 @@ class WorkloopPage extends StatelessWidget {
       body: safeArea ? SafeArea(child: content) : content,
     );
   }
+}
+
+/// A restrained paper-like backdrop shared by calm primary screens.
+class WorkloopTexturedBackdrop extends StatelessWidget {
+  const WorkloopTexturedBackdrop({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const IgnorePointer(
+      child: RepaintBoundary(
+        child: CustomPaint(painter: _WorkloopTexturePainter()),
+      ),
+    );
+  }
+}
+
+class _WorkloopTexturePainter extends CustomPainter {
+  const _WorkloopTexturePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bounds = Offset.zero & size;
+    final background = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFF8FAF5), Color(0xFFFFFFFF), Color(0xFFFBFCFA)],
+        stops: [0, 0.48, 1],
+      ).createShader(bounds);
+    canvas.drawRect(bounds, background);
+
+    final topGlow = Paint()
+      ..shader = const RadialGradient(
+        center: Alignment(-0.82, -0.92),
+        radius: 0.9,
+        colors: [Color(0x0F7FB500), Color(0x007FB500)],
+      ).createShader(bounds);
+    canvas.drawRect(bounds, topGlow);
+
+    var state = 0x13579B;
+    double nextUnit() {
+      state = (state * 1664525 + 1013904223) & 0x7fffffff;
+      return state / 0x7fffffff;
+    }
+
+    final neutralGrain = Paint()..color = const Color(0x08000000);
+    final greenGrain = Paint()..color = const Color(0x087FB500);
+    final pointCount = (size.width * size.height / 950).round();
+    for (var index = 0; index < pointCount; index++) {
+      final point = Offset(nextUnit() * size.width, nextUnit() * size.height);
+      final radius = 0.3 + (nextUnit() * 0.35);
+      canvas.drawCircle(
+        point,
+        radius,
+        index.isEven ? neutralGrain : greenGrain,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WorkloopTexturePainter oldDelegate) => false;
 }
 
 class WorkloopSurface extends StatelessWidget {

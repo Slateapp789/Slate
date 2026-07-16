@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/slate_models.dart';
+import '../../../shared/providers/clients_provider.dart';
 import '../../../shared/providers/notifications_provider.dart';
 import '../../../shared/providers/tasks_provider.dart';
 import '../../../shared/providers/workspace_provider.dart';
@@ -227,6 +229,7 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                     ref.invalidate(clientTasksProvider(widget.clientId));
                     ref.invalidate(allTasksProvider);
                     ref.invalidate(tasksProvider);
+                    ref.invalidate(clientCrmRecordsProvider);
                     ref.invalidate(notificationsProvider);
                     ref.invalidate(unreadNotificationsProvider);
                     if (ctx.mounted) Navigator.pop(ctx);
@@ -291,6 +294,7 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                   ref.invalidate(clientTasksProvider(widget.clientId));
                   ref.invalidate(allTasksProvider);
                   ref.invalidate(tasksProvider);
+                  ref.invalidate(clientCrmRecordsProvider);
                 },
               ),
               const SizedBox(height: 10),
@@ -353,6 +357,7 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                 ref.invalidate(clientTasksProvider(widget.clientId));
                 ref.invalidate(allTasksProvider);
                 ref.invalidate(tasksProvider);
+                ref.invalidate(clientCrmRecordsProvider);
               },
             ),
             const SizedBox(height: 10),
@@ -388,35 +393,10 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
       ),
       data: (tks) => Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child: GestureDetector(
-              onTap: _showAddTaskSheet,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.t1.withValues(alpha: 0.028),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(LucideIcons.plus, color: AppColors.green, size: 14),
-                    SizedBox(width: 6),
-                    Text(
-                      'Add Task',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.green,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          _TasksToolbar(
+            openCount: tks.where((task) => task.status != 'done').length,
+            onAdd: _showAddTaskSheet,
+            onOpenTasks: () => context.push('/tasks'),
           ),
           if (tks.isEmpty)
             const Expanded(child: _EmptyState())
@@ -549,6 +529,45 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
       'Dec',
     ];
     return '${dt.day} ${months[dt.month - 1]}';
+  }
+}
+
+class _TasksToolbar extends StatelessWidget {
+  final int openCount;
+  final VoidCallback onAdd;
+  final VoidCallback onOpenTasks;
+
+  const _TasksToolbar({
+    required this.openCount,
+    required this.onAdd,
+    required this.onOpenTasks,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pageX,
+        AppSpacing.xs,
+        AppSpacing.pageX,
+        AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Text(
+            '$openCount open',
+            style: const TextStyle(
+              color: AppColors.t2,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Spacer(),
+          WorkloopTextButton(label: 'Open Tasks', onPressed: onOpenTasks),
+          WorkloopTextButton(label: 'New task', onPressed: onAdd),
+        ],
+      ),
+    );
   }
 }
 

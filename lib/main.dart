@@ -47,6 +47,9 @@ class SlateApp extends ConsumerWidget {
       darkTheme: AppTheme.oledDark,
       themeMode: ThemeMode.light,
       routerConfig: _router,
+      builder: (context, child) => WorkloopKeyboardDismissRegion(
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

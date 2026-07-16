@@ -55,6 +55,7 @@ class _ObCompleteState extends ConsumerState<ObComplete>
       await ref
           .read(onboardingRepositoryProvider)
           .complete(
+            firstName: onboarding.firstName,
             businessName: onboarding.businessName,
             industry: onboarding.industry,
             handle: onboarding.handle,

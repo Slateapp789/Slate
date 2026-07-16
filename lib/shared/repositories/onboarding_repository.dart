@@ -13,6 +13,7 @@ class OnboardingRepository {
   const OnboardingRepository(this._client);
 
   Future<void> complete({
+    required String firstName,
     required String businessName,
     required String industry,
     required String handle,
@@ -23,6 +24,10 @@ class OnboardingRepository {
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) return;
+
+    await _client.auth.updateUser(
+      UserAttributes(data: {'first_name': firstName.trim()}),
+    );
 
     final workspaceId = _uuidV4();
     await _client.from('workspaces').insert({

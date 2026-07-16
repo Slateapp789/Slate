@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/business_feed_item.dart';
@@ -14,9 +13,41 @@ import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/notes_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
+import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/date_format.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../appointments/appointment_detail_screen.dart';
+
+final dashboardClockProvider = StreamProvider.autoDispose<DateTime>((
+  ref,
+) async* {
+  yield DateTime.now();
+  yield* Stream<DateTime>.periodic(
+    const Duration(minutes: 1),
+    (_) => DateTime.now(),
+  );
+});
+
+String dashboardGreetingForHour(int hour) {
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+String dashboardDateLabel(DateTime date) => _dashboardDate(date);
+
+List<Map<String, dynamic>> selectDashboardTodayBookings(
+  List<Map<String, dynamic>> rows, {
+  required DateTime now,
+}) => _todayJobs(rows, now: now);
+
+List<Map<String, dynamic>> selectDashboardComingUpBookings(
+  List<Map<String, dynamic>> rows, {
+  required DateTime now,
+}) => _upcomingJobs(
+  rows,
+  now: now,
+).where((job) => !_isSameDay(_startTime(job), now)).take(3).toList();
 
 class DashboardScreen extends ConsumerWidget {
   final void Function(int) onNavigate;
@@ -28,111 +59,110 @@ class DashboardScreen extends ConsumerWidget {
     required this.onOpenMoneyFollowUps,
   });
 
-  String get _greeting {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final workspace = ref.watch(workspaceProvider);
     final appointments = ref.watch(appointmentsProvider);
     final finance = ref.watch(financeSummaryProvider);
     final feed = ref.watch(businessFeedProvider);
-    final tasks = ref.watch(allTasksProvider);
-    final notes = ref.watch(allNotesProvider);
-    final displayName = _displayName();
+    final attention = ref.watch(dashboardAttentionProvider);
+    final displayName = ref.watch(authRepositoryProvider).currentFirstName;
+    final now = ref
+        .watch(dashboardClockProvider)
+        .maybeWhen(data: (value) => value, orElse: DateTime.now);
+    final greeting = dashboardGreetingForHour(now.hour);
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: RefreshIndicator(
-        color: AppColors.accentPrimary,
-        onRefresh: () async {
-          SlateHaptics.action();
-          ref.invalidate(workspaceProvider);
-          ref.invalidate(appointmentsProvider);
-          ref.invalidate(todayAppointmentsProvider);
-          ref.invalidate(financeSummaryProvider);
-          ref.invalidate(invoicesProvider);
-          ref.invalidate(expensesProvider);
-          ref.invalidate(clientsProvider);
-          ref.invalidate(allTasksProvider);
-          ref.invalidate(tasksProvider);
-          ref.invalidate(allNotesProvider);
-          ref.invalidate(businessFeedProvider);
-        },
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.pageX,
-            AppSpacing.pageTop,
-            AppSpacing.pageX,
-            AppSpacing.bottomNavClearance,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          RefreshIndicator(
+            color: AppColors.accentPrimary,
+            onRefresh: () async {
+              SlateHaptics.action();
+              ref.invalidate(workspaceProvider);
+              ref.invalidate(appointmentsProvider);
+              ref.invalidate(todayAppointmentsProvider);
+              ref.invalidate(financeSummaryProvider);
+              ref.invalidate(invoicesProvider);
+              ref.invalidate(expensesProvider);
+              ref.invalidate(clientsProvider);
+              ref.invalidate(allTasksProvider);
+              ref.invalidate(tasksProvider);
+              ref.invalidate(allNotesProvider);
+              ref.invalidate(businessFeedProvider);
+              ref.invalidate(dashboardAttentionProvider);
+            },
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                AppSpacing.pageTop + AppSpacing.xxl,
+                AppSpacing.pageX,
+                AppSpacing.bottomNavClearance,
+              ),
+              children: [
+                _DashboardGreeting(
+                  greeting: displayName == null
+                      ? greeting
+                      : '$greeting $displayName',
+                  subtitle: dashboardDateLabel(now),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                _TodaySection(
+                  appointments: appointments,
+                  now: now,
+                  onOpenJob: (appointment) =>
+                      _openAppointment(context, ref, appointment),
+                  onViewBookings: () => onNavigate(2),
+                ),
+                attention.maybeWhen(
+                  data: (items) => items.isEmpty
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.xxl),
+                          child: _WorthALookSection(
+                            items: items.take(2).toList(),
+                            onOpen: (item) =>
+                                _openAttentionItem(context, ref, item),
+                          ),
+                        ),
+                  orElse: () => const SizedBox.shrink(),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                _MoneyPulse(finance: finance, onOpen: () => onNavigate(3)),
+                const SizedBox(height: AppSpacing.xl),
+                _QuickAccessRow(
+                  taskSummary: 'Plan and follow up',
+                  noteSummary: 'Capture useful context',
+                  onOpenTasks: () => onNavigate(4),
+                  onOpenNotes: () => onNavigate(5),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                _UpcomingJobsSection(
+                  appointments: appointments,
+                  now: now,
+                  onOpenJob: (appointment) =>
+                      _openAppointment(context, ref, appointment),
+                  onViewBookings: () => onNavigate(2),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                _CalmFeedSection(
+                  feed: feed,
+                  onOpenFeedItem: (item) => _openFeedItem(context, item),
+                  onViewAllFeed: () => context.push('/business-feed'),
+                ),
+                if (workspace.hasError) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  const SlateErrorState(message: 'Could not refresh workspace'),
+                ],
+              ],
+            ),
           ),
-          children: [
-            _DashboardGreeting(
-              greeting: displayName == null
-                  ? _greeting
-                  : '$_greeting, $displayName',
-              subtitle: 'Here\'s what\'s happening today.',
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _QuickAccessRow(
-              taskSummary: tasks.maybeWhen(
-                data: (items) {
-                  final open = items
-                      .where(
-                        (task) =>
-                            task.status != 'done' && task.status != 'completed',
-                      )
-                      .length;
-                  return open == 1 ? '1 open' : '$open open';
-                },
-                orElse: () => 'View tasks',
-              ),
-              noteSummary: notes.maybeWhen(
-                data: (items) =>
-                    items.length == 1 ? '1 note' : '${items.length} notes',
-                orElse: () => 'View notes',
-              ),
-              onOpenTasks: () => onNavigate(4),
-              onOpenNotes: () => onNavigate(5),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            _IncomeThisMonthCard(finance: finance),
-            const SizedBox(height: AppSpacing.xxl),
-            _UpcomingJobsSection(
-              appointments: appointments,
-              onOpenJob: (appointment) =>
-                  _openAppointment(context, ref, appointment),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            _CalmFeedSection(
-              feed: feed,
-              onOpenFeedItem: (item) => _openFeedItem(context, item),
-              onViewAllFeed: () => context.push('/business-feed'),
-            ),
-            if (workspace.hasError) ...[
-              const SizedBox(height: AppSpacing.lg),
-              const SlateErrorState(message: 'Could not refresh workspace'),
-            ],
-          ],
-        ),
+        ],
       ),
     );
-  }
-
-  String? _displayName() {
-    final metadata = Supabase.instance.client.auth.currentUser?.userMetadata;
-    final raw =
-        metadata?['full_name'] ??
-        metadata?['name'] ??
-        metadata?['display_name'];
-    final value = raw?.toString().trim();
-    if (value == null || value.isEmpty) return null;
-    return value.split(RegExp(r'\s+')).first;
   }
 
   void _openAppointment(
@@ -177,6 +207,28 @@ class DashboardScreen extends ConsumerWidget {
     }
     context.push(route);
   }
+
+  void _openAttentionItem(
+    BuildContext context,
+    WidgetRef ref,
+    DashboardAttentionItem item,
+  ) {
+    switch (item.type) {
+      case DashboardAttentionType.unpaid:
+        onOpenMoneyFollowUps();
+      case DashboardAttentionType.unconfirmedAppointment:
+        final appointment = item.source;
+        if (appointment is Map<String, dynamic>) {
+          _openAppointment(context, ref, appointment);
+        } else {
+          onNavigate(2);
+        }
+      case DashboardAttentionType.overdueTask:
+        onNavigate(4);
+      case DashboardAttentionType.uncontactedLead:
+        onNavigate(1);
+    }
+  }
 }
 
 class _DashboardGreeting extends StatelessWidget {
@@ -206,7 +258,7 @@ class _DashboardGreeting extends StatelessWidget {
         Text(
           subtitle,
           style: const TextStyle(
-            color: AppColors.t3,
+            color: AppColors.t2,
             fontSize: 15,
             fontWeight: FontWeight.w600,
             height: 1.32,
@@ -242,12 +294,7 @@ class _QuickAccessRow extends StatelessWidget {
             onTap: onOpenTasks,
           ),
         ),
-        Container(
-          width: 1,
-          height: 34,
-          margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          color: AppColors.border.withValues(alpha: 0.58),
-        ),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: _QuickAccessItem(
             icon: LucideIcons.stickyNote,
@@ -279,105 +326,46 @@ class _QuickAccessItem extends StatelessWidget {
     return Semantics(
       button: true,
       label: '$label, $summary',
-      child: InkWell(
+      child: WorkloopSurface(
         onTap: () {
           SlateHaptics.tap();
           onTap();
         },
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-          child: Row(
-            children: [
-              Icon(icon, size: 17, color: AppColors.t3),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        color: AppColors.t1,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      summary,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.t3,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                LucideIcons.chevronRight,
-                size: 14,
-                color: AppColors.t3,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _IncomeThisMonthCard extends StatelessWidget {
-  final AsyncValue<FinanceSummary> finance;
-
-  const _IncomeThisMonthCard({required this.finance});
-
-  @override
-  Widget build(BuildContext context) {
-    return finance.when(
-      loading: () => const SlateLoadingBlock(height: 132, radius: AppRadius.lg),
-      error: (_, __) => const SlateErrorState(message: 'Could not load income'),
-      data: (summary) => WorkloopSurface(
-        radius: AppRadius.lg,
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        color: AppColors.t1.withValues(alpha: 0.04),
-        borderColor: AppColors.border.withValues(alpha: 0.46),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        radius: AppRadius.md,
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        color: AppColors.t1.withValues(alpha: 0.028),
+        borderColor: AppColors.border.withValues(alpha: 0.52),
+        child: Row(
           children: [
-            const Text(
-              'Income this month',
-              style: TextStyle(
-                color: AppColors.t3,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
+            Icon(icon, size: 17, color: AppColors.t3),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppColors.t1,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    summary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              '£${summary.thisMonthPaid.toStringAsFixed(0)}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.t1,
-                fontSize: 46,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0,
-                height: 1,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            const Text(
-              'Received so far in this calendar month.',
-              style: TextStyle(
-                color: AppColors.t3,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            const Icon(LucideIcons.chevronRight, size: 14, color: AppColors.t3),
           ],
         ),
       ),
@@ -385,39 +373,286 @@ class _IncomeThisMonthCard extends StatelessWidget {
   }
 }
 
-class _UpcomingJobsSection extends StatelessWidget {
+class _TodaySection extends StatelessWidget {
   final AsyncValue<List<Map<String, dynamic>>> appointments;
+  final DateTime now;
   final ValueChanged<Map<String, dynamic>> onOpenJob;
+  final VoidCallback onViewBookings;
 
-  const _UpcomingJobsSection({
+  const _TodaySection({
     required this.appointments,
+    required this.now,
     required this.onOpenJob,
+    required this.onViewBookings,
   });
 
   @override
   Widget build(BuildContext context) {
     return _DashboardSection(
-      title: 'Upcoming jobs',
+      title: 'Today',
+      prominent: true,
       child: appointments.when(
         loading: () =>
-            const SlateLoadingBlock(height: 180, radius: AppRadius.lg),
-        error: (_, __) =>
-            const SlateErrorState(message: 'Could not load upcoming jobs'),
+            const SlateLoadingBlock(height: 72, radius: AppRadius.md),
+        error: (_, __) => WorkloopListRow(
+          onTap: onViewBookings,
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          leading: const _SoftIcon(icon: LucideIcons.calendarDays),
+          title: const Text(
+            'Open today\'s bookings',
+            style: TextStyle(
+              color: AppColors.t1,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          subtitle: const Text(
+            'See the full schedule in Bookings.',
+            style: TextStyle(
+              color: AppColors.t2,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          trailing: const Icon(
+            LucideIcons.chevronRight,
+            color: AppColors.t3,
+            size: 16,
+          ),
+        ),
         data: (rows) {
-          final jobs = _upcomingJobs(rows).take(5).toList();
+          final jobs = selectDashboardTodayBookings(rows, now: now);
           if (jobs.isEmpty) {
-            return const WorkloopEmptyState(
-              icon: LucideIcons.calendarDays,
-              title: 'No upcoming jobs yet.',
-              subtitle: 'Your schedule is clear.',
+            return WorkloopListRow(
+              onTap: onViewBookings,
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+              leading: const _SoftIcon(icon: LucideIcons.sun),
+              title: const Text(
+                'Your day is clear',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              subtitle: const Text(
+                'There are no more bookings scheduled today.',
+                style: TextStyle(
+                  color: AppColors.t2,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              trailing: const Icon(
+                LucideIcons.chevronRight,
+                color: AppColors.t3,
+                size: 16,
+              ),
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _UpcomingJobRow(
+                job: jobs.first,
+                onTap: () => onOpenJob(jobs.first),
+                showDate: false,
+              ),
+              if (jobs.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xs),
+                  child: Text(
+                    jobs.length == 2
+                        ? '1 more booking later today'
+                        : '${jobs.length - 1} more bookings later today',
+                    style: const TextStyle(
+                      color: AppColors.t2,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WorthALookSection extends StatelessWidget {
+  final List<DashboardAttentionItem> items;
+  final ValueChanged<DashboardAttentionItem> onOpen;
+
+  const _WorthALookSection({required this.items, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardSection(
+      title: 'Worth a look',
+      child: Column(
+        children: [
+          for (final item in items)
+            WorkloopListRow(
+              onTap: () => onOpen(item),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+              leading: _SoftIcon(icon: _attentionIcon(item.type)),
+              title: Text(
+                _attentionTitle(item),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              subtitle: Text(
+                _attentionDetail(item),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.t2,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              trailing: const Icon(
+                LucideIcons.chevronRight,
+                color: AppColors.t3,
+                size: 16,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MoneyPulse extends StatelessWidget {
+  final AsyncValue<FinanceSummary> finance;
+  final VoidCallback onOpen;
+
+  const _MoneyPulse({required this.finance, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardSection(
+      title: 'Money',
+      child: finance.when(
+        loading: () =>
+            const SlateLoadingBlock(height: 68, radius: AppRadius.md),
+        error: (_, __) => _MoneyRow(onOpen: onOpen),
+        data: (summary) =>
+            _MoneyRow(onOpen: onOpen, amount: summary.thisMonthPaid),
+      ),
+    );
+  }
+}
+
+class _MoneyRow extends StatelessWidget {
+  final VoidCallback onOpen;
+  final double? amount;
+
+  const _MoneyRow({required this.onOpen, this.amount});
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkloopListRow(
+      onTap: onOpen,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      leading: const _SoftIcon(icon: LucideIcons.banknote),
+      title: Text(
+        amount == null
+            ? 'Open Money'
+            : '£${amount!.toStringAsFixed(0)} received',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      subtitle: Text(
+        amount == null
+            ? 'See your latest business progress.'
+            : 'So far this calendar month.',
+        style: const TextStyle(
+          color: AppColors.t2,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      trailing: const Icon(
+        LucideIcons.chevronRight,
+        color: AppColors.t3,
+        size: 16,
+      ),
+    );
+  }
+}
+
+class _UpcomingJobsSection extends StatelessWidget {
+  final AsyncValue<List<Map<String, dynamic>>> appointments;
+  final DateTime now;
+  final ValueChanged<Map<String, dynamic>> onOpenJob;
+  final VoidCallback onViewBookings;
+
+  const _UpcomingJobsSection({
+    required this.appointments,
+    required this.now,
+    required this.onOpenJob,
+    required this.onViewBookings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardSection(
+      title: 'Coming up',
+      actionLabel: 'View all',
+      onAction: onViewBookings,
+      child: appointments.when(
+        loading: () =>
+            const SlateLoadingBlock(height: 150, radius: AppRadius.lg),
+        error: (_, __) =>
+            const SlateErrorState(message: 'Could not load upcoming bookings'),
+        data: (rows) {
+          final jobs = selectDashboardComingUpBookings(rows, now: now);
+          if (jobs.isEmpty) {
+            return WorkloopListRow(
+              onTap: onViewBookings,
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+              leading: const _SoftIcon(icon: LucideIcons.calendarDays),
+              title: const Text(
+                'Nothing else scheduled yet',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              subtitle: const Text(
+                'Your upcoming schedule is open.',
+                style: TextStyle(
+                  color: AppColors.t2,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              trailing: const Icon(
+                LucideIcons.chevronRight,
+                color: AppColors.t3,
+                size: 16,
+              ),
             );
           }
 
           return Column(
             children: [
-              for (final job in jobs) ...[
+              for (final job in jobs)
                 _UpcomingJobRow(job: job, onTap: () => onOpenJob(job)),
-              ],
             ],
           );
         },
@@ -429,8 +664,13 @@ class _UpcomingJobsSection extends StatelessWidget {
 class _UpcomingJobRow extends StatelessWidget {
   final Map<String, dynamic> job;
   final VoidCallback onTap;
+  final bool showDate;
 
-  const _UpcomingJobRow({required this.job, required this.onTap});
+  const _UpcomingJobRow({
+    required this.job,
+    required this.onTap,
+    this.showDate = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -456,11 +696,11 @@ class _UpcomingJobRow extends StatelessWidget {
         ),
       ),
       subtitle: Text(
-        [date, if (time != null) time, service].join(' · '),
+        [if (showDate) date, if (time != null) time, service].join(' · '),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
-          color: AppColors.t3,
+          color: AppColors.t2,
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
@@ -488,7 +728,7 @@ class _CalmFeedSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _DashboardSection(
-      title: 'Feed',
+      title: 'Recent activity',
       actionLabel: 'View all',
       onAction: onViewAllFeed,
       child: feed.when(
@@ -496,7 +736,7 @@ class _CalmFeedSection extends StatelessWidget {
             const SlateLoadingBlock(height: 190, radius: AppRadius.lg),
         error: (_, __) => const SlateErrorState(message: 'Could not load feed'),
         data: (items) {
-          final calmItems = items.where(_isCalmFeedItem).take(6).toList();
+          final calmItems = items.where(_isCalmFeedItem).take(3).toList();
           if (calmItems.isEmpty) {
             return const WorkloopEmptyState(
               icon: LucideIcons.activity,
@@ -551,7 +791,7 @@ class _CalmFeedRow extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
-          color: AppColors.t3,
+          color: AppColors.t2,
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
@@ -568,12 +808,14 @@ class _DashboardSection extends StatelessWidget {
   final Widget child;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final bool prominent;
 
   const _DashboardSection({
     required this.title,
     required this.child,
     this.actionLabel,
     this.onAction,
+    this.prominent = false,
   });
 
   @override
@@ -586,9 +828,9 @@ class _DashboardSection extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.t1,
-                  fontSize: 20,
+                  fontSize: prominent ? 22 : 19,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0,
                 ),
@@ -624,8 +866,86 @@ class _SoftIcon extends StatelessWidget {
   }
 }
 
-List<Map<String, dynamic>> _upcomingJobs(List<Map<String, dynamic>> rows) {
-  final now = DateTime.now();
+String _dashboardDate(DateTime date) {
+  const weekdays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
+}
+
+List<Map<String, dynamic>> _todayJobs(
+  List<Map<String, dynamic>> rows, {
+  required DateTime now,
+}) {
+  return _upcomingJobs(
+    rows,
+    now: now,
+  ).where((row) => _isSameDay(_startTime(row), now)).toList();
+}
+
+bool _isSameDay(DateTime? first, DateTime second) {
+  return first != null &&
+      first.year == second.year &&
+      first.month == second.month &&
+      first.day == second.day;
+}
+
+String _attentionTitle(DashboardAttentionItem item) {
+  return switch (item.type) {
+    DashboardAttentionType.unpaid => 'Payment follow-up',
+    DashboardAttentionType.unconfirmedAppointment => 'Booking to confirm',
+    DashboardAttentionType.overdueTask => item.title,
+    DashboardAttentionType.uncontactedLead => 'Client follow-up',
+  };
+}
+
+String _attentionDetail(DashboardAttentionItem item) {
+  return switch (item.type) {
+    DashboardAttentionType.unpaid => item.detail,
+    DashboardAttentionType.unconfirmedAppointment => item.detail,
+    DashboardAttentionType.overdueTask =>
+      item.detail == 'Overdue task' ? 'A task ready when you are' : item.detail,
+    DashboardAttentionType.uncontactedLead => item.title.replaceFirst(
+      'Contact ',
+      '',
+    ),
+  };
+}
+
+IconData _attentionIcon(DashboardAttentionType type) {
+  return switch (type) {
+    DashboardAttentionType.unpaid => LucideIcons.banknote,
+    DashboardAttentionType.unconfirmedAppointment => LucideIcons.calendarCheck,
+    DashboardAttentionType.overdueTask => LucideIcons.listChecks,
+    DashboardAttentionType.uncontactedLead => LucideIcons.user,
+  };
+}
+
+List<Map<String, dynamic>> _upcomingJobs(
+  List<Map<String, dynamic>> rows, {
+  DateTime? now,
+}) {
+  final current = now ?? DateTime.now();
   final jobs = rows.where((row) {
     final status = row['status']?.toString().toLowerCase() ?? 'scheduled';
     final start = _startTime(row);
@@ -633,7 +953,7 @@ List<Map<String, dynamic>> _upcomingJobs(List<Map<String, dynamic>> rows) {
     if (status == 'completed' || status == 'cancelled' || status == 'no_show') {
       return false;
     }
-    return start.isAfter(now);
+    return start.isAfter(current);
   }).toList();
 
   jobs.sort((a, b) {
