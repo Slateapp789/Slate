@@ -24,7 +24,18 @@ import 'shared/providers/debug_demo_data_provider.dart';
 import 'shared/providers/workspace_provider.dart';
 import 'shared/widgets/slate_ui.dart';
 
+const workloopMinimumLaunchDuration = Duration(milliseconds: 1400);
+
+Duration remainingLaunchDuration(
+  Duration elapsed, {
+  Duration minimum = workloopMinimumLaunchDuration,
+}) {
+  if (elapsed >= minimum) return Duration.zero;
+  return minimum - elapsed;
+}
+
 void main() async {
+  final launchClock = Stopwatch()..start();
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy();
   SupabaseConfig.validate();
@@ -32,6 +43,10 @@ void main() async {
     url: SupabaseConfig.supabaseUrl,
     anonKey: SupabaseConfig.supabaseAnonKey,
   );
+  final remaining = remainingLaunchDuration(launchClock.elapsed);
+  if (remaining > Duration.zero) {
+    await Future<void>.delayed(remaining);
+  }
   runApp(const ProviderScope(child: SlateApp()));
 }
 
