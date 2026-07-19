@@ -2,244 +2,137 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/maps_preference_provider.dart';
 import '../../../shared/utils/maps_launcher.dart';
-import '../providers/settings_providers.dart';
-import 'settings_helpers.dart';
+import '../../../shared/widgets/slate_ui.dart';
 
 class SettingsAppTab extends ConsumerWidget {
   const SettingsAppTab({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(settingsBusinessProfileProvider);
     final mapsPreference = ref.watch(preferredMapsAppProvider);
+    final preference = mapsPreference.value ?? MapsAppPreference.askEveryTime;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pageX,
+        0,
+        AppSpacing.pageX,
+        AppSpacing.xxl,
+      ),
       children: [
-        sectionLabel('Preferences'),
-        const SizedBox(height: 10),
-        _mapsPreferenceRow(
-          context,
-          ref,
-          mapsPreference.value ?? MapsAppPreference.askEveryTime,
-        ),
-        const SizedBox(height: 28),
-
-        sectionLabel('About'),
-        const SizedBox(height: 10),
-        Column(
-          children: [
-            infoRow('App', 'Workloop'),
-            Divider(height: 1, color: AppColors.border),
-            infoRow('Version', '1.0.0 (MVP)'),
-            Divider(height: 1, color: AppColors.border),
-            infoRow('Built with', 'Flutter + Supabase'),
-          ],
-        ),
-        const SizedBox(height: 28),
-
-        sectionLabel('V1 Foundations'),
-        const SizedBox(height: 10),
-        Column(
-          children: [
-            _actionRow(
+        const WorkloopSectionHeader(label: 'General'),
+        const SizedBox(height: AppSpacing.xs),
+        _PreferenceRow(
+          icon: LucideIcons.navigation,
+          title: 'Default maps app',
+          subtitle: preference.label,
+          onTap: () async {
+            final selected = await showMapsPreferenceSheet(
               context,
-              LucideIcons.bell,
-              'Notification Centre',
-              'Bell centre and V1 alert preferences',
-              '/notifications',
-            ),
-            Divider(height: 1, color: AppColors.border),
-            _actionRow(
-              context,
-              LucideIcons.inbox,
-              'Booking Requests',
-              'Requests from your public profile',
-              '/booking-requests',
-            ),
-            Divider(height: 1, color: AppColors.border),
-            profile.maybeWhen(
-              data: (value) {
-                final handle = value?.handle.trim();
-                if (handle == null || handle.isEmpty) {
-                  return _comingSoonRow(
-                    LucideIcons.globe,
-                    'Public Profile Page',
-                    'Set a handle in Business settings',
-                  );
-                }
-                return _actionRow(
-                  context,
-                  LucideIcons.globe,
-                  'Public Profile Page',
-                  '/p/$handle',
-                  '/p/$handle',
-                );
-              },
-              orElse: () => _comingSoonRow(
-                LucideIcons.globe,
-                'Public Profile Page',
-                'Set a handle in Business settings',
-              ),
-            ),
-            Divider(height: 1, color: AppColors.border),
-            _actionRow(
-              context,
-              LucideIcons.calendarClock,
-              'Calendar Sync',
-              'Contained sync module',
-              '/calendar-sync',
-            ),
-            Divider(height: 1, color: AppColors.border),
-            _comingSoonRow(
-              LucideIcons.creditCard,
-              'Online Payments',
-              'Accept card payments via Stripe',
-            ),
-          ],
+              selected: preference,
+            );
+            if (selected == null) return;
+            await ref
+                .read(preferredMapsAppProvider.notifier)
+                .setPreference(selected);
+          },
         ),
+        const WorkloopDivider(margin: EdgeInsets.zero),
+        _PreferenceRow(
+          icon: LucideIcons.calendarClock,
+          title: 'Calendar',
+          subtitle: 'Export and calendar connection options',
+          onTap: () => context.push('/calendar-sync'),
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        const WorkloopSectionHeader(label: 'About Workloop'),
+        const SizedBox(height: AppSpacing.xs),
+        const _InformationRow(label: 'Version', value: '1.0.0'),
+        const WorkloopDivider(margin: EdgeInsets.zero),
+        const _InformationRow(label: 'Build', value: 'MVP'),
+        const WorkloopDivider(margin: EdgeInsets.zero),
+        const _InformationRow(label: 'Technology', value: 'Flutter + Supabase'),
       ],
     );
   }
+}
 
-  Widget _mapsPreferenceRow(
-    BuildContext context,
-    WidgetRef ref,
-    MapsAppPreference preference,
-  ) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () async {
-        final selected = await showMapsPreferenceSheet(
-          context,
-          selected: preference,
-        );
-        if (selected == null) return;
-        await ref
-            .read(preferredMapsAppProvider.notifier)
-            .setPreference(selected);
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        child: Row(
-          children: [
-            const Icon(
-              LucideIcons.navigation,
-              color: AppColors.green,
-              size: 18,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Default maps app',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.t1,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    preference.label,
-                    style: const TextStyle(fontSize: 12, color: AppColors.t3),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
-          ],
+class _PreferenceRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _PreferenceRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkloopListRow(
+      onTap: onTap,
+      showDivider: false,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          color: AppColors.modBg,
+          shape: BoxShape.circle,
         ),
+        child: Icon(icon, color: AppColors.t2, size: 18),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: AppColors.t3, fontSize: 13),
+      ),
+      trailing: const Icon(
+        LucideIcons.chevronRight,
+        color: AppColors.t3,
+        size: 16,
       ),
     );
   }
+}
 
-  Widget _actionRow(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String subtitle,
-    String path,
-  ) {
-    return GestureDetector(
-      onTap: () => context.push(path),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.green, size: 18),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.t1,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 12, color: AppColors.t3),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
-          ],
-        ),
-      ),
-    );
-  }
+class _InformationRow extends StatelessWidget {
+  final String label;
+  final String value;
 
-  Widget _comingSoonRow(IconData icon, String label, String subtitle) {
+  const _InformationRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.t3, size: 18),
-          const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.t2,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(fontSize: 12, color: AppColors.t3),
-                ),
-              ],
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.t2, fontSize: 14),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.bgInteract,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: const Text(
-              'Soon',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: AppColors.t3,
-              ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.t1,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],

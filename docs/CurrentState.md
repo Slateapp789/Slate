@@ -126,11 +126,11 @@ Last updated: 2026-07-15
 ### Profile
 
 - Profile is a dedicated owner-and-business overview instead of an alias for the Business settings tab.
-- The identity area places personal details directly beneath the business identity using the shared textured workspace shell and Workloop typography.
+- The identity area stays business-focused and uses the shared textured workspace shell and Workloop typography. Personal account controls live only in Settings.
 - A compact snapshot links directly to Services, Working hours, and active Booking requests.
 - Business and Online sections use shared divider-led rows rather than nested settings cards.
-- Public profile preview has an in-app back control, while profile-link copying, booking requests, business details, services, hours, and personal details open their canonical destinations.
-- Business details, Working hours, Public profile, and Services use dedicated Profile-owned screens while reusing the established repositories and save logic. Working hours are edited directly in a full-screen day-by-day view rather than through a summary row and nested sheet.
+- Public profile preview uses the already-loaded authenticated workspace data and the same native navigation stack, avoiding a blank owner preview while public deep links continue through the secured Edge Function.
+- Business details, Working hours, Public profile, and Services use dedicated Profile-owned screens while reusing the established repositories and save logic. Business Info includes the owner's preferred name, business name, and industry. Working hours use scrolling time wheels in a direct full-screen day-by-day editor.
 - Booking requests use a compact, filterable inbox. Each request opens a focused detail screen for calling, marking contacted, declining, or converting into a booking.
 - Settings is intentionally separate and contains only Alerts, Account, and App preferences.
 
@@ -188,18 +188,12 @@ Last updated: 2026-07-15
 
 ### Settings
 
-- Business info.
-- Business profile controls.
-- Handle/profile link.
-- Services add/edit/delete/show-on-profile.
-- Working hours editing.
-- Booking settings.
-- Revenue target.
-- Notification settings.
-- Calendar sync entry point.
-- Account email/password/sign out.
-- Editable preferred first name for personalised greetings.
-- Privacy export and account deletion request flow.
+- Calm Settings overview with account identity and dedicated Account, Notifications, and App preferences destinations.
+- Account owns preferred name, email, password, workspace export, account deletion request, and sign out.
+- Notifications owns booking, payment, task, follow-up, digest, summary, and quiet-time preferences.
+- App preferences owns the default maps choice, calendar connection entry point, and concise build information.
+- Business details, public profile, services, working hours, and booking requests remain in Profile rather than being duplicated in Settings.
+- Legacy tab navigation, nested settings cards, unfinished payment placeholders, and duplicate feature-directory links have been removed.
 
 ### Security / Foundation
 
