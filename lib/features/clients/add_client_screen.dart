@@ -31,6 +31,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
   DateTime? _birthday;
   bool _saving = false;
   bool _additionalInformationExpanded = false;
+  bool _allowPop = false;
 
   @override
   void dispose() {
@@ -64,9 +65,34 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
 
   Future<void> _handleBack() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    if (!_hasChanges || await confirmDiscardClientChanges(context)) {
-      if (mounted) Navigator.pop(context);
+    if (!_hasChanges) {
+      await _leaveScreen();
+      return;
     }
+    final decision = await showWorkloopDraftConfirmation(
+      context,
+      title: 'Save this client?',
+      message: 'Your client details have not been saved yet.',
+      saveLabel: 'Save client',
+      canSave: _canSave && !_saving,
+    );
+    if (!mounted) return;
+    switch (decision) {
+      case WorkloopDraftDecision.save:
+        await _save();
+        return;
+      case WorkloopDraftDecision.discard:
+        await _leaveScreen();
+        return;
+      case WorkloopDraftDecision.stay:
+        return;
+    }
+  }
+
+  Future<void> _leaveScreen() async {
+    if (!_allowPop && mounted) setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.pop(context);
   }
 
   Future<void> _save() async {
@@ -113,7 +139,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
       ref.invalidate(clientCrmRecordsProvider);
       if (mounted) {
         _showMessage('${_nameController.text.trim()} added', AppColors.green);
-        Navigator.pop(context);
+        await _leaveScreen();
       }
     } catch (_) {
       if (mounted) {
@@ -157,94 +183,100 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: Stack(
-        children: [
-          const Positioned.fill(child: WorkloopTexturedBackdrop()),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.pageX,
-                    AppSpacing.lg,
-                    AppSpacing.pageX,
-                    0,
-                  ),
-                  child: Row(
-                    children: [
-                      WorkloopIconButton(
-                        icon: LucideIcons.chevronLeft,
-                        semanticLabel: 'Back to clients',
-                        onTap: _handleBack,
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      const Expanded(
-                        child: Text(
-                          'New client',
-                          style: TextStyle(
-                            color: AppColors.t1,
-                            fontSize: 26,
-                            height: 1.05,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      _SaveAction(
-                        label: 'Add',
-                        loading: _saving,
-                        enabled: _canSave,
-                        onTap: _save,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                Expanded(
-                  child: SingleChildScrollView(
+    return PopScope(
+      canPop: _allowPop || !_hasChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: WorkloopTexturedBackdrop()),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.pageX,
-                      0,
+                      AppSpacing.lg,
                       AppSpacing.pageX,
-                      AppSpacing.xxl,
+                      0,
                     ),
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    child: ClientForm(
-                      nameController: _nameController,
-                      phoneController: _phoneController,
-                      emailController: _emailController,
-                      addressController: _addressController,
-                      sourceController: _sourceController,
-                      tagsController: _tagsController,
-                      notesController: _notesController,
-                      importantNotesController: _importantNotesController,
-                      status: _status,
-                      preferredContactMethod: _preferredContactMethod,
-                      birthday: _birthday,
-                      additionalInformationExpanded:
-                          _additionalInformationExpanded,
-                      autofocusName: true,
-                      onStatusChanged: (value) =>
-                          setState(() => _status = value),
-                      onPreferredContactChanged: (value) =>
-                          setState(() => _preferredContactMethod = value),
-                      onBirthdayChanged: (value) =>
-                          setState(() => _birthday = value),
-                      onToggleAdditionalInformation: () => setState(
-                        () => _additionalInformationExpanded =
-                            !_additionalInformationExpanded,
-                      ),
-                      onChanged: () => setState(() {}),
+                    child: Row(
+                      children: [
+                        WorkloopIconButton(
+                          icon: LucideIcons.chevronLeft,
+                          semanticLabel: 'Back to clients',
+                          onTap: _handleBack,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        const Expanded(
+                          child: Text(
+                            'New client',
+                            style: TextStyle(
+                              color: AppColors.t1,
+                              fontSize: 26,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        _SaveAction(
+                          label: 'Add',
+                          loading: _saving,
+                          enabled: _canSave,
+                          onTap: _save,
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.xl),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.pageX,
+                        0,
+                        AppSpacing.pageX,
+                        AppSpacing.xxl,
+                      ),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: ClientForm(
+                        nameController: _nameController,
+                        phoneController: _phoneController,
+                        emailController: _emailController,
+                        addressController: _addressController,
+                        sourceController: _sourceController,
+                        tagsController: _tagsController,
+                        notesController: _notesController,
+                        importantNotesController: _importantNotesController,
+                        status: _status,
+                        preferredContactMethod: _preferredContactMethod,
+                        birthday: _birthday,
+                        additionalInformationExpanded:
+                            _additionalInformationExpanded,
+                        autofocusName: true,
+                        onStatusChanged: (value) =>
+                            setState(() => _status = value),
+                        onPreferredContactChanged: (value) =>
+                            setState(() => _preferredContactMethod = value),
+                        onBirthdayChanged: (value) =>
+                            setState(() => _birthday = value),
+                        onToggleAdditionalInformation: () => setState(
+                          () => _additionalInformationExpanded =
+                              !_additionalInformationExpanded,
+                        ),
+                        onChanged: () => setState(() {}),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

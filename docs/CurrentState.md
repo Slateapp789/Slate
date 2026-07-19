@@ -88,11 +88,12 @@ Last updated: 2026-07-15
 - Calendar mode with month navigation, a Today shortcut, selected-date list, and selected-date hand-off when adding a booking.
 - Add and inline Edit booking forms share the client form visual language, keyboard dismissal, calm input surfaces, and progressive booking sections.
 - Change date/time/duration/service/price/client/location/notes/status.
-- Business/client/online location choices; client location can reuse the selected client's saved booking address.
+- Business/client/online location choices; physical locations use the shared Google Places address search and can reuse the selected client's saved booking address.
 - Saved physical booking locations open directions using the shared Apple Maps / Google Maps device preference.
 - Inline client creation in new booking.
 - Custom service name, duration, and price.
-- Conflict checks.
+- Working-hours exceptions show a calm confirmation and remain bookable by choice; real appointment conflicts remain blocked.
+- New and edited clients and bookings protect changed drafts with Save, Discard, and Keep editing choices before leaving.
 - Linked tasks in booking detail.
 - Booking status controls: scheduled, completed, cancelled/no-show style workflows.
 - Calendar export / ICS flow.

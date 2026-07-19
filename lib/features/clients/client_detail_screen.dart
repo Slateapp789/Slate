@@ -42,6 +42,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   DateTime? _birthday;
   bool _saving = false;
   bool _moreDetailsExpanded = false;
+  bool _allowPop = false;
 
   @override
   void initState() {
@@ -144,42 +145,43 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
       ? ''
       : '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-  void _resetEditDraft() {
-    _nameController.text = _client['name'] as String? ?? '';
-    _phoneController.text = _client['phone'] as String? ?? '';
-    _emailController.text = _client['email'] as String? ?? '';
-    _addressController.text = _client['address'] as String? ?? '';
-    _sourceController.text = _client['source'] as String? ?? '';
-    _tagsController.text = ((_client['tags'] as List?) ?? const []).join(', ');
-    _notesController.text = _client['notes'] as String? ?? '';
-    _importantNotesController.text =
-        _client['important_notes'] as String? ?? '';
-    _status = _client['status'] as String? ?? 'active';
-    _preferredContactMethod =
-        _client['preferred_contact_method'] as String? ?? 'phone';
-    _birthday = DateTime.tryParse(_client['birthday']?.toString() ?? '');
-  }
-
   Future<void> _handleBack() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    if (!_editing) {
-      Navigator.pop(context);
+    if (!_editing || !_hasEditChanges) {
+      await _leaveScreen();
       return;
     }
-    if (_hasEditChanges && !await confirmDiscardClientChanges(context)) return;
+    final decision = await showWorkloopDraftConfirmation(
+      context,
+      title: 'Save client changes?',
+      message: 'You changed this client. Save before returning to Clients?',
+      canSave: _canSaveDraft && !_saving,
+    );
     if (!mounted) return;
-    setState(() {
-      _resetEditDraft();
-      _editing = false;
-    });
+    switch (decision) {
+      case WorkloopDraftDecision.save:
+        if (await _save()) await _leaveScreen();
+        return;
+      case WorkloopDraftDecision.discard:
+        await _leaveScreen();
+        return;
+      case WorkloopDraftDecision.stay:
+        return;
+    }
+  }
+
+  Future<void> _leaveScreen() async {
+    if (!_allowPop && mounted) setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.pop(context);
   }
 
   // ── Save / Delete ─────────────────────────────────────────────────────────
 
-  Future<void> _save() async {
+  Future<bool> _save() async {
     if (!_canSaveDraft) {
       _snack('Check the client name and email address.', AppColors.error);
-      return;
+      return false;
     }
     setState(() => _saving = true);
     try {
@@ -195,7 +197,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
           '${duplicate.name} already uses this phone number or email.',
           AppColors.t2,
         );
-        return;
+        return false;
       }
       await ref
           .read(clientsRepositoryProvider)
@@ -249,11 +251,13 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
       });
       ref.invalidate(clientsProvider);
       ref.invalidate(clientCrmRecordsProvider);
+      return true;
     } catch (_) {
       setState(() => _saving = false);
       if (mounted) {
         _snack('Couldn’t save this client. Please try again.', AppColors.error);
       }
+      return false;
     }
   }
 
@@ -383,152 +387,161 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
         .join()
         .toUpperCase();
 
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: Stack(
-        children: [
-          const Positioned.fill(child: WorkloopTexturedBackdrop()),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.pageX,
-                    AppSpacing.lg,
-                    AppSpacing.pageX,
-                    0,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      WorkloopIconButton(
-                        icon: LucideIcons.chevronLeft,
-                        semanticLabel: 'Back to clients',
-                        onTap: _handleBack,
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Text(
-                          _editing ? 'Edit client' : name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 26,
-                            height: 1.05,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.t1,
+    return PopScope(
+      canPop: _allowPop || !_editing || !_hasEditChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: WorkloopTexturedBackdrop()),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.pageX,
+                      AppSpacing.lg,
+                      AppSpacing.pageX,
+                      0,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        WorkloopIconButton(
+                          icon: LucideIcons.chevronLeft,
+                          semanticLabel: 'Back to clients',
+                          onTap: _handleBack,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            _editing ? 'Edit client' : name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 26,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.t1,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      _HeaderAction(
-                        label: _editing ? 'Save' : 'Edit',
-                        primary: _editing,
-                        loading: _saving,
-                        onTap: _saving || (_editing && !_canSaveDraft)
-                            ? null
-                            : () => _editing
-                                  ? _save()
-                                  : setState(() => _editing = true),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                if (_editing)
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.pageX,
-                        0,
-                        AppSpacing.pageX,
-                        AppSpacing.xxl,
-                      ),
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      child: _editForm(),
-                    ),
-                  )
-                else
-                  Expanded(
-                    child: NestedScrollView(
-                      headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.pageX,
-                            0,
-                            AppSpacing.pageX,
-                            AppSpacing.sm,
-                          ),
-                          sliver: SliverList.list(
-                            children: [
-                              _ClientCompactHeader(
-                                initials: initials,
-                                status:
-                                    _client['status'] as String? ?? 'active',
-                                preferredContact: _contactLabel(
-                                  preferredMethod,
-                                ),
-                                onCall: phone.isEmpty
-                                    ? null
-                                    : () => _callPhone(phone),
-                                preferredIcon: _preferredContactIcon(
-                                  preferredMethod,
-                                ),
-                                onPreferred: switch (preferredMethod) {
-                                  'email' =>
-                                    email.isEmpty
-                                        ? null
-                                        : () => _sendEmail(email),
-                                  'sms' =>
-                                    phone.isEmpty
-                                        ? null
-                                        : () => _sendText(phone),
-                                  'whatsapp' =>
-                                    phone.isEmpty
-                                        ? null
-                                        : () => _openWhatsApp(phone),
-                                  _ =>
-                                    phone.isEmpty
-                                        ? null
-                                        : () => _callPhone(phone),
-                                },
-                              ),
-                              const SizedBox(height: AppSpacing.md),
-                              _ClientWorkspaceNavigation(
-                                index: _tabController.index,
-                                onChanged: _tabController.animateTo,
-                              ),
-                            ],
-                          ),
+                        const SizedBox(width: AppSpacing.sm),
+                        _HeaderAction(
+                          label: _editing ? 'Save' : 'Edit',
+                          primary: _editing,
+                          loading: _saving,
+                          onTap: _saving || (_editing && !_canSaveDraft)
+                              ? null
+                              : () => _editing
+                                    ? _save()
+                                    : setState(() => _editing = true),
                         ),
                       ],
-                      body: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          ClientOverviewTab(
-                            clientId: clientId,
-                            client: _client,
-                            onEdit: () => setState(() => _editing = true),
-                            onOpenBookings: () => _tabController.animateTo(1),
-                            onOpenPayments: () => _tabController.animateTo(2),
-                            onOpenTasks: () => _tabController.animateTo(3),
-                            onOpenAddress: _openDirections,
-                          ),
-                          ClientAppointmentsTab(clientId: clientId),
-                          ClientPaymentsTab(
-                            clientId: clientId,
-                            clientName: name,
-                          ),
-                          ClientTasksTab(clientId: clientId, clientName: name),
-                        ],
-                      ),
                     ),
                   ),
-              ],
+                  const SizedBox(height: AppSpacing.lg),
+                  if (_editing)
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.pageX,
+                          0,
+                          AppSpacing.pageX,
+                          AppSpacing.xxl,
+                        ),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        child: _editForm(),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: NestedScrollView(
+                        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.pageX,
+                              0,
+                              AppSpacing.pageX,
+                              AppSpacing.sm,
+                            ),
+                            sliver: SliverList.list(
+                              children: [
+                                _ClientCompactHeader(
+                                  initials: initials,
+                                  status:
+                                      _client['status'] as String? ?? 'active',
+                                  preferredContact: _contactLabel(
+                                    preferredMethod,
+                                  ),
+                                  onCall: phone.isEmpty
+                                      ? null
+                                      : () => _callPhone(phone),
+                                  preferredIcon: _preferredContactIcon(
+                                    preferredMethod,
+                                  ),
+                                  onPreferred: switch (preferredMethod) {
+                                    'email' =>
+                                      email.isEmpty
+                                          ? null
+                                          : () => _sendEmail(email),
+                                    'sms' =>
+                                      phone.isEmpty
+                                          ? null
+                                          : () => _sendText(phone),
+                                    'whatsapp' =>
+                                      phone.isEmpty
+                                          ? null
+                                          : () => _openWhatsApp(phone),
+                                    _ =>
+                                      phone.isEmpty
+                                          ? null
+                                          : () => _callPhone(phone),
+                                  },
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                _ClientWorkspaceNavigation(
+                                  index: _tabController.index,
+                                  onChanged: _tabController.animateTo,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        body: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            ClientOverviewTab(
+                              clientId: clientId,
+                              client: _client,
+                              onEdit: () => setState(() => _editing = true),
+                              onOpenBookings: () => _tabController.animateTo(1),
+                              onOpenPayments: () => _tabController.animateTo(2),
+                              onOpenTasks: () => _tabController.animateTo(3),
+                              onOpenAddress: _openDirections,
+                            ),
+                            ClientAppointmentsTab(clientId: clientId),
+                            ClientPaymentsTab(
+                              clientId: clientId,
+                              clientName: name,
+                            ),
+                            ClientTasksTab(
+                              clientId: clientId,
+                              clientName: name,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
