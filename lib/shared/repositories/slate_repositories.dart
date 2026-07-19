@@ -1,4 +1,5 @@
 export 'appointments_repository.dart';
+export 'address_search_repository.dart';
 export 'auth_repository.dart';
 export 'calendar_sync_repository.dart';
 export 'clients_repository.dart';

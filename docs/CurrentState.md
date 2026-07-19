@@ -66,8 +66,11 @@ Last updated: 2026-07-15
 - Search across client names, contact details, and tags, with bottom-navigation-inspired All/Active/Leads/Inactive views that can be changed by tapping, dragging the selected capsule across the selector, or swiping horizontally across the screen.
 - Active and Inactive remain distinct status views; inactive contacts also carry a quiet neutral label inside All.
 - Changing client views returns the portfolio to the top, and each empty category has calm, contextual guidance.
-- Add client flow organized around Basic details, Work details, and Notes.
-- Edit client flow mirrors the calmer section hierarchy.
+- Add and Edit client use one canonical form with the dashboard/client textured shell, shared field styling, and identical Contact information, Client settings, Booking address, Client notes, and Additional information sections.
+- The shared Booking address field supports debounced UK Google Places autocomplete through an authenticated Supabase Edge Function, suggestions that remain visible while the surrounding form is repositioned, and an independently scrollable and explicitly dismissible result list. It deliberately stays as one field: users start with the first line of an address for suggestions, or keep any manually typed value such as a postcode. Building-level matches preserve typed flat/unit labels, selection remains immediate with manual fallback, and the Google key stays out of the mobile app.
+- Saved client booking addresses open driving directions in Apple Maps or Google Maps. Users can choose per launch, remember a choice from the directions sheet, or change the device-level default under App settings.
+- Client entry validates optional email addresses, explains relationship statuses, warns when the selected contact channel has no matching detail, and blocks duplicate phone/email records before saving.
+- Lead source, tags, and birthday remain progressively disclosed; destructive deletion stays separate from Save, and backing out of an edited client offers to preserve or discard the draft.
 - Delete client with confirmation.
 - Client workspace with a compact relationship header, call/email actions, textured backdrop, and draggable Overview/Bookings/Money/Tasks navigation aligned with the app shell.
 - Notes and important notes.
@@ -80,19 +83,20 @@ Last updated: 2026-07-15
 ### Bookings
 
 - User-facing Bookings built on `appointments`.
-- Today / Upcoming / Past views.
-- Calendar view with selected-date list.
-- Next booking card.
-- Add booking.
-- Edit booking.
+- Calm Schedule / Requests workspace using the same textured backdrop, typography, spacing, segmented controls, and feature-header action as Home and Clients.
+- List mode with Today / Upcoming / Past views and a concise next-booking summary.
+- Calendar mode with month navigation, a Today shortcut, selected-date list, and selected-date hand-off when adding a booking.
+- Add and inline Edit booking forms share the client form visual language, keyboard dismissal, calm input surfaces, and progressive booking sections.
 - Change date/time/duration/service/price/client/location/notes/status.
-- Business/client/online location choices.
+- Business/client/online location choices; client location can reuse the selected client's saved booking address.
+- Saved physical booking locations open directions using the shared Apple Maps / Google Maps device preference.
 - Inline client creation in new booking.
 - Custom service name, duration, and price.
 - Conflict checks.
 - Linked tasks in booking detail.
 - Booking status controls: scheduled, completed, cancelled/no-show style workflows.
 - Calendar export / ICS flow.
+- Dashboard and client booking rows continue to open the canonical booking detail; booking detail links back to the canonical client workspace and shared Money and Tasks records.
 
 ### Tasks
 

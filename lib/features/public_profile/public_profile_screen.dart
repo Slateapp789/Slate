@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/working_hours.dart';
+import '../../shared/widgets/slate_ui.dart';
 
 final publicProfileProvider = FutureProvider.family<PublicProfile?, String>((
   ref,
@@ -263,20 +264,20 @@ class _ProfileContent extends StatelessWidget {
                         maxLength: 32,
                       ),
                       const SizedBox(height: 10),
-                      DropdownButtonFormField<String?>(
-                        initialValue: selectedServiceId,
-                        dropdownColor: AppColors.bgCard,
-                        style: const TextStyle(color: AppColors.t1),
-                        decoration: _fieldDecoration('Service'),
-                        items: [
-                          const DropdownMenuItem<String?>(
+                      WorkloopPickerField<String?>(
+                        value: selectedServiceId,
+                        title: 'Choose a service',
+                        hint: 'Service',
+                        searchHint: 'Search services',
+                        options: [
+                          const WorkloopPickerOption<String?>(
                             value: null,
-                            child: Text('Not sure yet'),
+                            label: 'Not sure yet',
                           ),
                           ...profile.services.map(
-                            (service) => DropdownMenuItem<String?>(
+                            (service) => WorkloopPickerOption<String?>(
                               value: service.id,
-                              child: Text(service.name),
+                              label: service.name,
                             ),
                           ),
                         ],

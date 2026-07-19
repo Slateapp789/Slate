@@ -44,6 +44,7 @@ dependencies:
   lucide_icons: ^0.257.0
   confetti: ^0.8.0
   native_glass_navbar: ^1.0.1
+  shared_preferences: ^2.5.3
   url_launcher: ^6.3.1
 
 dev_dependencies:

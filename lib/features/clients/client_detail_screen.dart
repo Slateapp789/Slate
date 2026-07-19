@@ -4,9 +4,12 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
+import '../../shared/providers/maps_preference_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/maps_launcher.dart';
 import '../../shared/widgets/slate_ui.dart';
 import 'widgets/client_appointments_tab.dart';
+import 'widgets/client_form.dart';
 import 'widgets/client_overview_tab.dart';
 import 'widgets/client_payments_tab.dart';
 import 'widgets/client_tasks_tab.dart';
@@ -74,6 +77,10 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     _preferredContactMethod =
         _client['preferred_contact_method'] as String? ?? 'phone';
     _birthday = DateTime.tryParse(_client['birthday']?.toString() ?? '');
+    _moreDetailsExpanded =
+        _sourceController.text.trim().isNotEmpty ||
+        _tagsController.text.trim().isNotEmpty ||
+        _birthday != null;
   }
 
   @override
@@ -95,12 +102,101 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     if (mounted) setState(() {});
   }
 
+  bool get _canSaveDraft =>
+      _nameController.text.trim().isNotEmpty &&
+      isValidClientEmail(_emailController.text);
+
+  bool get _hasEditChanges {
+    final currentTags = _tagsController.text
+        .split(',')
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .join(',');
+    final savedTags = ((_client['tags'] as List?) ?? const [])
+        .map((tag) => tag.toString().trim())
+        .where((tag) => tag.isNotEmpty)
+        .join(',');
+    final savedBirthday = DateTime.tryParse(
+      _client['birthday']?.toString() ?? '',
+    );
+    return _nameController.text.trim() !=
+            (_client['name'] as String? ?? '').trim() ||
+        _phoneController.text.trim() !=
+            (_client['phone'] as String? ?? '').trim() ||
+        _emailController.text.trim() !=
+            (_client['email'] as String? ?? '').trim() ||
+        _addressController.text.trim() !=
+            (_client['address'] as String? ?? '').trim() ||
+        _sourceController.text.trim() !=
+            (_client['source'] as String? ?? '').trim() ||
+        currentTags != savedTags ||
+        _notesController.text.trim() !=
+            (_client['notes'] as String? ?? '').trim() ||
+        _importantNotesController.text.trim() !=
+            (_client['important_notes'] as String? ?? '').trim() ||
+        _status != (_client['status'] as String? ?? 'active') ||
+        _preferredContactMethod !=
+            (_client['preferred_contact_method'] as String? ?? 'phone') ||
+        _dateKey(_birthday) != _dateKey(savedBirthday);
+  }
+
+  String _dateKey(DateTime? date) => date == null
+      ? ''
+      : '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+  void _resetEditDraft() {
+    _nameController.text = _client['name'] as String? ?? '';
+    _phoneController.text = _client['phone'] as String? ?? '';
+    _emailController.text = _client['email'] as String? ?? '';
+    _addressController.text = _client['address'] as String? ?? '';
+    _sourceController.text = _client['source'] as String? ?? '';
+    _tagsController.text = ((_client['tags'] as List?) ?? const []).join(', ');
+    _notesController.text = _client['notes'] as String? ?? '';
+    _importantNotesController.text =
+        _client['important_notes'] as String? ?? '';
+    _status = _client['status'] as String? ?? 'active';
+    _preferredContactMethod =
+        _client['preferred_contact_method'] as String? ?? 'phone';
+    _birthday = DateTime.tryParse(_client['birthday']?.toString() ?? '');
+  }
+
+  Future<void> _handleBack() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (!_editing) {
+      Navigator.pop(context);
+      return;
+    }
+    if (_hasEditChanges && !await confirmDiscardClientChanges(context)) return;
+    if (!mounted) return;
+    setState(() {
+      _resetEditDraft();
+      _editing = false;
+    });
+  }
+
   // ── Save / Delete ─────────────────────────────────────────────────────────
 
   Future<void> _save() async {
-    if (_nameController.text.trim().isEmpty) return;
+    if (!_canSaveDraft) {
+      _snack('Check the client name and email address.', AppColors.error);
+      return;
+    }
     setState(() => _saving = true);
     try {
+      final duplicate = findDuplicateClient(
+        await ref.read(clientsProvider.future),
+        phone: _phoneController.text,
+        email: _emailController.text,
+        excludingClientId: _client['id'] as String,
+      );
+      if (duplicate != null) {
+        setState(() => _saving = false);
+        _snack(
+          '${duplicate.name} already uses this phone number or email.',
+          AppColors.t2,
+        );
+        return;
+      }
       await ref
           .read(clientsRepositoryProvider)
           .update(_client['id'] as String, {
@@ -153,9 +249,11 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
       });
       ref.invalidate(clientsProvider);
       ref.invalidate(clientCrmRecordsProvider);
-    } catch (e) {
+    } catch (_) {
       setState(() => _saving = false);
-      if (mounted) _snack('Error: $e', AppColors.error);
+      if (mounted) {
+        _snack('Couldn’t save this client. Please try again.', AppColors.error);
+      }
     }
   }
 
@@ -241,6 +339,32 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     );
   }
 
+  Future<void> _openDirections(String address) async {
+    if (address.trim().isEmpty) return;
+    try {
+      var preference = await ref.read(preferredMapsAppProvider.future);
+      if (!mounted) return;
+      if (preference == MapsAppPreference.askEveryTime) {
+        final choice = await showMapLaunchSheet(context, address);
+        if (choice == null || !mounted) return;
+        preference = choice.app;
+        if (choice.remember) {
+          await ref
+              .read(preferredMapsAppProvider.notifier)
+              .setPreference(preference);
+        }
+      }
+      final launched = await launchMapDirections(preference, address);
+      if (!launched && mounted) {
+        _snack('Couldn’t open directions on this device.', AppColors.t2);
+      }
+    } catch (_) {
+      if (mounted) {
+        _snack('Couldn’t open directions on this device.', AppColors.t2);
+      }
+    }
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -280,12 +404,12 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                       WorkloopIconButton(
                         icon: LucideIcons.chevronLeft,
                         semanticLabel: 'Back to clients',
-                        onTap: () => Navigator.pop(context),
+                        onTap: _handleBack,
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Text(
-                          name,
+                          _editing ? 'Edit client' : name,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -301,7 +425,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                         label: _editing ? 'Save' : 'Edit',
                         primary: _editing,
                         loading: _saving,
-                        onTap: _saving
+                        onTap: _saving || (_editing && !_canSaveDraft)
                             ? null
                             : () => _editing
                                   ? _save()
@@ -320,60 +444,87 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                         AppSpacing.pageX,
                         AppSpacing.xxl,
                       ),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
                       child: _editForm(),
                     ),
                   )
-                else ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.pageX,
-                    ),
-                    child: _ClientCompactHeader(
-                      initials: initials,
-                      status: _client['status'] as String? ?? 'active',
-                      preferredContact: _contactLabel(preferredMethod),
-                      onCall: phone.isEmpty ? null : () => _callPhone(phone),
-                      preferredIcon: _preferredContactIcon(preferredMethod),
-                      onPreferred: switch (preferredMethod) {
-                        'email' =>
-                          email.isEmpty ? null : () => _sendEmail(email),
-                        'sms' => phone.isEmpty ? null : () => _sendText(phone),
-                        'whatsapp' =>
-                          phone.isEmpty ? null : () => _openWhatsApp(phone),
-                        _ => phone.isEmpty ? null : () => _callPhone(phone),
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.pageX,
-                    ),
-                    child: _ClientWorkspaceNavigation(
-                      index: _tabController.index,
-                      onChanged: _tabController.animateTo,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
+                else
                   Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        ClientOverviewTab(
-                          clientId: clientId,
-                          client: _client,
-                          onEdit: () => setState(() => _editing = true),
-                          onOpenBookings: () => _tabController.animateTo(1),
-                          onOpenPayments: () => _tabController.animateTo(2),
-                          onOpenTasks: () => _tabController.animateTo(3),
+                    child: NestedScrollView(
+                      headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.pageX,
+                            0,
+                            AppSpacing.pageX,
+                            AppSpacing.sm,
+                          ),
+                          sliver: SliverList.list(
+                            children: [
+                              _ClientCompactHeader(
+                                initials: initials,
+                                status:
+                                    _client['status'] as String? ?? 'active',
+                                preferredContact: _contactLabel(
+                                  preferredMethod,
+                                ),
+                                onCall: phone.isEmpty
+                                    ? null
+                                    : () => _callPhone(phone),
+                                preferredIcon: _preferredContactIcon(
+                                  preferredMethod,
+                                ),
+                                onPreferred: switch (preferredMethod) {
+                                  'email' =>
+                                    email.isEmpty
+                                        ? null
+                                        : () => _sendEmail(email),
+                                  'sms' =>
+                                    phone.isEmpty
+                                        ? null
+                                        : () => _sendText(phone),
+                                  'whatsapp' =>
+                                    phone.isEmpty
+                                        ? null
+                                        : () => _openWhatsApp(phone),
+                                  _ =>
+                                    phone.isEmpty
+                                        ? null
+                                        : () => _callPhone(phone),
+                                },
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              _ClientWorkspaceNavigation(
+                                index: _tabController.index,
+                                onChanged: _tabController.animateTo,
+                              ),
+                            ],
+                          ),
                         ),
-                        ClientAppointmentsTab(clientId: clientId),
-                        ClientPaymentsTab(clientId: clientId, clientName: name),
-                        ClientTasksTab(clientId: clientId, clientName: name),
                       ],
+                      body: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          ClientOverviewTab(
+                            clientId: clientId,
+                            client: _client,
+                            onEdit: () => setState(() => _editing = true),
+                            onOpenBookings: () => _tabController.animateTo(1),
+                            onOpenPayments: () => _tabController.animateTo(2),
+                            onOpenTasks: () => _tabController.animateTo(3),
+                            onOpenAddress: _openDirections,
+                          ),
+                          ClientAppointmentsTab(clientId: clientId),
+                          ClientPaymentsTab(
+                            clientId: clientId,
+                            clientName: name,
+                          ),
+                          ClientTasksTab(clientId: clientId, clientName: name),
+                        ],
+                      ),
                     ),
                   ),
-                ],
               ],
             ),
           ),
@@ -388,52 +539,30 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _editSectionTitle('Basic details'),
-        _editField('Name', _nameController),
-        const SizedBox(height: 12),
-        _editField(
-          'Phone',
-          _phoneController,
-          keyboardType: TextInputType.phone,
-        ),
-        const SizedBox(height: 12),
-        _editField(
-          'Email',
-          _emailController,
-          keyboardType: TextInputType.emailAddress,
-        ),
-        const SizedBox(height: 24),
-        _editSectionTitle('Work details'),
-        _editField('Address', _addressController, maxLines: 2),
-        const SizedBox(height: 12),
-        _contactMethodEditor(),
-        const SizedBox(height: 12),
-        _statusEditor(),
-        const SizedBox(height: 12),
-        SlateDisclosure(
-          title: 'More client details',
-          subtitle: 'Source, birthday and tags',
-          icon: LucideIcons.listPlus,
-          expanded: _moreDetailsExpanded,
-          onToggle: () =>
+        ClientForm(
+          nameController: _nameController,
+          phoneController: _phoneController,
+          emailController: _emailController,
+          addressController: _addressController,
+          sourceController: _sourceController,
+          tagsController: _tagsController,
+          notesController: _notesController,
+          importantNotesController: _importantNotesController,
+          status: _status,
+          preferredContactMethod: _preferredContactMethod,
+          birthday: _birthday,
+          additionalInformationExpanded: _moreDetailsExpanded,
+          onStatusChanged: (value) => setState(() => _status = value),
+          onPreferredContactChanged: (value) =>
+              setState(() => _preferredContactMethod = value),
+          onBirthdayChanged: (value) => setState(() => _birthday = value),
+          onToggleAdditionalInformation: () =>
               setState(() => _moreDetailsExpanded = !_moreDetailsExpanded),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _editField('Source', _sourceController),
-              const SizedBox(height: 12),
-              _editField('Tags', _tagsController),
-              const SizedBox(height: 12),
-              _dateEditor(),
-            ],
-          ),
+          onChanged: () => setState(() {}),
         ),
-        const SizedBox(height: 24),
-        _editSectionTitle('Notes'),
-        _editField('Notes', _notesController, maxLines: 4),
-        const SizedBox(height: 12),
-        _editField('Important notes', _importantNotesController, maxLines: 2),
         const SizedBox(height: AppSpacing.xl),
+        const WorkloopDivider(),
+        const SizedBox(height: AppSpacing.md),
         Center(
           child: TextButton(
             onPressed: _confirmDeleteClient,
@@ -448,206 +577,6 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _editSectionTitle(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 10),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: AppColors.t1,
-          fontSize: 18,
-          fontWeight: FontWeight.w900,
-          height: 1.1,
-        ),
-      ),
-    );
-  }
-
-  Widget _statusEditor() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Status',
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.t3,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: ['active', 'lead', 'inactive'].map((s) {
-            final active = _status == s;
-            return GestureDetector(
-              onTap: () => setState(() => _status = s),
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: active
-                      ? AppColors.accentPrimaryStrong.withValues(alpha: 0.32)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: active
-                        ? AppColors.accentPrimaryStrong.withValues(alpha: 0.64)
-                        : AppColors.border,
-                  ),
-                ),
-                child: Text(
-                  s,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: active ? AppColors.t1 : AppColors.t3,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _contactMethodEditor() {
-    const options = {
-      'phone': 'Phone',
-      'sms': 'Text',
-      'email': 'Email',
-      'whatsapp': 'WhatsApp',
-    };
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Preferred contact',
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.t3,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: options.entries.map((entry) {
-            final active = _preferredContactMethod == entry.key;
-            return GestureDetector(
-              onTap: () => setState(() => _preferredContactMethod = entry.key),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: active ? AppColors.green : AppColors.bgInteract,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(
-                    color: active ? AppColors.green : AppColors.border,
-                  ),
-                ),
-                child: Text(
-                  entry.value,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: active ? Colors.white : AppColors.t3,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _dateEditor() {
-    return GestureDetector(
-      onTap: _pickBirthday,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: AppColors.bgInteract,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            const Text(
-              'Birthday',
-              style: TextStyle(color: AppColors.t3, fontSize: 13),
-            ),
-            const Spacer(),
-            Text(
-              _birthday == null
-                  ? 'Add date'
-                  : '${_birthday!.day}/${_birthday!.month}/${_birthday!.year}',
-              style: const TextStyle(
-                color: AppColors.t2,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickBirthday() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _birthday ?? DateTime(now.year - 25),
-      firstDate: DateTime(now.year - 100),
-      lastDate: now,
-    );
-    if (picked != null) setState(() => _birthday = picked);
-  }
-
-  Widget _editField(
-    String label,
-    TextEditingController controller, {
-    int maxLines = 1,
-    TextInputType? keyboardType,
-  }) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: AppColors.t1, fontSize: 14),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: AppColors.t3, fontSize: 13),
-        filled: true,
-        fillColor: AppColors.bgInteract,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.green, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-      ),
     );
   }
 }
@@ -678,78 +607,67 @@ class _ClientCompactHeader extends StatelessWidget {
         : AppColors.t3;
     return SlateGlassSurface(
       blur: 18,
-      color: AppColors.bgCard.withValues(alpha: 0.72),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
+      color: AppColors.bgCard.withValues(alpha: 0.68),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.modClients.withValues(alpha: 0.09),
-                  shape: BoxShape.circle,
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.modClients.withValues(alpha: 0.09),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                initials.isEmpty ? '?' : initials,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.modClients,
                 ),
-                child: Center(
-                  child: Text(
-                    initials.isEmpty ? '?' : initials,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.modClients,
-                    ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _statusLabel(status),
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _statusLabel(status),
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      'Prefers $preferredContact',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.t2,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 2),
+                Text(
+                  'Prefers $preferredContact',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.t2,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: _CompactContactButton(
-                  icon: LucideIcons.phone,
-                  label: 'Call',
-                  onTap: onCall,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _CompactContactButton(
-                  icon: preferredIcon,
-                  label: preferredContact,
-                  onTap: onPreferred,
-                ),
-              ),
-            ],
+          const SizedBox(width: AppSpacing.xs),
+          _CompactContactButton(
+            icon: LucideIcons.phone,
+            label: 'Call',
+            onTap: onCall,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          _CompactContactButton(
+            icon: preferredIcon,
+            label: preferredContact,
+            onTap: onPreferred,
           ),
         ],
       ),
@@ -770,38 +688,24 @@ class _CompactContactButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: onTap == null
-          ? AppColors.bgInteract.withValues(alpha: 0.55)
-          : AppColors.modClients.withValues(alpha: 0.09),
-      borderRadius: BorderRadius.circular(AppRadius.pill),
-      child: InkWell(
-        onTap: onTap,
+    return Tooltip(
+      message: label,
+      child: Material(
+        color: onTap == null
+            ? AppColors.bgInteract.withValues(alpha: 0.55)
+            : AppColors.modClients.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        child: SizedBox(
-          height: AppSpacing.minTouch,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: onTap == null ? AppColors.t4 : AppColors.modClients,
-                size: 17,
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: onTap == null ? AppColors.t4 : AppColors.modClients,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: SizedBox(
+            width: AppSpacing.minTouch,
+            height: AppSpacing.minTouch,
+            child: Icon(
+              icon,
+              color: onTap == null ? AppColors.t4 : AppColors.modClients,
+              size: 17,
+            ),
           ),
         ),
       ),
@@ -824,8 +728,9 @@ class _HeaderAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null || loading;
     return Material(
-      color: primary
+      color: primary && enabled
           ? AppColors.accentPrimary.withValues(alpha: 0.14)
           : Colors.transparent,
       borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -847,9 +752,13 @@ class _HeaderAction extends StatelessWidget {
                 : Text(
                     label,
                     style: TextStyle(
-                      color: primary ? AppColors.accentPrimary : AppColors.t2,
+                      color: !enabled
+                          ? AppColors.t4
+                          : primary
+                          ? AppColors.accentPrimary
+                          : AppColors.t2,
                       fontSize: 13,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
           ),

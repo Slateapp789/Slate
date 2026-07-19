@@ -184,47 +184,27 @@ class _ClientPicker extends StatelessWidget {
         clients.any((client) => client.id == selectedClientId);
     final safeSelectedClientId = hasSelectedClient ? selectedClientId : null;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: AppColors.bgInteract,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String?>(
-          value: safeSelectedClientId,
-          isExpanded: true,
-          dropdownColor: AppColors.bgRaised,
-          icon: const Icon(
-            LucideIcons.chevronDown,
-            color: AppColors.t3,
-            size: 16,
-          ),
-          hint: const Text(
-            'Link to client',
-            style: TextStyle(color: AppColors.t3, fontSize: 14),
-          ),
-          items: [
-            const DropdownMenuItem<String?>(
-              value: null,
-              child: Text(
-                'No client',
-                style: TextStyle(color: AppColors.t3, fontSize: 14),
-              ),
-            ),
-            ...clients.map(
-              (client) => DropdownMenuItem<String?>(
-                value: client.id as String,
-                child: Text(
-                  client.name as String,
-                  style: const TextStyle(color: AppColors.t1, fontSize: 14),
-                ),
-              ),
-            ),
-          ],
-          onChanged: onChanged,
+    return WorkloopPickerField<String?>(
+      value: safeSelectedClientId,
+      title: 'Link a client',
+      hint: 'Link to client',
+      searchHint: 'Search clients',
+      searchable: true,
+      leadingIcon: LucideIcons.users,
+      options: [
+        const WorkloopPickerOption<String?>(
+          value: null,
+          label: 'No client',
+          subtitle: 'Keep this as a general task',
         ),
-      ),
+        ...clients.map(
+          (client) => WorkloopPickerOption<String?>(
+            value: client.id as String,
+            label: client.name as String,
+          ),
+        ),
+      ],
+      onChanged: onChanged,
     );
   }
 }

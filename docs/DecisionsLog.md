@@ -394,3 +394,85 @@ Consequences:
 - Client tasks remain canonical Tasks records through `contact_id`, and the client view provides an explicit route to the full Tasks workspace.
 - Financial summaries use received and remaining amounts, including partial payments, with neutral language and colour.
 - The workspace reuses the dashboard backdrop, typography, spacing, dividers, and draggable capsule navigation.
+
+## 2026-07-16 - Client Data Entry Has One Canonical Form
+
+Decision:
+
+Use one shared mobile client form for both creation and editing. Organise it as Contact information, Client settings, Booking address, Client notes, and progressively disclosed Additional information.
+
+Reasoning:
+
+Add and Edit previously used separate field components, labels, spacing, and selection controls, which allowed validation and visual behaviour to drift. Familiar CRM terminology is useful, but Workloop should retain only the fields that support the client, booking, work, payment, and repeat workflow.
+
+Consequences:
+
+- Add and Edit now render the same input controls, status explanations, contact preferences, optional metadata, and field ordering.
+- Client name is required and optional email addresses are validated before writes.
+- Matching phone numbers and email addresses are checked against existing clients to reduce accidental duplicates without requiring schema changes.
+- Lead source, tags, and birthday remain optional and collapsed by default unless an edited client already contains them.
+- Important notes remain distinct because they are surfaced prominently in the relationship workspace.
+- The change reuses the existing contacts schema, repository, providers, and security model.
+
+## 2026-07-16 - Booking Address Search Uses a Trusted Server Boundary
+
+Decision:
+
+Use Google Places API (New) for client booking-address autocomplete through an authenticated Supabase Edge Function, rather than placing a Google web-service key in Flutter.
+
+Reasoning:
+
+Address entry should be fast and reliable on both iOS and future Android builds. A shared server boundary keeps provider credentials out of the downloadable app, centralises UK/language restrictions and field masks, and gives Workloop one integration to secure and monitor.
+
+Consequences:
+
+- Add and Edit Client share the same debounced Booking address search with manual entry fallback.
+- Address entry deliberately remains a single-field workflow. Users start with the first line of an address for dependable suggestions; a postcode or any other manually typed location can be saved as entered. Workloop does not attempt a fragile postcode-to-property refinement flow.
+- Suggestions remain interactive while being selected or scrolled, and a chosen result populates the field before canonical Place Details resolution.
+- Scrolling the surrounding client form no longer clears suggestions; results close after selection or through their explicit Close action, avoiding accidental dismissal during one-handed repositioning.
+- Saved booking addresses use standards-based Apple Maps and Google Maps direction URLs. The preferred maps app is a non-critical device preference, stored locally rather than adding workspace schema solely for a platform-specific choice.
+- The function accepts authenticated users only, validates and limits input, uses Google session tokens, and requests only the minimum suggestion and address fields.
+- No database migration is required; the selected formatted address continues to use the existing contact `address` field.
+- Google Places billing, API enablement, an API-restricted key, quotas, and a Supabase function secret are required before live suggestions work.
+- Coordinates are returned but deliberately not persisted until routing needs justify a contacts schema addition.
+- Unit-prefixed input searches both the building and the full text, then keeps
+  the typed flat/apartment/unit label when Google only identifies the building.
+  This improves subpremise entry without adding another provider or schema.
+- Public legal pages must include the Google Maps terms/privacy references before release.
+
+## 2026-07-19 - Bookings Uses One Calm Connected Workspace
+
+Decision:
+
+Present Bookings as a calm Schedule / Requests workspace with explicit List and Calendar modes. Reuse the same textured backdrop, typography, spacing, segmented controls, compact header action, and form surfaces established by Home and Clients while preserving the existing appointment repository and workflows.
+
+Reasoning:
+
+The existing booking system already supports the important operating loop, but duplicated mode controls, dashboard-like metrics, and locally styled forms made it feel like a separate product. A solo operator primarily needs to see the next commitment, move between a chronological list and calendar, and create or update work without losing client, payment, or task context.
+
+Consequences:
+
+- Schedule and Requests remain first-class but visually restrained destinations; List and Calendar are explicit schedule views rather than duplicate header actions.
+- Today, Upcoming, and Past use the shared segmented-control behaviour and remain swipeable through the existing tab view.
+- Calendar creation carries the selected day into New booking and adds a direct Today shortcut.
+- New and Edit booking use the same backdrop, header hierarchy, input treatment, and keyboard dismissal conventions as client data entry.
+- Selecting a client can reuse that client's saved booking address, and saved physical booking locations use the shared Maps preference for directions.
+- Dashboard, client detail, booking detail, Money, and Tasks continue to share canonical records and providers; no booking-only duplicate data or database migration is introduced.
+
+## 2026-07-19 - Selection Lists Use One Mobile Picker Pattern
+
+Decision:
+
+Replace Flutter's native dropdown menus with a shared Workloop picker sheet for all in-app selection fields.
+
+Reasoning:
+
+The platform dropdown expands into a visually heavy, desktop-style menu that does not match Workloop's calm mobile design language. A bottom sheet keeps choices within thumb reach, supports long business lists, and gives every workflow the same interaction and selection hierarchy.
+
+Consequences:
+
+- Short option sets use a compact rounded sheet with a clear selected state.
+- Longer sets, including clients, add search automatically and remain independently scrollable.
+- Picker fields, rows, typography, spacing, haptics, and dismissal behaviour come from one shared component.
+- Booking, onboarding, public-profile, task, and payment selectors now use the same interaction.
+- No package, database, repository, or navigation change is introduced.

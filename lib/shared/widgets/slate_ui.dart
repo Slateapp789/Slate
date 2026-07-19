@@ -492,6 +492,413 @@ class WorkloopIconButton extends StatelessWidget {
   }
 }
 
+class WorkloopPickerOption<T> {
+  final T value;
+  final String label;
+  final String? subtitle;
+  final Widget? leading;
+
+  const WorkloopPickerOption({
+    required this.value,
+    required this.label,
+    this.subtitle,
+    this.leading,
+  });
+}
+
+/// A mobile-first alternative to Flutter's desktop-style dropdown menu.
+///
+/// Long lists become searchable automatically and every picker uses the same
+/// rounded, keyboard-safe sheet and selection treatment.
+class WorkloopPickerField<T> extends StatelessWidget {
+  final T? value;
+  final List<WorkloopPickerOption<T>> options;
+  final ValueChanged<T> onChanged;
+  final String title;
+  final String hint;
+  final String searchHint;
+  final IconData? leadingIcon;
+  final bool searchable;
+  final bool enabled;
+  final Color accentColor;
+
+  const WorkloopPickerField({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+    required this.title,
+    required this.hint,
+    this.searchHint = 'Search',
+    this.leadingIcon,
+    this.searchable = false,
+    this.enabled = true,
+    this.accentColor = AppColors.accentPrimary,
+  });
+
+  WorkloopPickerOption<T>? get _selectedOption {
+    for (final option in options) {
+      if (option.value == value) return option;
+    }
+    return null;
+  }
+
+  Future<void> _showPicker(BuildContext context) async {
+    if (!enabled || options.isEmpty) return;
+    SlateHaptics.tap();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: AppColors.t1.withValues(alpha: 0.20),
+      builder: (sheetContext) => _WorkloopPickerSheet<T>(
+        title: title,
+        searchHint: searchHint,
+        selected: value,
+        options: options,
+        searchable: searchable || options.length > 8,
+        accentColor: accentColor,
+        onSelected: (selected) {
+          Navigator.pop(sheetContext);
+          SlateHaptics.tap();
+          onChanged(selected);
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    final selected = _selectedOption;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? () => _showPicker(context) : null,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Ink(
+          height: 58,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          decoration: BoxDecoration(
+            color: tokens.surfaceRaised.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: tokens.divider.withValues(alpha: 0.72)),
+          ),
+          child: Row(
+            children: [
+              if (selected?.leading != null || leadingIcon != null) ...[
+                selected?.leading ??
+                    Icon(leadingIcon, color: tokens.textTertiary, size: 18),
+                const SizedBox(width: AppSpacing.sm),
+              ],
+              Expanded(
+                child: Text(
+                  selected?.label ?? hint,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected == null
+                        ? tokens.textTertiary
+                        : tokens.textPrimary,
+                    fontSize: 15,
+                    fontWeight: selected == null
+                        ? FontWeight.w600
+                        : FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Icon(
+                LucideIcons.chevronDown,
+                size: 18,
+                color: enabled ? tokens.textTertiary : tokens.textDisabled,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkloopPickerSheet<T> extends StatefulWidget {
+  final String title;
+  final String searchHint;
+  final T? selected;
+  final List<WorkloopPickerOption<T>> options;
+  final bool searchable;
+  final Color accentColor;
+  final ValueChanged<T> onSelected;
+
+  const _WorkloopPickerSheet({
+    required this.title,
+    required this.searchHint,
+    required this.selected,
+    required this.options,
+    required this.searchable,
+    required this.accentColor,
+    required this.onSelected,
+  });
+
+  @override
+  State<_WorkloopPickerSheet<T>> createState() =>
+      _WorkloopPickerSheetState<T>();
+}
+
+class _WorkloopPickerSheetState<T> extends State<_WorkloopPickerSheet<T>> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<WorkloopPickerOption<T>> get _filteredOptions {
+    final query = _query.trim().toLowerCase();
+    if (query.isEmpty) return widget.options;
+    return widget.options.where((option) {
+      return option.label.toLowerCase().contains(query) ||
+          (option.subtitle?.toLowerCase().contains(query) ?? false);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: widget.options.length > 6 ? 0.78 : 0.55,
+      minChildSize: 0.42,
+      maxChildSize: 0.92,
+      builder: (context, scrollController) {
+        final filtered = _filteredOptions;
+        return Container(
+          decoration: BoxDecoration(
+            color: tokens.surfaceRaised,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadius.xl),
+            ),
+            border: Border.all(color: tokens.divider.withValues(alpha: 0.62)),
+            boxShadow: AppShadows.glass,
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: AppSpacing.sm),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: tokens.textPrimary.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        style: TextStyle(
+                          color: tokens.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          height: 1.08,
+                        ),
+                      ),
+                    ),
+                    WorkloopIconButton(
+                      icon: LucideIcons.x,
+                      semanticLabel: 'Close ${widget.title}',
+                      onTap: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              if (widget.searchable)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    0,
+                    AppSpacing.lg,
+                    AppSpacing.sm,
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    autofocus: false,
+                    textInputAction: TextInputAction.search,
+                    onChanged: (value) => setState(() => _query = value),
+                    decoration: InputDecoration(
+                      hintText: widget.searchHint,
+                      prefixIcon: const Icon(LucideIcons.search, size: 18),
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _query = '');
+                              },
+                              icon: const Icon(LucideIcons.x, size: 17),
+                            ),
+                      filled: true,
+                      fillColor: tokens.textPrimary.withValues(alpha: 0.035),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        borderSide: BorderSide(
+                          color: tokens.divider.withValues(alpha: 0.62),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        borderSide: BorderSide(
+                          color: tokens.divider.withValues(alpha: 0.62),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        borderSide: BorderSide(
+                          color: widget.accentColor.withValues(alpha: 0.72),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No matches found',
+                          style: TextStyle(
+                            color: tokens.textTertiary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.lg,
+                          AppSpacing.xs,
+                          AppSpacing.lg,
+                          AppSpacing.xl,
+                        ),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final option = filtered[index];
+                          final selected = option.value == widget.selected;
+                          return _WorkloopPickerRow<T>(
+                            option: option,
+                            selected: selected,
+                            accentColor: widget.accentColor,
+                            onTap: () => widget.onSelected(option.value),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _WorkloopPickerRow<T> extends StatelessWidget {
+  final WorkloopPickerOption<T> option;
+  final bool selected;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  const _WorkloopPickerRow({
+    required this.option,
+    required this.selected,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    return Material(
+      color: selected
+          ? accentColor.withValues(alpha: 0.09)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
+            children: [
+              if (option.leading != null) ...[
+                option.leading!,
+                const SizedBox(width: AppSpacing.md),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      option.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: tokens.textPrimary,
+                        fontSize: 15,
+                        fontWeight: selected
+                            ? FontWeight.w800
+                            : FontWeight.w700,
+                      ),
+                    ),
+                    if (option.subtitle?.isNotEmpty == true) ...[
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        option.subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: tokens.textTertiary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (selected)
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.14),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(LucideIcons.check, color: accentColor, size: 16),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class WorkloopSegment<T> {
   final T value;
   final String label;
@@ -569,6 +976,125 @@ class WorkloopSegmentedControl<T> extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// A draggable glass navigation capsule shared by feature workspaces.
+///
+/// This mirrors the interaction and geometry of the bottom navigation and the
+/// Clients workspace rail. Use it for peer destinations; use
+/// [WorkloopSegmentedControl] for compact filters.
+class WorkloopNavigationControl<T> extends StatelessWidget {
+  final List<WorkloopSegment<T>> segments;
+  final T selected;
+  final ValueChanged<T> onChanged;
+  final Color color;
+
+  const WorkloopNavigationControl({
+    super.key,
+    required this.segments,
+    required this.selected,
+    required this.onChanged,
+    this.color = AppColors.accentPrimary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedIndex = segments.indexWhere(
+      (segment) => segment.value == selected,
+    );
+    return SlateGlassSurface(
+      blur: 22,
+      color: AppColors.bgCard.withValues(alpha: 0.90),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      child: SizedBox(
+        height: 54,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final itemWidth = constraints.maxWidth / segments.length;
+
+            void select(T value) {
+              if (value == selected) return;
+              SlateHaptics.tap();
+              onChanged(value);
+            }
+
+            void handleDrag(double dx) {
+              final index = (dx / itemWidth).floor().clamp(
+                0,
+                segments.length - 1,
+              );
+              select(segments[index].value);
+            }
+
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragStart: (details) {
+                handleDrag(details.localPosition.dx);
+              },
+              onHorizontalDragUpdate: (details) {
+                handleDrag(details.localPosition.dx);
+              },
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  AnimatedPositioned(
+                    duration: AppMotion.deliberate,
+                    curve: AppMotion.emphasized,
+                    left: (selectedIndex < 0 ? 0 : selectedIndex) * itemWidth,
+                    top: 6,
+                    width: itemWidth,
+                    height: 42,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          border: Border.all(
+                            color: color.withValues(alpha: 0.22),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      for (final segment in segments)
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => select(segment.value),
+                            child: Center(
+                              child: AnimatedDefaultTextStyle(
+                                duration: AppMotion.standard,
+                                style: TextStyle(
+                                  color: segment.value == selected
+                                      ? color
+                                      : AppColors.t3,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                child: Text(
+                                  segment.badge == null
+                                      ? segment.label
+                                      : '${segment.label} ${segment.badge}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/providers/maps_preference_provider.dart';
+import '../../../shared/utils/maps_launcher.dart';
 import '../providers/settings_providers.dart';
 import 'settings_helpers.dart';
 
@@ -12,9 +14,19 @@ class SettingsAppTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(settingsBusinessProfileProvider);
+    final mapsPreference = ref.watch(preferredMapsAppProvider);
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
       children: [
+        sectionLabel('Preferences'),
+        const SizedBox(height: 10),
+        _mapsPreferenceRow(
+          context,
+          ref,
+          mapsPreference.value ?? MapsAppPreference.askEveryTime,
+        ),
+        const SizedBox(height: 28),
+
         sectionLabel('About'),
         const SizedBox(height: 10),
         Column(
@@ -89,6 +101,60 @@ class SettingsAppTab extends ConsumerWidget {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _mapsPreferenceRow(
+    BuildContext context,
+    WidgetRef ref,
+    MapsAppPreference preference,
+  ) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () async {
+        final selected = await showMapsPreferenceSheet(
+          context,
+          selected: preference,
+        );
+        if (selected == null) return;
+        await ref
+            .read(preferredMapsAppProvider.notifier)
+            .setPreference(selected);
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        child: Row(
+          children: [
+            const Icon(
+              LucideIcons.navigation,
+              color: AppColors.green,
+              size: 18,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Default maps app',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.t1,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    preference.label,
+                    style: const TextStyle(fontSize: 12, color: AppColors.t3),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
+          ],
+        ),
+      ),
     );
   }
 

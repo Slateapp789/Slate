@@ -31,4 +31,33 @@ void main() {
 
     expect(next?['id'], 'first-at-nine');
   });
+
+  test('selectNextBooking ignores past and cancelled bookings', () {
+    final now = DateTime.utc(2026, 7, 19, 10);
+    final bookings = [
+      {
+        'id': 'past',
+        'start_time': '2026-07-19T09:30:00Z',
+        'status': 'scheduled',
+      },
+      {
+        'id': 'cancelled',
+        'start_time': '2026-07-19T10:30:00Z',
+        'status': 'cancelled',
+      },
+    ];
+
+    expect(selectNextBooking(bookings, now: now), isNull);
+  });
+
+  test('selectNextBooking treats a booking starting now as upcoming', () {
+    final now = DateTime.utc(2026, 7, 19, 10);
+    final booking = {
+      'id': 'now',
+      'start_time': '2026-07-19T10:00:00Z',
+      'status': 'scheduled',
+    };
+
+    expect(selectNextBooking([booking], now: now)?['id'], 'now');
+  });
 }

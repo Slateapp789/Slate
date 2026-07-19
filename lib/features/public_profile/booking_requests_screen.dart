@@ -43,151 +43,152 @@ class _BookingRequestsScreenState extends ConsumerState<BookingRequestsScreen> {
     final requests = ref.watch(bookingRequestsProvider);
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Icon(
-                        LucideIcons.chevronLeft,
-                        color: AppColors.t2,
-                        size: 18,
-                      ),
-                    ),
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    AppSpacing.lg,
+                    AppSpacing.pageX,
+                    AppSpacing.md,
                   ),
-                  const SizedBox(width: 14),
-                  const Text(
-                    'Booking requests',
-                    style: TextStyle(
-                      color: AppColors.t1,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            requests.maybeWhen(
-              data: (items) {
-                if (items.isEmpty) return const SizedBox.shrink();
-                final pending = items
-                    .where((item) => item.status == 'pending')
-                    .length;
-                final contacted = items
-                    .where((item) => item.status == 'contacted')
-                    .length;
-                final booked = items
-                    .where((item) => item.status == 'confirmed')
-                    .length;
-                final declined = items
-                    .where((item) => item.status == 'declined')
-                    .length;
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                   child: Row(
                     children: [
-                      _RequestFilterChip(
-                        label: 'Active ${pending + contacted}',
-                        active: _view == _RequestView.active,
-                        onTap: () =>
-                            setState(() => _view = _RequestView.active),
+                      WorkloopIconButton(
+                        icon: LucideIcons.chevronLeft,
+                        semanticLabel: 'Back to bookings',
+                        onTap: () => Navigator.pop(context),
                       ),
-                      const SizedBox(width: 8),
-                      _RequestFilterChip(
-                        label: 'New $pending',
-                        active: _view == _RequestView.pending,
-                        onTap: () =>
-                            setState(() => _view = _RequestView.pending),
-                      ),
-                      const SizedBox(width: 8),
-                      _RequestFilterChip(
-                        label: 'Contacted $contacted',
-                        active: _view == _RequestView.contacted,
-                        onTap: () =>
-                            setState(() => _view = _RequestView.contacted),
-                      ),
-                      const SizedBox(width: 8),
-                      _RequestFilterChip(
-                        label: 'Booked $booked',
-                        active: _view == _RequestView.booked,
-                        onTap: () =>
-                            setState(() => _view = _RequestView.booked),
-                      ),
-                      const SizedBox(width: 8),
-                      _RequestFilterChip(
-                        label: 'Declined $declined',
-                        active: _view == _RequestView.declined,
-                        onTap: () =>
-                            setState(() => _view = _RequestView.declined),
+                      const SizedBox(width: AppSpacing.sm),
+                      const Expanded(
+                        child: Text(
+                          'Booking requests',
+                          style: TextStyle(
+                            color: AppColors.t1,
+                            fontSize: 26,
+                            height: 1.05,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                );
-              },
-              orElse: () => const SizedBox.shrink(),
-            ),
-            Expanded(
-              child: requests.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(color: AppColors.green),
                 ),
-                error: (_, __) => const _EmptyRequests(
-                  title: 'Could not load requests',
-                  subtitle: 'Try again in a moment.',
+                requests.maybeWhen(
+                  data: (items) {
+                    if (items.isEmpty) return const SizedBox.shrink();
+                    final pending = items
+                        .where((item) => item.status == 'pending')
+                        .length;
+                    final contacted = items
+                        .where((item) => item.status == 'contacted')
+                        .length;
+                    final booked = items
+                        .where((item) => item.status == 'confirmed')
+                        .length;
+                    final declined = items
+                        .where((item) => item.status == 'declined')
+                        .length;
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                      child: Row(
+                        children: [
+                          _RequestFilterChip(
+                            label: 'Active ${pending + contacted}',
+                            active: _view == _RequestView.active,
+                            onTap: () =>
+                                setState(() => _view = _RequestView.active),
+                          ),
+                          const SizedBox(width: 8),
+                          _RequestFilterChip(
+                            label: 'New $pending',
+                            active: _view == _RequestView.pending,
+                            onTap: () =>
+                                setState(() => _view = _RequestView.pending),
+                          ),
+                          const SizedBox(width: 8),
+                          _RequestFilterChip(
+                            label: 'Contacted $contacted',
+                            active: _view == _RequestView.contacted,
+                            onTap: () =>
+                                setState(() => _view = _RequestView.contacted),
+                          ),
+                          const SizedBox(width: 8),
+                          _RequestFilterChip(
+                            label: 'Booked $booked',
+                            active: _view == _RequestView.booked,
+                            onTap: () =>
+                                setState(() => _view = _RequestView.booked),
+                          ),
+                          const SizedBox(width: 8),
+                          _RequestFilterChip(
+                            label: 'Declined $declined',
+                            active: _view == _RequestView.declined,
+                            onTap: () =>
+                                setState(() => _view = _RequestView.declined),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  orElse: () => const SizedBox.shrink(),
                 ),
-                data: (items) {
-                  if (items.isEmpty) {
-                    return const _EmptyRequests(
-                      title: 'No booking requests',
-                      subtitle:
-                          'Requests from your public profile will appear here.',
-                    );
-                  }
-                  final filtered = _filterRequests(items);
-                  if (filtered.isEmpty) {
-                    return _EmptyRequests(
-                      title: switch (_view) {
-                        _RequestView.pending => 'No new requests',
-                        _RequestView.contacted => 'No contacted requests',
-                        _RequestView.booked => 'No booked requests',
-                        _RequestView.declined => 'No declined requests',
-                        _ => 'No active requests',
-                      },
-                      subtitle: 'Switch filters to review other requests.',
-                    );
-                  }
-                  return RefreshIndicator(
-                    color: AppColors.green,
-                    onRefresh: () async =>
-                        ref.invalidate(bookingRequestsProvider),
-                    child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-                      itemBuilder: (context, index) =>
-                          _RequestCard(request: filtered[index]),
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemCount: filtered.length,
+                Expanded(
+                  child: requests.when(
+                    loading: () => const Center(
+                      child: CircularProgressIndicator(color: AppColors.green),
                     ),
-                  );
-                },
-              ),
+                    error: (_, __) => const _EmptyRequests(
+                      title: 'Could not load requests',
+                      subtitle: 'Try again in a moment.',
+                    ),
+                    data: (items) {
+                      if (items.isEmpty) {
+                        return const _EmptyRequests(
+                          title: 'No booking requests',
+                          subtitle:
+                              'Requests from your public profile will appear here.',
+                        );
+                      }
+                      final filtered = _filterRequests(items);
+                      if (filtered.isEmpty) {
+                        return _EmptyRequests(
+                          title: switch (_view) {
+                            _RequestView.pending => 'No new requests',
+                            _RequestView.contacted => 'No contacted requests',
+                            _RequestView.booked => 'No booked requests',
+                            _RequestView.declined => 'No declined requests',
+                            _ => 'No active requests',
+                          },
+                          subtitle: 'Switch filters to review other requests.',
+                        );
+                      }
+                      return RefreshIndicator(
+                        color: AppColors.green,
+                        onRefresh: () async =>
+                            ref.invalidate(bookingRequestsProvider),
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                          itemBuilder: (context, index) =>
+                              _RequestCard(request: filtered[index]),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemCount: filtered.length,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

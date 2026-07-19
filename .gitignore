@@ -37,6 +37,7 @@ migrate_working_dir/
 /build
 /build/
 ui_screenshots/
+supabase/.temp/
 
 # Symbolication related
 app.*.symbols

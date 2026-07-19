@@ -9,6 +9,7 @@ import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/models/slate_models.dart';
+import '../../shared/widgets/slate_ui.dart';
 
 class AddPaymentScreen extends ConsumerStatefulWidget {
   final String? initialClientId;
@@ -363,47 +364,28 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                     ),
                     const SizedBox(height: 12),
                     clients.when(
-                      data: (data) => DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedClientId,
-                          isExpanded: true,
-                          dropdownColor: AppColors.bgRaised,
-                          icon: const Icon(
-                            LucideIcons.chevronDown,
-                            color: AppColors.t3,
-                            size: 16,
+                      data: (data) => WorkloopPickerField<String?>(
+                        value: _selectedClientId,
+                        title: 'Choose a client',
+                        hint: 'Select a client',
+                        searchHint: 'Search clients',
+                        searchable: true,
+                        leadingIcon: LucideIcons.users,
+                        options: [
+                          const WorkloopPickerOption<String?>(
+                            value: null,
+                            label: 'No client',
+                            subtitle: 'Keep this payment unlinked',
                           ),
-                          hint: const Text(
-                            'Select a client',
-                            style: TextStyle(color: AppColors.t3, fontSize: 14),
+                          ...data.map(
+                            (client) => WorkloopPickerOption<String?>(
+                              value: client.id,
+                              label: client.name,
+                            ),
                           ),
-                          items: [
-                            const DropdownMenuItem(
-                              value: null,
-                              child: Text(
-                                'No client',
-                                style: TextStyle(
-                                  color: AppColors.t3,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                            ...data.map(
-                              (c) => DropdownMenuItem(
-                                value: c.id,
-                                child: Text(
-                                  c.name,
-                                  style: const TextStyle(
-                                    color: AppColors.t1,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                          onChanged: (v) =>
-                              setState(() => _selectedClientId = v),
-                        ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _selectedClientId = value),
                       ),
                       loading: () => const CircularProgressIndicator(
                         color: AppColors.green,

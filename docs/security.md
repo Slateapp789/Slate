@@ -17,6 +17,11 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-or-publishable-key
 ```
 
+Google Places is called only by the authenticated `places-address-search` Edge
+Function. Store `GOOGLE_PLACES_API_KEY` in Supabase Edge Function secrets and
+restrict it to Places API (New). Never add that key to Flutter `.env`, source
+code, or a mobile application bundle. See `docs/GooglePlacesSetup.md`.
+
 The Supabase anon/publishable key is not a server secret. It is expected to be present in client apps, but database safety depends on correct Supabase Row Level Security policies. Never put a `service_role` key or any other privileged backend secret in Flutter code, `.env`, or mobile app bundles.
 
 The public booking/profile Edge Functions are deployed with JWT verification enabled, so the current mobile `.env` uses the legacy anon JWT rather than the newer publishable key. Both are public client keys; the service role key only lives in Supabase Edge Function secrets.

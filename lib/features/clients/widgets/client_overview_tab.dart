@@ -15,6 +15,7 @@ class ClientOverviewTab extends ConsumerWidget {
   final VoidCallback onOpenBookings;
   final VoidCallback onOpenPayments;
   final VoidCallback onOpenTasks;
+  final ValueChanged<String> onOpenAddress;
 
   const ClientOverviewTab({
     super.key,
@@ -24,6 +25,7 @@ class ClientOverviewTab extends ConsumerWidget {
     required this.onOpenBookings,
     required this.onOpenPayments,
     required this.onOpenTasks,
+    required this.onOpenAddress,
   });
 
   @override
@@ -71,7 +73,11 @@ class ClientOverviewTab extends ConsumerWidget {
           const WorkloopDivider(margin: EdgeInsets.symmetric(vertical: 22)),
           _NotesSection(client: client, onEdit: onEdit),
           const WorkloopDivider(margin: EdgeInsets.symmetric(vertical: 22)),
-          _DetailsSection(client: client, onEdit: onEdit),
+          _DetailsSection(
+            client: client,
+            onEdit: onEdit,
+            onOpenAddress: onOpenAddress,
+          ),
           const WorkloopDivider(margin: EdgeInsets.symmetric(vertical: 22)),
           _RecentActivity(
             appointments: appointmentRows,
@@ -448,8 +454,13 @@ class _NotesSection extends StatelessWidget {
 class _DetailsSection extends StatelessWidget {
   final Map<String, dynamic> client;
   final VoidCallback onEdit;
+  final ValueChanged<String> onOpenAddress;
 
-  const _DetailsSection({required this.client, required this.onEdit});
+  const _DetailsSection({
+    required this.client,
+    required this.onEdit,
+    required this.onOpenAddress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -461,23 +472,36 @@ class _DetailsSection extends StatelessWidget {
         .map((tag) => tag.toString().trim())
         .where((tag) => tag.isNotEmpty)
         .toList();
-    final rows = <({IconData icon, String label, String value})>[
-      (
-        icon: LucideIcons.messageCircle,
-        label: 'Preferred contact',
-        value: _contactLabel(preferred),
-      ),
-      if (address.isNotEmpty)
-        (icon: LucideIcons.mapPin, label: 'Address', value: address),
-      if (source.isNotEmpty)
-        (icon: LucideIcons.radio, label: 'Source', value: source),
-      if (birthday != null)
-        (
-          icon: LucideIcons.cake,
-          label: 'Birthday',
-          value: '${birthday.day}/${birthday.month}/${birthday.year}',
-        ),
-    ];
+    final rows =
+        <({IconData icon, String label, String value, VoidCallback? onTap})>[
+          (
+            icon: LucideIcons.messageCircle,
+            label: 'Preferred contact',
+            value: _contactLabel(preferred),
+            onTap: null,
+          ),
+          if (address.isNotEmpty)
+            (
+              icon: LucideIcons.mapPin,
+              label: 'Booking address',
+              value: address,
+              onTap: () => onOpenAddress(address),
+            ),
+          if (source.isNotEmpty)
+            (
+              icon: LucideIcons.radio,
+              label: 'Source',
+              value: source,
+              onTap: null,
+            ),
+          if (birthday != null)
+            (
+              icon: LucideIcons.cake,
+              label: 'Birthday',
+              value: '${birthday.day}/${birthday.month}/${birthday.year}',
+              onTap: null,
+            ),
+        ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -485,39 +509,57 @@ class _DetailsSection extends StatelessWidget {
         _SectionHeader(title: 'Details', action: 'Edit', onAction: onEdit),
         const SizedBox(height: AppSpacing.xs),
         ...rows.map(
-          (row) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(row.icon, color: AppColors.t3, size: 16),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        row.label,
-                        style: const TextStyle(
-                          color: AppColors.t3,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
+          (row) => Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              onTap: row.onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(row.icon, color: AppColors.t3, size: 16),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            row.label,
+                            style: const TextStyle(
+                              color: AppColors.t3,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            row.value,
+                            style: const TextStyle(
+                              color: AppColors.t2,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        row.value,
-                        style: const TextStyle(
-                          color: AppColors.t2,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          height: 1.35,
+                    ),
+                    if (row.onTap != null) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Icon(
+                          LucideIcons.navigation,
+                          color: AppColors.accentPrimary,
+                          size: 16,
                         ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
