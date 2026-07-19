@@ -58,6 +58,20 @@ double _sumTotals(List<Map<String, dynamic>> rows) {
   });
 }
 
+double _sumOutstanding(List<Map<String, dynamic>> rows) {
+  return rows.fold<double>(0, (sum, row) {
+    final totalValue = row['total'];
+    final paidValue = row['amount_paid'];
+    final total = totalValue is num
+        ? totalValue.toDouble()
+        : double.tryParse(totalValue?.toString() ?? '') ?? 0;
+    final paid = paidValue is num
+        ? paidValue.toDouble()
+        : double.tryParse(paidValue?.toString() ?? '') ?? 0;
+    return sum + (total - paid).clamp(0, double.infinity);
+  });
+}
+
 double _sumAmounts(List<Map<String, dynamic>> rows) {
   return rows.fold<double>(0, (sum, row) {
     final v = row['amount'];
@@ -128,7 +142,9 @@ final dashboardRevenueProvider = FutureProvider<DashboardRevenue>((ref) async {
     monthTotal: _sumTotals(List<Map<String, dynamic>>.from(monthPaid)),
     weekExpenses: _sumAmounts(List<Map<String, dynamic>>.from(weekExpenses)),
     monthExpenses: _sumAmounts(List<Map<String, dynamic>>.from(monthExpenses)),
-    outstanding: _sumTotals(List<Map<String, dynamic>>.from(outstandingRows)),
+    outstanding: _sumOutstanding(
+      List<Map<String, dynamic>>.from(outstandingRows),
+    ),
     revenueTarget: revenueTarget,
   );
 });
@@ -195,7 +211,7 @@ final dashboardFocusProvider = FutureProvider<DashboardFocus>((ref) async {
     nextAppointment: nextAppointment,
     pendingBookingRequests: pendingRequests,
     overduePayments: overdueRows.length,
-    overdueTotal: _sumTotals(overdueRows),
+    overdueTotal: _sumOutstanding(overdueRows),
     calendarSyncEnabled: calendarSyncEnabled,
   );
 });

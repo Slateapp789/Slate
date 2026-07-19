@@ -51,102 +51,47 @@ class _MoneySectionHero extends StatelessWidget {
   }
 }
 
-class _OutstandingHero extends StatelessWidget {
-  final double total;
-  final double upcoming;
-  final double overdue;
+class _IncomeTargetProgress extends StatelessWidget {
+  final String label;
+  final double made;
+  final double target;
+  final VoidCallback onEditTarget;
 
-  const _OutstandingHero({
-    required this.total,
-    required this.upcoming,
-    required this.overdue,
+  const _IncomeTargetProgress({
+    required this.label,
+    required this.made,
+    required this.target,
+    required this.onEditTarget,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Outstanding',
-          style: TextStyle(
-            color: AppColors.t3,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xxs),
-        Text(
-          '£${total.toStringAsFixed(0)}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppColors.t1,
-            fontSize: 40,
-            height: 1,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        WorkloopMetricRow(
-          children: [
-            WorkloopMetricItem(
-              value: '£${upcoming.toStringAsFixed(0)}',
-              label: 'Upcoming',
-              color: AppColors.t1,
-            ),
-            WorkloopMetricItem(
-              value: '£${overdue.toStringAsFixed(0)}',
-              label: 'Past due',
-              color: AppColors.t1,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _WeeklyTargetCard extends StatelessWidget {
-  final FinanceSummary summary;
-  final VoidCallback onEditTarget;
-
-  const _WeeklyTargetCard({required this.summary, required this.onEditTarget});
-
-  @override
-  Widget build(BuildContext context) {
-    final hasTarget = summary.weeklyTarget > 0;
-    final progress = summary.weeklyProgress;
-    final left = (summary.weeklyTarget - summary.thisWeekPaid).clamp(
-      0,
-      double.infinity,
-    );
-    final change = summary.weekDelta;
+    final hasTarget = target > 0;
+    final progress = hasTarget ? (made / target).clamp(0.0, 1.0) : 0.0;
+    final left = (target - made).clamp(0, double.infinity);
+    final percentage = hasTarget ? ((made / target) * 100).round() : 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         WorkloopSectionHeader(
-          label: 'Weekly target',
+          label: label,
           actionLabel: hasTarget ? 'Edit' : 'Set target',
           onAction: onEditTarget,
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          hasTarget
-              ? '£${summary.thisWeekPaid.toStringAsFixed(0)} of £${summary.weeklyTarget.toStringAsFixed(0)}'
-              : 'No target set',
+          hasTarget ? '$percentage% complete' : 'No target set',
           style: const TextStyle(
             color: AppColors.t1,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
         ClipRRect(
           borderRadius: BorderRadius.circular(AppRadius.pill),
           child: LinearProgressIndicator(
-            minHeight: 5,
+            minHeight: 8,
             value: hasTarget ? progress : 0,
             backgroundColor: AppColors.t1.withValues(alpha: 0.06),
             valueColor: const AlwaysStoppedAnimation(
@@ -157,8 +102,10 @@ class _WeeklyTargetCard extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         Text(
           hasTarget
-              ? '£${left.toStringAsFixed(0)} left · ${change >= 0 ? '+' : '-'}£${change.abs().toStringAsFixed(0)} compared with last week'
-              : 'Set a monthly goal to see gentle weekly progress here.',
+              ? left > 0
+                    ? '£${made.toStringAsFixed(0)} of £${target.toStringAsFixed(0)} · £${left.toStringAsFixed(0)} left'
+                    : '£${made.toStringAsFixed(0)} of £${target.toStringAsFixed(0)} · Target reached'
+              : 'Set an income target to track your progress here.',
           style: const TextStyle(
             color: AppColors.t3,
             fontSize: 12,
@@ -192,28 +139,6 @@ class _QuietMoneyState extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _MoneyCollectGroupHeader extends StatelessWidget {
-  final String label;
-
-  const _MoneyCollectGroupHeader({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xs),
-      child: Text(
-        label.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
-          color: AppColors.t3,
-          letterSpacing: 0,
-        ),
       ),
     );
   }

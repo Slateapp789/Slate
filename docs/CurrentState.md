@@ -118,7 +118,7 @@ Last updated: 2026-07-15
 ### Money
 
 - User-facing Money built partly on `invoices`.
-- Calm three-section Money workspace aligned with Home, Clients, and Bookings: a draggable Income / Outgoing / Outstanding navigation bar, section-specific totals and activity, shared period controls for Income and Outgoing, slim target progress, category summaries, and divider-led collection rows.
+- Calm three-section Money workspace aligned with Home, Clients, and Bookings: plain-language Made / Spent / Owed navigation, one primary figure per section, period controls for Made and Spent, period-aware target progress, category summaries, and one divider-led owed list.
 - Compact top actions create income or expense entries without a floating action button.
 - Record payment.
 - Edit payment.

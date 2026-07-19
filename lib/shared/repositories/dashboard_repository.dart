@@ -19,7 +19,7 @@ class DashboardRepository {
   }) async {
     var query = _client
         .from('invoices')
-        .select('total')
+        .select('total,amount_paid')
         .eq('workspace_id', workspaceId);
     if (statuses != null) {
       query = query.inFilter('status', statuses);
@@ -91,7 +91,7 @@ class DashboardRepository {
   Future<List<Map<String, dynamic>>> overduePayments(String workspaceId) async {
     final rows = await _client
         .from('invoices')
-        .select('id,total,contacts(name)')
+        .select('id,total,amount_paid,contacts(name)')
         .eq('workspace_id', workspaceId)
         .eq('status', 'overdue')
         .order('due_date', ascending: true);

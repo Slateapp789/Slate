@@ -7,7 +7,7 @@ import 'package:workloop/shared/widgets/slate_ui.dart';
 
 void main() {
   testWidgets('Money navigation exposes three clear sections', (tester) async {
-    MoneySection selected = MoneySection.income;
+    MoneySection selected = MoneySection.made;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -16,15 +16,9 @@ void main() {
             body: WorkloopNavigationControl<MoneySection>(
               selected: selected,
               segments: const [
-                WorkloopSegment(value: MoneySection.income, label: 'Income'),
-                WorkloopSegment(
-                  value: MoneySection.outgoing,
-                  label: 'Outgoing',
-                ),
-                WorkloopSegment(
-                  value: MoneySection.outstanding,
-                  label: 'Outstanding',
-                ),
+                WorkloopSegment(value: MoneySection.made, label: 'Made'),
+                WorkloopSegment(value: MoneySection.spent, label: 'Spent'),
+                WorkloopSegment(value: MoneySection.owed, label: 'Owed'),
               ],
               onChanged: (value) => setState(() => selected = value),
             ),
@@ -33,13 +27,13 @@ void main() {
       ),
     );
 
-    expect(find.text('Income'), findsOneWidget);
-    expect(find.text('Outgoing'), findsOneWidget);
-    expect(find.text('Outstanding'), findsOneWidget);
+    expect(find.text('Made'), findsOneWidget);
+    expect(find.text('Spent'), findsOneWidget);
+    expect(find.text('Owed'), findsOneWidget);
 
-    await tester.tap(find.text('Outstanding'));
+    await tester.tap(find.text('Owed'));
     await tester.pumpAndSettle();
-    expect(selected, MoneySection.outstanding);
+    expect(selected, MoneySection.owed);
   });
 
   testWidgets('Money period selector uses the shared segmented interaction', (
