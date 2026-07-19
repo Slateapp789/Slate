@@ -20,7 +20,7 @@ part 'finance_screen_widgets.dart';
 
 enum FinanceInitialFocus { top, followUps }
 
-enum MoneySection { income, outgoing, outstanding }
+enum MoneySection { made, spent, owed }
 
 class FinanceScreen extends ConsumerStatefulWidget {
   final FinanceInitialFocus initialFocus;
@@ -32,7 +32,7 @@ class FinanceScreen extends ConsumerStatefulWidget {
 }
 
 class _FinanceScreenState extends ConsumerState<FinanceScreen> {
-  MoneySection _section = MoneySection.income;
+  MoneySection _section = MoneySection.made;
   FinancePeriod _period = FinancePeriod.week;
   DateTime? _customStart;
   DateTime? _customEnd;
@@ -44,7 +44,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   void initState() {
     super.initState();
     if (widget.initialFocus == FinanceInitialFocus.followUps) {
-      _section = MoneySection.outstanding;
+      _section = MoneySection.owed;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _applyInitialFocus());
   }
@@ -55,7 +55,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     if (widget.initialFocus != oldWidget.initialFocus &&
         widget.initialFocus == FinanceInitialFocus.followUps) {
       _didApplyInitialFocus = false;
-      _section = MoneySection.outstanding;
+      _section = MoneySection.owed;
       WidgetsBinding.instance.addPostFrameCallback((_) => _applyInitialFocus());
     }
   }
@@ -116,7 +116,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                   WorkloopPageHeader(
                     icon: LucideIcons.banknote,
                     title: 'Money',
-                    subtitle: 'Income, outgoing, and what is still due.',
+                    subtitle: 'What you have made, spent, and are owed.',
                     color: AppColors.modFinance,
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -143,18 +143,12 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                   WorkloopNavigationControl<MoneySection>(
                     selected: _section,
                     segments: const [
+                      WorkloopSegment(value: MoneySection.made, label: 'Made'),
                       WorkloopSegment(
-                        value: MoneySection.income,
-                        label: 'Income',
+                        value: MoneySection.spent,
+                        label: 'Spent',
                       ),
-                      WorkloopSegment(
-                        value: MoneySection.outgoing,
-                        label: 'Outgoing',
-                      ),
-                      WorkloopSegment(
-                        value: MoneySection.outstanding,
-                        label: 'Outstanding',
-                      ),
+                      WorkloopSegment(value: MoneySection.owed, label: 'Owed'),
                     ],
                     color: AppColors.accentPrimary,
                     onChanged: (section) => setState(() => _section = section),
@@ -214,18 +208,18 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       range: range,
     );
     return switch (_section) {
-      MoneySection.income => _incomeSection(
+      MoneySection.made => _incomeSection(
         payments: payments,
         summary: summary,
         range: range,
         periodSummary: periodSummary,
       ),
-      MoneySection.outgoing => _outgoingSection(
+      MoneySection.spent => _outgoingSection(
         expenses: expenses,
         range: range,
         periodSummary: periodSummary,
       ),
-      MoneySection.outstanding => _outstandingSection(payments),
+      MoneySection.owed => _owedSection(payments),
     };
   }
 
@@ -261,19 +255,27 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         _periodSelector(range),
         const SizedBox(height: AppSpacing.xl),
         _MoneySectionHero(
-          label: 'Income received',
+          label: 'Made ${range.label.toLowerCase()}',
           value: periodSummary.paid,
           detail:
-              '${income.length} received entr${income.length == 1 ? 'y' : 'ies'} · ${range.label}',
+              '${income.length} payment${income.length == 1 ? '' : 's'} received',
         ),
-        const SizedBox(height: AppSpacing.xxl),
-        _WeeklyTargetCard(
-          summary: summary,
-          onEditTarget: () => _showTargetSheet(context, summary),
-        ),
+        if (_period != FinancePeriod.custom) ...[
+          const SizedBox(height: AppSpacing.xxl),
+          _IncomeTargetProgress(
+            label: _period == FinancePeriod.month
+                ? 'Monthly target'
+                : 'Weekly target',
+            made: periodSummary.paid,
+            target: _period == FinancePeriod.month
+                ? summary.monthlyTarget
+                : summary.weeklyTarget,
+            onEditTarget: () => _showTargetSheet(context, summary),
+          ),
+        ],
         const SizedBox(height: AppSpacing.xxl),
         WorkloopSectionHeader(
-          label: 'Income activity',
+          label: 'Payments received',
           actionLabel: 'Add',
           onAction: () => _recordPayment(context),
         ),
@@ -281,8 +283,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         if (income.isEmpty)
           const WorkloopEmptyState(
             icon: LucideIcons.arrowDownToLine,
-            title: 'No income in this period',
-            subtitle: 'Received income will appear here.',
+            title: 'Nothing made in this period',
+            subtitle: 'Payments you receive will appear here.',
           )
         else
           ...income.map(
@@ -312,7 +314,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         _periodSelector(range),
         const SizedBox(height: AppSpacing.xl),
         _MoneySectionHero(
-          label: 'Outgoing',
+          label: 'Spent ${range.label.toLowerCase()}',
           value: periodSummary.expenses,
           detail:
               '${outgoing.length} expense${outgoing.length == 1 ? '' : 's'} · ${range.label}',
@@ -323,7 +325,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         ],
         const SizedBox(height: AppSpacing.xxl),
         WorkloopSectionHeader(
-          label: 'Outgoing activity',
+          label: 'Expenses',
           actionLabel: 'Add',
           onAction: () => _showExpenseSheet(context),
         ),
@@ -331,8 +333,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         if (outgoing.isEmpty)
           const WorkloopEmptyState(
             icon: LucideIcons.receipt,
-            title: 'No outgoing in this period',
-            subtitle: 'Business expenses will appear here.',
+            title: 'Nothing spent in this period',
+            subtitle: 'Business expenses you record will appear here.',
           )
         else
           ...outgoing.map(
@@ -346,67 +348,44 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     );
   }
 
-  Widget _outstandingSection(List<Payment> payments) {
-    final overdue =
-        payments
-            .where((payment) => moneyStatusFor(payment) == MoneyStatus.overdue)
-            .toList()
-          ..sort(
-            (a, b) =>
-                (a.dueDate ?? a.issueDate).compareTo(b.dueDate ?? b.issueDate),
-          );
-    final upcoming =
-        payments
-            .where((payment) => moneyStatusFor(payment) == MoneyStatus.unpaid)
-            .toList()
-          ..sort(
-            (a, b) =>
-                (a.dueDate ?? a.issueDate).compareTo(b.dueDate ?? b.issueDate),
-          );
-    final overdueTotal = overdue.fold<double>(
+  Widget _owedSection(List<Payment> payments) {
+    final owed =
+        payments.where((payment) => outstandingAmountFor(payment) > 0).toList()
+          ..sort((a, b) {
+            final aOverdue = moneyStatusFor(a) == MoneyStatus.overdue;
+            final bOverdue = moneyStatusFor(b) == MoneyStatus.overdue;
+            if (aOverdue != bOverdue) return aOverdue ? -1 : 1;
+            return (a.dueDate ?? a.issueDate).compareTo(
+              b.dueDate ?? b.issueDate,
+            );
+          });
+    final owedTotal = owed.fold<double>(
       0,
-      (total, payment) => total + payment.total,
-    );
-    final upcomingTotal = upcoming.fold<double>(
-      0,
-      (total, payment) => total + payment.total,
+      (total, payment) => total + outstandingAmountFor(payment),
     );
     return Column(
       key: _followUpsKey,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _OutstandingHero(
-          total: overdueTotal + upcomingTotal,
-          upcoming: upcomingTotal,
-          overdue: overdueTotal,
+        _MoneySectionHero(
+          label: 'You are owed',
+          value: owedTotal,
+          detail:
+              '${owed.length} payment${owed.length == 1 ? '' : 's'} waiting to be paid',
         ),
         const SizedBox(height: AppSpacing.xxl),
-        const WorkloopSectionHeader(label: 'Waiting to be collected'),
+        const WorkloopSectionHeader(label: 'Payments owed'),
         const SizedBox(height: AppSpacing.xs),
-        if (overdue.isEmpty && upcoming.isEmpty)
+        if (owed.isEmpty)
           const _QuietMoneyState()
-        else ...[
-          if (overdue.isNotEmpty) ...[
-            const _MoneyCollectGroupHeader(label: 'Past due'),
-            ...overdue.map(
-              (payment) => PaymentCard(
-                payment: payment,
-                onTap: () => _showPaymentActionsSheet(context, payment),
-                onDelete: () => _confirmDeletePayment(context, payment),
-              ),
+        else
+          ...owed.map(
+            (payment) => PaymentCard(
+              payment: payment,
+              onTap: () => _showPaymentActionsSheet(context, payment),
+              onDelete: () => _confirmDeletePayment(context, payment),
             ),
-          ],
-          if (upcoming.isNotEmpty) ...[
-            const _MoneyCollectGroupHeader(label: 'Upcoming'),
-            ...upcoming.map(
-              (payment) => PaymentCard(
-                payment: payment,
-                onTap: () => _showPaymentActionsSheet(context, payment),
-                onDelete: () => _confirmDeletePayment(context, payment),
-              ),
-            ),
-          ],
-        ],
+          ),
       ],
     );
   }

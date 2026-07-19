@@ -114,7 +114,7 @@ class PaymentCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '£${payment.total.toStringAsFixed(0)}',
+                  '£${(isPaid ? receivedAmountFor(payment) : outstandingAmountFor(payment)).toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,

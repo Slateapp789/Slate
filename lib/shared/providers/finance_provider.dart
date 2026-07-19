@@ -66,6 +66,18 @@ MoneyStatus moneyStatusFor(Payment payment, {DateTime? now}) {
   return dueDay.isBefore(today) ? MoneyStatus.overdue : MoneyStatus.unpaid;
 }
 
+double receivedAmountFor(Payment payment) {
+  if (payment.amountPaid > 0) {
+    return payment.amountPaid.clamp(0, payment.total);
+  }
+  return payment.status == 'paid' ? payment.total : 0;
+}
+
+double outstandingAmountFor(Payment payment) {
+  if (payment.status == 'paid') return 0;
+  return (payment.total - receivedAmountFor(payment)).clamp(0, double.infinity);
+}
+
 DateTime displayReceivedDate(Payment payment, {DateTime? now}) {
   final today = startOfDay(now ?? DateTime.now());
   final received = startOfDay(payment.issueDate);
@@ -107,21 +119,21 @@ class PeriodMoneySummary {
           (payment) => moneyStatusFor(payment, now: today) == MoneyStatus.paid,
         )
         .where((payment) => inRange(payment.issueDate))
-        .fold<double>(0, (sum, payment) => sum + payment.total);
+        .fold<double>(0, (sum, payment) => sum + receivedAmountFor(payment));
     final unpaid = payments
         .where(
           (payment) =>
               moneyStatusFor(payment, now: today) == MoneyStatus.unpaid,
         )
         .where((payment) => inRange(payment.dueDate ?? payment.issueDate))
-        .fold<double>(0, (sum, payment) => sum + payment.total);
+        .fold<double>(0, (sum, payment) => sum + outstandingAmountFor(payment));
     final overdue = payments
         .where(
           (payment) =>
               moneyStatusFor(payment, now: today) == MoneyStatus.overdue,
         )
         .where((payment) => inRange(payment.dueDate ?? payment.issueDate))
-        .fold<double>(0, (sum, payment) => sum + payment.total);
+        .fold<double>(0, (sum, payment) => sum + outstandingAmountFor(payment));
     final categoryTotals = <String, double>{};
     final expenseTotal = expenses
         .where((expense) => inRange(expense.expenseDate))
@@ -241,12 +253,12 @@ class FinanceSummary {
         .where(
           (item) => moneyStatusFor(item, now: current) == MoneyStatus.unpaid,
         )
-        .fold<double>(0, (sum, item) => sum + item.total);
+        .fold<double>(0, (sum, item) => sum + outstandingAmountFor(item));
     final overdue = payments
         .where(
           (item) => moneyStatusFor(item, now: current) == MoneyStatus.overdue,
         )
-        .fold<double>(0, (sum, item) => sum + item.total);
+        .fold<double>(0, (sum, item) => sum + outstandingAmountFor(item));
     final thisWeekExpenses = _sumExpensesInRange(
       expenses,
       thisWeekStart,
@@ -297,7 +309,7 @@ double _sumPaymentsInRange(
         (item) =>
             !item.issueDate.isBefore(start) && item.issueDate.isBefore(end),
       )
-      .fold<double>(0, (sum, item) => sum + item.total);
+      .fold<double>(0, (sum, item) => sum + receivedAmountFor(item));
 }
 
 double _sumExpensesInRange(

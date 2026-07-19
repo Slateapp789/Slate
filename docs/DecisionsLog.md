@@ -533,3 +533,21 @@ Consequences:
 - Dashboard follow-up links open Money with Outstanding selected.
 - The large navigation capsule represents peer Money destinations; the smaller Week / Month / Custom control remains a local filter inside Income and Outgoing.
 - Add/Edit Income, Add/Edit Expense, repository behavior, Supabase schema, RLS, client links, and booking links are unchanged.
+
+## 2026-07-19 - Money Uses Plain Business Language
+
+Decision:
+
+Name the three Money destinations Made, Spent, and Owed. Each destination answers one question with one primary figure. Keep payment timing on individual owed rows instead of presenting Upcoming and Past due as competing summary totals.
+
+Reasoning:
+
+Income, Outgoing, and Outstanding describe accounting states rather than the questions a solo business owner naturally asks. Made, Spent, and Owed are faster to understand and reduce the overview to the three figures that matter.
+
+Consequences:
+
+- Made is sourced from received payment records in the selected period.
+- Spent is sourced from expense records in the selected period.
+- Owed is the remaining balance across every unpaid payment, including future and overdue payments.
+- Weekly and monthly views show the matching income target, percentage complete, and amount left; custom ranges do not show a misleading target.
+- Due and overdue status remains visible on individual payment rows for action context.

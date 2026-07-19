@@ -109,5 +109,34 @@ void main() {
       expect(summary.overdue, 90);
       expect(summary.toCollect, 130);
     });
+
+    test('uses received and remaining balances for partially paid records', () {
+      final payment = Payment.fromMap({
+        'id': 'pay-partial',
+        'workspace_id': 'workspace-1',
+        'invoice_number': 'PAY-003',
+        'status': 'sent',
+        'issue_date': '2026-05-26',
+        'due_date': '2026-05-31',
+        'total': 100,
+        'amount_paid': 35,
+      });
+
+      expect(receivedAmountFor(payment), 35);
+      expect(outstandingAmountFor(payment), 65);
+
+      final summary = PeriodMoneySummary.from(
+        range: MoneyPeriodRange(
+          start: DateTime(2026, 5, 25),
+          end: DateTime(2026, 6, 1),
+          label: 'This week',
+        ),
+        payments: [payment],
+        expenses: const [],
+        now: DateTime(2026, 5, 29),
+      );
+      expect(summary.unpaid, 65);
+      expect(summary.toCollect, 65);
+    });
   });
 }
