@@ -68,11 +68,6 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   @override
   Widget build(BuildContext context) {
     final notes = ref.watch(allNotesProvider);
-    final noteStats = notes.maybeWhen(
-      data: (items) => _NoteStats.from(items),
-      orElse: () =>
-          const _NoteStats(active: 0, pinned: 0, clients: 0, bookings: 0),
-    );
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -112,23 +107,6 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                         ),
                         onTap: () => _openEditor(),
                       ),
-                      metrics: [
-                        WorkloopMetricItem(
-                          value: '${noteStats.active}',
-                          label: 'Active',
-                          color: AppColors.modNotes,
-                        ),
-                        WorkloopMetricItem(
-                          value: '${noteStats.pinned}',
-                          label: 'Pinned',
-                          color: AppColors.warning,
-                        ),
-                        WorkloopMetricItem(
-                          value: '${noteStats.clients}',
-                          label: 'Clients',
-                          color: AppColors.modTasks,
-                        ),
-                      ],
                     ),
                   ),
                 ],
@@ -148,9 +126,8 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
             ),
             const SizedBox(height: AppSpacing.md),
             notes.maybeWhen(
-              data: (data) => _NoteFilterRail(
+              data: (_) => _NoteFilterRail(
                 selected: _filter,
-                stats: _NoteStats.from(data),
                 onChanged: (value) => setState(() => _filter = value),
               ),
               orElse: () => const SizedBox.shrink(),
@@ -217,65 +194,25 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   }
 }
 
-class _NoteStats {
-  final int active;
-  final int pinned;
-  final int clients;
-  final int bookings;
-
-  const _NoteStats({
-    required this.active,
-    required this.pinned,
-    required this.clients,
-    required this.bookings,
-  });
-
-  factory _NoteStats.from(List<SlateNote> notes) {
-    return _NoteStats(
-      active: notes.length,
-      pinned: notes.where((note) => note.pinned).length,
-      clients: notes.where((note) => note.contactId != null).length,
-      bookings: notes.where((note) => note.appointmentId != null).length,
-    );
-  }
-}
-
 class _NoteFilterRail extends StatelessWidget {
   final _NoteFilter selected;
-  final _NoteStats stats;
   final ValueChanged<_NoteFilter> onChanged;
 
-  const _NoteFilterRail({
-    required this.selected,
-    required this.stats,
-    required this.onChanged,
-  });
+  const _NoteFilterRail({required this.selected, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 42,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
-        children: [
-          _chip(_NoteFilter.all, 'All', stats.active),
-          _chip(_NoteFilter.pinned, 'Pinned', stats.pinned),
-          _chip(_NoteFilter.clients, 'Clients', stats.clients),
-          _chip(_NoteFilter.bookings, 'Bookings', stats.bookings),
-        ],
-      ),
-    );
-  }
-
-  Widget _chip(_NoteFilter value, String label, int count) {
-    final active = selected == value;
     return Padding(
-      padding: const EdgeInsets.only(right: AppSpacing.xs),
-      child: WorkloopFilterChip(
-        label: '$label $count',
-        selected: active,
-        onTap: () => onChanged(value),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
+      child: WorkloopSegmentedControl<_NoteFilter>(
+        selected: selected,
+        onChanged: onChanged,
+        segments: const [
+          WorkloopSegment(value: _NoteFilter.all, label: 'All'),
+          WorkloopSegment(value: _NoteFilter.pinned, label: 'Pinned'),
+          WorkloopSegment(value: _NoteFilter.clients, label: 'Clients'),
+          WorkloopSegment(value: _NoteFilter.bookings, label: 'Bookings'),
+        ],
       ),
     );
   }
@@ -316,10 +253,10 @@ class _NotesList extends StatelessWidget {
               padding: const EdgeInsets.only(top: 42),
               child: WorkloopEmptyState(
                 icon: LucideIcons.stickyNote,
-                title: hasSearch ? 'No matching notes' : 'No notes',
+                title: hasSearch ? 'No matching notes' : 'No notes yet',
                 subtitle: hasSearch
                     ? 'Try a different search term.'
-                    : 'Tap compose to write your first note.',
+                    : 'Useful details will appear here.',
               ),
             )
           else ...[
@@ -348,16 +285,8 @@ class _NoteDateHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 0, 2, AppSpacing.sm),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: AppColors.t1,
-          fontSize: 24,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0,
-        ),
-      ),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: WorkloopSectionHeader(label: label),
     );
   }
 }
@@ -398,10 +327,14 @@ class _NoteListRow extends StatelessWidget {
     return WorkloopListRow(
       onTap: () => onOpen(note),
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      leading: Icon(
-        note.pinned ? LucideIcons.pin : LucideIcons.fileText,
-        size: 17,
-        color: note.pinned ? AppColors.accentPrimary : AppColors.t3,
+      leading: SizedBox(
+        width: 28,
+        height: 28,
+        child: Icon(
+          note.pinned ? LucideIcons.pin : LucideIcons.fileText,
+          size: 16,
+          color: note.pinned ? AppColors.accentPrimary : AppColors.t3,
+        ),
       ),
       title: Text(
         title,
@@ -409,8 +342,8 @@ class _NoteListRow extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
           color: AppColors.t1,
-          fontSize: 16,
-          fontWeight: FontWeight.w900,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
         ),
       ),
       subtitle: Column(
@@ -435,8 +368,7 @@ class _NoteListRow extends StatelessWidget {
               height: 1.3,
             ),
           ),
-          if (note.clientName != null) ...[
-            const SizedBox(height: AppSpacing.xxs),
+          if (note.clientName != null)
             Text(
               note.clientName!,
               maxLines: 1,
@@ -444,10 +376,9 @@ class _NoteListRow extends StatelessWidget {
               style: const TextStyle(
                 color: AppColors.t3,
                 fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ],
         ],
       ),
       trailing: const Icon(
@@ -1076,44 +1007,39 @@ class _NoteFormatToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateSurface(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xs,
-        vertical: AppSpacing.xs,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: AppColors.t1.withValues(alpha: 0.07)),
+        ),
       ),
-      color: AppColors.bgRaised.withValues(alpha: 0.96),
-      borderColor: AppColors.t1.withValues(alpha: 0.08),
-      radius: AppRadius.pill,
-      elevated: true,
-      child: Row(
-        children: [
-          Expanded(
-            child: _FormatButton(
+      child: Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.xs),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _FormatButton(
               icon: LucideIcons.checkSquare,
               label: 'Checklist',
               active: checklistActive,
               onTap: onChecklist,
             ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: _FormatButton(
+            const SizedBox(width: AppSpacing.md),
+            _FormatButton(
               icon: LucideIcons.list,
               label: 'Bullets',
               active: bulletActive,
               onTap: onBullet,
             ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: _FormatButton(
+            const SizedBox(width: AppSpacing.md),
+            _FormatButton(
               icon: LucideIcons.link,
               label: 'Link',
               active: false,
               onTap: onLink,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1142,43 +1068,22 @@ class _FormatButton extends StatelessWidget {
         selected: active,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           child: AnimatedContainer(
             duration: AppMotion.fast,
             curve: AppMotion.curve,
-            height: 42,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: active ? AppColors.slateDim : Colors.transparent,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-              border: Border.all(
-                color: active
-                    ? AppColors.slateLight.withValues(alpha: 0.35)
-                    : AppColors.t1.withValues(alpha: 0.07),
-              ),
+              color: active
+                  ? AppColors.modNotes.withValues(alpha: 0.12)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: 18,
-                  color: active ? AppColors.slateLight : AppColors.t2,
-                ),
-                const SizedBox(width: AppSpacing.xxs),
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: active ? AppColors.slateLight : AppColors.t2,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
+            child: Icon(
+              icon,
+              size: 19,
+              color: active ? AppColors.modNotes : AppColors.t2,
             ),
           ),
         ),
