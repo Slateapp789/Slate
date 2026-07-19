@@ -8,6 +8,7 @@ import '../../shared/models/slate_models.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/widgets/slate_ui.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -230,7 +231,12 @@ class NotificationSettingsView extends ConsumerWidget {
         style: TextStyle(color: AppColors.error),
       ),
       data: (values) => ListView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.pageX,
+          0,
+          AppSpacing.pageX,
+          AppSpacing.xxl,
+        ),
         children: [
           _PreferenceGroup(
             title: 'Important alerts',
@@ -339,47 +345,27 @@ class _PreferenceGroup extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title.toUpperCase(),
-          style: const TextStyle(
-            color: AppColors.t3,
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
+        WorkloopSectionHeader(label: title),
+        const SizedBox(height: AppSpacing.xs),
+        for (var i = 0; i < items.length; i++) ...[
+          _PreferenceRow(
+            item: items[i],
+            value: values[items[i].key] as bool? ?? false,
+            onChanged: (next) async {
+              final workspaceId = await ref.read(workspaceIdProvider.future);
+              if (workspaceId == null) return;
+              await ref.read(notificationsRepositoryProvider).upsertPreferences(
+                workspaceId,
+                {items[i].key: next},
+              );
+              ref.invalidate(notificationPreferencesProvider);
+              ref.invalidate(notificationsProvider);
+              ref.invalidate(unreadNotificationsProvider);
+            },
           ),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              for (var i = 0; i < items.length; i++) ...[
-                _PreferenceRow(
-                  item: items[i],
-                  value: values[items[i].key] as bool? ?? false,
-                  onChanged: (next) async {
-                    final workspaceId = await ref.read(
-                      workspaceIdProvider.future,
-                    );
-                    if (workspaceId == null) return;
-                    await ref
-                        .read(notificationsRepositoryProvider)
-                        .upsertPreferences(workspaceId, {items[i].key: next});
-                    ref.invalidate(notificationPreferencesProvider);
-                    ref.invalidate(notificationsProvider);
-                    ref.invalidate(unreadNotificationsProvider);
-                  },
-                ),
-                if (i < items.length - 1)
-                  Divider(height: 1, color: AppColors.border),
-              ],
-            ],
-          ),
-        ),
+          if (i < items.length - 1)
+            const WorkloopDivider(margin: EdgeInsets.zero),
+        ],
       ],
     );
   }
@@ -406,7 +392,7 @@ class _PreferenceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Row(
         children: [
           Expanded(
@@ -428,9 +414,9 @@ class _PreferenceRow extends StatelessWidget {
               ],
             ),
           ),
-          Switch(
+          Switch.adaptive(
             value: value,
-            activeThumbColor: AppColors.green,
+            activeThumbColor: AppColors.accentPrimary,
             onChanged: onChanged,
           ),
         ],

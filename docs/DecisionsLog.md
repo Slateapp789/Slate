@@ -600,12 +600,12 @@ The previous Profile entry simply opened Business settings, so it did not meet t
 
 Consequences:
 
-- Profile presents personal and business identity together, followed by a small operational snapshot and Business and Online sections in the current Workloop design language.
-- Every displayed control is actionable and opens the public profile, booking requests, a dedicated Profile editor, or personal account details. Alerts, reminders, and app preferences remain exclusively in Settings.
+- Profile presents business identity, a small operational snapshot, and Business and Online sections in the current Workloop design language. Personal account controls remain exclusively in Settings.
+- The owner's preferred name is editable alongside business name and industry in Business Info because it is part of how the business workspace identifies its owner, without exposing account controls in Profile.
 - Business details, Services, Working hours, and Public profile are presented as dedicated Profile-owned screens that reuse one established implementation underneath.
-- Working hours use a direct full-screen editor, avoiding the redundant summary-screen-to-modal flow.
+- Working hours use a direct full-screen editor and iOS-style scrolling time wheels, avoiding the redundant summary-screen-to-modal flow and Material clock face.
 - Booking requests are compact list records that open a focused detail screen; this preserves scanability while keeping lifecycle actions and conversion details available on demand.
-- Public profile previews opened from Profile expose an explicit back action, while standalone public deep links remain self-contained.
-- Settings exposes only Alerts, Account, and App, making the ownership boundary visible to users.
+- Public profile previews opened from Profile use loaded authenticated workspace data on the same navigation stack and expose an explicit back action. Standalone public deep links remain self-contained and use the secured Edge Function.
+- Settings is a calm overview that opens dedicated Account, Notifications, and App preferences screens. It no longer duplicates Profile routes or unfinished feature placeholders.
 - Profile-link copying uses the platform clipboard without adding a sharing package.
 - No Supabase schema, RLS, repository contract, or CRUD path changes.

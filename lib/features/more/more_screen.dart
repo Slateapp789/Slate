@@ -89,7 +89,7 @@ class MoreScreen extends StatelessWidget {
                   title: 'Settings',
                   subtitle: 'Alerts, account, and app preferences',
                   color: AppColors.t2,
-                  onTap: () => _openSettings(context, initialTab: 1),
+                  onTap: () => _openSettings(context),
                 ),
               ],
             ),
@@ -99,10 +99,10 @@ class MoreScreen extends StatelessWidget {
     );
   }
 
-  void _openSettings(BuildContext context, {required int initialTab}) {
+  void _openSettings(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => SettingsScreen(initialTab: initialTab)),
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
     );
   }
 }
