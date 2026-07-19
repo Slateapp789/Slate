@@ -43,6 +43,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   final _publicProfileKey = GlobalKey();
   final _servicesKey = GlobalKey();
   bool _editingInfo = false;
+  bool _businessInfoHydrated = false;
   bool _saving = false;
   bool _profileHydrated = false;
 
@@ -818,129 +819,158 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
             workspace.when(
               loading: () => skeletonBox(80),
               error: (_, __) => errorBox('Could not load workspace'),
-              data: (ws) => Container(
-                decoration: BoxDecoration(
-                  color: AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: _editingInfo
-                    ? Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            settingsField(
-                              label: 'BUSINESS NAME',
-                              controller: _nameController,
-                              hint: 'Your business name',
-                            ),
-                            const SizedBox(height: 12),
-                            settingsField(
-                              label: 'INDUSTRY',
-                              controller: _industryController,
-                              hint: 'e.g. Health & Fitness',
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () =>
-                                        setState(() => _editingInfo = false),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 12,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.bgInteract,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: AppColors.border,
+              data: (ws) {
+                if (!_businessInfoHydrated) {
+                  _nameController.text = ws?['name'] as String? ?? '';
+                  _industryController.text = ws?['industry'] as String? ?? '';
+                  _businessInfoHydrated = true;
+                }
+                final editing = widget.showOnlySelected || _editingInfo;
+                return Container(
+                  decoration: BoxDecoration(
+                    color: widget.showOnlySelected
+                        ? Colors.transparent
+                        : AppColors.bgCard,
+                    borderRadius: BorderRadius.circular(16),
+                    border: widget.showOnlySelected
+                        ? null
+                        : Border.all(color: AppColors.border),
+                  ),
+                  child: editing
+                      ? Padding(
+                          padding: EdgeInsets.all(
+                            widget.showOnlySelected ? 0 : 16,
+                          ),
+                          child: Column(
+                            children: [
+                              settingsField(
+                                label: 'BUSINESS NAME',
+                                controller: _nameController,
+                                hint: 'Your business name',
+                              ),
+                              const SizedBox(height: 12),
+                              settingsField(
+                                label: 'INDUSTRY',
+                                controller: _industryController,
+                                hint: 'e.g. Health & Fitness',
+                              ),
+                              const SizedBox(height: 16),
+                              if (widget.showOnlySelected)
+                                saveBtn(
+                                  label: 'Save business details',
+                                  loading: _saving,
+                                  onTap: () => _saveInfo(ws?['id'] as String),
+                                )
+                              else
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () => setState(
+                                          () => _editingInfo = false,
                                         ),
-                                      ),
-                                      child: const Center(
-                                        child: Text(
-                                          'Cancel',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.t3,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.bgInteract,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            border: Border.all(
+                                              color: AppColors.border,
+                                            ),
+                                          ),
+                                          child: const Center(
+                                            child: Text(
+                                              'Cancel',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.t3,
+                                              ),
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: _saving
-                                        ? null
-                                        : () => _saveInfo(ws?['id'] as String),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 12,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.green,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Center(
-                                        child: _saving
-                                            ? const SizedBox(
-                                                width: 16,
-                                                height: 16,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      color: Colors.white,
-                                                      strokeWidth: 2,
-                                                    ),
-                                              )
-                                            : const Text(
-                                                'Save',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: Colors.white,
-                                                ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: _saving
+                                            ? null
+                                            : () => _saveInfo(
+                                                ws?['id'] as String,
                                               ),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.green,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: Center(
+                                            child: _saving
+                                                ? const SizedBox(
+                                                    width: 16,
+                                                    height: 16,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          color: Colors.white,
+                                                          strokeWidth: 2,
+                                                        ),
+                                                  )
+                                                : const Text(
+                                                    'Save',
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ],
+                            ],
+                          ),
+                        )
+                      : Column(
+                          children: [
+                            tappableRow(
+                              label: 'Business name',
+                              value: ws?['name'] as String? ?? '—',
+                              onTap: () {
+                                _nameController.text =
+                                    ws?['name'] as String? ?? '';
+                                _industryController.text =
+                                    ws?['industry'] as String? ?? '';
+                                setState(() => _editingInfo = true);
+                              },
+                            ),
+                            Divider(height: 1, color: AppColors.border),
+                            tappableRow(
+                              label: 'Industry',
+                              value: ws?['industry'] as String? ?? '—',
+                              onTap: () {
+                                _nameController.text =
+                                    ws?['name'] as String? ?? '';
+                                _industryController.text =
+                                    ws?['industry'] as String? ?? '';
+                                setState(() => _editingInfo = true);
+                              },
                             ),
                           ],
                         ),
-                      )
-                    : Column(
-                        children: [
-                          tappableRow(
-                            label: 'Business name',
-                            value: ws?['name'] as String? ?? '—',
-                            onTap: () {
-                              _nameController.text =
-                                  ws?['name'] as String? ?? '';
-                              _industryController.text =
-                                  ws?['industry'] as String? ?? '';
-                              setState(() => _editingInfo = true);
-                            },
-                          ),
-                          Divider(height: 1, color: AppColors.border),
-                          tappableRow(
-                            label: 'Industry',
-                            value: ws?['industry'] as String? ?? '—',
-                            onTap: () {
-                              _nameController.text =
-                                  ws?['name'] as String? ?? '';
-                              _industryController.text =
-                                  ws?['industry'] as String? ?? '';
-                              setState(() => _editingInfo = true);
-                            },
-                          ),
-                        ],
-                      ),
-              ),
+                );
+              },
             ),
             const SizedBox(height: 28),
           ],
@@ -1012,13 +1042,18 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                     _profileHydrated = true;
                   }
                   return Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(widget.showOnlySelected ? 0 : 16),
                     decoration: BoxDecoration(
-                      color: AppColors.bgCard,
+                      color: widget.showOnlySelected
+                          ? Colors.transparent
+                          : AppColors.bgCard,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
+                      border: widget.showOnlySelected
+                          ? null
+                          : Border.all(color: AppColors.border),
                     ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         settingsField(
                           label: 'HANDLE',
@@ -1034,13 +1069,6 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                         ),
                         const SizedBox(height: 12),
                         settingsField(
-                          label: 'COVER PHOTO URL',
-                          controller: _coverPhotoController,
-                          hint: 'https://...',
-                          keyboardType: TextInputType.url,
-                        ),
-                        const SizedBox(height: 12),
-                        settingsField(
                           label: 'NOTICE',
                           controller: _noticeController,
                           hint: 'Optional seasonal notice',
@@ -1052,74 +1080,20 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                           onChanged: (value) =>
                               setState(() => _bookingMode = value),
                         ),
-                        const SizedBox(height: 14),
-                        _ProfileToggleRow(
-                          title: 'Reviews',
-                          subtitle:
-                              'Show review sections on the public profile',
-                          value: _reviewsEnabled,
-                          onChanged: (value) =>
-                              setState(() => _reviewsEnabled = value),
-                        ),
-                        _ProfileToggleRow(
-                          title: 'Gallery',
-                          subtitle:
-                              'Show visual work samples when media is added',
-                          value: _galleryEnabled,
-                          onChanged: (value) =>
-                              setState(() => _galleryEnabled = value),
-                        ),
-                        if (_galleryEnabled) ...[
-                          const SizedBox(height: 2),
-                          settingsField(
-                            label: 'GALLERY IMAGE URLS',
-                            controller: _galleryController,
-                            hint: 'One image URL per line',
-                            keyboardType: TextInputType.url,
-                            maxLines: 3,
+                        const SizedBox(height: 16),
+                        Text(
+                          'workloop.app/${_handleController.text.isEmpty ? 'your-handle' : _handleController.text}',
+                          style: const TextStyle(
+                            color: AppColors.t3,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
-                          const SizedBox(height: 10),
-                        ],
-                        if (_reviewsEnabled) ...[
-                          const SizedBox(height: 2),
-                          settingsField(
-                            label: 'REVIEW QUOTES',
-                            controller: _reviewsController,
-                            hint: 'One short quote per line',
-                            maxLines: 3,
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                        _ProfileToggleRow(
-                          title: 'Pay now',
-                          subtitle:
-                              'Mark the profile as ready for online payments',
-                          value: _payNowEnabled,
-                          onChanged: (value) =>
-                              setState(() => _payNowEnabled = value),
                         ),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Profile link: /p/${_handleController.text.isEmpty ? 'your-handle' : _handleController.text}',
-                                style: const TextStyle(
-                                  color: AppColors.t3,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            SizedBox(
-                              width: 112,
-                              child: saveBtn(
-                                label: 'Save',
-                                loading: _saving,
-                                onTap: () => _saveProfile(ws?['id'] as String),
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 16),
+                        saveBtn(
+                          label: 'Save public profile',
+                          loading: _saving,
+                          onTap: () => _saveProfile(ws?['id'] as String),
                         ),
                       ],
                     ),
@@ -1227,65 +1201,6 @@ class _BookingModeChip extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ProfileToggleRow extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  const _ProfileToggleRow({
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.bgInteract,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: AppColors.t3, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            activeThumbColor: AppColors.green,
-            activeTrackColor: AppColors.green.withValues(alpha: 0.24),
-            inactiveThumbColor: AppColors.t3,
-            inactiveTrackColor: AppColors.bgRaised,
-            onChanged: onChanged,
-          ),
-        ],
       ),
     );
   }
