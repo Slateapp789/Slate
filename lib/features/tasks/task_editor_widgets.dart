@@ -290,6 +290,16 @@ class _DueDatePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final today = _dateOnly(DateTime.now());
+    final tomorrow = today.add(const Duration(days: 1));
+    final nextWeek = today.add(const Duration(days: 7));
+    final selectedDate = dueDate == null ? null : _dateOnly(dueDate!);
+    final customSelected =
+        selectedDate != null &&
+        selectedDate != today &&
+        selectedDate != tomorrow &&
+        selectedDate != nextWeek;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -308,21 +318,24 @@ class _DueDatePicker extends StatelessWidget {
           children: [
             _DateChoice(
               label: 'Today',
-              onTap: () => onChanged(_dateOnly(DateTime.now())),
+              selected: selectedDate == today,
+              onTap: () => onChanged(today),
             ),
             _DateChoice(
               label: 'Tomorrow',
-              onTap: () => onChanged(
-                _dateOnly(DateTime.now().add(const Duration(days: 1))),
-              ),
+              selected: selectedDate == tomorrow,
+              onTap: () => onChanged(tomorrow),
             ),
             _DateChoice(
               label: 'Next week',
-              onTap: () => onChanged(
-                _dateOnly(DateTime.now().add(const Duration(days: 7))),
-              ),
+              selected: selectedDate == nextWeek,
+              onTap: () => onChanged(nextWeek),
             ),
-            _DateChoice(label: 'Custom', onTap: () => _pickCustomDate(context)),
+            _DateChoice(
+              label: 'Custom',
+              selected: customSelected,
+              onTap: () => _pickCustomDate(context),
+            ),
             if (dueDate != null)
               _DateChoice(label: 'Clear date', onTap: () => onChanged(null)),
           ],
@@ -491,26 +504,40 @@ class _ReminderPicker extends StatelessWidget {
 
 class _DateChoice extends StatelessWidget {
   final String label;
+  final bool selected;
   final VoidCallback onTap;
 
-  const _DateChoice({required this.label, required this.onTap});
+  const _DateChoice({
+    required this.label,
+    this.selected = false,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: AppMotion.standard,
+        curve: AppMotion.curve,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: AppColors.t1.withValues(alpha: 0.05),
+          color: selected
+              ? AppColors.modTasks.withValues(alpha: 0.14)
+              : AppColors.t1.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(
+            color: selected
+                ? AppColors.modTasks.withValues(alpha: 0.45)
+                : Colors.transparent,
+          ),
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w800,
-            color: AppColors.t2,
+            color: selected ? AppColors.modTasks : AppColors.t2,
           ),
         ),
       ),
