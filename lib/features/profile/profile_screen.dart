@@ -9,7 +9,10 @@ import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../public_profile/booking_requests_screen.dart';
+import '../settings/providers/settings_providers.dart';
 import '../settings/settings_screen.dart';
+import '../settings/widgets/settings_business_tab.dart';
+import 'profile_editor_screen.dart';
 
 String profileWorkingHoursSummary(Map<String, dynamic> workingHours) {
   const dayOrder = [
@@ -93,10 +96,9 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 children: [
                   _ProfileHeader(
-                    onEdit: () => _openSettings(
+                    onEdit: () => _openProfileEditor(
                       context,
                       ref,
-                      0,
                       SettingsBusinessSection.business,
                     ),
                   ),
@@ -108,10 +110,9 @@ class ProfileScreen extends ConsumerWidget {
                         : 'Add your industry',
                     ownerName: ownerName,
                     email: auth.currentEmail,
-                    onTap: () => _openSettings(
+                    onTap: () => _openProfileEditor(
                       context,
                       ref,
-                      0,
                       SettingsBusinessSection.business,
                     ),
                   ),
@@ -124,16 +125,14 @@ class ProfileScreen extends ConsumerWidget {
                           true;
                     }).length,
                     requests: pendingRequests,
-                    onServices: () => _openSettings(
+                    onServices: () => _openProfileEditor(
                       context,
                       ref,
-                      0,
                       SettingsBusinessSection.services,
                     ),
-                    onHours: () => _openSettings(
+                    onHours: () => _openProfileEditor(
                       context,
                       ref,
-                      0,
                       SettingsBusinessSection.workingHours,
                     ),
                     onRequests: () => context.push('/booking-requests'),
@@ -147,10 +146,9 @@ class ProfileScreen extends ConsumerWidget {
                     subtitle: industry?.isNotEmpty == true
                         ? '$displayName · $industry'
                         : 'Name, industry, and public description',
-                    onTap: () => _openSettings(
+                    onTap: () => _openProfileEditor(
                       context,
                       ref,
-                      0,
                       SettingsBusinessSection.business,
                     ),
                   ),
@@ -158,10 +156,9 @@ class ProfileScreen extends ConsumerWidget {
                     icon: LucideIcons.slidersHorizontal,
                     title: 'Services',
                     subtitle: profileServicesSummary(servicesData.length),
-                    onTap: () => _openSettings(
+                    onTap: () => _openProfileEditor(
                       context,
                       ref,
-                      0,
                       SettingsBusinessSection.services,
                     ),
                   ),
@@ -169,10 +166,9 @@ class ProfileScreen extends ConsumerWidget {
                     icon: LucideIcons.clock3,
                     title: 'Working hours',
                     subtitle: profileWorkingHoursSummary(workingHours),
-                    onTap: () => _openSettings(
+                    onTap: () => _openProfileEditor(
                       context,
                       ref,
-                      0,
                       SettingsBusinessSection.workingHours,
                     ),
                     showDivider: false,
@@ -186,16 +182,20 @@ class ProfileScreen extends ConsumerWidget {
                     subtitle: handle.isEmpty
                         ? 'Set up your public booking page'
                         : 'workloop.app/$handle',
-                    trailingLabel: handle.isEmpty ? 'Set up' : 'View',
-                    onTap: () => handle.isEmpty
-                        ? _openSettings(
-                            context,
-                            ref,
-                            0,
-                            SettingsBusinessSection.publicProfile,
-                          )
-                        : context.push('/p/$handle'),
+                    trailingLabel: handle.isEmpty ? 'Set up' : 'Edit',
+                    onTap: () => _openProfileEditor(
+                      context,
+                      ref,
+                      SettingsBusinessSection.publicProfile,
+                    ),
                   ),
+                  if (handle.isNotEmpty)
+                    _ProfileRow(
+                      icon: LucideIcons.globe,
+                      title: 'Preview public profile',
+                      subtitle: 'See the page your clients will open',
+                      onTap: () => context.push('/p/$handle'),
+                    ),
                   if (handle.isNotEmpty)
                     _ProfileRow(
                       icon: LucideIcons.copy,
@@ -222,19 +222,19 @@ class ProfileScreen extends ConsumerWidget {
                     subtitle: ownerName?.isNotEmpty == true
                         ? '$ownerName · ${auth.currentEmail}'
                         : auth.currentEmail,
-                    onTap: () => _openSettings(context, ref, 2),
+                    onTap: () => _openSettings(context, ref, 1),
                   ),
                   _ProfileRow(
                     icon: LucideIcons.bell,
                     title: 'Alerts and reminders',
                     subtitle: 'Choose what Workloop brings to your attention',
-                    onTap: () => _openSettings(context, ref, 1),
+                    onTap: () => _openSettings(context, ref, 0),
                   ),
                   _ProfileRow(
                     icon: LucideIcons.slidersHorizontal,
                     title: 'App preferences',
                     subtitle: 'Maps, calendar, and connected tools',
-                    onTap: () => _openSettings(context, ref, 3),
+                    onTap: () => _openSettings(context, ref, 2),
                     showDivider: false,
                   ),
                   if (workspace.isLoading ||
@@ -281,18 +281,27 @@ class ProfileScreen extends ConsumerWidget {
   Future<void> _openSettings(
     BuildContext context,
     WidgetRef ref,
-    int initialTab, [
-    SettingsBusinessSection initialBusinessSection =
-        SettingsBusinessSection.business,
-  ]) async {
+    int initialTab,
+  ) async {
     await Navigator.push<void>(
       context,
-      MaterialPageRoute(
-        builder: (_) => SettingsScreen(
-          initialTab: initialTab,
-          initialBusinessSection: initialBusinessSection,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => SettingsScreen(initialTab: initialTab)),
+    );
+    if (!context.mounted) return;
+    ref.invalidate(workspaceProvider);
+    ref.invalidate(settingsBusinessProfileProvider);
+    ref.invalidate(settingsWorkspaceSettingsProvider);
+    ref.invalidate(settingsServicesProvider);
+  }
+
+  Future<void> _openProfileEditor(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsBusinessSection section,
+  ) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => ProfileEditorScreen(section: section)),
     );
     if (!context.mounted) return;
     ref.invalidate(workspaceProvider);

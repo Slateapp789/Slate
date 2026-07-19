@@ -89,7 +89,7 @@ class MoreScreen extends StatelessWidget {
                   title: 'Settings',
                   subtitle: 'Alerts, account, and app preferences',
                   color: AppColors.t2,
-                  onTap: () => _openSettings(context, initialTab: 2),
+                  onTap: () => _openSettings(context, initialTab: 1),
                 ),
               ],
             ),
