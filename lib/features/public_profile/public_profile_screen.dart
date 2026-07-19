@@ -16,7 +16,13 @@ final publicProfileProvider = FutureProvider.family<PublicProfile?, String>((
 
 class PublicProfileScreen extends ConsumerStatefulWidget {
   final String handle;
-  const PublicProfileScreen({super.key, required this.handle});
+  final PublicProfile? previewProfile;
+
+  const PublicProfileScreen({
+    super.key,
+    required this.handle,
+    this.previewProfile,
+  });
 
   @override
   ConsumerState<PublicProfileScreen> createState() =>
@@ -95,7 +101,9 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final profile = ref.watch(publicProfileProvider(widget.handle));
+    final AsyncValue<PublicProfile?> profile = widget.previewProfile == null
+        ? ref.watch(publicProfileProvider(widget.handle))
+        : AsyncValue.data(widget.previewProfile);
     final canGoBack = Navigator.of(context).canPop();
     return Scaffold(
       backgroundColor: AppColors.bg,

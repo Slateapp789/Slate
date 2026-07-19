@@ -5,12 +5,13 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../shared/models/slate_models.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../public_profile/booking_requests_screen.dart';
+import '../public_profile/public_profile_screen.dart';
 import '../settings/providers/settings_providers.dart';
-import '../settings/settings_screen.dart';
 import '../settings/widgets/settings_business_tab.dart';
 import 'profile_editor_screen.dart';
 
@@ -109,13 +110,11 @@ class ProfileScreen extends ConsumerWidget {
                         ? industry!
                         : 'Add your industry',
                     ownerName: ownerName,
-                    email: auth.currentEmail,
                     onBusinessTap: () => _openProfileEditor(
                       context,
                       ref,
                       SettingsBusinessSection.business,
                     ),
-                    onPersonalTap: () => _openSettings(context, ref, 1),
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _ProfileSnapshot(
@@ -195,7 +194,15 @@ class ProfileScreen extends ConsumerWidget {
                       icon: LucideIcons.globe,
                       title: 'Preview public profile',
                       subtitle: 'See the page your clients will open',
-                      onTap: () => context.push('/p/$handle'),
+                      onTap: () => _openPublicPreview(
+                        context,
+                        handle: handle,
+                        businessName: displayName,
+                        industry: industry,
+                        profile: profileData!,
+                        workingHours: workingHours,
+                        services: servicesData,
+                      ),
                     ),
                   if (handle.isNotEmpty)
                     _ProfileRow(
@@ -255,22 +262,6 @@ class ProfileScreen extends ConsumerWidget {
     ]);
   }
 
-  Future<void> _openSettings(
-    BuildContext context,
-    WidgetRef ref,
-    int initialTab,
-  ) async {
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute(builder: (_) => SettingsScreen(initialTab: initialTab)),
-    );
-    if (!context.mounted) return;
-    ref.invalidate(workspaceProvider);
-    ref.invalidate(settingsBusinessProfileProvider);
-    ref.invalidate(settingsWorkspaceSettingsProvider);
-    ref.invalidate(settingsServicesProvider);
-  }
-
   Future<void> _openProfileEditor(
     BuildContext context,
     WidgetRef ref,
@@ -295,6 +286,39 @@ class ProfileScreen extends ConsumerWidget {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Profile link copied')));
+  }
+
+  Future<void> _openPublicPreview(
+    BuildContext context, {
+    required String handle,
+    required String businessName,
+    required String? industry,
+    required BusinessProfile profile,
+    required Map<String, dynamic> workingHours,
+    required List<Map<String, dynamic>> services,
+  }) {
+    final publicServices = services
+        .where(
+          (service) =>
+              service['active'] != false && service['show_on_profile'] != false,
+        )
+        .map(Service.fromMap)
+        .toList();
+    return Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PublicProfileScreen(
+          handle: handle,
+          previewProfile: PublicProfile(
+            profile: profile,
+            businessName: businessName,
+            industry: industry,
+            workingHours: workingHours,
+            services: publicServices,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -334,17 +358,13 @@ class _ProfileIdentity extends StatelessWidget {
   final String businessName;
   final String industry;
   final String? ownerName;
-  final String email;
   final VoidCallback onBusinessTap;
-  final VoidCallback onPersonalTap;
 
   const _ProfileIdentity({
     required this.businessName,
     required this.industry,
     required this.ownerName,
-    required this.email,
     required this.onBusinessTap,
-    required this.onPersonalTap,
   });
 
   @override
@@ -407,7 +427,9 @@ class _ProfileIdentity extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        ownerName?.isNotEmpty == true ? ownerName! : email,
+                        ownerName?.isNotEmpty == true
+                            ? ownerName!
+                            : 'Add your name in Business details',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -426,46 +448,6 @@ class _ProfileIdentity extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ),
-        const WorkloopDivider(
-          margin: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-        ),
-        WorkloopListRow(
-          onTap: onPersonalTap,
-          showDivider: false,
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              color: AppColors.modBg,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(LucideIcons.user, color: AppColors.t2, size: 18),
-          ),
-          title: Text(
-            ownerName?.isNotEmpty == true ? ownerName! : 'Personal details',
-            style: const TextStyle(
-              color: AppColors.t1,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          subtitle: Text(
-            email,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.t3,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          trailing: const Icon(
-            LucideIcons.chevronRight,
-            size: 16,
-            color: AppColors.t3,
           ),
         ),
       ],
