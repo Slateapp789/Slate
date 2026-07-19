@@ -26,7 +26,7 @@ class TasksScreen extends ConsumerStatefulWidget {
 }
 
 class _TasksScreenState extends ConsumerState<TasksScreen> {
-  _TaskView _view = _TaskView.urgent;
+  _TaskView _view = _TaskView.todo;
 
   @override
   void didUpdateWidget(covariant TasksScreen oldWidget) {
@@ -44,18 +44,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   @override
   Widget build(BuildContext context) {
     final tasks = ref.watch(allTasksProvider);
-    final taskCounts = tasks.maybeWhen(
-      data: (data) => _countsForTasks(data),
-      orElse: () => const _TaskCounts(
-        overdue: 0,
-        today: 0,
-        upcoming: 0,
-        noDate: 0,
-        done: 0,
-        open: 0,
-      ),
-    );
-
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
@@ -81,23 +69,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   backgroundColor: AppColors.modTasks.withValues(alpha: 0.10),
                   onTap: () => _showTaskEditor(context),
                 ),
-                metrics: [
-                  WorkloopMetricItem(
-                    value: '${taskCounts.urgent}',
-                    label: 'Urgent',
-                    color: AppColors.modTasks,
-                  ),
-                  WorkloopMetricItem(
-                    value: '${taskCounts.upcoming}',
-                    label: 'Upcoming',
-                    color: AppColors.warning,
-                  ),
-                  WorkloopMetricItem(
-                    value: '${taskCounts.done}',
-                    label: 'Done',
-                    color: AppColors.statusSuccess,
-                  ),
-                ],
               ),
             ),
             const SizedBox(height: 16),
@@ -175,16 +146,14 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   Widget _emptyState() {
     final title = switch (_view) {
-      _TaskView.urgent => 'Nothing urgent',
-      _TaskView.upcoming => 'No upcoming tasks',
+      _TaskView.todo => 'Nothing to do',
+      _TaskView.later => 'Nothing planned yet',
       _TaskView.done => 'No completed tasks',
-      _TaskView.all => 'No tasks yet',
     };
     final subtitle = switch (_view) {
-      _TaskView.urgent => 'Add a task or check upcoming work.',
-      _TaskView.upcoming => 'Tasks with future due dates will appear here.',
+      _TaskView.todo => 'Your current list is clear.',
+      _TaskView.later => 'Future tasks will appear here.',
       _TaskView.done => 'Completed tasks will appear here.',
-      _TaskView.all => 'Tap New to add the first task.',
     };
     return Padding(
       padding: const EdgeInsets.only(top: 42),
@@ -222,52 +191,29 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            task.title,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              color: task.status == 'done'
-                                  ? AppColors.t3
-                                  : AppColors.t1,
-                              decoration: task.status == 'done'
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
-                          ),
-                        ),
-                        _PriorityBadge(priority: task.priority),
-                      ],
+                    Text(
+                      task.title,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: task.status == 'done'
+                            ? AppColors.t3
+                            : AppColors.t1,
+                        decoration: task.status == 'done'
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
                     ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _TaskDetailChip(
-                          icon: LucideIcons.circleDot,
-                          label: task.status == 'done' ? 'Done' : 'Open',
-                        ),
-                        if (task.dueDate != null)
-                          _TaskDetailChip(
-                            icon: LucideIcons.calendar,
-                            label: _formatDue(task.dueDate!),
-                          ),
-                        if (task.clientName != null)
-                          _TaskDetailChip(
-                            icon: LucideIcons.user,
-                            label: task.clientName!,
-                          ),
-                        _TaskDetailChip(
-                          icon: LucideIcons.bell,
-                          label: _reminderLabel(task.reminderTiming),
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    Text(
+                      '${task.status == 'done' ? 'Completed' : _priorityLabel(task.priority)} task',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.t3,
+                      ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 20),
                     _TaskContextPanel(task: task),
                     const SizedBox(height: 18),
                     _TaskChecklistPanel(
@@ -348,6 +294,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     String reminderTiming = task?.reminderTiming ?? 'none';
     final draftChecklist = <String>[];
     var saving = false;
+    var showOptions =
+        task?.priority != null && task!.priority != 'medium' ||
+        task?.reminderTiming != null && task!.reminderTiming != 'none';
 
     showModalBottomSheet(
       context: context,
@@ -390,6 +339,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       textInputAction: TextInputAction.done,
                       style: const TextStyle(color: AppColors.t1),
                       decoration: const InputDecoration(
+                        labelText: 'Task',
                         hintText: 'What needs doing?',
                       ),
                     ),
@@ -428,70 +378,77 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Priority',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.t3,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _PriorityChoice(
-                          value: 'high',
-                          label: 'High',
-                          selected: priority,
-                          color: AppColors.error,
-                          onTap: (value) => setModal(() => priority = value),
-                        ),
-                        const SizedBox(width: 8),
-                        _PriorityChoice(
-                          value: 'medium',
-                          label: 'Medium',
-                          selected: priority,
-                          color: AppColors.warning,
-                          onTap: (value) => setModal(() => priority = value),
-                        ),
-                        const SizedBox(width: 8),
-                        _PriorityChoice(
-                          value: 'low',
-                          label: 'Low',
-                          selected: priority,
-                          color: AppColors.t3,
-                          onTap: (value) => setModal(() => priority = value),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
                     _DueDatePicker(
                       dueDate: dueDate,
                       onChanged: (value) => setModal(() => dueDate = value),
                     ),
-                    const SizedBox(height: 16),
-                    _ReminderPicker(
-                      value: reminderTiming,
-                      enabled: dueDate != null,
-                      onChanged: (value) =>
-                          setModal(() => reminderTiming = value),
+                    const SizedBox(height: 12),
+                    _TaskOptionsDisclosure(
+                      expanded: showOptions,
+                      onTap: () => setModal(() => showOptions = !showOptions),
                     ),
-                    if (task == null) ...[
+                    if (showOptions) ...[
                       const SizedBox(height: 16),
-                      _DraftChecklistEditor(
-                        controller: checklistController,
-                        items: draftChecklist,
-                        onAdd: () {
-                          final title = checklistController.text.trim();
-                          if (title.isEmpty) return;
-                          setModal(() {
-                            draftChecklist.add(title);
-                            checklistController.clear();
-                          });
-                        },
-                        onRemove: (index) =>
-                            setModal(() => draftChecklist.removeAt(index)),
+                      const Text(
+                        'Priority',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.t3,
+                        ),
                       ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _PriorityChoice(
+                            value: 'high',
+                            label: 'High',
+                            selected: priority,
+                            color: AppColors.error,
+                            onTap: (value) => setModal(() => priority = value),
+                          ),
+                          const SizedBox(width: 8),
+                          _PriorityChoice(
+                            value: 'medium',
+                            label: 'Medium',
+                            selected: priority,
+                            color: AppColors.warning,
+                            onTap: (value) => setModal(() => priority = value),
+                          ),
+                          const SizedBox(width: 8),
+                          _PriorityChoice(
+                            value: 'low',
+                            label: 'Low',
+                            selected: priority,
+                            color: AppColors.t3,
+                            onTap: (value) => setModal(() => priority = value),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _ReminderPicker(
+                        value: reminderTiming,
+                        enabled: dueDate != null,
+                        onChanged: (value) =>
+                            setModal(() => reminderTiming = value),
+                      ),
+                      if (task == null) ...[
+                        const SizedBox(height: 18),
+                        _DraftChecklistEditor(
+                          controller: checklistController,
+                          items: draftChecklist,
+                          onAdd: () {
+                            final title = checklistController.text.trim();
+                            if (title.isEmpty) return;
+                            setModal(() {
+                              draftChecklist.add(title);
+                              checklistController.clear();
+                            });
+                          },
+                          onRemove: (index) =>
+                              setModal(() => draftChecklist.removeAt(index)),
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 22),
                     SlateButton(
@@ -854,22 +811,19 @@ class _TaskViewSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: _TaskView.values.map((view) {
-          final active = value == view;
-          final count = _viewCount(view, counts);
-          return Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.xs),
-            child: WorkloopFilterChip(
-              label: '${_viewLabel(view)} $count',
-              selected: active,
-              onTap: () => onChanged(view),
+    return WorkloopNavigationControl<_TaskView>(
+      selected: value,
+      color: AppColors.modTasks,
+      onChanged: onChanged,
+      segments: _TaskView.values
+          .map(
+            (view) => WorkloopSegment<_TaskView>(
+              value: view,
+              label: _viewLabel(view),
+              badge: '${_viewCount(view, counts)}',
             ),
-          );
-        }).toList(),
-      ),
+          )
+          .toList(),
     );
   }
 }
@@ -896,33 +850,10 @@ class _TaskSectionView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                section.title.toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.t3,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${section.tasks.length}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.t3,
-                ),
-              ),
-            ],
+          WorkloopSectionHeader(
+            label: '${section.title}  ${section.tasks.length}',
           ),
-          const SizedBox(height: 4),
-          Text(
-            section.subtitle,
-            style: const TextStyle(fontSize: 12, color: AppColors.t3),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           ...section.tasks.map(
             (task) => _TaskCard(
               task: task,
