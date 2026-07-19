@@ -494,3 +494,23 @@ Consequences:
 - A booking outside saved working hours explains the exception and can continue through an explicit Book anyway action.
 - Appointment overlap checks remain mandatory and cannot be bypassed by the working-hours confirmation.
 - Existing repositories, Supabase security, routes, schema, and booking records remain unchanged.
+
+## 2026-07-19 - Money Uses One Calm Ledger Hierarchy
+
+Decision:
+
+Present Money as a quiet period overview followed by target progress, money to collect, and one chronological activity ledger. Use a dedicated shared form vocabulary for income and expenses while preserving the existing payment and expense data model.
+
+Reasoning:
+
+The previous screen exposed the right capabilities but stacked several competing cards, metric tiles, pills, status colours, and locally styled forms. A solo operator needs to understand money received, money spent, what remains to collect, and recent movement without reading an accounting dashboard.
+
+Consequences:
+
+- Received is the primary period figure; Expenses and Net are supporting metrics rather than competing cards.
+- Week, Month, and Custom use the canonical Workloop segmented control.
+- Weekly target progress is a slim section with secondary comparison text.
+- Empty expense categories are hidden, and income/expense activity remains visible even when one record type is empty.
+- Collection rows retain due and overdue meaning with restrained styling rather than alarm-heavy surfaces.
+- Income and expense creation/editing use shared Money fields and protect changed drafts before navigation.
+- Existing Riverpod providers, repositories, Supabase tables, RLS, booking links, client links, and CRUD capabilities remain unchanged.

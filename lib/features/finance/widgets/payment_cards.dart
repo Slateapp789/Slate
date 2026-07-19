@@ -5,194 +5,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/slate_models.dart';
 import '../../../shared/providers/finance_provider.dart';
 import '../../../shared/utils/date_format.dart';
-import '../../../shared/widgets/slate_ui.dart';
-
-class PaymentSummaryCard extends StatelessWidget {
-  final List<Payment> payments;
-  const PaymentSummaryCard({super.key, required this.payments});
-
-  @override
-  Widget build(BuildContext context) {
-    double received = 0;
-    double outstanding = 0;
-    double overdue = 0;
-    double thisMonth = 0;
-    int overdueCount = 0;
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month, 1);
-
-    for (final payment in payments) {
-      final status = moneyStatusFor(payment);
-      if (status == MoneyStatus.paid) {
-        received += payment.total;
-        if (!payment.issueDate.isBefore(monthStart)) {
-          thisMonth += payment.total;
-        }
-      } else if (status == MoneyStatus.unpaid) {
-        outstanding += payment.total;
-      } else if (status == MoneyStatus.overdue) {
-        outstanding += payment.total;
-        overdue += payment.total;
-        overdueCount++;
-      }
-    }
-
-    return SlateSurface(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      color: AppColors.t1.withValues(alpha: 0.028),
-      borderColor: AppColors.border.withValues(alpha: 0.54),
-      radius: AppRadius.lg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'TOTAL RECEIVED',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0,
-              color: AppColors.t3,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '£${received.toStringAsFixed(0)}',
-            style: const TextStyle(
-              fontSize: 44,
-              fontWeight: FontWeight.w800,
-              color: AppColors.t1,
-              letterSpacing: 0,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Container(height: 1, color: AppColors.border.withValues(alpha: 0.54)),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'OUTSTANDING',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.t3,
-                      ),
-                    ),
-                    Text(
-                      '£${outstanding.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: outstanding > 0
-                            ? AppColors.t1
-                            : AppColors.t1.withValues(alpha: 0.28),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (overdueCount > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                  child: Text(
-                    '$overdueCount overdue',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.error,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _MiniPaymentMetric(
-                  label: 'This month',
-                  value: thisMonth,
-                  muted: thisMonth == 0,
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 34,
-                color: AppColors.border.withValues(alpha: 0.54),
-              ),
-              Expanded(
-                child: _MiniPaymentMetric(
-                  label: 'Overdue',
-                  value: overdue,
-                  muted: overdue == 0,
-                  danger: overdue > 0,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MiniPaymentMetric extends StatelessWidget {
-  final String label;
-  final double value;
-  final bool muted;
-  final bool danger;
-
-  const _MiniPaymentMetric({
-    required this.label,
-    required this.value,
-    this.muted = false,
-    this.danger = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: AppColors.t3,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '£${value.toStringAsFixed(0)}',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              color: danger
-                  ? AppColors.error
-                  : muted
-                  ? AppColors.t1.withValues(alpha: 0.28)
-                  : AppColors.t1,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class PaymentCard extends StatelessWidget {
   final Payment payment;
@@ -218,9 +30,9 @@ class PaymentCard extends StatelessWidget {
     final statusColor = isPaid
         ? AppColors.success
         : isOverdue
-        ? AppColors.error
+        ? AppColors.t2
         : isPending
-        ? AppColors.warning
+        ? AppColors.t3
         : AppColors.t3;
 
     final statusLabel = isPaid
@@ -238,21 +50,17 @@ class PaymentCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
           border: Border(
-            bottom: BorderSide(
-              color: isOverdue
-                  ? AppColors.error.withValues(alpha: 0.18)
-                  : AppColors.t1.withValues(alpha: 0.06),
-            ),
+            bottom: BorderSide(color: AppColors.t1.withValues(alpha: 0.06)),
           ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 34,
-              height: 34,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
+                color: AppColors.t1.withValues(alpha: 0.045),
                 shape: BoxShape.circle,
               ),
               child: Center(
@@ -260,9 +68,9 @@ class PaymentCard extends StatelessWidget {
                   isPaid
                       ? LucideIcons.check
                       : isOverdue
-                      ? LucideIcons.alertCircle
+                      ? LucideIcons.clock3
                       : LucideIcons.clock3,
-                  size: 16,
+                  size: 15,
                   color: statusColor,
                 ),
               ),
@@ -308,28 +116,18 @@ class PaymentCard extends StatelessWidget {
                 Text(
                   '£${payment.total.toStringAsFixed(0)}',
                   style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                     color: AppColors.t1,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                  child: Text(
-                    statusLabel,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: statusColor,
-                    ),
+                const SizedBox(height: 3),
+                Text(
+                  statusLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
                   ),
                 ),
               ],
