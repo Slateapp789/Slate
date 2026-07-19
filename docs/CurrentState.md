@@ -115,6 +115,14 @@ Last updated: 2026-07-15
 - Checklist item creation, editing, toggling, deletion.
 - Client task rows no longer complete instantly.
 
+### Notes
+
+- Calm searchable notes workspace with All, Pinned, Clients, and Bookings filters.
+- Full-screen note editor aligned with the shared textured app shell and page hierarchy.
+- First line acts as the note title while the remaining text supports paragraphs, checklists, bullets, and links.
+- Pin remains a visible editor action; delete sits behind a secondary actions menu and retains confirmation.
+- Compact labelled writing toolbar remains available above the keyboard and preserves layout stability.
+
 ### Money
 
 - User-facing Money built partly on `invoices`.

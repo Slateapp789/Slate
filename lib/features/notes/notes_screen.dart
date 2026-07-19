@@ -439,104 +439,124 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.pageX,
-                AppSpacing.sm,
-                AppSpacing.pageX,
-                AppSpacing.xs,
-              ),
-              child: Row(
-                children: [
-                  TextButton.icon(
-                    onPressed: _saving ? null : _saveAndClose,
-                    icon: const Icon(LucideIcons.chevronLeft, size: 18),
-                    label: const Text('Notes'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.slateLight,
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(72, 44),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
+      extendBody: true,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    AppSpacing.lg,
+                    AppSpacing.pageX,
+                    0,
                   ),
-                  const Spacer(),
-                  WorkloopIconButton(
-                    icon: _pinned ? LucideIcons.pinOff : LucideIcons.pin,
-                    semanticLabel: _pinned ? 'Unpin note' : 'Pin note',
-                    color: _pinned ? AppColors.slateLight : AppColors.t2,
-                    size: 40,
-                    onTap: () => setState(() => _pinned = !_pinned),
+                  child: Row(
+                    children: [
+                      WorkloopIconButton(
+                        icon: LucideIcons.chevronLeft,
+                        semanticLabel: 'Back to notes',
+                        onTap: _saving ? () {} : _saveAndClose,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      const Expanded(
+                        child: Text(
+                          'Note',
+                          style: TextStyle(
+                            color: AppColors.t1,
+                            fontSize: 26,
+                            height: 1.05,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      WorkloopIconButton(
+                        icon: _pinned ? LucideIcons.pinOff : LucideIcons.pin,
+                        semanticLabel: _pinned ? 'Unpin note' : 'Pin note',
+                        color: _pinned ? AppColors.modNotes : AppColors.t2,
+                        backgroundColor: _pinned
+                            ? AppColors.modNotes.withValues(alpha: 0.12)
+                            : null,
+                        size: 42,
+                        onTap: () => setState(() => _pinned = !_pinned),
+                      ),
+                      if (isEditing) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        WorkloopIconButton(
+                          icon: LucideIcons.moreHorizontal,
+                          semanticLabel: 'Note actions',
+                          color: AppColors.t2,
+                          size: 42,
+                          onTap: _showNoteActions,
+                        ),
+                      ],
+                      const SizedBox(width: AppSpacing.xs),
+                      _NoteDoneAction(loading: _saving, onTap: _saveAndClose),
+                    ],
                   ),
-                  if (isEditing) ...[
-                    const SizedBox(width: AppSpacing.xs),
-                    WorkloopIconButton(
-                      icon: LucideIcons.trash2,
-                      semanticLabel: 'Delete note',
-                      color: AppColors.error,
-                      size: 40,
-                      onTap: _confirmDelete,
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.pageX,
                     ),
-                  ],
-                  const SizedBox(width: AppSpacing.xs),
-                  TextButton(
-                    onPressed: _saving ? null : _saveAndClose,
-                    child: Text(_saving ? 'Saving' : 'Done'),
+                    child: SlateErrorState(message: _error!),
                   ),
                 ],
-              ),
-            ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.pageX,
-                ),
-                child: SlateErrorState(message: _error!),
-              ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.pageX,
-                  AppSpacing.sm,
-                  AppSpacing.pageX,
-                  AppSpacing.lg,
-                ),
-                child: Stack(
-                  children: [
-                    TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      autofocus: !isEditing,
-                      expands: true,
-                      maxLines: null,
-                      minLines: null,
-                      keyboardType: TextInputType.multiline,
-                      textCapitalization: TextCapitalization.sentences,
-                      textInputAction: TextInputAction.newline,
-                      style: const TextStyle(
-                        color: AppColors.t1,
-                        fontSize: 17,
-                        height: 1.45,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      decoration: const InputDecoration(
-                        filled: false,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                        hintText: 'New note',
-                      ),
+                const SizedBox(height: AppSpacing.xl),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.pageX,
+                      0,
+                      AppSpacing.pageX,
+                      88,
                     ),
-                    ..._checklistMarkerButtons(),
-                  ],
+                    child: Stack(
+                      children: [
+                        TextField(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          autofocus: !isEditing,
+                          expands: true,
+                          maxLines: null,
+                          minLines: null,
+                          keyboardType: TextInputType.multiline,
+                          textCapitalization: TextCapitalization.sentences,
+                          textInputAction: TextInputAction.newline,
+                          style: const TextStyle(
+                            color: AppColors.t1,
+                            fontSize: 17,
+                            height: 1.45,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          decoration: const InputDecoration(
+                            filled: false,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            hintText: 'Note title\nStart writing...',
+                            hintStyle: TextStyle(
+                              color: AppColors.t3,
+                              fontSize: 17,
+                              height: 1.55,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        ..._checklistMarkerButtons(),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       bottomNavigationBar: AnimatedPadding(
         duration: AppMotion.standard,
@@ -545,7 +565,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
           AppSpacing.pageX,
           AppSpacing.xs,
           AppSpacing.pageX,
-          keyboardInset > 0 ? keyboardInset + AppSpacing.xs : AppSpacing.sm,
+          keyboardInset > 0 ? keyboardInset + AppSpacing.xs : AppSpacing.md,
         ),
         child: _NoteFormatToolbar(
           checklistActive: lineFormat == _LineFormat.checklist,
@@ -553,6 +573,59 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
           onChecklist: _toggleChecklistLines,
           onBullet: _toggleBulletLines,
           onLink: _insertLink,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showNoteActions() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: AppColors.t1.withValues(alpha: 0.20),
+      builder: (sheetContext) => SlateSheetFrame(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          AppSpacing.xl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Note actions',
+              style: TextStyle(
+                color: AppColors.t1,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            WorkloopListRow(
+              showDivider: false,
+              leading: const Icon(
+                LucideIcons.trash2,
+                size: 18,
+                color: AppColors.error,
+              ),
+              title: const Text(
+                'Delete note',
+                style: TextStyle(
+                  color: AppColors.error,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) _confirmDelete();
+                });
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -1007,38 +1080,81 @@ class _NoteFormatToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: AppColors.t1.withValues(alpha: 0.07)),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.only(top: AppSpacing.xs),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _FormatButton(
+    return SlateSurface(
+      color: AppColors.bgCard.withValues(alpha: 0.92),
+      borderColor: AppColors.t1.withValues(alpha: 0.08),
+      radius: AppRadius.lg,
+      elevated: true,
+      padding: const EdgeInsets.all(AppSpacing.xs),
+      child: Row(
+        children: [
+          Expanded(
+            child: _FormatButton(
               icon: LucideIcons.checkSquare,
               label: 'Checklist',
               active: checklistActive,
               onTap: onChecklist,
             ),
-            const SizedBox(width: AppSpacing.md),
-            _FormatButton(
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: _FormatButton(
               icon: LucideIcons.list,
               label: 'Bullets',
               active: bulletActive,
               onTap: onBullet,
             ),
-            const SizedBox(width: AppSpacing.md),
-            _FormatButton(
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: _FormatButton(
               icon: LucideIcons.link,
               label: 'Link',
               active: false,
               onTap: onLink,
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoteDoneAction extends StatelessWidget {
+  final bool loading;
+  final VoidCallback onTap;
+
+  const _NoteDoneAction({required this.loading, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.modNotes.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: InkWell(
+        onTap: loading ? null : onTap,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 62, minHeight: 42),
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: AppColors.modNotes,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text(
+                    'Done',
+                    style: TextStyle(
+                      color: AppColors.modNotes,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+          ),
         ),
       ),
     );
@@ -1072,18 +1188,36 @@ class _FormatButton extends StatelessWidget {
           child: AnimatedContainer(
             duration: AppMotion.fast,
             curve: AppMotion.curve,
-            width: 44,
             height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
             decoration: BoxDecoration(
               color: active
                   ? AppColors.modNotes.withValues(alpha: 0.12)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: Icon(
-              icon,
-              size: 19,
-              color: active ? AppColors.modNotes : AppColors.t2,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 17,
+                  color: active ? AppColors.modNotes : AppColors.t2,
+                ),
+                const SizedBox(width: AppSpacing.xxs),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: active ? AppColors.modNotes : AppColors.t2,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
