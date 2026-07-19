@@ -551,3 +551,21 @@ Consequences:
 - Owed is the remaining balance across every unpaid payment, including future and overdue payments.
 - Weekly and monthly views show the matching income target, percentage complete, and amount left; custom ranges do not show a misleading target.
 - Due and overdue status remains visible on individual payment rows for action context.
+
+## 2026-07-19 - Tasks Use Dedicated Working Screens
+
+Decision:
+
+Present Tasks as Now, Later, and Done. Open task detail, creation, and editing as dedicated screens instead of temporary sheets.
+
+Reasoning:
+
+A task can carry client context, timing, reminders, priority, a checklist, and deliberate completion actions. Full screens give that work the same stable hierarchy as Clients and Bookings, while the task list can remain a lightweight scanning surface.
+
+Consequences:
+
+- Now groups Overdue, Today, and Anytime tasks; Later contains future work; Done contains completed work.
+- Tapping a task opens one canonical detail screen with checklist and completion actions.
+- New and Edit Task use the same page header, textured backdrop, spacing rhythm, top save action, and progressive disclosure as Client and Booking forms.
+- Changed task drafts offer Save, Discard, or Keep editing before leaving.
+- Task repositories, providers, reminders, linked clients, checklists, deliberate completion, swipe actions, and Supabase records remain unchanged.
