@@ -119,9 +119,18 @@ Last updated: 2026-07-15
 
 - Calm searchable notes workspace with All, Pinned, Clients, and Bookings filters.
 - Full-screen note editor aligned with the shared textured app shell and page hierarchy.
-- First line acts as the note title while the remaining text supports paragraphs, checklists, bullets, and links.
+- First line acts as the note title while the remaining text supports paragraphs, checklists, and bullets.
 - Pin remains a visible editor action; delete sits behind a secondary actions menu and retains confirmation.
-- Compact labelled writing toolbar remains available above the keyboard and preserves layout stability.
+- Compact labelled checklist and bullet controls remain available above the keyboard and preserve layout stability.
+
+### Profile
+
+- Profile is a dedicated owner-and-business overview instead of an alias for the Business settings tab.
+- The identity area combines business name, industry, owner, and account context using the shared textured workspace shell and Workloop typography.
+- A compact snapshot links directly to Services, Working hours, and active Booking requests.
+- Business, Online, and Account sections use shared divider-led rows rather than nested settings cards.
+- Public profile preview, profile-link copying, booking requests, business details, services, hours, personal details, alerts, and app preferences all open their canonical existing destinations.
+- Business settings navigation is section-aware, so Profile links land at Business info, Working hours, Public profile, or Services rather than the top of a long form.
 
 ### Money
 

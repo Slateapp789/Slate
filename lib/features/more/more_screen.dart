@@ -3,6 +3,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../profile/profile_screen.dart';
 import '../settings/settings_screen.dart';
 
 class MoreScreen extends StatelessWidget {
@@ -78,7 +79,10 @@ class MoreScreen extends StatelessWidget {
                   title: 'Profile',
                   subtitle: 'Business details and public profile',
                   color: AppColors.accentPrimary,
-                  onTap: () => _openSettings(context, initialTab: 0),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  ),
                 ),
                 _MoreRow(
                   icon: LucideIcons.settings,

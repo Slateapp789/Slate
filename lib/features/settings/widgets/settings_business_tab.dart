@@ -10,8 +10,15 @@ import 'settings_services_section.dart';
 
 final _profileHandlePattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$');
 
+enum SettingsBusinessSection { business, workingHours, publicProfile, services }
+
 class SettingsBusinessTab extends ConsumerStatefulWidget {
-  const SettingsBusinessTab({super.key});
+  final SettingsBusinessSection initialSection;
+
+  const SettingsBusinessTab({
+    super.key,
+    this.initialSection = SettingsBusinessSection.business,
+  });
 
   @override
   ConsumerState<SettingsBusinessTab> createState() =>
@@ -28,9 +35,36 @@ class _HoursBlockControllers {
 }
 
 class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
+  final _scrollController = ScrollController();
+  final _businessKey = GlobalKey();
+  final _workingHoursKey = GlobalKey();
+  final _publicProfileKey = GlobalKey();
+  final _servicesKey = GlobalKey();
   bool _editingInfo = false;
   bool _saving = false;
   bool _profileHydrated = false;
+
+  Future<void> _scrollToSection() async {
+    if (widget.initialSection == SettingsBusinessSection.business) return;
+    await Future<void>.delayed(const Duration(milliseconds: 280));
+    if (!mounted) return;
+    final key = switch (widget.initialSection) {
+      SettingsBusinessSection.business => _businessKey,
+      SettingsBusinessSection.workingHours => _workingHoursKey,
+      SettingsBusinessSection.publicProfile => _publicProfileKey,
+      SettingsBusinessSection.services => _servicesKey,
+    };
+    final target = key.currentContext;
+    if (target == null) return;
+    if (!target.mounted) return;
+    await Scrollable.ensureVisible(
+      target,
+      duration: AppMotion.deliberate,
+      curve: AppMotion.curve,
+      alignment: 0.04,
+    );
+  }
+
   String _bookingMode = 'manual';
   bool _reviewsEnabled = false;
   bool _galleryEnabled = false;
@@ -61,10 +95,12 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     _galleryController = TextEditingController();
     _reviewsController = TextEditingController();
     _noticeController = TextEditingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSection());
   }
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _nameController.dispose();
     _industryController.dispose();
     _handleController.dispose();
@@ -762,10 +798,11 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
       },
       color: AppColors.green,
       child: ListView(
+        controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
         children: [
           // ── Business info ────────────────────────────────────────────────
-          sectionLabel('Business Info'),
+          KeyedSubtree(key: _businessKey, child: sectionLabel('Business Info')),
           const SizedBox(height: 10),
           workspace.when(
             loading: () => skeletonBox(80),
@@ -893,7 +930,10 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
           ),
           const SizedBox(height: 28),
 
-          sectionLabel('Working Hours'),
+          KeyedSubtree(
+            key: _workingHoursKey,
+            child: sectionLabel('Working Hours'),
+          ),
           const SizedBox(height: 10),
           workspaceSettings.when(
             loading: () => skeletonBox(80),
@@ -926,7 +966,10 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
           ),
           const SizedBox(height: 28),
 
-          sectionLabel('Public Profile'),
+          KeyedSubtree(
+            key: _publicProfileKey,
+            child: sectionLabel('Public Profile'),
+          ),
           const SizedBox(height: 10),
           workspace.when(
             loading: () => skeletonBox(140),
@@ -1066,10 +1109,13 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
           ),
           const SizedBox(height: 28),
 
-          SettingsServicesSection(
-            services: services,
-            onAdd: _showAddServiceSheet,
-            onEdit: _showEditServiceSheet,
+          KeyedSubtree(
+            key: _servicesKey,
+            child: SettingsServicesSection(
+              services: services,
+              onAdd: _showAddServiceSheet,
+              onEdit: _showEditServiceSheet,
+            ),
           ),
         ],
       ),

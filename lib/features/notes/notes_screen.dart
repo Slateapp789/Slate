@@ -572,7 +572,6 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
           bulletActive: lineFormat == _LineFormat.bullet,
           onChecklist: _toggleChecklistLines,
           onBullet: _toggleBulletLines,
-          onLink: _insertLink,
         ),
       ),
     );
@@ -970,32 +969,6 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
     return _LineFormat.none;
   }
 
-  Future<void> _insertLink() async {
-    final text = _controller.text;
-    final selection = _safeSelection(text);
-    final selectedText = selection.isCollapsed
-        ? ''
-        : text.substring(selection.start, selection.end);
-
-    final result = await showDialog<_LinkDraft>(
-      context: context,
-      builder: (context) => _LinkDialog(initialText: selectedText),
-    );
-    if (result == null) return;
-
-    final label = result.label.trim().isEmpty
-        ? result.url
-        : result.label.trim();
-    final markdown = '[$label](${result.url})';
-    final start = selection.start;
-    final end = selection.end;
-    _controller.value = TextEditingValue(
-      text: text.replaceRange(start, end, markdown),
-      selection: TextSelection.collapsed(offset: start + markdown.length),
-    );
-    _focusNode.requestFocus();
-  }
-
   TextSelection _safeSelection(String text) {
     final selection = _controller.selection;
     if (selection.isValid) {
@@ -1068,14 +1041,12 @@ class _NoteFormatToolbar extends StatelessWidget {
   final bool bulletActive;
   final VoidCallback onChecklist;
   final VoidCallback onBullet;
-  final VoidCallback onLink;
 
   const _NoteFormatToolbar({
     required this.checklistActive,
     required this.bulletActive,
     required this.onChecklist,
     required this.onBullet,
-    required this.onLink,
   });
 
   @override
@@ -1103,15 +1074,6 @@ class _NoteFormatToolbar extends StatelessWidget {
               label: 'Bullets',
               active: bulletActive,
               onTap: onBullet,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: _FormatButton(
-              icon: LucideIcons.link,
-              label: 'Link',
-              active: false,
-              onTap: onLink,
             ),
           ),
         ],
@@ -1226,123 +1188,6 @@ class _FormatButton extends StatelessWidget {
   }
 }
 
-class _LinkDraft {
-  final String label;
-  final String url;
-
-  const _LinkDraft({required this.label, required this.url});
-}
-
-class _LinkDialog extends StatefulWidget {
-  final String initialText;
-
-  const _LinkDialog({required this.initialText});
-
-  @override
-  State<_LinkDialog> createState() => _LinkDialogState();
-}
-
-class _LinkDialogState extends State<_LinkDialog> {
-  late final TextEditingController _labelController;
-  late final TextEditingController _urlController;
-  String? _urlError;
-
-  @override
-  void initState() {
-    super.initState();
-    final initialUrl = _looksLikeUrl(widget.initialText)
-        ? widget.initialText.trim()
-        : '';
-    _labelController = TextEditingController(
-      text: initialUrl.isEmpty ? widget.initialText : '',
-    );
-    _urlController = TextEditingController(text: initialUrl);
-  }
-
-  bool _looksLikeUrl(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty || trimmed.contains(RegExp(r'\s'))) return false;
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return true;
-    }
-    return trimmed.contains('.') || trimmed == 'localhost';
-  }
-
-  @override
-  void dispose() {
-    _labelController.dispose();
-    _urlController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppColors.bgCard,
-      title: const Text('Add link'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _labelController,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: 'Text',
-              hintText: 'Link label',
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          TextField(
-            controller: _urlController,
-            autofocus: true,
-            keyboardType: TextInputType.url,
-            textInputAction: TextInputAction.done,
-            autocorrect: false,
-            decoration: InputDecoration(
-              labelText: 'URL',
-              hintText: 'https://example.com',
-              errorText: _urlError,
-            ),
-            onChanged: (_) {
-              if (_urlError != null) setState(() => _urlError = null);
-            },
-            onSubmitted: (_) => _submit(),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        TextButton(onPressed: _submit, child: const Text('Add')),
-      ],
-    );
-  }
-
-  void _submit() {
-    final url = _normalizeUrl(_urlController.text);
-    if (url == null) {
-      setState(() => _urlError = 'Enter a valid web address.');
-      return;
-    }
-    Navigator.pop(context, _LinkDraft(label: _labelController.text, url: url));
-  }
-
-  String? _normalizeUrl(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return null;
-    final withScheme =
-        trimmed.startsWith('http://') || trimmed.startsWith('https://')
-        ? trimmed
-        : 'https://$trimmed';
-    final uri = Uri.tryParse(withScheme);
-    if (uri == null || !uri.hasScheme || uri.host.trim().isEmpty) return null;
-    if (!uri.host.contains('.') && uri.host != 'localhost') return null;
-    return withScheme;
-  }
-}
-
 class _NoteDraft {
   final String title;
   final String body;
@@ -1423,28 +1268,7 @@ class _NoteTextController extends TextEditingController {
 
   List<TextSpan> _styledLineSpans(String value, TextStyle style) {
     final spans = <TextSpan>[];
-    final linkPattern = RegExp(r'(\[[^\]]+\]\([^)]+\)|https?:\/\/\S+)');
-    var cursor = _addListMarkerSpan(value, style, spans);
-
-    for (final match in linkPattern.allMatches(value)) {
-      if (match.end <= cursor) continue;
-      if (match.start > cursor) {
-        spans.add(
-          TextSpan(text: value.substring(cursor, match.start), style: style),
-        );
-      }
-      spans.add(
-        TextSpan(
-          text: value.substring(match.start, match.end),
-          style: style.copyWith(
-            color: AppColors.slateLight,
-            decoration: TextDecoration.underline,
-            decorationColor: AppColors.slateLight,
-          ),
-        ),
-      );
-      cursor = match.end;
-    }
+    final cursor = _addListMarkerSpan(value, style, spans);
 
     if (cursor < value.length) {
       spans.add(TextSpan(text: value.substring(cursor), style: style));
