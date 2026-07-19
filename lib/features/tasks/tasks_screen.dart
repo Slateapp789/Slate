@@ -46,85 +46,94 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     final tasks = ref.watch(allTasksProvider);
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.pageX,
-                AppSpacing.lg,
-                AppSpacing.pageX,
-                0,
-              ),
-              child: WorkloopPageHeader(
-                icon: LucideIcons.listChecks,
-                title: 'Tasks',
-                subtitle: 'Keep follow-ups and admin from slipping.',
-                color: AppColors.modTasks,
-                trailing: WorkloopIconButton(
-                  icon: LucideIcons.plus,
-                  semanticLabel: 'New task',
-                  color: AppColors.modTasks,
-                  backgroundColor: AppColors.modTasks.withValues(alpha: 0.10),
-                  onTap: () => _showTaskEditor(context),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: tasks.when(
-                loading: () => _skeletonList(),
-                error: (_, __) => Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.pageX,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    AppSpacing.lg,
+                    AppSpacing.pageX,
+                    0,
                   ),
-                  child: SlateErrorState(message: 'Could not load tasks'),
-                ),
-                data: (data) {
-                  final sorted = [...data]..sort(_taskSort);
-                  final sections = _sectionsForView(sorted, _view);
-                  final counts = _countsForTasks(sorted);
-
-                  return RefreshIndicator(
-                    onRefresh: () async => ref.invalidate(allTasksProvider),
-                    color: AppColors.accentPrimary,
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.pageX,
-                        0,
-                        AppSpacing.pageX,
-                        112,
+                  child: WorkloopPageHeader(
+                    icon: LucideIcons.listChecks,
+                    title: 'Tasks',
+                    subtitle: 'Keep follow-ups and admin from slipping.',
+                    color: AppColors.modTasks,
+                    trailing: WorkloopIconButton(
+                      icon: LucideIcons.plus,
+                      semanticLabel: 'New task',
+                      color: AppColors.modTasks,
+                      backgroundColor: AppColors.modTasks.withValues(
+                        alpha: 0.10,
                       ),
-                      children: [
-                        _TaskViewSwitcher(
-                          value: _view,
-                          counts: counts,
-                          onChanged: (view) => setState(() => _view = view),
-                        ),
-                        const SizedBox(height: 18),
-                        if (sections.every((section) => section.tasks.isEmpty))
-                          _emptyState()
-                        else
-                          ...sections
-                              .where((section) => section.tasks.isNotEmpty)
-                              .map(
-                                (section) => _TaskSectionView(
-                                  section: section,
-                                  onOpen: _showTaskDetails,
-                                  onCompleteRequest: _confirmComplete,
-                                  onReopen: _reopenTask,
-                                  onDelete: _confirmDelete,
-                                ),
-                              ),
-                      ],
+                      onTap: () => _showTaskEditor(context),
                     ),
-                  );
-                },
-              ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: tasks.when(
+                    loading: () => _skeletonList(),
+                    error: (_, __) => Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.pageX,
+                      ),
+                      child: SlateErrorState(message: 'Could not load tasks'),
+                    ),
+                    data: (data) {
+                      final sorted = [...data]..sort(_taskSort);
+                      final sections = _sectionsForView(sorted, _view);
+                      final counts = _countsForTasks(sorted);
+
+                      return RefreshIndicator(
+                        onRefresh: () async => ref.invalidate(allTasksProvider),
+                        color: AppColors.accentPrimary,
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.pageX,
+                            0,
+                            AppSpacing.pageX,
+                            112,
+                          ),
+                          children: [
+                            _TaskViewSwitcher(
+                              value: _view,
+                              counts: counts,
+                              onChanged: (view) => setState(() => _view = view),
+                            ),
+                            const SizedBox(height: 18),
+                            if (sections.every(
+                              (section) => section.tasks.isEmpty,
+                            ))
+                              _emptyState()
+                            else
+                              ...sections
+                                  .where((section) => section.tasks.isNotEmpty)
+                                  .map(
+                                    (section) => _TaskSectionView(
+                                      section: section,
+                                      onOpen: _showTaskDetails,
+                                      onCompleteRequest: _confirmComplete,
+                                      onReopen: _reopenTask,
+                                      onDelete: _confirmDelete,
+                                    ),
+                                  ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
