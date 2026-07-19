@@ -126,11 +126,12 @@ Last updated: 2026-07-15
 ### Profile
 
 - Profile is a dedicated owner-and-business overview instead of an alias for the Business settings tab.
-- The identity area combines business name, industry, owner, and account context using the shared textured workspace shell and Workloop typography.
+- The identity area places personal details directly beneath the business identity using the shared textured workspace shell and Workloop typography.
 - A compact snapshot links directly to Services, Working hours, and active Booking requests.
-- Business, Online, and Account sections use shared divider-led rows rather than nested settings cards.
-- Public profile preview, profile-link copying, booking requests, business details, services, hours, personal details, alerts, and app preferences all open their canonical destinations.
-- Business details, Working hours, Public profile, and Services use dedicated Profile-owned screens while reusing the established repositories and save logic.
+- Business and Online sections use shared divider-led rows rather than nested settings cards.
+- Public profile preview has an in-app back control, while profile-link copying, booking requests, business details, services, hours, and personal details open their canonical destinations.
+- Business details, Working hours, Public profile, and Services use dedicated Profile-owned screens while reusing the established repositories and save logic. Working hours are edited directly in a full-screen day-by-day view rather than through a summary row and nested sheet.
+- Booking requests use a compact, filterable inbox. Each request opens a focused detail screen for calling, marking contacted, declining, or converting into a booking.
 - Settings is intentionally separate and contains only Alerts, Account, and App preferences.
 
 ### Money

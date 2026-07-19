@@ -99,37 +99,37 @@ class _BookingRequestsScreenState extends ConsumerState<BookingRequestsScreen> {
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                       child: Row(
                         children: [
-                          _RequestFilterChip(
+                          WorkloopFilterChip(
                             label: 'Active ${pending + contacted}',
-                            active: _view == _RequestView.active,
+                            selected: _view == _RequestView.active,
                             onTap: () =>
                                 setState(() => _view = _RequestView.active),
                           ),
                           const SizedBox(width: 8),
-                          _RequestFilterChip(
+                          WorkloopFilterChip(
                             label: 'New $pending',
-                            active: _view == _RequestView.pending,
+                            selected: _view == _RequestView.pending,
                             onTap: () =>
                                 setState(() => _view = _RequestView.pending),
                           ),
                           const SizedBox(width: 8),
-                          _RequestFilterChip(
+                          WorkloopFilterChip(
                             label: 'Contacted $contacted',
-                            active: _view == _RequestView.contacted,
+                            selected: _view == _RequestView.contacted,
                             onTap: () =>
                                 setState(() => _view = _RequestView.contacted),
                           ),
                           const SizedBox(width: 8),
-                          _RequestFilterChip(
+                          WorkloopFilterChip(
                             label: 'Booked $booked',
-                            active: _view == _RequestView.booked,
+                            selected: _view == _RequestView.booked,
                             onTap: () =>
                                 setState(() => _view = _RequestView.booked),
                           ),
                           const SizedBox(width: 8),
-                          _RequestFilterChip(
+                          WorkloopFilterChip(
                             label: 'Declined $declined',
-                            active: _view == _RequestView.declined,
+                            selected: _view == _RequestView.declined,
                             onTap: () =>
                                 setState(() => _view = _RequestView.declined),
                           ),
@@ -175,10 +175,19 @@ class _BookingRequestsScreenState extends ConsumerState<BookingRequestsScreen> {
                             ref.invalidate(bookingRequestsProvider),
                         child: ListView.separated(
                           padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-                          itemBuilder: (context, index) =>
-                              _RequestCard(request: filtered[index]),
+                          itemBuilder: (context, index) => _RequestRow(
+                            request: filtered[index],
+                            onTap: () => Navigator.push<void>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => BookingRequestDetailScreen(
+                                  request: filtered[index],
+                                ),
+                              ),
+                            ),
+                          ),
                           separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
+                              const WorkloopDivider(margin: EdgeInsets.zero),
                           itemCount: filtered.length,
                         ),
                       );
@@ -224,44 +233,139 @@ class _BookingRequestsScreenState extends ConsumerState<BookingRequestsScreen> {
   }
 }
 
-class _RequestFilterChip extends StatelessWidget {
-  final String label;
-  final bool active;
+class _RequestRow extends StatelessWidget {
+  final BookingRequest request;
   final VoidCallback onTap;
 
-  const _RequestFilterChip({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
+  const _RequestRow({required this.request, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final contextLine = [
+      if (request.serviceName?.trim().isNotEmpty == true)
+        request.serviceName!.trim(),
+      if (request.preferredTimeText?.trim().isNotEmpty == true)
+        request.preferredTimeText!.trim(),
+    ].join(' · ');
+    final initial = request.name.trim().isEmpty
+        ? '?'
+        : request.name.trim()[0].toUpperCase();
+    return WorkloopListRow(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppMotion.fast,
-        curve: AppMotion.curve,
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-        decoration: BoxDecoration(
-          color: active
-              ? AppColors.t1.withValues(alpha: 0.10)
-              : AppColors.bgCard,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: active
-                ? AppColors.t1.withValues(alpha: 0.15)
-                : AppColors.border,
-          ),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      showDivider: false,
+      leading: Container(
+        width: 44,
+        height: 44,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          color: AppColors.modBg,
+          shape: BoxShape.circle,
         ),
         child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
+          initial,
+          style: const TextStyle(
+            color: AppColors.t1,
+            fontSize: 16,
             fontWeight: FontWeight.w800,
-            color: active ? AppColors.t1 : AppColors.t3,
           ),
         ),
+      ),
+      title: Text(
+        request.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      subtitle: Text(
+        contextLine.isEmpty ? request.phone : contextLine,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t3,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _StatusBadge(status: request.status),
+          const SizedBox(width: AppSpacing.xs),
+          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
+        ],
+      ),
+    );
+  }
+}
+
+class BookingRequestDetailScreen extends StatelessWidget {
+  final BookingRequest request;
+
+  const BookingRequestDetailScreen({super.key, required this.request});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    AppSpacing.lg,
+                    AppSpacing.pageX,
+                    AppSpacing.xl,
+                  ),
+                  child: Row(
+                    children: [
+                      WorkloopIconButton(
+                        icon: LucideIcons.chevronLeft,
+                        semanticLabel: 'Back to booking requests',
+                        onTap: () => Navigator.pop(context),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      const Expanded(
+                        child: Text(
+                          'Booking request',
+                          style: TextStyle(
+                            color: AppColors.t1,
+                            fontSize: 26,
+                            height: 1.05,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.pageX,
+                      0,
+                      AppSpacing.pageX,
+                      AppSpacing.xxl,
+                    ),
+                    child: _RequestCard(
+                      request: request,
+                      detailMode: true,
+                      closeAfterAction: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -269,7 +373,14 @@ class _RequestFilterChip extends StatelessWidget {
 
 class _RequestCard extends ConsumerStatefulWidget {
   final BookingRequest request;
-  const _RequestCard({required this.request});
+  final bool detailMode;
+  final bool closeAfterAction;
+
+  const _RequestCard({
+    required this.request,
+    this.detailMode = false,
+    this.closeAfterAction = false,
+  });
 
   @override
   ConsumerState<_RequestCard> createState() => _RequestCardState();
@@ -285,6 +396,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
           .read(profileRepositoryProvider)
           .updateBookingRequestStatus(widget.request.id, status);
       ref.invalidate(bookingRequestsProvider);
+      if (widget.closeAfterAction && mounted) Navigator.pop(context);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -668,6 +780,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
             behavior: SnackBarBehavior.floating,
           ),
         );
+        if (widget.closeAfterAction) Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
@@ -695,12 +808,16 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
     final pending = request.status == 'pending';
     final contacted = request.status == 'contacted';
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
+      padding: widget.detailMode
+          ? EdgeInsets.zero
+          : const EdgeInsets.all(AppSpacing.md),
+      decoration: widget.detailMode
+          ? null
+          : BoxDecoration(
+              color: AppColors.bgCard,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: AppColors.border),
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

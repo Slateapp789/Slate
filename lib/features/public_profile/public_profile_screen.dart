@@ -96,38 +96,62 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(publicProfileProvider(widget.handle));
+    final canGoBack = Navigator.of(context).canPop();
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: profile.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.green),
-        ),
-        error: (_, __) => const _ProfileMessage(
-          title: 'Could not load profile',
-          body: 'Check the link and try again.',
-        ),
-        data: (data) {
-          if (data == null) {
-            return const _ProfileMessage(
-              title: 'Profile not found',
-              body: 'This Workloop profile is not available.',
-            );
-          }
-          return _ProfileContent(
-            profile: data,
-            selectedServiceId: _selectedServiceId,
-            nameController: _nameController,
-            phoneController: _phoneController,
-            preferredTimeController: _preferredTimeController,
-            messageController: _messageController,
-            sending: _sending,
-            sent: _sent,
-            onServiceChanged: (id) => setState(() => _selectedServiceId = id),
-            onPreferredTimePicked: (value) =>
-                setState(() => _preferredTimeController.text = value),
-            onSubmit: () => _sendRequest(data),
-          );
-        },
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: profile.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.green),
+              ),
+              error: (_, __) => const _ProfileMessage(
+                title: 'Could not load profile',
+                body: 'Check the link and try again.',
+              ),
+              data: (data) {
+                if (data == null) {
+                  return const _ProfileMessage(
+                    title: 'Profile not found',
+                    body: 'This Workloop profile is not available.',
+                  );
+                }
+                return _ProfileContent(
+                  profile: data,
+                  selectedServiceId: _selectedServiceId,
+                  nameController: _nameController,
+                  phoneController: _phoneController,
+                  preferredTimeController: _preferredTimeController,
+                  messageController: _messageController,
+                  sending: _sending,
+                  sent: _sent,
+                  topInset: canGoBack ? 84 : 28,
+                  onServiceChanged: (id) =>
+                      setState(() => _selectedServiceId = id),
+                  onPreferredTimePicked: (value) =>
+                      setState(() => _preferredTimeController.text = value),
+                  onSubmit: () => _sendRequest(data),
+                );
+              },
+            ),
+          ),
+          if (canGoBack)
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(
+                  left: AppSpacing.pageX,
+                  top: AppSpacing.sm,
+                ),
+                child: WorkloopIconButton(
+                  icon: LucideIcons.chevronLeft,
+                  semanticLabel: 'Back to profile',
+                  backgroundColor: AppColors.bgCard.withValues(alpha: 0.94),
+                  onTap: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -142,6 +166,7 @@ class _ProfileContent extends StatelessWidget {
   final TextEditingController messageController;
   final bool sending;
   final bool sent;
+  final double topInset;
   final ValueChanged<String?> onServiceChanged;
   final ValueChanged<String> onPreferredTimePicked;
   final VoidCallback onSubmit;
@@ -155,6 +180,7 @@ class _ProfileContent extends StatelessWidget {
     required this.messageController,
     required this.sending,
     required this.sent,
+    required this.topInset,
     required this.onServiceChanged,
     required this.onPreferredTimePicked,
     required this.onSubmit,
@@ -177,7 +203,7 @@ class _ProfileContent extends StatelessWidget {
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
+        padding: EdgeInsets.fromLTRB(20, topInset, 20, 40),
         children: [
           _Hero(profile: profile),
           const SizedBox(height: 24),

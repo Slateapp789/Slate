@@ -110,11 +110,12 @@ class ProfileScreen extends ConsumerWidget {
                         : 'Add your industry',
                     ownerName: ownerName,
                     email: auth.currentEmail,
-                    onTap: () => _openProfileEditor(
+                    onBusinessTap: () => _openProfileEditor(
                       context,
                       ref,
                       SettingsBusinessSection.business,
                     ),
+                    onPersonalTap: () => _openSettings(context, ref, 1),
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _ProfileSnapshot(
@@ -211,30 +212,6 @@ class ProfileScreen extends ConsumerWidget {
                         ? null
                         : pendingRequests.toString(),
                     onTap: () => context.push('/booking-requests'),
-                    showDivider: false,
-                  ),
-                  const SizedBox(height: AppSpacing.xxl),
-                  const WorkloopSectionHeader(label: 'Account'),
-                  const SizedBox(height: AppSpacing.xs),
-                  _ProfileRow(
-                    icon: LucideIcons.user,
-                    title: 'Personal details',
-                    subtitle: ownerName?.isNotEmpty == true
-                        ? '$ownerName · ${auth.currentEmail}'
-                        : auth.currentEmail,
-                    onTap: () => _openSettings(context, ref, 1),
-                  ),
-                  _ProfileRow(
-                    icon: LucideIcons.bell,
-                    title: 'Alerts and reminders',
-                    subtitle: 'Choose what Workloop brings to your attention',
-                    onTap: () => _openSettings(context, ref, 0),
-                  ),
-                  _ProfileRow(
-                    icon: LucideIcons.slidersHorizontal,
-                    title: 'App preferences',
-                    subtitle: 'Maps, calendar, and connected tools',
-                    onTap: () => _openSettings(context, ref, 2),
                     showDivider: false,
                   ),
                   if (workspace.isLoading ||
@@ -358,14 +335,16 @@ class _ProfileIdentity extends StatelessWidget {
   final String industry;
   final String? ownerName;
   final String email;
-  final VoidCallback onTap;
+  final VoidCallback onBusinessTap;
+  final VoidCallback onPersonalTap;
 
   const _ProfileIdentity({
     required this.businessName,
     required this.industry,
     required this.ownerName,
     required this.email,
-    required this.onTap,
+    required this.onBusinessTap,
+    required this.onPersonalTap,
   });
 
   @override
@@ -373,75 +352,123 @@ class _ProfileIdentity extends StatelessWidget {
     final initial = businessName.trim().isEmpty
         ? 'W'
         : businessName.trim()[0].toUpperCase();
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-        child: Row(
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: const BoxDecoration(
-                color: AppColors.accentPrimaryStrong,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                initial,
-                style: const TextStyle(
-                  color: AppColors.t1,
-                  fontSize: 25,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    businessName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+    return Column(
+      children: [
+        InkWell(
+          onTap: onBusinessTap,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+            child: Row(
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: const BoxDecoration(
+                    color: AppColors.accentPrimaryStrong,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    initial,
                     style: const TextStyle(
                       color: AppColors.t1,
-                      fontSize: 22,
-                      height: 1.15,
+                      fontSize: 25,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xxs),
-                  Text(
-                    industry,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.t3,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        businessName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.t1,
+                          fontSize: 22,
+                          height: 1.15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        industry,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        ownerName?.isNotEmpty == true ? ownerName! : email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    ownerName?.isNotEmpty == true ? ownerName! : email,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.t3,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                const Icon(
+                  LucideIcons.chevronRight,
+                  size: 17,
+                  color: AppColors.t3,
+                ),
+              ],
             ),
-            const Icon(LucideIcons.chevronRight, size: 17, color: AppColors.t3),
-          ],
+          ),
         ),
-      ),
+        const WorkloopDivider(
+          margin: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        ),
+        WorkloopListRow(
+          onTap: onPersonalTap,
+          showDivider: false,
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: AppColors.modBg,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(LucideIcons.user, color: AppColors.t2, size: 18),
+          ),
+          title: Text(
+            ownerName?.isNotEmpty == true ? ownerName! : 'Personal details',
+            style: const TextStyle(
+              color: AppColors.t1,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          subtitle: Text(
+            email,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.t3,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          trailing: const Icon(
+            LucideIcons.chevronRight,
+            size: 16,
+            color: AppColors.t3,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../settings/widgets/settings_business_tab.dart';
+import 'working_hours_editor.dart';
 
 class ProfileEditorScreen extends StatelessWidget {
   final SettingsBusinessSection section;
@@ -58,10 +59,12 @@ class ProfileEditorScreen extends StatelessWidget {
                   ),
                 ),
                 Expanded(
-                  child: SettingsBusinessTab(
-                    initialSection: section,
-                    showOnlySelected: true,
-                  ),
+                  child: section == SettingsBusinessSection.workingHours
+                      ? const WorkingHoursEditor()
+                      : SettingsBusinessTab(
+                          initialSection: section,
+                          showOnlySelected: true,
+                        ),
                 ),
               ],
             ),
