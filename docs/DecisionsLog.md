@@ -569,3 +569,20 @@ Consequences:
 - New and Edit Task use the same page header, textured backdrop, spacing rhythm, top save action, and progressive disclosure as Client and Booking forms.
 - Changed task drafts offer Save, Discard, or Keep editing before leaving.
 - Task repositories, providers, reminders, linked clients, checklists, deliberate completion, swipe actions, and Supabase records remain unchanged.
+
+## 2026-07-19 - Notes Keep Writing Primary
+
+Decision:
+
+Treat the note editor as a dedicated Workloop writing screen with the shared textured backdrop, canonical page header, and one compact labelled formatting toolbar.
+
+Reasoning:
+
+The plain editor canvas preserved focus but looked disconnected from every other evolved workspace, while unlabeled formatting icons and a prominent destructive header action made basic editing less obvious than necessary.
+
+Consequences:
+
+- Back, title, pin, secondary actions, and Done follow the same header hierarchy as Task, Client, and Booking screens.
+- Delete remains available with confirmation but moves behind the secondary note-actions control.
+- Checklist, bullet, and link controls show concise labels and selected state without covering the writing area.
+- Existing note parsing, checklist interaction, links, pinning, Supabase persistence, and routes remain unchanged.
