@@ -1,46 +1,5 @@
 part of 'finance_screen.dart';
 
-class _HeaderAction extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _HeaderAction({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.slateLight,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: AppColors.t1.withValues(alpha: 0.14)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.panelInk, size: 14),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: AppColors.panelInk,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _WeeklyTargetCard extends StatelessWidget {
   final FinanceSummary summary;
   final VoidCallback onEditTarget;
@@ -56,9 +15,9 @@ class _WeeklyTargetCard extends StatelessWidget {
       double.infinity,
     );
     return SlateSurface(
-      padding: const EdgeInsets.all(22),
-      color: AppColors.panelSoft,
-      borderColor: AppColors.panelSoftRaised,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      color: AppColors.t1.withValues(alpha: 0.028),
+      borderColor: AppColors.border.withValues(alpha: 0.54),
       radius: AppRadius.lg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,7 +27,7 @@ class _WeeklyTargetCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w900,
-              color: AppColors.panelMuted,
+              color: AppColors.t3,
             ),
           ),
           const SizedBox(height: 4),
@@ -82,7 +41,7 @@ class _WeeklyTargetCard extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.bgRaised.withValues(alpha: 0.55),
+                  color: AppColors.bg,
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: const Row(
@@ -110,10 +69,10 @@ class _WeeklyTargetCard extends StatelessWidget {
               Text(
                 '£${summary.thisWeekPaid.toStringAsFixed(0)}',
                 style: const TextStyle(
-                  fontSize: 40,
+                  fontSize: 38,
                   height: 1,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.panelInk,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.t1,
                   letterSpacing: 0,
                 ),
               ),
@@ -127,7 +86,7 @@ class _WeeklyTargetCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.panelMuted,
+                    color: AppColors.t3,
                   ),
                 ),
               ),
@@ -140,7 +99,9 @@ class _WeeklyTargetCard extends StatelessWidget {
               minHeight: 8,
               value: hasTarget ? progress : 0,
               backgroundColor: AppColors.panelFaint,
-              valueColor: const AlwaysStoppedAnimation(AppColors.panelInk),
+              valueColor: const AlwaysStoppedAnimation(
+                AppColors.accentPrimaryStrong,
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -187,8 +148,8 @@ class _FinanceComparePill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.bgRaised.withValues(alpha: 0.50),
-        borderRadius: BorderRadius.circular(14),
+        color: AppColors.bg,
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,7 +159,7 @@ class _FinanceComparePill extends StatelessWidget {
             style: const TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w900,
-              color: AppColors.panelMuted,
+              color: AppColors.t3,
             ),
           ),
           const SizedBox(height: 4),
@@ -229,8 +190,8 @@ class _TargetLeftPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.bgRaised.withValues(alpha: 0.50),
-        borderRadius: BorderRadius.circular(14),
+        color: AppColors.bg,
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,7 +201,7 @@ class _TargetLeftPill extends StatelessWidget {
             style: const TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w900,
-              color: AppColors.panelMuted,
+              color: AppColors.t3,
             ),
           ),
           const SizedBox(height: 4),
@@ -251,7 +212,7 @@ class _TargetLeftPill extends StatelessWidget {
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w900,
-              color: AppColors.panelInk,
+              color: AppColors.t1,
             ),
           ),
         ],

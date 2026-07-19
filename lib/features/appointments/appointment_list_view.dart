@@ -45,7 +45,7 @@ class _AppointmentListView extends StatelessWidget {
                     onPressed: onEmptyAction,
                     icon: const Icon(LucideIcons.calendarPlus, size: 17),
                     label: const Text(
-                      'Add Booking',
+                      'Add booking',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -63,7 +63,7 @@ class _AppointmentListView extends StatelessWidget {
     if (!groupByDate) {
       return RefreshIndicator(
         onRefresh: () async => onRefresh(),
-        color: AppColors.green,
+        color: AppColors.accentPrimary,
         child: ListView.separated(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.pageX,
@@ -95,7 +95,7 @@ class _AppointmentListView extends StatelessWidget {
 
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
-      color: AppColors.green,
+      color: AppColors.accentPrimary,
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.pageX,
@@ -194,7 +194,7 @@ class _BookingCalendarView extends StatelessWidget {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
-      color: AppColors.green,
+      color: AppColors.accentPrimary,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.pageX,
@@ -238,7 +238,7 @@ class _BookingCalendarView extends StatelessWidget {
                 onPressed: onEmptyAction,
                 icon: const Icon(LucideIcons.calendarPlus, size: 17),
                 label: const Text(
-                  'Add Booking',
+                  'Add booking',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
               ),
@@ -283,9 +283,9 @@ class _MonthCalendar extends StatelessWidget {
     const weekdayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
     return SlateSurface(
-      radius: AppRadius.xl,
-      color: AppColors.panelSoft,
-      borderColor: AppColors.t1.withValues(alpha: 0.06),
+      radius: AppRadius.lg,
+      color: AppColors.t1.withValues(alpha: 0.022),
+      borderColor: AppColors.border.withValues(alpha: 0.54),
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
@@ -304,7 +304,18 @@ class _MonthCalendar extends StatelessWidget {
                   style: const TextStyle(
                     color: AppColors.t1,
                     fontSize: 17,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => onDateSelected(_dateOnly(DateTime.now())),
+                child: const Text(
+                  'Today',
+                  style: TextStyle(
+                    color: AppColors.modCalendar,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -352,21 +363,26 @@ class _MonthCalendar extends StatelessWidget {
               final inMonth = date.month == month.month;
               final count = countForDay(date);
               return GestureDetector(
-                onTap: () => onDateSelected(_dateOnly(date)),
+                onTap: () {
+                  SlateHaptics.tap();
+                  onDateSelected(_dateOnly(date));
+                },
                 child: AnimatedContainer(
                   duration: AppMotion.fast,
                   curve: AppMotion.curve,
                   padding: const EdgeInsets.symmetric(vertical: 5),
                   decoration: BoxDecoration(
                     color: selected
-                        ? AppColors.slateLight
+                        ? AppColors.accentPrimaryStrong.withValues(alpha: 0.72)
                         : count > 0
-                        ? AppColors.greenDim
+                        ? AppColors.accentPrimaryStrong.withValues(alpha: 0.20)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(AppRadius.md),
                     border: Border.all(
                       color: selected
-                          ? AppColors.borderStrong
+                          ? AppColors.accentPrimaryStrong.withValues(
+                              alpha: 0.74,
+                            )
                           : AppColors.t1.withValues(alpha: 0.05),
                     ),
                   ),
@@ -381,7 +397,7 @@ class _MonthCalendar extends StatelessWidget {
                               ? AppColors.t1
                               : AppColors.t3.withValues(alpha: 0.42),
                           fontSize: 14,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                       const Spacer(),
@@ -392,7 +408,7 @@ class _MonthCalendar extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: selected
                                 ? AppColors.panelInk
-                                : AppColors.green,
+                                : AppColors.accentPrimary,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -524,180 +540,118 @@ class _AppointmentCard extends StatelessWidget {
     final startStr = startDt != null ? _time(startDt) : '--:--';
     final endStr = endDt != null ? _time(endDt) : null;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.md),
+    final location = (appt['location'] as String? ?? '').trim();
+    final timing = endStr == null ? startStr : '$startStr–$endStr';
+
+    return WorkloopListRow(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 13),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      leading: Container(
+        width: 42,
+        height: 42,
         decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: AppColors.t1.withValues(alpha: 0.06)),
+          color: statusColor.withValues(alpha: 0.08),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Icon(
+            isCompleted
+                ? LucideIcons.checkCircle2
+                : isCancelled
+                ? LucideIcons.xCircle
+                : isNoShow
+                ? LucideIcons.alertCircle
+                : LucideIcons.calendarClock,
+            size: 18,
+            color: statusColor,
           ),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 54,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    startStr,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.t1,
-                      height: 1,
-                    ),
-                  ),
-                  if (endStr != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      endStr,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.t3,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+      ),
+      title: Text(
+        clientName,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          color: AppColors.t1,
+        ),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            [
+              timing,
+              serviceName,
+              if (location.isNotEmpty) location,
+            ].join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.t2,
+              fontWeight: FontWeight.w600,
             ),
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Column(
-                children: [
-                  Container(
-                    width: 11,
-                    height: 11,
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: statusColor.withValues(alpha: 0.18),
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
+          ),
+          if (showStatusBadge ||
+              (recurrenceRule != null && recurrenceRule.isNotEmpty)) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                if (showStatusBadge)
+                  _AppointmentPill(
+                    label: status.replaceAll('_', ' '),
+                    icon: isCompleted
+                        ? LucideIcons.checkCircle
+                        : isCancelled
+                        ? LucideIcons.xCircle
+                        : isNoShow
+                        ? LucideIcons.alertCircle
+                        : LucideIcons.clock,
+                    color: statusColor,
                   ),
-                  const SizedBox(height: 4),
-                  Container(
-                    width: 1,
-                    height:
-                        ((isCancelled || isNoShow) && notes.isNotEmpty) ||
-                            (recurrenceRule != null &&
-                                recurrenceRule.isNotEmpty)
-                        ? 72
-                        : 42,
-                    color: AppColors.t1.withValues(alpha: 0.08),
+                if (recurrenceRule != null && recurrenceRule.isNotEmpty)
+                  const _AppointmentPill(
+                    label: 'Repeats',
+                    icon: LucideIcons.repeat,
+                    color: AppColors.t3,
                   ),
-                ],
-              ),
+              ],
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              clientName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.t1,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              serviceName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.t3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (price != null) ...[
-                        const SizedBox(width: 12),
-                        Text(
-                          '£${(price as num).toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.t1,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(width: 8),
-                      const Icon(
-                        LucideIcons.chevronRight,
-                        color: AppColors.t3,
-                        size: 16,
-                      ),
-                    ],
-                  ),
-                  if (showStatusBadge ||
-                      (recurrenceRule != null &&
-                          recurrenceRule.isNotEmpty)) ...[
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        if (showStatusBadge)
-                          _AppointmentPill(
-                            label: status.replaceAll('_', ' '),
-                            icon: isCompleted
-                                ? LucideIcons.checkCircle
-                                : isCancelled
-                                ? LucideIcons.xCircle
-                                : isNoShow
-                                ? LucideIcons.alertCircle
-                                : LucideIcons.clock,
-                            color: statusColor,
-                          ),
-                        if (recurrenceRule != null && recurrenceRule.isNotEmpty)
-                          const _AppointmentPill(
-                            label: 'Repeats',
-                            icon: LucideIcons.repeat,
-                            color: AppColors.t3,
-                          ),
-                      ],
-                    ),
-                  ],
-                  if ((isCancelled || isNoShow) && notes.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      isCancelled ? 'Cancelled: $notes' : 'No show: $notes',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.error.withValues(alpha: 0.78),
-                      ),
-                    ),
-                  ],
-                ],
+          ],
+          if ((isCancelled || isNoShow) && notes.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              isCancelled ? 'Cancelled: $notes' : 'No show: $notes',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.error.withValues(alpha: 0.78),
               ),
             ),
           ],
-        ),
+        ],
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (price != null) ...[
+            Text(
+              '£${(price as num).toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: AppColors.t1,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+          ],
+          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
+        ],
       ),
     );
   }

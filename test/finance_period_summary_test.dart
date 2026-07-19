@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slate/shared/models/slate_models.dart';
-import 'package:slate/shared/providers/finance_provider.dart';
+import 'package:workloop/shared/models/slate_models.dart';
+import 'package:workloop/shared/providers/finance_provider.dart';
 
 void main() {
   group('PeriodMoneySummary', () {

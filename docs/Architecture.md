@@ -14,6 +14,7 @@ Slate is a Flutter application using:
 - Google Fonts / Inter
 - Lucide icons
 - url_launcher for phone/email/external actions
+- shared_preferences for non-critical, device-specific choices such as the default maps app
 - confetti for target celebration
 
 The app is multi-platform by Flutter structure, but current product design is mobile-first.

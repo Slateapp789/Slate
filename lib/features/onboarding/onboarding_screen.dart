@@ -55,7 +55,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   children: [
                     Row(
                       children: [
-                        SlateIconButton(
+                        WorkloopIconButton(
                           icon: Icons.arrow_back_ios_new_rounded,
                           onTap: prevPage,
                           size: 38,
@@ -78,7 +78,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                   ),
                                   valueColor:
                                       const AlwaysStoppedAnimation<Color>(
-                                        AppColors.slateLight,
+                                        AppColors.accentPrimaryStrong,
                                       ),
                                   minHeight: 5,
                                 );

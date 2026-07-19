@@ -1,4 +1,4 @@
-# Slate Roadmap
+# Workloop Roadmap
 
 Last updated: 2026-06-07
 
@@ -66,7 +66,7 @@ Exit criteria:
 
 Goal:
 
-Make Slate safe enough for paying users.
+Make Workloop safe enough for paying users.
 
 Scope:
 
@@ -90,7 +90,7 @@ Dependencies:
 
 Goal:
 
-Turn Slate into a trusted daily assistant without notification fatigue.
+Turn Workloop into a trusted daily assistant without notification fatigue.
 
 Scope:
 

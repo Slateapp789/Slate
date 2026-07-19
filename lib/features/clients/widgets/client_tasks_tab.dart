@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/slate_models.dart';
+import '../../../shared/providers/clients_provider.dart';
 import '../../../shared/providers/notifications_provider.dart';
 import '../../../shared/providers/tasks_provider.dart';
 import '../../../shared/providers/workspace_provider.dart';
@@ -227,6 +229,7 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                     ref.invalidate(clientTasksProvider(widget.clientId));
                     ref.invalidate(allTasksProvider);
                     ref.invalidate(tasksProvider);
+                    ref.invalidate(clientCrmRecordsProvider);
                     ref.invalidate(notificationsProvider);
                     ref.invalidate(unreadNotificationsProvider);
                     if (ctx.mounted) Navigator.pop(ctx);
@@ -291,6 +294,7 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                   ref.invalidate(clientTasksProvider(widget.clientId));
                   ref.invalidate(allTasksProvider);
                   ref.invalidate(tasksProvider);
+                  ref.invalidate(clientCrmRecordsProvider);
                 },
               ),
               const SizedBox(height: 10),
@@ -353,6 +357,7 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                 ref.invalidate(clientTasksProvider(widget.clientId));
                 ref.invalidate(allTasksProvider);
                 ref.invalidate(tasksProvider);
+                ref.invalidate(clientCrmRecordsProvider);
               },
             ),
             const SizedBox(height: 10),
@@ -388,37 +393,10 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
       ),
       data: (tks) => Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child: GestureDetector(
-              onTap: _showAddTaskSheet,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.green.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(LucideIcons.plus, color: AppColors.green, size: 14),
-                    SizedBox(width: 6),
-                    Text(
-                      'Add Task',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.green,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          _TasksToolbar(
+            openCount: tks.where((task) => task.status != 'done').length,
+            onAdd: _showAddTaskSheet,
+            onOpenTasks: () => context.push('/tasks'),
           ),
           if (tks.isEmpty)
             const Expanded(child: _EmptyState())
@@ -431,98 +409,72 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
                   itemCount: tks.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, __) => const SizedBox.shrink(),
                   itemBuilder: (context, i) {
                     final task = tks[i];
-                    final priority = task.priority;
                     final isDone = task.status == 'done';
                     final dueDate = task.dueDate;
-                    final priorityColor = priority == 'high'
-                        ? AppColors.error
-                        : priority == 'medium'
-                        ? AppColors.warning
-                        : AppColors.t3;
 
-                    return GestureDetector(
+                    return WorkloopListRow(
                       onTap: () => _showTaskActions(task),
-                      onLongPress: () => _confirmDeleteTask(task),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
+                      leading: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 22,
+                        height: 22,
                         decoration: BoxDecoration(
-                          color: AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
+                          shape: BoxShape.circle,
+                          color: isDone
+                              ? AppColors.success
+                              : Colors.transparent,
+                          border: Border.all(
+                            color: isDone
+                                ? AppColors.success
+                                : AppColors.border,
+                            width: 2,
+                          ),
                         ),
-                        child: Row(
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isDone
-                                    ? AppColors.green
-                                    : Colors.transparent,
-                                border: Border.all(
-                                  color: isDone
-                                      ? AppColors.green
-                                      : AppColors.border,
-                                  width: 2,
-                                ),
+                        child: isDone
+                            ? const Icon(
+                                Icons.check_rounded,
+                                color: Colors.white,
+                                size: 13,
+                              )
+                            : null,
+                      ),
+                      title: Text(
+                        task.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: isDone ? AppColors.t3 : AppColors.t1,
+                          decoration: isDone
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                      subtitle: dueDate == null
+                          ? const Text(
+                              'No due date',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.t3,
                               ),
-                              child: isDone
-                                  ? const Icon(
-                                      Icons.check_rounded,
-                                      color: Colors.white,
-                                      size: 12,
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    task.title,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDone
-                                          ? AppColors.t3
-                                          : AppColors.t1,
-                                      decoration: isDone
-                                          ? TextDecoration.lineThrough
-                                          : null,
-                                    ),
-                                  ),
-                                  if (dueDate != null) ...[
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      _formatDue(dueDate),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: _isOverdue(dueDate) && !isDone
-                                            ? AppColors.error
-                                            : _isDueToday(dueDate) && !isDone
-                                            ? AppColors.warning
-                                            : AppColors.t3,
-                                      ),
-                                    ),
-                                  ],
-                                ],
+                            )
+                          : Text(
+                              _formatDue(dueDate),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.t3,
                               ),
                             ),
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: isDone ? AppColors.t3 : priorityColor,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
+                      trailing: Text(
+                        isDone ? 'Done' : 'Open',
+                        style: const TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     );
@@ -562,7 +514,6 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
     if (diff == 0) return 'Due today';
     if (diff == 1) return 'Due tomorrow';
     if (diff == -1) return 'Due yesterday';
-    if (diff < 0) return 'Overdue ${-diff}d';
     const months = [
       'Jan',
       'Feb',
@@ -579,15 +530,44 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
     ];
     return '${dt.day} ${months[dt.month - 1]}';
   }
+}
 
-  bool _isDueToday(DateTime dt) {
-    final now = DateTime.now();
-    return dt.year == now.year && dt.month == now.month && dt.day == now.day;
-  }
+class _TasksToolbar extends StatelessWidget {
+  final int openCount;
+  final VoidCallback onAdd;
+  final VoidCallback onOpenTasks;
 
-  bool _isOverdue(DateTime dt) {
-    final today = DateTime.now();
-    return dt.isBefore(DateTime(today.year, today.month, today.day));
+  const _TasksToolbar({
+    required this.openCount,
+    required this.onAdd,
+    required this.onOpenTasks,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pageX,
+        AppSpacing.xs,
+        AppSpacing.pageX,
+        AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Text(
+            '$openCount open',
+            style: const TextStyle(
+              color: AppColors.t2,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Spacer(),
+          WorkloopTextButton(label: 'Open Tasks', onPressed: onOpenTasks),
+          WorkloopTextButton(label: 'New task', onPressed: onAdd),
+        ],
+      ),
+    );
   }
 }
 
@@ -642,11 +622,10 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(LucideIcons.checkSquare, color: AppColors.t3, size: 32),
-          SizedBox(height: 12),
-          Text(
-            'No tasks linked to this client',
-            style: TextStyle(fontSize: 14, color: AppColors.t3),
+          WorkloopEmptyState(
+            icon: LucideIcons.checkSquare,
+            title: 'No tasks yet.',
+            subtitle: 'Client tasks will appear here.',
           ),
         ],
       ),

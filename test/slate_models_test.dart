@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:slate/shared/models/slate_models.dart';
-import 'package:slate/shared/utils/calendar_export.dart';
-import 'package:slate/shared/utils/working_hours.dart';
+import 'package:workloop/shared/models/slate_models.dart';
+import 'package:workloop/shared/utils/calendar_export.dart';
+import 'package:workloop/shared/utils/working_hours.dart';
 
 void main() {
   group('Slate models', () {
@@ -170,6 +170,24 @@ void main() {
       expect(item.completed, isTrue);
       expect(item.position, 2);
       expect(item.toMap()['title'], 'Send reminder text');
+    });
+
+    test('SlateNote preserves pinned notes and linked client data', () {
+      final note = SlateNote.fromMap({
+        'id': 'note-1',
+        'workspace_id': 'workspace-1',
+        'title': 'Colour formula',
+        'body': 'Use 7N with low developer',
+        'contact_id': 'client-1',
+        'appointment_id': 'booking-1',
+        'pinned': true,
+        'contacts': {'name': 'Maya'},
+      });
+
+      expect(note.clientName, 'Maya');
+      expect(note.pinned, isTrue);
+      expect(note.toMap()['title'], 'Colour formula');
+      expect(note.toMap()['appointment_id'], 'booking-1');
     });
 
     test('Service preserves public profile visibility fields', () {

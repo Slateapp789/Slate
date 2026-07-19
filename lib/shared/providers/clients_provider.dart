@@ -86,6 +86,10 @@ class ClientCrmRecord {
 
   bool get isLead => client.status == 'lead';
 
+  bool get isActive => client.status == 'active';
+
+  bool get isInactive => client.status == 'inactive';
+
   bool get isDormant {
     final latest = lastBooking?.startTime ?? client.lastActivityAt;
     if (latest == null) return false;

@@ -7,14 +7,14 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'core/theme/app_theme.dart';
 import 'core/supabase/supabase_config.dart';
 import 'features/auth/auth_screen.dart';
+import 'features/business_feed/business_feed_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/clients/clients_screen.dart';
-import 'features/clients/add_client_screen.dart';
 import 'features/appointments/appointments_screen.dart';
-import 'features/appointments/add_appointment_screen.dart';
 import 'features/finance/finance_screen.dart';
-import 'features/finance/add_payment_screen.dart';
+import 'features/notes/notes_screen.dart';
 import 'features/tasks/tasks_screen.dart';
+import 'features/more/more_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/calendar_sync/calendar_sync_screen.dart';
 import 'features/notifications/notifications_screen.dart';
@@ -41,10 +41,15 @@ class SlateApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'Slate',
+      title: 'Workloop',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.oledDark,
+      themeMode: ThemeMode.light,
       routerConfig: _router,
+      builder: (context, child) => WorkloopKeyboardDismissRegion(
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }
@@ -58,6 +63,10 @@ final _router = GoRouter(
       builder: (context, state) => const OnboardingScreen(),
     ),
     GoRoute(path: '/home', builder: (context, state) => const MainShell()),
+    GoRoute(
+      path: '/business-feed',
+      builder: (context, state) => const BusinessFeedScreen(),
+    ),
     GoRoute(
       path: '/clients',
       builder: (context, state) => const MainShell(initialIndex: 1),
@@ -77,6 +86,10 @@ final _router = GoRouter(
     GoRoute(
       path: '/notifications',
       builder: (context, state) => const NotificationsScreen(),
+    ),
+    GoRoute(
+      path: '/notes',
+      builder: (context, state) => const MainShell(initialIndex: 5),
     ),
     GoRoute(
       path: '/booking-requests',
@@ -137,7 +150,14 @@ class WorkspaceGate extends ConsumerWidget {
     final workspace = ref.watch(workspaceProvider);
     return workspace.when(
       loading: () => const _LoadingScreen(),
-      error: (e, _) => const AuthScreen(),
+      error: (e, _) => _WorkspaceErrorScreen(
+        message: e.toString(),
+        onRetry: () => ref.invalidate(workspaceProvider),
+        onSignOut: () async {
+          await Supabase.instance.client.auth.signOut();
+          ref.invalidate(workspaceProvider);
+        },
+      ),
       data: (ws) {
         if (ws == null) return const OnboardingScreen();
         const seedDemoData = bool.fromEnvironment('SEED_DEMO_DATA');
@@ -168,141 +188,6 @@ class _MainShellState extends State<MainShell> {
     _currentIndex = widget.initialIndex;
   }
 
-  // Tabs: 0=Home, 1=Clients, 2=Bookings, 3=Money, 4=Tasks
-  Widget getScreen() {
-    switch (_currentIndex) {
-      case 0:
-        return DashboardScreen(
-          onNavigate: (i) => setState(() => _currentIndex = i),
-          onOpenMoneyFollowUps: () => setState(() {
-            _financeInitialFocus = FinanceInitialFocus.followUps;
-            _currentIndex = 3;
-          }),
-        );
-      case 1:
-        return const ClientsScreen();
-      case 2:
-        return const AppointmentsScreen();
-      case 3:
-        return FinanceScreen(initialFocus: _financeInitialFocus);
-      case 4:
-        return const TasksScreen();
-      default:
-        return DashboardScreen(
-          onNavigate: (i) => setState(() => _currentIndex = i),
-          onOpenMoneyFollowUps: () => setState(() {
-            _financeInitialFocus = FinanceInitialFocus.followUps;
-            _currentIndex = 3;
-          }),
-        );
-    }
-  }
-
-  void _showFabSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (context) {
-        return SlateSheetFrame(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _fabOption(
-                icon: LucideIcons.calendarPlus,
-                label: 'New Booking',
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => AddAppointmentScreen()),
-                  ).then((_) {
-                    if (mounted) setState(() => _currentIndex = 2);
-                  });
-                },
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              _fabOption(
-                icon: LucideIcons.userPlus,
-                label: 'New Client',
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AddClientScreen()),
-                  ).then((_) {
-                    if (mounted) setState(() => _currentIndex = 1);
-                  });
-                },
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              _fabOption(
-                icon: LucideIcons.banknote,
-                label: 'Record Payment',
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AddPaymentScreen()),
-                  ).then((_) {
-                    if (mounted) setState(() => _currentIndex = 3);
-                  });
-                },
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              _fabOption(
-                icon: LucideIcons.checkSquare,
-                label: 'New Task',
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() => _currentIndex = 4);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _fabOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return SlateSurface(
-      onTap: onTap,
-      color: AppColors.t1.withValues(alpha: 0.06),
-      borderColor: AppColors.t1.withValues(alpha: 0.08),
-      radius: AppRadius.lg,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.t1.withValues(alpha: 0.07),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: Icon(icon, color: AppColors.t2, size: 20),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppColors.t1,
-            ),
-          ),
-          const Spacer(),
-          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -310,259 +195,148 @@ class _MainShellState extends State<MainShell> {
       extendBody: true,
       body: AnimatedSwitcher(
         duration: AppMotion.standard,
-        switchInCurve: AppMotion.curve,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: AppMotion.curve,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.025, 0),
-                end: Offset.zero,
-              ).animate(curved),
-              child: child,
-            ),
-          );
-        },
-        child: KeyedSubtree(key: ValueKey(_currentIndex), child: getScreen()),
-      ),
-      bottomNavigationBar: _SlatePillNavBar(
-        currentIndex: _currentIndex,
-        onTap: (i) => setState(() {
-          _financeInitialFocus = FinanceInitialFocus.top;
-          _currentIndex = i;
-        }),
-        onAction: _showFabSheet,
-      ),
-    );
-  }
-}
-
-class _SlatePillNavBar extends StatelessWidget {
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-  final VoidCallback onAction;
-
-  const _SlatePillNavBar({
-    required this.currentIndex,
-    required this.onTap,
-    required this.onAction,
-  });
-
-  static const _tabs = [
-    _NavItem(label: 'Home', icon: LucideIcons.home, color: AppColors.slate),
-    _NavItem(label: 'Clients', icon: LucideIcons.users, color: AppColors.slate),
-    _NavItem(
-      label: 'Bookings',
-      icon: LucideIcons.calendarDays,
-      color: AppColors.slate,
-    ),
-    _NavItem(
-      label: 'Money',
-      icon: LucideIcons.banknote,
-      color: AppColors.slate,
-    ),
-    _NavItem(
-      label: 'Tasks',
-      icon: LucideIcons.listChecks,
-      color: AppColors.slate,
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).padding.bottom;
-    final tabCount = _tabs.length;
-    return SafeArea(
-      top: false,
-      minimum: EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        0,
-        AppSpacing.md,
-        bottom > 0 ? 2 : AppSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: SlateGlassSurface(
-              blur: 30,
-              color: AppColors.bgRaised.withValues(alpha: 0.40),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: SizedBox(
-                height: 70,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final tabWidth = constraints.maxWidth / tabCount;
-                    final left = currentIndex * tabWidth;
-
-                    int indexForPosition(double dx) {
-                      return (dx / tabWidth).floor().clamp(0, tabCount - 1);
-                    }
-
-                    return GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onHorizontalDragStart: (details) {
-                        final index = indexForPosition(
-                          details.localPosition.dx,
-                        );
-                        if (index != currentIndex) onTap(index);
-                      },
-                      onHorizontalDragUpdate: (details) {
-                        final index = indexForPosition(
-                          details.localPosition.dx,
-                        );
-                        if (index != currentIndex) onTap(index);
-                      },
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          AnimatedPositioned(
-                            duration: AppMotion.deliberate,
-                            curve: AppMotion.emphasized,
-                            left: left,
-                            top: 9,
-                            width: tabWidth,
-                            height: 52,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 2,
-                              ),
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: _tabs[currentIndex].color.withValues(
-                                    alpha: 0.18,
-                                  ),
-                                  borderRadius: BorderRadius.circular(
-                                    AppRadius.pill,
-                                  ),
-                                  border: Border.all(
-                                    color: _tabs[currentIndex].color.withValues(
-                                      alpha: 0.22,
-                                    ),
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.t1.withValues(
-                                        alpha: 0.07,
-                                      ),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 6),
-                                    ),
-                                    BoxShadow(
-                                      color: AppColors.slateGlow.withValues(
-                                        alpha: 0.18,
-                                      ),
-                                      blurRadius: 26,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          Row(
-                            children: List.generate(
-                              tabCount,
-                              (index) => Expanded(child: _buildTab(index)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          SlateGlassSurface(
-            radius: AppRadius.pill,
-            blur: 30,
-            color: AppColors.bgRaised.withValues(alpha: 0.44),
-            child: GestureDetector(
-              onTap: onAction,
-              child: const SizedBox(
-                width: 68,
-                height: 68,
-                child: Icon(LucideIcons.plus, color: AppColors.t1, size: 28),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTab(int index) {
-    final tab = _tabs[index];
-    final active = index == currentIndex;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => onTap(index),
-      child: Container(
-        height: 70,
-        margin: const EdgeInsets.symmetric(horizontal: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
+        child: IndexedStack(
+          key: const ValueKey('main-shell-tabs'),
+          index: _currentIndex,
           children: [
-            AnimatedScale(
-              scale: active ? 1.15 : 1,
-              duration: AppMotion.standard,
-              curve: AppMotion.curve,
-              child: Icon(
-                tab.icon,
-                color: active ? tab.color : AppColors.t3,
-                size: 19,
-              ),
+            DashboardScreen(
+              onNavigate: (i) => setState(() => _currentIndex = i),
+              onOpenMoneyFollowUps: () => setState(() {
+                _financeInitialFocus = FinanceInitialFocus.followUps;
+                _currentIndex = 3;
+              }),
             ),
-            AnimatedSize(
-              duration: AppMotion.standard,
-              curve: AppMotion.curve,
-              alignment: Alignment.topCenter,
-              child: active
-                  ? Padding(
-                      padding: const EdgeInsets.only(top: 3),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          tab.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.fade,
-                          softWrap: false,
-                          style: TextStyle(
-                            color: tab.color,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            height: 1,
-                          ),
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
+            const ClientsScreen(),
+            const AppointmentsScreen(),
+            FinanceScreen(initialFocus: _financeInitialFocus),
+            const TasksScreen(),
+            const NotesScreen(showBackButton: false),
+            MoreScreen(
+              onOpenMoney: () => setState(() => _currentIndex = 3),
+              onOpenTasks: () => setState(() => _currentIndex = 4),
+              onOpenNotes: () => setState(() => _currentIndex = 5),
             ),
           ],
         ),
       ),
+      bottomNavigationBar: WorkloopBottomNav(
+        currentIndex: _currentIndex <= 2 ? _currentIndex : 3,
+        items: const [
+          WorkloopNavItem(
+            label: 'Home',
+            icon: LucideIcons.home,
+            color: AppColors.accentPrimary,
+          ),
+          WorkloopNavItem(
+            label: 'Clients',
+            icon: LucideIcons.users,
+            color: AppColors.accentPrimary,
+          ),
+          WorkloopNavItem(
+            label: 'Bookings',
+            icon: LucideIcons.calendarDays,
+            color: AppColors.accentPrimary,
+          ),
+          WorkloopNavItem(
+            label: 'More',
+            icon: LucideIcons.menu,
+            color: AppColors.accentPrimary,
+          ),
+        ],
+        onTap: (i) {
+          final destination = i == 3 ? 6 : i;
+          if (destination == _currentIndex) return;
+          setState(() {
+            _financeInitialFocus = FinanceInitialFocus.top;
+            _currentIndex = destination;
+          });
+        },
+      ),
     );
   }
 }
 
-class _NavItem {
-  final String label;
-  final IconData icon;
-  final Color color;
+class _WorkspaceErrorScreen extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  final Future<void> Function() onSignOut;
 
-  const _NavItem({
-    required this.label,
-    required this.icon,
-    required this.color,
+  const _WorkspaceErrorScreen({
+    required this.message,
+    required this.onRetry,
+    required this.onSignOut,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Center(
+            child: WorkloopSurface(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    LucideIcons.alertTriangle,
+                    color: AppColors.warning,
+                    size: 32,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  const Text(
+                    'Could not open your workspace',
+                    style: TextStyle(
+                      color: AppColors.t1,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    message,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: WorkloopPrimaryButton(
+                          label: 'Try again',
+                          icon: LucideIcons.refreshCcw,
+                          onPressed: onRetry,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: WorkloopPrimaryButton(
+                          label: 'Sign out',
+                          icon: LucideIcons.logOut,
+                          secondary: true,
+                          onPressed: () {
+                            onSignOut();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _LoadingScreen extends StatelessWidget {
@@ -590,13 +364,13 @@ class _LoadingScreen extends StatelessWidget {
                 width: 30,
                 height: 30,
                 child: CircularProgressIndicator(
-                  color: AppColors.slateLight,
+                  color: AppColors.accentPrimaryStrong,
                   strokeWidth: 2.4,
                 ),
               ),
               SizedBox(height: AppSpacing.md),
               Text(
-                'Opening Slate',
+                'Opening Workloop',
                 style: TextStyle(
                   color: AppColors.t3,
                   fontWeight: FontWeight.w700,

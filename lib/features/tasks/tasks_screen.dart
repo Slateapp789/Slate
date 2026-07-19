@@ -17,7 +17,9 @@ part 'task_detail_widgets.dart';
 part 'task_editor_widgets.dart';
 
 class TasksScreen extends ConsumerStatefulWidget {
-  const TasksScreen({super.key});
+  final int createRequest;
+
+  const TasksScreen({super.key, this.createRequest = 0});
 
   @override
   ConsumerState<TasksScreen> createState() => _TasksScreenState();
@@ -27,8 +29,32 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   _TaskView _view = _TaskView.urgent;
 
   @override
+  void didUpdateWidget(covariant TasksScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.createRequest == oldWidget.createRequest ||
+        widget.createRequest == 0) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showTaskEditor(context);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final tasks = ref.watch(allTasksProvider);
+    final taskCounts = tasks.maybeWhen(
+      data: (data) => _countsForTasks(data),
+      orElse: () => const _TaskCounts(
+        overdue: 0,
+        today: 0,
+        upcoming: 0,
+        noDate: 0,
+        done: 0,
+        open: 0,
+      ),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -43,48 +69,33 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 AppSpacing.pageX,
                 0,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Tasks',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.t1,
-                      letterSpacing: 0,
-                    ),
+              child: WorkloopPageHeader(
+                icon: LucideIcons.listChecks,
+                title: 'Tasks',
+                subtitle: 'Keep follow-ups and admin from slipping.',
+                color: AppColors.modTasks,
+                trailing: WorkloopIconButton(
+                  icon: LucideIcons.plus,
+                  semanticLabel: 'New task',
+                  color: AppColors.modTasks,
+                  backgroundColor: AppColors.modTasks.withValues(alpha: 0.10),
+                  onTap: () => _showTaskEditor(context),
+                ),
+                metrics: [
+                  WorkloopMetricItem(
+                    value: '${taskCounts.urgent}',
+                    label: 'Urgent',
+                    color: AppColors.modTasks,
                   ),
-                  GestureDetector(
-                    onTap: () => _showTaskEditor(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.slateLight,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(
-                            LucideIcons.plus,
-                            color: AppColors.panelInk,
-                            size: 14,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'New',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.panelInk,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  WorkloopMetricItem(
+                    value: '${taskCounts.upcoming}',
+                    label: 'Upcoming',
+                    color: AppColors.warning,
+                  ),
+                  WorkloopMetricItem(
+                    value: '${taskCounts.done}',
+                    label: 'Done',
+                    color: AppColors.statusSuccess,
                   ),
                 ],
               ),
@@ -106,7 +117,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
                   return RefreshIndicator(
                     onRefresh: () async => ref.invalidate(allTasksProvider),
-                    color: AppColors.green,
+                    color: AppColors.accentPrimary,
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(
                         AppSpacing.pageX,
@@ -177,7 +188,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     };
     return Padding(
       padding: const EdgeInsets.only(top: 42),
-      child: SlateEmptyState(
+      child: WorkloopEmptyState(
         icon: Icons.check_circle_outline_rounded,
         title: title,
         subtitle: subtitle,
@@ -849,30 +860,12 @@ class _TaskViewSwitcher extends StatelessWidget {
         children: _TaskView.values.map((view) {
           final active = value == view;
           final count = _viewCount(view, counts);
-          return GestureDetector(
-            onTap: () => onChanged(view),
-            child: Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-              decoration: BoxDecoration(
-                color: active
-                    ? AppColors.t1.withValues(alpha: 0.12)
-                    : AppColors.t1.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                border: Border.all(
-                  color: active
-                      ? AppColors.t1.withValues(alpha: 0.18)
-                      : AppColors.t1.withValues(alpha: 0.07),
-                ),
-              ),
-              child: Text(
-                '${_viewLabel(view)} $count',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: active ? AppColors.t1 : AppColors.t2,
-                ),
-              ),
+          return Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.xs),
+            child: WorkloopFilterChip(
+              label: '${_viewLabel(view)} $count',
+              selected: active,
+              onTap: () => onChanged(view),
             ),
           );
         }).toList(),

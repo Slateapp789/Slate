@@ -38,7 +38,7 @@ class _TaskCard extends StatelessWidget {
         alignment: Alignment.centerLeft,
         icon: isDone ? LucideIcons.rotateCcw : LucideIcons.checkCircle,
         label: isDone ? 'Reopen' : 'Complete',
-        color: AppColors.green,
+        color: AppColors.success,
       ),
       secondaryBackground: const _SwipeBackground(
         alignment: Alignment.centerRight,
@@ -71,9 +71,9 @@ class _TaskCard extends StatelessWidget {
                     height: 24,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDone ? AppColors.green : Colors.transparent,
+                      color: isDone ? AppColors.success : Colors.transparent,
                       border: Border.all(
-                        color: isDone ? AppColors.green : AppColors.border,
+                        color: isDone ? AppColors.success : AppColors.border,
                         width: 2,
                       ),
                     ),

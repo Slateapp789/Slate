@@ -38,9 +38,9 @@ class PaymentSummaryCard extends StatelessWidget {
     }
 
     return SlateSurface(
-      padding: const EdgeInsets.all(22),
-      color: AppColors.panelSoft,
-      borderColor: AppColors.panelSoftRaised,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      color: AppColors.t1.withValues(alpha: 0.028),
+      borderColor: AppColors.border.withValues(alpha: 0.54),
       radius: AppRadius.lg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -49,9 +49,9 @@ class PaymentSummaryCard extends StatelessWidget {
             'TOTAL RECEIVED',
             style: TextStyle(
               fontSize: 9,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               letterSpacing: 0,
-              color: AppColors.panelMuted,
+              color: AppColors.t3,
             ),
           ),
           const SizedBox(height: 4),
@@ -59,14 +59,14 @@ class PaymentSummaryCard extends StatelessWidget {
             '£${received.toStringAsFixed(0)}',
             style: const TextStyle(
               fontSize: 44,
-              fontWeight: FontWeight.w900,
-              color: AppColors.panelInk,
+              fontWeight: FontWeight.w800,
+              color: AppColors.t1,
               letterSpacing: 0,
               height: 1,
             ),
           ),
           const SizedBox(height: 14),
-          Container(height: 1, color: AppColors.panelFaint),
+          Container(height: 1, color: AppColors.border.withValues(alpha: 0.54)),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -79,7 +79,7 @@ class PaymentSummaryCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.panelMuted,
+                        color: AppColors.t3,
                       ),
                     ),
                     Text(
@@ -88,8 +88,8 @@ class PaymentSummaryCard extends StatelessWidget {
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                         color: outstanding > 0
-                            ? AppColors.panelInk
-                            : AppColors.panelInk.withValues(alpha: 0.28),
+                            ? AppColors.t1
+                            : AppColors.t1.withValues(alpha: 0.28),
                       ),
                     ),
                   ],
@@ -126,7 +126,11 @@ class PaymentSummaryCard extends StatelessWidget {
                   muted: thisMonth == 0,
                 ),
               ),
-              Container(width: 1, height: 34, color: AppColors.panelFaint),
+              Container(
+                width: 1,
+                height: 34,
+                color: AppColors.border.withValues(alpha: 0.54),
+              ),
               Expanded(
                 child: _MiniPaymentMetric(
                   label: 'Overdue',
@@ -168,7 +172,7 @@ class _MiniPaymentMetric extends StatelessWidget {
             style: const TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w700,
-              color: AppColors.panelMuted,
+              color: AppColors.t3,
             ),
           ),
           const SizedBox(height: 2),
@@ -180,8 +184,8 @@ class _MiniPaymentMetric extends StatelessWidget {
               color: danger
                   ? AppColors.error
                   : muted
-                  ? AppColors.panelInk.withValues(alpha: 0.28)
-                  : AppColors.panelInk,
+                  ? AppColors.t1.withValues(alpha: 0.28)
+                  : AppColors.t1,
             ),
           ),
         ],
@@ -212,7 +216,7 @@ class PaymentCard extends StatelessWidget {
     final isPaid = status == MoneyStatus.paid;
 
     final statusColor = isPaid
-        ? AppColors.green
+        ? AppColors.success
         : isOverdue
         ? AppColors.error
         : isPending

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/onboarding_provider.dart';
+import '../../../shared/widgets/slate_ui.dart';
 
 class ObFirstBooking extends ConsumerStatefulWidget {
   final VoidCallback onNext;
@@ -300,46 +301,23 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
           // Service
           _label('Service'),
           const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedService,
-                hint: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: Text(
-                    'Select a service',
-                    style: TextStyle(color: AppColors.t3, fontSize: 15),
+          WorkloopPickerField<String>(
+            value: _selectedService,
+            title: 'Choose a service',
+            hint: 'Select a service',
+            searchHint: 'Search services',
+            options: services
+                .map(
+                  (service) => WorkloopPickerOption(
+                    value: service['name'] as String,
+                    label: service['name'] as String,
+                    subtitle: service['duration_mins'] == null
+                        ? null
+                        : '${service['duration_mins']} min',
                   ),
-                ),
-                isExpanded: true,
-                dropdownColor: AppColors.bgRaised,
-                icon: Padding(
-                  padding: const EdgeInsets.only(right: 14),
-                  child: Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: AppColors.t3,
-                  ),
-                ),
-                items: services.map((s) {
-                  return DropdownMenuItem<String>(
-                    value: s['name'] as String,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
-                      child: Text(
-                        s['name'] as String,
-                        style: TextStyle(color: AppColors.t1, fontSize: 15),
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) => setState(() => _selectedService = val),
-              ),
-            ),
+                )
+                .toList(),
+            onChanged: (value) => setState(() => _selectedService = value),
           ),
           const SizedBox(height: 20),
 

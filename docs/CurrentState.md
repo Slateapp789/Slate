@@ -1,6 +1,6 @@
-# Slate Current State
+# Workloop Current State
 
-Last updated: 2026-06-07
+Last updated: 2026-07-15
 
 ## Completed / Mostly Working Features
 
@@ -17,6 +17,7 @@ Last updated: 2026-06-07
 
 - Multi-step onboarding.
 - Captures business profile basics.
+- Persists the owner's preferred first name in Supabase Auth metadata for personalised app greetings.
 - Captures public handle.
 - Captures services.
 - Captures working hours, including split working blocks with breaks.
@@ -27,54 +28,75 @@ Last updated: 2026-06-07
 ### Navigation
 
 - GoRouter top-level routes.
-- Main shell with glass/pill bottom navigation.
-- Tabs: Home, Clients, Bookings, Money, Tasks.
-- Floating action button with creation sheet.
-- Tasks, Work/Bookings, and Payments routes can deep-link to shell indexes.
+- Main shell with a four-item glass/pill bottom navigation: Home, Clients, Bookings, More.
+- More keeps Money, Tasks, Notes, Profile, and Settings one tap away without crowding the primary navigation.
+- The oversized global create button has been removed; Clients, Bookings, Money, Tasks, and Notes expose a consistent compact create action in each feature header.
+- Tasks, Notes, Work/Bookings, and Payments routes can deep-link to their shell screens while More remains the active navigation destination for secondary modules.
+- Business Feed route opens from Home without adding a bottom navigation tab.
+- Tapping outside an active text field dismisses the keyboard consistently across every route while taps within the field keep editing active.
 
 ### Dashboard
 
-- Revenue card.
-- Today pulse / business pulse.
-- Today schedule.
-- Tasks section.
-- Notification access and unread count.
-- Booking request visibility.
+- Calm daily overview ordered around Today, Worth a look, Money, quick access, Coming up, and Recent activity.
+- Visual hierarchy stays close to the original flat dashboard, with a very quiet paper-like backdrop, a stronger Today heading, and higher-contrast operational metadata adding depth without more cards or decorative colour markers.
+- Time-aware personalised greeting includes the current date.
+- Today shows only the next remaining booking plus a quiet count of later bookings; Coming up excludes today and is capped at three rows.
+- Worth a look is optional, neutrally worded, capped at two rows, and uses no alarming totals, badges, or urgency colours.
+- Money is a compact received-this-month row rather than a dominant hero card.
+- Tasks and Notes use two small, low-contrast utility cards so they read separately from Money without adding visual noise.
+- Recent activity is capped at three calm items and excludes attention/overdue/unpaid warning states.
+- Dashboard rows and section actions open the related booking detail or owning feature.
 - Pull-to-refresh.
 - Navigation callbacks into core modules.
 
+### Business Feed
+
+- Computed feed generated from existing bookings, clients, payments, expenses, tasks, notes, booking requests, and weekly target progress.
+- Feed item types include today's bookings, upcoming bookings, payment received, unpaid/overdue invoices, expenses, due/overdue tasks, notes, client follow-ups, booking requests, quiet-day detection, daily summary, and weekly target progress.
+- Home preview appears inside Daily Command with a View all action.
+- Full Business Feed screen includes All, Needs attention, Money, Bookings, Tasks, and Clients filters.
+- Feed row taps route to the most useful existing module or booking request screen where exact detail routes do not yet exist.
+- No persisted feed table or AI dependency has been introduced.
+
 ### Clients / CRM
 
-- Client list.
-- Search and filtering/sorting.
-- Simplified rows showing useful business signals rather than contact clutter.
-- Add client.
-- Edit client.
+- Calm, whitespace-first client list aligned with the dashboard's title scale, top spacing, paper-like backdrop, text hierarchy, and continuous divider-led rows.
+- Client sorting supports Next booking, A–Z, Recently booked, Recently added, and Most booked without additional database queries.
+- Client sorting is presented as a compact single-line choice menu with a quiet selected state rather than a second list of full record-style rows.
+- Search across client names, contact details, and tags, with bottom-navigation-inspired All/Active/Leads/Inactive views that can be changed by tapping, dragging the selected capsule across the selector, or swiping horizontally across the screen.
+- Active and Inactive remain distinct status views; inactive contacts also carry a quiet neutral label inside All.
+- Changing client views returns the portfolio to the top, and each empty category has calm, contextual guidance.
+- Add and Edit client use one canonical form with the dashboard/client textured shell, shared field styling, and identical Contact information, Client settings, Booking address, Client notes, and Additional information sections.
+- The shared Booking address field supports debounced UK Google Places autocomplete through an authenticated Supabase Edge Function, suggestions that remain visible while the surrounding form is repositioned, and an independently scrollable and explicitly dismissible result list. It deliberately stays as one field: users start with the first line of an address for suggestions, or keep any manually typed value such as a postcode. Building-level matches preserve typed flat/unit labels, selection remains immediate with manual fallback, and the Google key stays out of the mobile app.
+- Saved client booking addresses open driving directions in Apple Maps or Google Maps. Users can choose per launch, remember a choice from the directions sheet, or change the device-level default under App settings.
+- Client entry validates optional email addresses, explains relationship statuses, warns when the selected contact channel has no matching detail, and blocks duplicate phone/email records before saving.
+- Lead source, tags, and birthday remain progressively disclosed; destructive deletion stays separate from Save, and backing out of an edited client offers to preserve or discard the draft.
 - Delete client with confirmation.
-- Client detail with call/email actions.
+- Client workspace with a compact relationship header, call/email actions, textured backdrop, and draggable Overview/Bookings/Money/Tasks navigation aligned with the app shell.
 - Notes and important notes.
 - Status/source/tags/birthday/preferred contact method fields.
-- Client booking history.
-- Client payment history.
-- Client task history.
-- Client overview timeline and follow-up task creation.
+- Client overview prioritises the next booking, a restrained relationship snapshot, calm follow-up rows, useful context, and three recent activities rather than repeating full module histories.
+- Client booking history is repository-backed, opens canonical booking details, and creates bookings with the client preselected.
+- Client payment history is repository-backed, supports direct recording/editing, and distinguishes received, remaining, paid, part-paid, and unpaid amounts without alarm styling.
+- Client task history uses the shared task repository and contact relationship, invalidates the main Tasks state, and links directly to the full Tasks workspace.
 
 ### Bookings
 
 - User-facing Bookings built on `appointments`.
-- Today / Upcoming / Past views.
-- Calendar view with selected-date list.
-- Next booking card.
-- Add booking.
-- Edit booking.
+- Calm Schedule / Requests workspace using the same textured backdrop, typography, spacing, segmented controls, and feature-header action as Home and Clients.
+- List mode with Today / Upcoming / Past views and a concise next-booking summary.
+- Calendar mode with month navigation, a Today shortcut, selected-date list, and selected-date hand-off when adding a booking.
+- Add and inline Edit booking forms share the client form visual language, keyboard dismissal, calm input surfaces, and progressive booking sections.
 - Change date/time/duration/service/price/client/location/notes/status.
-- Business/client/online location choices.
+- Business/client/online location choices; client location can reuse the selected client's saved booking address.
+- Saved physical booking locations open directions using the shared Apple Maps / Google Maps device preference.
 - Inline client creation in new booking.
 - Custom service name, duration, and price.
 - Conflict checks.
 - Linked tasks in booking detail.
 - Booking status controls: scheduled, completed, cancelled/no-show style workflows.
 - Calendar export / ICS flow.
+- Dashboard and client booking rows continue to open the canonical booking detail; booking detail links back to the canonical client workspace and shared Money and Tasks records.
 
 ### Tasks
 
@@ -153,6 +175,7 @@ Last updated: 2026-06-07
 - Notification settings.
 - Calendar sync entry point.
 - Account email/password/sign out.
+- Editable preferred first name for personalised greetings.
 - Privacy export and account deletion request flow.
 
 ### Security / Foundation
@@ -214,6 +237,7 @@ Post-V1 / V2:
 
 ## Technical Debt
 
+- UI system: the 2026-07-07 whitespace-first refoundation now has canonical `Workloop*` screen primitives for headers, metrics, rows, filters, segmented controls, empty states, buttons, bottom nav, FAB, and surfaces. Some settings child tabs, onboarding steps, auth, notification, public profile, form, sheet, and detail widgets still contain local `Container`/`AppColors` styling that should be migrated to shared theme tokens and row/divider primitives before enabling real dark mode.
 - Large files:
   - `lib/features/tasks/tasks_screen.dart` ~946 lines after extracting task card, task logic, task detail, and task editor parts.
   - `lib/features/tasks/task_logic.dart` ~280 lines.

@@ -24,7 +24,8 @@ class MoneyPeriodSwitcher extends StatelessWidget {
     return SlateSurface(
       padding: const EdgeInsets.all(6),
       radius: AppRadius.pill,
-      color: AppColors.bgInteract,
+      color: AppColors.t1.withValues(alpha: 0.028),
+      borderColor: AppColors.border.withValues(alpha: 0.54),
       child: Row(
         children: [
           _periodOption('Week', FinancePeriod.week),
@@ -46,11 +47,13 @@ class MoneyPeriodSwitcher extends StatelessWidget {
           height: 36,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: active ? AppColors.bgRaised : Colors.transparent,
+            color: active
+                ? AppColors.accentPrimaryStrong.withValues(alpha: 0.34)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.pill),
             border: Border.all(
               color: active
-                  ? AppColors.t1.withValues(alpha: 0.08)
+                  ? AppColors.accentPrimaryStrong.withValues(alpha: 0.54)
                   : Colors.transparent,
             ),
           ),
@@ -60,7 +63,7 @@ class MoneyPeriodSwitcher extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               color: active ? AppColors.t1 : AppColors.t3,
             ),
           ),
@@ -77,73 +80,218 @@ class MoneySnapshot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateSurface(
-      padding: const EdgeInsets.all(16),
-      radius: AppRadius.lg,
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'MONEY SUMMARY',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.t3,
-                    letterSpacing: 0,
+    final netPositive = summary.profit >= 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              LucideIcons.walletCards,
+              color: AppColors.modFinance,
+              size: 24,
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Cashflow',
+                    style: TextStyle(
+                      color: AppColors.t1,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0,
+                    ),
                   ),
+                  Text(
+                    summary.label,
+                    style: const TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: netPositive ? AppColors.greenDim : AppColors.errorDim,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(
+                  color: netPositive
+                      ? AppColors.green.withValues(alpha: 0.22)
+                      : AppColors.error.withValues(alpha: 0.22),
                 ),
               ),
-              Text(
-                summary.label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t3,
+              child: Text(
+                netPositive ? 'Net positive' : 'Net down',
+                style: TextStyle(
+                  color: netPositive ? AppColors.green : AppColors.error,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-            ],
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: netPositive
+                    ? AppColors.success.withValues(alpha: 0.14)
+                    : AppColors.error.withValues(alpha: 0.16),
+                width: 3,
+              ),
+            ),
           ),
-          const SizedBox(height: 14),
-          Row(
+          child: Row(
             children: [
+              const SizedBox(width: AppSpacing.md),
               Expanded(
-                child: _MoneyMetric(
-                  label: 'Paid',
-                  value: summary.paid,
-                  icon: LucideIcons.checkCircle2,
-                ),
-              ),
-              Expanded(
-                child: _MoneyMetric(
-                  label: 'Unpaid',
-                  value: summary.unpaid,
-                  icon: LucideIcons.clock3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _MoneyMetric(
-                  label: 'Overdue',
-                  value: summary.overdue,
-                  icon: LucideIcons.alertCircle,
-                  danger: summary.overdue > 0,
-                  muted: summary.overdue == 0,
-                ),
-              ),
-              Expanded(
-                child: _MoneyMetric(
-                  label: 'Profit',
+                child: _CashflowValue(
+                  label: 'Net',
                   value: summary.profit,
-                  icon: LucideIcons.trendingUp,
+                  size: 40,
+                  color: netPositive ? AppColors.success : AppColors.error,
                 ),
               ),
+              Icon(
+                netPositive
+                    ? LucideIcons.arrowUpRight
+                    : LucideIcons.arrowDownRight,
+                color: netPositive ? AppColors.success : AppColors.error,
+                size: 30,
+              ),
             ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: _CashflowTile(
+                icon: LucideIcons.trendingUp,
+                label: 'Income',
+                value: summary.paid,
+                color: AppColors.success,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: _CashflowTile(
+                icon: LucideIcons.receipt,
+                label: 'Expenses',
+                value: summary.expenses,
+                color: AppColors.error,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _CashflowTile(
+          icon: LucideIcons.clock3,
+          label: 'To collect',
+          value: summary.toCollect,
+          color: summary.toCollect > 0 ? AppColors.warning : AppColors.t3,
+          fullWidth: true,
+        ),
+      ],
+    );
+  }
+}
+
+class _CashflowValue extends StatelessWidget {
+  final String label;
+  final double value;
+  final double size;
+  final Color color;
+
+  const _CashflowValue({
+    required this.label,
+    required this.value,
+    required this.size,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.t3,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          '£${value.toStringAsFixed(0)}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: color,
+            fontSize: size,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+            height: 1,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CashflowTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final double value;
+  final Color color;
+  final bool fullWidth;
+
+  const _CashflowTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    this.fullWidth = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: fullWidth ? double.infinity : null,
+      constraints: const BoxConstraints(minHeight: 78),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: AppColors.border.withValues(alpha: 0.58)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: _CashflowValue(
+              label: label,
+              value: value,
+              size: 24,
+              color: AppColors.t1,
+            ),
           ),
         ],
       ),
@@ -161,59 +309,55 @@ class ExpenseCategorySummary extends StatelessWidget {
     final categories = summary.categoryTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    return SlateSurface(
-      padding: const EdgeInsets.all(16),
-      radius: AppRadius.lg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'EXPENSE CATEGORIES',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.t3,
-                  ),
-                ),
-              ),
-              Text(
-                summary.label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'EXPENSE CATEGORIES',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
                   color: AppColors.t3,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (categories.isEmpty)
-            const Text(
-              'No expenses in this period.',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+            ),
+            Text(
+              summary.label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
                 color: AppColors.t3,
               ),
-            )
-          else
-            ...categories
-                .take(4)
-                .map(
-                  (entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _CategoryBar(
-                      label: entry.key,
-                      amount: entry.value,
-                      total: summary.expenses,
-                    ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (categories.isEmpty)
+          const Text(
+            'No expenses in this period.',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.t3,
+            ),
+          )
+        else
+          ...categories
+              .take(4)
+              .map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _CategoryBar(
+                    label: entry.key,
+                    amount: entry.value,
+                    total: summary.expenses,
                   ),
                 ),
-        ],
-      ),
+              ),
+      ],
     );
   }
 }
@@ -341,64 +485,6 @@ class _ModePill extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _MoneyMetric extends StatelessWidget {
-  final String label;
-  final double value;
-  final IconData icon;
-  final bool danger;
-  final bool muted;
-
-  const _MoneyMetric({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.danger = false,
-    this.muted = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = danger ? AppColors.error : AppColors.t1;
-    return Row(
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color.withValues(alpha: 0.72), size: 16),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '£${value.toStringAsFixed(0)}',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  color: muted ? AppColors.t3 : color,
-                ),
-              ),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t3,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/working_hours.dart';
+import '../../shared/widgets/slate_ui.dart';
 
 final publicProfileProvider = FutureProvider.family<PublicProfile?, String>((
   ref,
@@ -109,7 +110,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
           if (data == null) {
             return const _ProfileMessage(
               title: 'Profile not found',
-              body: 'This Slate profile is not available.',
+              body: 'This Workloop profile is not available.',
             );
           }
           return _ProfileContent(
@@ -263,20 +264,20 @@ class _ProfileContent extends StatelessWidget {
                         maxLength: 32,
                       ),
                       const SizedBox(height: 10),
-                      DropdownButtonFormField<String?>(
-                        initialValue: selectedServiceId,
-                        dropdownColor: AppColors.bgCard,
-                        style: const TextStyle(color: AppColors.t1),
-                        decoration: _fieldDecoration('Service'),
-                        items: [
-                          const DropdownMenuItem<String?>(
+                      WorkloopPickerField<String?>(
+                        value: selectedServiceId,
+                        title: 'Choose a service',
+                        hint: 'Service',
+                        searchHint: 'Search services',
+                        options: [
+                          const WorkloopPickerOption<String?>(
                             value: null,
-                            child: Text('Not sure yet'),
+                            label: 'Not sure yet',
                           ),
                           ...profile.services.map(
-                            (service) => DropdownMenuItem<String?>(
+                            (service) => WorkloopPickerOption<String?>(
                               value: service.id,
-                              child: Text(service.name),
+                              label: service.name,
                             ),
                           ),
                         ],
@@ -404,7 +405,7 @@ class _Hero extends StatelessWidget {
             const Icon(LucideIcons.link, color: AppColors.t3, size: 15),
             const SizedBox(width: 6),
             Text(
-              'slate.app/${profile.profile.handle}',
+              'workloop.app/${profile.profile.handle}',
               style: const TextStyle(color: AppColors.t3, fontSize: 13),
             ),
           ],

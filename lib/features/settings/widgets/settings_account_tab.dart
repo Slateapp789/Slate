@@ -22,6 +22,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
   bool _requestingDeletion = false;
   final _newPasswordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
+  final _firstNameCtrl = TextEditingController();
   final _deleteConfirmCtrl = TextEditingController();
   bool _obscureNew = true;
   bool _obscureConfirm = true;
@@ -30,6 +31,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
   void dispose() {
     _newPasswordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
+    _firstNameCtrl.dispose();
     _deleteConfirmCtrl.dispose();
     super.dispose();
   }
@@ -70,6 +72,82 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
     } catch (e) {
       setState(() => _savingPassword = false);
       if (mounted) _snack('Error: $e', AppColors.error);
+    }
+  }
+
+  void _showNameSheet() {
+    _firstNameCtrl.text =
+        ref.read(authRepositoryProvider).currentFirstName ?? '';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          12,
+          24,
+          24 + MediaQuery.viewInsetsOf(ctx).bottom,
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: settingsHandle()),
+              const SizedBox(height: 24),
+              const Text(
+                'Your name',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Workloop uses your first name in personal greetings.',
+                style: TextStyle(color: AppColors.t3, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _firstNameCtrl,
+                autofocus: true,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(hintText: 'First name'),
+                onSubmitted: (_) => _saveFirstName(ctx),
+              ),
+              const SizedBox(height: 20),
+              saveBtn(label: 'Save name', onTap: () => _saveFirstName(ctx)),
+              const SizedBox(height: 10),
+              cancelBtn(ctx),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveFirstName(BuildContext sheetContext) async {
+    final value = _firstNameCtrl.text.trim();
+    if (value.isEmpty) {
+      _snack('Enter your first name', AppColors.error);
+      return;
+    }
+    try {
+      await ref.read(authRepositoryProvider).updateFirstName(value);
+      if (sheetContext.mounted) Navigator.pop(sheetContext);
+      if (mounted) {
+        setState(() {});
+        _snack('Name updated', AppColors.green);
+      }
+    } catch (e) {
+      if (mounted) _snack('Could not update name: $e', AppColors.error);
     }
   }
 
@@ -165,7 +243,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'This includes the workspace data Slate currently stores for your account.',
+                'This includes the workspace data Workloop currently stores for your account.',
                 style: TextStyle(color: AppColors.t3, height: 1.4),
               ),
               const SizedBox(height: 14),
@@ -324,7 +402,9 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
 
   @override
   Widget build(BuildContext context) {
-    final email = ref.watch(authRepositoryProvider).currentEmail;
+    final authRepository = ref.watch(authRepositoryProvider);
+    final email = authRepository.currentEmail;
+    final firstName = authRepository.currentFirstName;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
@@ -338,7 +418,18 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.border),
           ),
-          child: infoRow('Email', email),
+          child: Column(
+            children: [
+              tappableRow(
+                label: 'Your name',
+                value: firstName ?? 'Add name',
+                onTap: _showNameSheet,
+                valueColor: firstName == null ? AppColors.green : AppColors.t2,
+              ),
+              Divider(height: 1, color: AppColors.border),
+              infoRow('Email', email),
+            ],
+          ),
         ),
         const SizedBox(height: 28),
 
