@@ -1,40 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:workloop/features/finance/finance_screen.dart';
 import 'package:workloop/features/finance/widgets/money_editor_widgets.dart';
 import 'package:workloop/features/finance/widgets/money_summary_widgets.dart';
-import 'package:workloop/shared/providers/finance_provider.dart';
+import 'package:workloop/shared/widgets/slate_ui.dart';
 
 void main() {
-  testWidgets('Money overview keeps received as the single primary figure', (
-    tester,
-  ) async {
-    const summary = PeriodMoneySummary(
-      label: 'This month',
-      paid: 120,
-      unpaid: 40,
-      overdue: 10,
-      expenses: 35,
-      categoryTotals: {'Materials': 35},
-    );
+  testWidgets('Money navigation exposes three clear sections', (tester) async {
+    MoneySection selected = MoneySection.income;
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: Padding(
-            padding: EdgeInsets.all(24),
-            child: MoneySnapshot(summary: summary),
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) => Scaffold(
+            body: WorkloopNavigationControl<MoneySection>(
+              selected: selected,
+              segments: const [
+                WorkloopSegment(value: MoneySection.income, label: 'Income'),
+                WorkloopSegment(
+                  value: MoneySection.outgoing,
+                  label: 'Outgoing',
+                ),
+                WorkloopSegment(
+                  value: MoneySection.outstanding,
+                  label: 'Outstanding',
+                ),
+              ],
+              onChanged: (value) => setState(() => selected = value),
+            ),
           ),
         ),
       ),
     );
 
-    expect(find.text('Received'), findsOneWidget);
-    expect(find.text('£120'), findsOneWidget);
-    expect(find.text('Expenses'), findsOneWidget);
-    expect(find.text('£35'), findsOneWidget);
-    expect(find.text('Net'), findsOneWidget);
-    expect(find.text('£85'), findsOneWidget);
-    expect(find.text('To collect'), findsNothing);
+    expect(find.text('Income'), findsOneWidget);
+    expect(find.text('Outgoing'), findsOneWidget);
+    expect(find.text('Outstanding'), findsOneWidget);
+
+    await tester.tap(find.text('Outstanding'));
+    await tester.pumpAndSettle();
+    expect(selected, MoneySection.outstanding);
   });
 
   testWidgets('Money period selector uses the shared segmented interaction', (

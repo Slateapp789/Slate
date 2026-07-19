@@ -35,66 +35,6 @@ class MoneyPeriodSwitcher extends StatelessWidget {
   }
 }
 
-class MoneySnapshot extends StatelessWidget {
-  final PeriodMoneySummary summary;
-
-  const MoneySnapshot({super.key, required this.summary});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          summary.label,
-          style: const TextStyle(
-            color: AppColors.t3,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        const Text(
-          'Received',
-          style: TextStyle(
-            color: AppColors.t3,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xxs),
-        Text(
-          '£${summary.paid.toStringAsFixed(0)}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppColors.t1,
-            fontSize: 40,
-            fontWeight: FontWeight.w800,
-            height: 1,
-            letterSpacing: 0,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        WorkloopMetricRow(
-          children: [
-            WorkloopMetricItem(
-              value: '£${summary.expenses.toStringAsFixed(0)}',
-              label: 'Expenses',
-              color: AppColors.t1,
-            ),
-            WorkloopMetricItem(
-              value: '£${summary.profit.toStringAsFixed(0)}',
-              label: 'Net',
-              color: AppColors.t1,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
 class ExpenseCategorySummary extends StatelessWidget {
   final PeriodMoneySummary summary;
 
