@@ -514,3 +514,22 @@ Consequences:
 - Collection rows retain due and overdue meaning with restrained styling rather than alarm-heavy surfaces.
 - Income and expense creation/editing use shared Money fields and protect changed drafts before navigation.
 - Existing Riverpod providers, repositories, Supabase tables, RLS, booking links, client links, and CRUD capabilities remain unchanged.
+
+## 2026-07-19 - Money Separates Income, Outgoing, and Outstanding
+
+Decision:
+
+Use a first-class three-section navigation bar inside Money. Income, Outgoing, and Outstanding each own their summary, supporting information, empty state, and activity list.
+
+Reasoning:
+
+A combined money overview remained visually calm but required users to interpret received money, spending, and collection work in one long page. These are three distinct questions with different actions and time horizons. Separating them improves scanning while keeping all three one gesture away.
+
+Consequences:
+
+- Income shows period-filtered received money, weekly target progress, and received-income history.
+- Outgoing shows period-filtered spending, category distribution, and expense history.
+- Outstanding shows all currently uncollected money, split into Upcoming and Past due without applying an arbitrary period filter.
+- Dashboard follow-up links open Money with Outstanding selected.
+- The large navigation capsule represents peer Money destinations; the smaller Week / Month / Custom control remains a local filter inside Income and Outgoing.
+- Add/Edit Income, Add/Edit Expense, repository behavior, Supabase schema, RLS, client links, and booking links are unchanged.

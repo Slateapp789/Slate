@@ -1,5 +1,113 @@
 part of 'finance_screen.dart';
 
+class _MoneySectionHero extends StatelessWidget {
+  final String label;
+  final double value;
+  final String detail;
+
+  const _MoneySectionHero({
+    required this.label,
+    required this.value,
+    required this.detail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.t3,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          '£${value.toStringAsFixed(0)}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.t1,
+            fontSize: 40,
+            height: 1,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          detail,
+          style: const TextStyle(
+            color: AppColors.t3,
+            fontSize: 12,
+            height: 1.35,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OutstandingHero extends StatelessWidget {
+  final double total;
+  final double upcoming;
+  final double overdue;
+
+  const _OutstandingHero({
+    required this.total,
+    required this.upcoming,
+    required this.overdue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Outstanding',
+          style: TextStyle(
+            color: AppColors.t3,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          '£${total.toStringAsFixed(0)}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.t1,
+            fontSize: 40,
+            height: 1,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        WorkloopMetricRow(
+          children: [
+            WorkloopMetricItem(
+              value: '£${upcoming.toStringAsFixed(0)}',
+              label: 'Upcoming',
+              color: AppColors.t1,
+            ),
+            WorkloopMetricItem(
+              value: '£${overdue.toStringAsFixed(0)}',
+              label: 'Past due',
+              color: AppColors.t1,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _WeeklyTargetCard extends StatelessWidget {
   final FinanceSummary summary;
   final VoidCallback onEditTarget;
@@ -179,21 +287,5 @@ class _ExpenseRow extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _MoneyActivity {
-  final Payment? payment;
-  final Expense? expense;
-  final DateTime date;
-
-  const _MoneyActivity._({this.payment, this.expense, required this.date});
-
-  factory _MoneyActivity.payment(Payment payment, DateTime date) {
-    return _MoneyActivity._(payment: payment, date: date);
-  }
-
-  factory _MoneyActivity.expense(Expense expense, DateTime date) {
-    return _MoneyActivity._(expense: expense, date: date);
   }
 }
