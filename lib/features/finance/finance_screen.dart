@@ -12,6 +12,7 @@ import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
 import 'add_payment_screen.dart';
+import 'expense_editor_screen.dart';
 import 'widgets/money_summary_widgets.dart';
 import 'widgets/payment_cards.dart';
 
@@ -86,193 +87,215 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            SlateHaptics.action();
-            ref.invalidate(invoicesProvider);
-            ref.invalidate(expensesProvider);
-            ref.invalidate(financeSummaryProvider);
-            ref.invalidate(dashboardRevenueProvider);
-            ref.invalidate(clientCrmRecordsProvider);
-          },
-          color: AppColors.accentPrimary,
-          child: ListView(
-            controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.pageX,
-              AppSpacing.lg,
-              AppSpacing.pageX,
-              110,
-            ),
-            children: [
-              WorkloopPageHeader(
-                icon: LucideIcons.banknote,
-                title: 'Money',
-                subtitle: 'See income, expenses, net, and what is still due.',
-                color: AppColors.modFinance,
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    WorkloopIconButton(
-                      icon: LucideIcons.plus,
-                      semanticLabel: 'Record payment',
-                      color: AppColors.modFinance,
-                      backgroundColor: AppColors.modFinance.withValues(
-                        alpha: 0.10,
-                      ),
-                      onTap: () => _recordPayment(context),
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    WorkloopIconButton(
-                      icon: LucideIcons.receipt,
-                      semanticLabel: 'Add expense',
-                      color: AppColors.modFinance,
-                      backgroundColor: AppColors.modFinance.withValues(
-                        alpha: 0.10,
-                      ),
-                      onTap: () => _showExpenseSheet(context),
-                    ),
-                  ],
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                SlateHaptics.action();
+                ref.invalidate(invoicesProvider);
+                ref.invalidate(expensesProvider);
+                ref.invalidate(financeSummaryProvider);
+                ref.invalidate(dashboardRevenueProvider);
+                ref.invalidate(clientCrmRecordsProvider);
+              },
+              color: AppColors.accentPrimary,
+              child: ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.pageX,
+                  AppSpacing.lg,
+                  AppSpacing.pageX,
+                  110,
                 ),
-              ),
-              const SizedBox(height: 20),
-              summary.when(
-                loading: () => const SlateLoadingBlock(height: 240, radius: 22),
-                error: (_, __) =>
-                    const SlateErrorState(message: 'Could not load finances'),
-                data: (data) => invoices.when(
-                  loading: () =>
-                      const SlateLoadingBlock(height: 240, radius: 22),
-                  error: (_, __) =>
-                      const SlateErrorState(message: 'Could not load payments'),
-                  data: (payments) => expenses.when(
+                children: [
+                  WorkloopPageHeader(
+                    icon: LucideIcons.banknote,
+                    title: 'Money',
+                    subtitle: 'A clear view of money in and out.',
+                    color: AppColors.modFinance,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        WorkloopIconButton(
+                          icon: LucideIcons.plus,
+                          semanticLabel: 'Record income',
+                          color: AppColors.t2,
+                          backgroundColor: AppColors.t1.withValues(alpha: 0.04),
+                          onTap: () => _recordPayment(context),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        WorkloopIconButton(
+                          icon: LucideIcons.minus,
+                          semanticLabel: 'Add expense',
+                          color: AppColors.t2,
+                          backgroundColor: AppColors.t1.withValues(alpha: 0.04),
+                          onTap: () => _showExpenseSheet(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  summary.when(
                     loading: () =>
                         const SlateLoadingBlock(height: 240, radius: 22),
                     error: (_, __) => const SlateErrorState(
-                      message: 'Could not load expenses',
+                      message: 'Could not load finances',
                     ),
-                    data: (expenseRows) {
-                      final range = _selectedRange();
-                      final periodSummary = PeriodMoneySummary.from(
-                        payments: payments,
-                        expenses: expenseRows,
-                        range: range,
-                      );
-                      return Column(
-                        children: [
-                          _WeeklyTargetCard(
-                            summary: data,
-                            onEditTarget: () => _showTargetSheet(context, data),
-                          ),
-                          const SizedBox(height: 12),
-                          MoneyPeriodSwitcher(
-                            selected: _period,
-                            customLabel: _period == FinancePeriod.custom
-                                ? range.label
-                                : null,
-                            onSelected: (period) async {
-                              if (period == FinancePeriod.custom) {
-                                await _showCustomPeriodSheet(context);
-                                return;
-                              }
-                              setState(() => _period = period);
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          MoneySnapshot(summary: periodSummary),
-                          const SizedBox(height: 12),
-                          ExpenseCategorySummary(summary: periodSummary),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 22),
-              invoices.when(
-                loading: () => _skeletonList(),
-                error: (_, __) =>
-                    const SlateErrorState(message: 'Could not load payments'),
-                data: (payments) {
-                  final overdue =
-                      payments
-                          .where(
-                            (p) => moneyStatusFor(p) == MoneyStatus.overdue,
-                          )
-                          .toList()
-                        ..sort(
-                          (a, b) => (a.dueDate ?? a.issueDate).compareTo(
-                            b.dueDate ?? b.issueDate,
-                          ),
-                        );
-                  final upcoming =
-                      payments
-                          .where((p) => moneyStatusFor(p) == MoneyStatus.unpaid)
-                          .toList()
-                        ..sort(
-                          (a, b) => (a.dueDate ?? a.issueDate).compareTo(
-                            b.dueDate ?? b.issueDate,
-                          ),
-                        );
-                  if (payments.isEmpty) return _emptyState(context);
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      KeyedSubtree(
-                        key: _followUpsKey,
-                        child: const WorkloopSectionHeader(
-                          label: 'Money to collect',
-                        ),
+                    data: (data) => invoices.when(
+                      loading: () =>
+                          const SlateLoadingBlock(height: 240, radius: 22),
+                      error: (_, __) => const SlateErrorState(
+                        message: 'Could not load payments',
                       ),
-                      const SizedBox(height: 8),
-                      if (overdue.isEmpty && upcoming.isEmpty)
-                        const _QuietMoneyState()
-                      else ...[
-                        if (overdue.isNotEmpty) ...[
-                          const _MoneyCollectGroupHeader(label: 'Overdue'),
-                          ...overdue.map(
-                            (p) => PaymentCard(
-                              payment: p,
-                              onTap: () => _showPaymentActionsSheet(context, p),
-                              onDelete: () => _confirmDeletePayment(context, p),
-                            ),
-                          ),
-                        ],
-                        if (upcoming.isNotEmpty) ...[
-                          const _MoneyCollectGroupHeader(
-                            label: 'Due soon / Upcoming',
-                          ),
-                          ...upcoming
-                              .take(4)
-                              .map(
-                                (p) => PaymentCard(
-                                  payment: p,
-                                  onTap: () =>
-                                      _showPaymentActionsSheet(context, p),
-                                  onDelete: () =>
-                                      _confirmDeletePayment(context, p),
-                                ),
-                              ),
-                        ],
-                      ],
-                      const SizedBox(height: 22),
-                      const WorkloopSectionHeader(label: 'Recent activity'),
-                      const SizedBox(height: 8),
-                      expenses.when(
+                      data: (payments) => expenses.when(
                         loading: () =>
-                            const SlateLoadingBlock(height: 90, radius: 16),
-                        error: (_, __) => _activityList(payments, const []),
-                        data: (expenseRows) =>
-                            _activityList(payments, expenseRows),
+                            const SlateLoadingBlock(height: 240, radius: 22),
+                        error: (_, __) => const SlateErrorState(
+                          message: 'Could not load expenses',
+                        ),
+                        data: (expenseRows) {
+                          final range = _selectedRange();
+                          final periodSummary = PeriodMoneySummary.from(
+                            payments: payments,
+                            expenses: expenseRows,
+                            range: range,
+                          );
+                          return Column(
+                            children: [
+                              MoneyPeriodSwitcher(
+                                selected: _period,
+                                customLabel: _period == FinancePeriod.custom
+                                    ? range.label
+                                    : null,
+                                onSelected: (period) async {
+                                  if (period == FinancePeriod.custom) {
+                                    await _showCustomPeriodSheet(context);
+                                    return;
+                                  }
+                                  setState(() => _period = period);
+                                },
+                              ),
+                              const SizedBox(height: AppSpacing.xl),
+                              MoneySnapshot(summary: periodSummary),
+                              const SizedBox(height: AppSpacing.xxl),
+                              _WeeklyTargetCard(
+                                summary: data,
+                                onEditTarget: () =>
+                                    _showTargetSheet(context, data),
+                              ),
+                              if (periodSummary.categoryTotals.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.xxl),
+                                ExpenseCategorySummary(summary: periodSummary),
+                              ],
+                            ],
+                          );
+                        },
                       ),
-                    ],
-                  );
-                },
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  invoices.when(
+                    loading: () => _skeletonList(),
+                    error: (_, __) => const SlateErrorState(
+                      message: 'Could not load payments',
+                    ),
+                    data: (payments) => expenses.when(
+                      loading: () => _skeletonList(),
+                      error: (_, __) => const SlateErrorState(
+                        message: 'Could not load expenses',
+                      ),
+                      data: (expenseRows) {
+                        final overdue =
+                            payments
+                                .where(
+                                  (p) =>
+                                      moneyStatusFor(p) == MoneyStatus.overdue,
+                                )
+                                .toList()
+                              ..sort(
+                                (a, b) => (a.dueDate ?? a.issueDate).compareTo(
+                                  b.dueDate ?? b.issueDate,
+                                ),
+                              );
+                        final upcoming =
+                            payments
+                                .where(
+                                  (p) =>
+                                      moneyStatusFor(p) == MoneyStatus.unpaid,
+                                )
+                                .toList()
+                              ..sort(
+                                (a, b) => (a.dueDate ?? a.issueDate).compareTo(
+                                  b.dueDate ?? b.issueDate,
+                                ),
+                              );
+                        if (payments.isEmpty && expenseRows.isEmpty) {
+                          return _emptyState(context);
+                        }
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            KeyedSubtree(
+                              key: _followUpsKey,
+                              child: const WorkloopSectionHeader(
+                                label: 'Money to collect',
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            if (overdue.isEmpty && upcoming.isEmpty)
+                              const _QuietMoneyState()
+                            else ...[
+                              if (overdue.isNotEmpty) ...[
+                                const _MoneyCollectGroupHeader(
+                                  label: 'Overdue',
+                                ),
+                                ...overdue.map(
+                                  (p) => PaymentCard(
+                                    payment: p,
+                                    onTap: () =>
+                                        _showPaymentActionsSheet(context, p),
+                                    onDelete: () =>
+                                        _confirmDeletePayment(context, p),
+                                  ),
+                                ),
+                              ],
+                              if (upcoming.isNotEmpty) ...[
+                                const _MoneyCollectGroupHeader(
+                                  label: 'Due soon / Upcoming',
+                                ),
+                                ...upcoming
+                                    .take(4)
+                                    .map(
+                                      (p) => PaymentCard(
+                                        payment: p,
+                                        onTap: () => _showPaymentActionsSheet(
+                                          context,
+                                          p,
+                                        ),
+                                        onDelete: () =>
+                                            _confirmDeletePayment(context, p),
+                                      ),
+                                    ),
+                              ],
+                            ],
+                            const SizedBox(height: 22),
+                            const WorkloopSectionHeader(
+                              label: 'Recent activity',
+                            ),
+                            const SizedBox(height: 8),
+                            _activityList(payments, expenseRows),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -298,28 +321,14 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           children: [
             const WorkloopEmptyState(
               icon: LucideIcons.banknote,
-              title: 'No payments yet',
-              subtitle: 'Record your first payment to get started',
+              title: 'No money activity yet',
+              subtitle: 'Income and expenses will appear here.',
             ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AddPaymentScreen()),
-                  );
-                  ref.invalidate(invoicesProvider);
-                  ref.invalidate(dashboardRevenueProvider);
-                  ref.invalidate(clientCrmRecordsProvider);
-                },
-                icon: const Icon(LucideIcons.plus, size: 17),
-                label: const Text(
-                  'Record Payment',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                ),
-              ),
+            const SizedBox(height: AppSpacing.lg),
+            WorkloopPrimaryButton(
+              label: 'Record income',
+              icon: LucideIcons.plus,
+              onPressed: () => _recordPayment(context),
             ),
           ],
         ),
@@ -629,215 +638,15 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     });
   }
 
-  void _showExpenseSheet(BuildContext context, {Expense? expense}) {
-    final amountController = TextEditingController(
-      text: expense == null
-          ? ''
-          : expense.amount.toStringAsFixed(
-              expense.amount.truncateToDouble() == expense.amount ? 0 : 2,
-            ),
+  Future<void> _showExpenseSheet(
+    BuildContext context, {
+    Expense? expense,
+  }) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ExpenseEditorScreen(expense: expense)),
     );
-    final notesController = TextEditingController(text: expense?.notes ?? '');
-    var category = expense?.category ?? 'Materials';
-    var date = expense?.expenseDate ?? DateTime.now();
-    var saving = false;
-    final editing = expense != null;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          Future<void> pickDate() async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: date,
-              firstDate: DateTime.now().subtract(const Duration(days: 730)),
-              lastDate: DateTime.now().add(const Duration(days: 30)),
-            );
-            if (picked != null) setSheetState(() => date = picked);
-          }
-
-          Future<void> save() async {
-            final amount = double.tryParse(amountController.text.trim());
-            if (amount == null || amount <= 0) return;
-            setSheetState(() => saving = true);
-            final workspaceId = await ref.read(workspaceIdProvider.future);
-            if (workspaceId == null) return;
-            try {
-              if (editing) {
-                await ref
-                    .read(expensesRepositoryProvider)
-                    .update(
-                      expenseId: expense.id,
-                      amount: amount,
-                      category: category,
-                      date: date,
-                      notes: notesController.text,
-                    );
-              } else {
-                await ref
-                    .read(expensesRepositoryProvider)
-                    .create(
-                      workspaceId: workspaceId,
-                      amount: amount,
-                      category: category,
-                      date: date,
-                      notes: notesController.text,
-                    );
-              }
-              _refreshMoney();
-              if (context.mounted) Navigator.pop(ctx);
-            } catch (error) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Could not save expense: $error'),
-                    backgroundColor: AppColors.error,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
-            } finally {
-              if (context.mounted) setSheetState(() => saving = false);
-            }
-          }
-
-          return SlateSheetFrame(
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    editing ? 'Edit expense' : 'Add expense',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.t1,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: amountController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    style: const TextStyle(
-                      color: AppColors.t1,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                    ),
-                    decoration: const InputDecoration(
-                      prefixText: '£ ',
-                      hintText: '0',
-                      labelText: 'Amount',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: ['Materials', 'Rent', 'Travel', 'Tools', 'Other']
-                        .map((item) {
-                          final active = category == item;
-                          return GestureDetector(
-                            onTap: () => setSheetState(() => category = item),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: active
-                                    ? AppColors.t1.withValues(alpha: 0.10)
-                                    : AppColors.bgInteract,
-                                borderRadius: BorderRadius.circular(
-                                  AppRadius.pill,
-                                ),
-                                border: Border.all(
-                                  color: active
-                                      ? AppColors.t1.withValues(alpha: 0.16)
-                                      : AppColors.border,
-                                ),
-                              ),
-                              child: Text(
-                                item,
-                                style: TextStyle(
-                                  color: active ? AppColors.t1 : AppColors.t3,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          );
-                        })
-                        .toList(),
-                  ),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: pickDate,
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgInteract,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            LucideIcons.calendar,
-                            color: AppColors.t3,
-                            size: 17,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            _formatDate(date),
-                            style: const TextStyle(
-                              color: AppColors.t1,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: notesController,
-                    maxLines: 2,
-                    style: const TextStyle(color: AppColors.t1),
-                    decoration: const InputDecoration(
-                      labelText: 'Note',
-                      hintText: 'e.g. Colour supplies',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SlateButton(
-                    label: saving
-                        ? 'Saving...'
-                        : editing
-                        ? 'Save Expense'
-                        : 'Add Expense',
-                    icon: LucideIcons.receipt,
-                    onPressed: saving ? null : save,
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    ).whenComplete(() {
-      amountController.dispose();
-      notesController.dispose();
-    });
+    _refreshMoney();
   }
 
   void _confirmDeleteExpense(BuildContext context, Expense expense) {
@@ -908,100 +717,77 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SlateSurface(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  radius: AppRadius.lg,
-                  color: AppColors.greenDim,
-                  borderColor: AppColors.t1.withValues(alpha: 0.08),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        payment.status == 'paid'
-                            ? 'PAYMENT RECEIVED'
-                            : 'PAYMENT',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.t3,
-                        ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      payment.status == 'paid'
+                          ? 'Income received'
+                          : 'To collect',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.t3,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        clientName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.t1,
-                        ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      '£${amount.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.t1,
+                        letterSpacing: 0,
                       ),
-                      const SizedBox(height: 8),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      clientName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.t1,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      _paymentTiming(payment),
+                      style: const TextStyle(fontSize: 13, color: AppColors.t3),
+                    ),
+                    if (description.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
-                        _paymentTiming(payment),
+                        description,
                         style: const TextStyle(
                           fontSize: 13,
                           color: AppColors.t3,
                         ),
                       ),
-                      if (description.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          description,
-                          style: const TextStyle(
-                            fontSize: 13,
+                    ],
+                    if (payment.appointmentId != null) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      const Row(
+                        children: [
+                          Icon(
+                            LucideIcons.calendarCheck,
+                            size: 14,
                             color: AppColors.t3,
                           ),
-                        ),
-                      ],
-                      if (payment.appointmentId != null) ...[
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.bg.withValues(alpha: 0.42),
-                            borderRadius: BorderRadius.circular(AppRadius.pill),
-                            border: Border.all(
-                              color: AppColors.t1.withValues(alpha: 0.08),
+                          SizedBox(width: 6),
+                          Text(
+                            'Linked to booking',
+                            style: TextStyle(
+                              color: AppColors.t3,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                LucideIcons.calendarCheck,
-                                size: 13,
-                                color: AppColors.t2,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                'Linked to booking',
-                                style: TextStyle(
-                                  color: AppColors.t2,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 10),
-                      Text(
-                        '£${amount.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.t1,
-                          letterSpacing: 0,
-                        ),
+                        ],
                       ),
                     ],
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.xl),
                 if (canMarkPaid) ...[
                   SlateButton(
                     label: 'Mark as Received',
@@ -1014,7 +800,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                   const SizedBox(height: 10),
                 ],
                 SlateButton(
-                  label: 'Edit Payment',
+                  label: 'Edit income',
                   icon: LucideIcons.pencil,
                   secondary: true,
                   onPressed: () {
@@ -1033,7 +819,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 ),
                 const SizedBox(height: 10),
                 SlateButton(
-                  label: 'Delete Payment',
+                  label: 'Delete income',
                   icon: LucideIcons.trash2,
                   destructive: true,
                   onPressed: () {
@@ -1099,7 +885,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Delete payment?',
+              'Delete income entry?',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -1114,7 +900,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             ),
             const SizedBox(height: 24),
             SlateButton(
-              label: 'Delete Payment',
+              label: 'Delete income',
               destructive: true,
               onPressed: () async {
                 Navigator.pop(ctx);

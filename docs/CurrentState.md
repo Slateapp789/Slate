@@ -118,6 +118,8 @@ Last updated: 2026-07-15
 ### Money
 
 - User-facing Money built partly on `invoices`.
+- Calm, whitespace-first overview aligned with Home, Clients, and Bookings: one received figure, supporting Expenses and Net metrics, a shared period control, slim target progress, divider-led collection rows, and a combined activity ledger.
+- Compact top actions create income or expense entries without a floating action button.
 - Record payment.
 - Edit payment.
 - Mark payment as received.
@@ -135,6 +137,7 @@ Last updated: 2026-07-15
 - Paid/unpaid/expenses/profit summary.
 - Booking-linked payment rows through `appointment_id`.
 - Supabase-backed `expenses` table with RLS.
+- Add/Edit Income and Add/Edit Expense use the same Money form sections, amount field, picker treatment, date rows, page hierarchy, keyboard behaviour, and Save/Discard/Keep editing protection.
 
 ### Public Business Profile
 

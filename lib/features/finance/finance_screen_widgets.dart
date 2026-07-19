@@ -14,209 +14,50 @@ class _WeeklyTargetCard extends StatelessWidget {
       0,
       double.infinity,
     );
-    return SlateSurface(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      color: AppColors.t1.withValues(alpha: 0.028),
-      borderColor: AppColors.border.withValues(alpha: 0.54),
-      radius: AppRadius.lg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'WEEKLY TARGET',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              color: AppColors.t3,
+    final change = summary.weekDelta;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        WorkloopSectionHeader(
+          label: 'Weekly target',
+          actionLabel: hasTarget ? 'Edit' : 'Set target',
+          onAction: onEditTarget,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          hasTarget
+              ? '£${summary.thisWeekPaid.toStringAsFixed(0)} of £${summary.weeklyTarget.toStringAsFixed(0)}'
+              : 'No target set',
+          style: const TextStyle(
+            color: AppColors.t1,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: LinearProgressIndicator(
+            minHeight: 5,
+            value: hasTarget ? progress : 0,
+            backgroundColor: AppColors.t1.withValues(alpha: 0.06),
+            valueColor: const AlwaysStoppedAnimation(
+              AppColors.accentPrimaryStrong,
             ),
           ),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerRight,
-            child: GestureDetector(
-              onTap: onEditTarget,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.bg,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(LucideIcons.target, size: 13, color: AppColors.t2),
-                    SizedBox(width: 5),
-                    Text(
-                      'Edit target',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.t2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          hasTarget
+              ? '£${left.toStringAsFixed(0)} left · ${change >= 0 ? '+' : '-'}£${change.abs().toStringAsFixed(0)} compared with last week'
+              : 'Set a monthly goal to see gentle weekly progress here.',
+          style: const TextStyle(
+            color: AppColors.t3,
+            fontSize: 12,
+            height: 1.35,
           ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '£${summary.thisWeekPaid.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 38,
-                  height: 1,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t1,
-                  letterSpacing: 0,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  hasTarget
-                      ? '/ £${summary.weeklyTarget.toStringAsFixed(0)}'
-                      : 'this week',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.t3,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            child: LinearProgressIndicator(
-              minHeight: 8,
-              value: hasTarget ? progress : 0,
-              backgroundColor: AppColors.panelFaint,
-              valueColor: const AlwaysStoppedAnimation(
-                AppColors.accentPrimaryStrong,
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _FinanceComparePill(
-                  label: 'vs last week',
-                  value: summary.weekDelta,
-                  percent: summary.weekDeltaPercent,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _TargetLeftPill(
-                  label: hasTarget ? 'left' : 'target',
-                  value: hasTarget
-                      ? '£${left.toStringAsFixed(0)}'
-                      : 'Set monthly target',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FinanceComparePill extends StatelessWidget {
-  final String label;
-  final double value;
-  final double percent;
-
-  const _FinanceComparePill({
-    required this.label,
-    required this.value,
-    required this.percent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final positive = value >= 0;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.bg,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              color: AppColors.t3,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${positive ? '+' : '-'}£${value.abs().toStringAsFixed(0)} · ${(percent.abs() * 100).toStringAsFixed(0)}%',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: positive ? AppColors.success : AppColors.error,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TargetLeftPill extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _TargetLeftPill({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.bg,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              color: AppColors.t3,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: AppColors.t1,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -226,30 +67,19 @@ class _QuietMoneyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateSurface(
-      padding: const EdgeInsets.all(16),
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.10),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              LucideIcons.check,
-              color: AppColors.success,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
+          Icon(LucideIcons.check, color: AppColors.t3, size: 17),
+          SizedBox(width: AppSpacing.sm),
+          Expanded(
             child: Text(
-              'No unpaid money to collect.',
+              'Nothing waiting to be collected.',
               style: TextStyle(
-                color: AppColors.t2,
-                fontWeight: FontWeight.w800,
+                color: AppColors.t3,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -306,18 +136,10 @@ class _ExpenseRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: AppColors.t1.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                LucideIcons.receipt,
-                size: 16,
-                color: AppColors.t2,
-              ),
+            const SizedBox(
+              width: 32,
+              height: 32,
+              child: Icon(LucideIcons.receipt, size: 17, color: AppColors.t3),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -348,8 +170,8 @@ class _ExpenseRow extends StatelessWidget {
             Text(
               '-£${expense.amount.toStringAsFixed(0)}',
               style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
                 color: AppColors.t1,
               ),
             ),
