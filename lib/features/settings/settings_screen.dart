@@ -3,24 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/slate_ui.dart';
-import 'providers/settings_providers.dart';
-import 'widgets/settings_business_tab.dart';
 import 'widgets/settings_account_tab.dart';
 import 'widgets/settings_app_tab.dart';
 import '../notifications/notifications_screen.dart';
 
-export 'providers/settings_providers.dart';
-export 'widgets/settings_business_tab.dart' show SettingsBusinessSection;
-
 class SettingsScreen extends ConsumerStatefulWidget {
   final int initialTab;
-  final SettingsBusinessSection initialBusinessSection;
 
-  const SettingsScreen({
-    super.key,
-    this.initialTab = 0,
-    this.initialBusinessSection = SettingsBusinessSection.business,
-  });
+  const SettingsScreen({super.key, this.initialTab = 0});
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -34,16 +24,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    _selectedTab = widget.initialTab.clamp(0, 3);
+    _selectedTab = widget.initialTab.clamp(0, 2);
     _tabController = TabController(
-      length: 4,
+      length: 3,
       vsync: this,
       initialIndex: _selectedTab,
     );
     _tabController.addListener(_handleTabChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.invalidate(settingsServicesProvider);
-    });
   }
 
   void _handleTabChanged() {
@@ -95,10 +82,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                 selected: _selectedTab,
                 onChanged: (index) => _tabController.animateTo(index),
                 segments: const [
-                  WorkloopSegment(value: 0, label: 'Business'),
-                  WorkloopSegment(value: 1, label: 'Alerts'),
-                  WorkloopSegment(value: 2, label: 'Account'),
-                  WorkloopSegment(value: 3, label: 'App'),
+                  WorkloopSegment(value: 0, label: 'Alerts'),
+                  WorkloopSegment(value: 1, label: 'Account'),
+                  WorkloopSegment(value: 2, label: 'App'),
                 ],
               ),
             ),
@@ -107,13 +93,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             Expanded(
               child: TabBarView(
                 controller: _tabController,
-                children: [
-                  SettingsBusinessTab(
-                    initialSection: widget.initialBusinessSection,
-                  ),
-                  const NotificationSettingsView(),
-                  const SettingsAccountTab(),
-                  const SettingsAppTab(),
+                children: const [
+                  NotificationSettingsView(),
+                  SettingsAccountTab(),
+                  SettingsAppTab(),
                 ],
               ),
             ),

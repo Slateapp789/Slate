@@ -592,16 +592,17 @@ Consequences:
 
 Decision:
 
-Give Profile its own calm owner-and-business overview backed by existing account, workspace, profile, settings, service, and booking-request providers. Keep durable editing in the canonical Settings flows and navigate directly to the relevant section.
+Give Profile its own calm owner-and-business overview backed by existing account, workspace, profile, settings, service, and booking-request providers. Profile owns business editing; Settings remains reserved for alerts, account security, and app preferences.
 
 Reasoning:
 
-The previous Profile entry simply opened Business settings, so it did not meet the familiar mobile expectation that a profile should explain who is signed in, which business is active, what clients can see, and where related account controls live. Duplicating the forms would create two editing authorities and invite data drift.
+The previous Profile entry simply opened Business settings, so it did not meet the familiar mobile expectation that a profile should explain who is signed in, which business is active, what clients can see, and where related account controls live. Sending Profile edits into a screen titled Settings also made both destinations feel duplicated.
 
 Consequences:
 
 - Profile presents identity, a small operational snapshot, and Business, Online, and Account sections in the current Workloop design language.
-- Every displayed control is actionable and opens the existing public profile, booking requests, or correct Settings destination.
-- Business settings accepts a target section so Services, Working hours, and Public profile links land precisely.
+- Every displayed control is actionable and opens the public profile, booking requests, a dedicated Profile editor, or the correct non-business Settings destination.
+- Business details, Services, Working hours, and Public profile are presented as dedicated Profile-owned screens that reuse one established implementation underneath.
+- Settings exposes only Alerts, Account, and App, making the ownership boundary visible to users.
 - Profile-link copying uses the platform clipboard without adding a sharing package.
 - No Supabase schema, RLS, repository contract, or CRUD path changes.

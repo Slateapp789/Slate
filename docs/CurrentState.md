@@ -129,8 +129,9 @@ Last updated: 2026-07-15
 - The identity area combines business name, industry, owner, and account context using the shared textured workspace shell and Workloop typography.
 - A compact snapshot links directly to Services, Working hours, and active Booking requests.
 - Business, Online, and Account sections use shared divider-led rows rather than nested settings cards.
-- Public profile preview, profile-link copying, booking requests, business details, services, hours, personal details, alerts, and app preferences all open their canonical existing destinations.
-- Business settings navigation is section-aware, so Profile links land at Business info, Working hours, Public profile, or Services rather than the top of a long form.
+- Public profile preview, profile-link copying, booking requests, business details, services, hours, personal details, alerts, and app preferences all open their canonical destinations.
+- Business details, Working hours, Public profile, and Services use dedicated Profile-owned screens while reusing the established repositories and save logic.
+- Settings is intentionally separate and contains only Alerts, Account, and App preferences.
 
 ### Money
 
