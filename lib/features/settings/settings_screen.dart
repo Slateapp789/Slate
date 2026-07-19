@@ -10,11 +10,17 @@ import 'widgets/settings_app_tab.dart';
 import '../notifications/notifications_screen.dart';
 
 export 'providers/settings_providers.dart';
+export 'widgets/settings_business_tab.dart' show SettingsBusinessSection;
 
 class SettingsScreen extends ConsumerStatefulWidget {
   final int initialTab;
+  final SettingsBusinessSection initialBusinessSection;
 
-  const SettingsScreen({super.key, this.initialTab = 0});
+  const SettingsScreen({
+    super.key,
+    this.initialTab = 0,
+    this.initialBusinessSection = SettingsBusinessSection.business,
+  });
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -101,11 +107,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             Expanded(
               child: TabBarView(
                 controller: _tabController,
-                children: const [
-                  SettingsBusinessTab(),
-                  NotificationSettingsView(),
-                  SettingsAccountTab(),
-                  SettingsAppTab(),
+                children: [
+                  SettingsBusinessTab(
+                    initialSection: widget.initialBusinessSection,
+                  ),
+                  const NotificationSettingsView(),
+                  const SettingsAccountTab(),
+                  const SettingsAppTab(),
                 ],
               ),
             ),

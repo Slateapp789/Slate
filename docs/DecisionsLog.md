@@ -584,5 +584,24 @@ Consequences:
 
 - Back, title, pin, secondary actions, and Done follow the same header hierarchy as Task, Client, and Booking screens.
 - Delete remains available with confirmation but moves behind the secondary note-actions control.
-- Checklist, bullet, and link controls show concise labels and selected state without covering the writing area.
-- Existing note parsing, checklist interaction, links, pinning, Supabase persistence, and routes remain unchanged.
+- Checklist and bullet controls show concise labels and selected state without covering the writing area.
+- Link insertion and link-specific styling are intentionally removed; existing saved note text is not migrated or rewritten.
+- Existing note parsing, checklist interaction, pinning, Supabase persistence, and routes remain unchanged.
+
+## 2026-07-19 - Profile Is An Overview, Not Another Settings Form
+
+Decision:
+
+Give Profile its own calm owner-and-business overview backed by existing account, workspace, profile, settings, service, and booking-request providers. Keep durable editing in the canonical Settings flows and navigate directly to the relevant section.
+
+Reasoning:
+
+The previous Profile entry simply opened Business settings, so it did not meet the familiar mobile expectation that a profile should explain who is signed in, which business is active, what clients can see, and where related account controls live. Duplicating the forms would create two editing authorities and invite data drift.
+
+Consequences:
+
+- Profile presents identity, a small operational snapshot, and Business, Online, and Account sections in the current Workloop design language.
+- Every displayed control is actionable and opens the existing public profile, booking requests, or correct Settings destination.
+- Business settings accepts a target section so Services, Working hours, and Public profile links land precisely.
+- Profile-link copying uses the platform clipboard without adding a sharing package.
+- No Supabase schema, RLS, repository contract, or CRUD path changes.
