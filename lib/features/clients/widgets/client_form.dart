@@ -42,47 +42,6 @@ Client? findDuplicateClient(
   return null;
 }
 
-Future<bool> confirmDiscardClientChanges(BuildContext context) async {
-  final result = await showModalBottomSheet<bool>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.34),
-    builder: (sheetContext) => SlateSheetFrame(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Discard changes?',
-            style: TextStyle(
-              color: AppColors.t1,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          const Text(
-            'The client information you entered has not been saved.',
-            style: TextStyle(color: AppColors.t3, fontSize: 13, height: 1.4),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          SlateButton(
-            label: 'Keep editing',
-            onPressed: () => Navigator.pop(sheetContext, false),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          SlateButton(
-            label: 'Discard changes',
-            destructive: true,
-            onPressed: () => Navigator.pop(sheetContext, true),
-          ),
-        ],
-      ),
-    ),
-  );
-  return result ?? false;
-}
-
 class ClientForm extends StatelessWidget {
   final TextEditingController nameController;
   final TextEditingController phoneController;

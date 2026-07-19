@@ -476,3 +476,21 @@ Consequences:
 - Picker fields, rows, typography, spacing, haptics, and dismissal behaviour come from one shared component.
 - Booking, onboarding, public-profile, task, and payment selectors now use the same interaction.
 - No package, database, repository, or navigation change is introduced.
+
+## 2026-07-19 - Booking Guardrails Inform Without Blocking Intent
+
+Decision:
+
+Reuse the authenticated Google Places booking-address field across client and booking capture, protect changed client and booking drafts before navigation, and treat saved working hours as guidance rather than an absolute booking restriction.
+
+Reasoning:
+
+Physical work needs the same dependable address capture wherever it is created. Accidental navigation should not lose customer or schedule edits, while a solo operator must still be able to accept legitimate early, late, or exceptional work without changing business settings first.
+
+Consequences:
+
+- New and edited physical bookings use the same address search and manual fallback as client booking addresses.
+- Leaving a changed New/Edit Client or New/Edit Booking screen offers Save, Discard changes, or Keep editing.
+- A booking outside saved working hours explains the exception and can continue through an explicit Book anyway action.
+- Appointment overlap checks remain mandatory and cannot be bypassed by the working-hours confirmation.
+- Existing repositories, Supabase security, routes, schema, and booking records remain unchanged.

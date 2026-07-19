@@ -13,6 +13,7 @@ import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/working_hours.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../clients/widgets/client_form.dart';
 
 part 'add_appointment_logic.dart';
 part 'add_appointment_widgets.dart';
@@ -51,6 +52,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   final _newClientNameController = TextEditingController();
   final _newClientPhoneController = TextEditingController();
   final _newClientEmailController = TextEditingController();
+  final _newClientAddressController = TextEditingController();
   final _customServiceController = TextEditingController();
   final _priceController = TextEditingController();
   final _durationController = TextEditingController(text: '60');
@@ -58,6 +60,9 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   final _notesController = TextEditingController();
   final List<TextEditingController> _taskControllers = [];
   bool _saving = false;
+  bool _allowPop = false;
+  late DateTime _initialDate;
+  late String? _initialClientId;
 
   @override
   void initState() {
@@ -66,6 +71,25 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     if (widget.initialDate != null) {
       _selectedDate = widget.initialDate!;
     }
+    _initialDate = _selectedDate;
+    _initialClientId = _selectedClientId;
+    for (final controller in [
+      _newClientNameController,
+      _newClientPhoneController,
+      _newClientEmailController,
+      _newClientAddressController,
+      _customServiceController,
+      _priceController,
+      _durationController,
+      _locationController,
+      _notesController,
+    ]) {
+      controller.addListener(_handleDraftChanged);
+    }
+  }
+
+  void _handleDraftChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -73,6 +97,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     _newClientNameController.dispose();
     _newClientPhoneController.dispose();
     _newClientEmailController.dispose();
+    _newClientAddressController.dispose();
     _customServiceController.dispose();
     _priceController.dispose();
     _durationController.dispose();
@@ -117,25 +142,78 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     });
   }
 
+  bool get _hasDraftChanges {
+    final dateChanged =
+        _selectedDate.year != _initialDate.year ||
+        _selectedDate.month != _initialDate.month ||
+        _selectedDate.day != _initialDate.day;
+    return _selectedClientId != _initialClientId ||
+        _creatingClient ||
+        _newClientNameController.text.trim().isNotEmpty ||
+        _newClientPhoneController.text.trim().isNotEmpty ||
+        _newClientEmailController.text.trim().isNotEmpty ||
+        _newClientAddressController.text.trim().isNotEmpty ||
+        _selectedServiceId != null ||
+        _customService ||
+        _customServiceController.text.trim().isNotEmpty ||
+        _priceController.text.trim().isNotEmpty ||
+        _durationController.text.trim() != '60' ||
+        dateChanged ||
+        _selectedHour != 9 ||
+        _selectedMinute != 0 ||
+        _locationMode != 'business' ||
+        _locationController.text.trim().isNotEmpty ||
+        _notesController.text.trim().isNotEmpty ||
+        _taskControllers.any(
+          (controller) => controller.text.trim().isNotEmpty,
+        ) ||
+        _repeatMode != 'none' ||
+        _createPaymentDue;
+  }
+
+  Future<void> _handleBack() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (!_hasDraftChanges) {
+      await _leaveScreen();
+      return;
+    }
+    final decision = await showWorkloopDraftConfirmation(
+      context,
+      title: 'Save this booking?',
+      message: 'Your booking details have not been saved yet.',
+      saveLabel: 'Save booking',
+      canSave: _canSave && !_saving,
+    );
+    if (!mounted) return;
+    switch (decision) {
+      case WorkloopDraftDecision.save:
+        await _save();
+        return;
+      case WorkloopDraftDecision.discard:
+        await _leaveScreen();
+        return;
+      case WorkloopDraftDecision.stay:
+        return;
+    }
+  }
+
+  Future<void> _leaveScreen() async {
+    if (!_allowPop && mounted) setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.pop(context);
+  }
+
   Future<void> _save() async {
     if (!_canSave) return;
     setState(() => _saving = true);
     try {
       final workspaceId = await ref.read(workspaceIdProvider.future);
-      if (workspaceId == null) return;
+      if (workspaceId == null) {
+        if (mounted) setState(() => _saving = false);
+        return;
+      }
 
       var contactId = _selectedClientId;
-      if (_creatingClient) {
-        contactId = await ref
-            .read(clientsRepositoryProvider)
-            .create(
-              workspaceId: workspaceId,
-              name: _newClientNameController.text,
-              phone: _newClientPhoneController.text,
-              email: _newClientEmailController.text,
-              status: 'active',
-            );
-      }
 
       final startTime = DateTime(
         _selectedDate.year,
@@ -162,18 +240,56 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
           : <String, dynamic>{};
       final location = _locationTextWithDefault(
         settings?['business_address'] as String?,
+        newClientAddress: _creatingClient
+            ? _newClientAddressController.text
+            : null,
       );
 
-      await ref
-          .read(appointmentsRepositoryProvider)
-          .ensureScheduleAvailable(
-            workspaceId: workspaceId,
-            startTime: startTime,
-            endTime: endTime,
-            workingHours: workingHours,
-            recurrenceRule: recurrenceRule,
-            repeatOccurrences: repeatOccurrences,
-          );
+      final repository = ref.read(appointmentsRepositoryProvider);
+      try {
+        await repository.ensureScheduleAvailable(
+          workspaceId: workspaceId,
+          startTime: startTime,
+          endTime: endTime,
+          workingHours: workingHours,
+          recurrenceRule: recurrenceRule,
+          repeatOccurrences: repeatOccurrences,
+        );
+      } on AppointmentScheduleException catch (error) {
+        if (error.issue != AppointmentScheduleIssue.workingHours) rethrow;
+        if (!mounted) return;
+        final proceed = await showWorkloopOutsideHoursConfirmation(
+          context,
+          detail: error.message,
+          repeating: repeatOccurrences > 1,
+        );
+        if (!proceed) {
+          if (mounted) setState(() => _saving = false);
+          return;
+        }
+        await repository.ensureScheduleAvailable(
+          workspaceId: workspaceId,
+          startTime: startTime,
+          endTime: endTime,
+          workingHours: workingHours,
+          recurrenceRule: recurrenceRule,
+          repeatOccurrences: repeatOccurrences,
+          enforceWorkingHours: false,
+        );
+      }
+
+      if (_creatingClient) {
+        contactId = await ref
+            .read(clientsRepositoryProvider)
+            .create(
+              workspaceId: workspaceId,
+              name: _newClientNameController.text,
+              phone: _newClientPhoneController.text,
+              email: _newClientEmailController.text,
+              address: _newClientAddressController.text,
+              status: 'active',
+            );
+      }
 
       final bookingIds = await ref
           .read(appointmentsRepositoryProvider)
@@ -248,7 +364,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       ref.invalidate(clientsProvider);
       ref.invalidate(notificationsProvider);
       ref.invalidate(unreadNotificationsProvider);
-      if (mounted) Navigator.pop(context);
+      if (mounted) await _leaveScreen();
     } catch (e) {
       setState(() => _saving = false);
       if (mounted) {
@@ -324,7 +440,10 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     });
   }
 
-  String? _locationTextWithDefault(String? businessAddress) {
+  String? _locationTextWithDefault(
+    String? businessAddress, {
+    String? newClientAddress,
+  }) {
     final custom = _locationController.text.trim();
     if (_locationMode == 'business') {
       if (custom.isNotEmpty) return custom;
@@ -332,6 +451,10 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       return address?.isNotEmpty == true ? address : 'Business location';
     }
     if (_locationMode == 'client') {
+      final inlineAddress = newClientAddress?.trim();
+      if (custom.isEmpty && inlineAddress?.isNotEmpty == true) {
+        return inlineAddress;
+      }
       return custom.isEmpty ? 'Client location' : custom;
     }
     if (_locationMode == 'online') {
@@ -394,385 +517,431 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       return start.isBefore(endTime) && end.isAfter(appointmentStart);
     }).toList();
 
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: Stack(
-        children: [
-          const Positioned.fill(child: WorkloopTexturedBackdrop()),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.pageX,
-                    AppSpacing.lg,
-                    AppSpacing.pageX,
-                    0,
-                  ),
-                  child: Row(
-                    children: [
-                      WorkloopIconButton(
-                        icon: LucideIcons.chevronLeft,
-                        semanticLabel: 'Back to bookings',
-                        onTap: () => Navigator.pop(context),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      const Expanded(
-                        child: Text(
-                          'New booking',
-                          style: TextStyle(
-                            color: AppColors.t1,
-                            fontSize: 26,
-                            height: 1.05,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      _BookingSaveAction(
-                        label: _repeatOccurrencesFor(_repeatMode) > 1
-                            ? 'Add ${_repeatOccurrencesFor(_repeatMode)}'
-                            : 'Add',
-                        loading: _saving,
-                        enabled: _canSave,
-                        onTap: _save,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-
-                Expanded(
-                  child: SingleChildScrollView(
+    return PopScope(
+      canPop: _allowPop || !_hasDraftChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: WorkloopTexturedBackdrop()),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.pageX,
-                      0,
+                      AppSpacing.lg,
                       AppSpacing.pageX,
-                      AppSpacing.xxl,
+                      0,
                     ),
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        // ── Client ──────────────────────────────────────
-                        const _AppointmentSectionLabel(
-                          'CLIENT',
-                          subtitle: 'Choose who this booking is for.',
+                        WorkloopIconButton(
+                          icon: LucideIcons.chevronLeft,
+                          semanticLabel: 'Back to bookings',
+                          onTap: _handleBack,
                         ),
-                        const SizedBox(height: 8),
-                        clients.when(
-                          loading: () => const _AppointmentSkeleton(height: 54),
-                          error: (_, __) => const _AppointmentErrorBox(
-                            'Error loading clients',
-                          ),
-                          data: (data) => Column(
-                            children: [
-                              if (!_creatingClient)
-                                WorkloopPickerField<String>(
-                                  value: _selectedClientId,
-                                  title: 'Choose a client',
-                                  hint: 'Select client',
-                                  searchHint: 'Search clients',
-                                  searchable: true,
-                                  leadingIcon: LucideIcons.users,
-                                  options: data
-                                      .map(
-                                        (client) => WorkloopPickerOption(
-                                          value: client.id,
-                                          label: client.name,
-                                          subtitle:
-                                              client.address
-                                                      ?.trim()
-                                                      .isNotEmpty ==
-                                                  true
-                                              ? client.address!.trim()
-                                              : null,
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (value) =>
-                                      _selectClient(value, data),
-                                ),
-                              if (_creatingClient) ...[
-                                _AppointmentTextInput(
-                                  controller: _newClientNameController,
-                                  label: 'Client name',
-                                  hint: 'Client name',
-                                  icon: LucideIcons.user,
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _AppointmentTextInput(
-                                        controller: _newClientPhoneController,
-                                        label: 'Phone number',
-                                        hint: 'Phone',
-                                        icon: LucideIcons.phone,
-                                        keyboardType: TextInputType.phone,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: _AppointmentTextInput(
-                                        controller: _newClientEmailController,
-                                        label: 'Email address',
-                                        hint: 'Email',
-                                        icon: LucideIcons.mail,
-                                        keyboardType:
-                                            TextInputType.emailAddress,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                              const SizedBox(height: 10),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: TextButton.icon(
-                                  onPressed: () {
-                                    setState(() {
-                                      _creatingClient = !_creatingClient;
-                                      if (_creatingClient) {
-                                        _selectedClientId = null;
-                                      }
-                                    });
-                                  },
-                                  icon: Icon(
-                                    _creatingClient
-                                        ? Icons.person_search_rounded
-                                        : Icons.person_add_alt_rounded,
-                                    size: 16,
-                                  ),
-                                  label: Text(
-                                    _creatingClient
-                                        ? 'Choose existing client'
-                                        : 'Add new client',
-                                  ),
-                                ),
-                              ),
-                            ],
+                        const SizedBox(width: AppSpacing.sm),
+                        const Expanded(
+                          child: Text(
+                            'New booking',
+                            style: TextStyle(
+                              color: AppColors.t1,
+                              fontSize: 26,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(width: AppSpacing.sm),
+                        _BookingSaveAction(
+                          label: _repeatOccurrencesFor(_repeatMode) > 1
+                              ? 'Add ${_repeatOccurrencesFor(_repeatMode)}'
+                              : 'Add',
+                          loading: _saving,
+                          enabled: _canSave,
+                          onTap: _save,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
 
-                        // ── Service ──────────────────────────────────────
-                        const _AppointmentSectionLabel(
-                          'SERVICE',
-                          subtitle: 'What you are doing and what it costs.',
-                        ),
-                        const SizedBox(height: 8),
-                        services.when(
-                          loading: () => const _AppointmentSkeleton(height: 54),
-                          error: (_, __) => const _AppointmentErrorBox(
-                            'Error loading services',
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.pageX,
+                        0,
+                        AppSpacing.pageX,
+                        AppSpacing.xxl,
+                      ),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ── Client ──────────────────────────────────────
+                          const _AppointmentSectionLabel(
+                            'CLIENT',
+                            subtitle: 'Choose who this booking is for.',
                           ),
-                          data: (data) => Column(
-                            children: [
-                              WorkloopPickerField<String>(
-                                value: _selectedServiceId,
-                                title: 'Choose a service',
-                                hint: 'Select service',
-                                searchHint: 'Search services',
-                                leadingIcon: LucideIcons.briefcase,
-                                options: [
-                                  ...data.map(
-                                    (service) => WorkloopPickerOption(
-                                      value: service['id'] as String,
-                                      label: service['name'] as String,
-                                      subtitle:
-                                          '£${(service['price'] as num).toStringAsFixed(0)} · ${service['duration_mins']} min',
-                                    ),
+                          const SizedBox(height: 8),
+                          clients.when(
+                            loading: () =>
+                                const _AppointmentSkeleton(height: 54),
+                            error: (_, __) => const _AppointmentErrorBox(
+                              'Error loading clients',
+                            ),
+                            data: (data) => Column(
+                              children: [
+                                if (!_creatingClient)
+                                  WorkloopPickerField<String>(
+                                    value: _selectedClientId,
+                                    title: 'Choose a client',
+                                    hint: 'Select client',
+                                    searchHint: 'Search clients',
+                                    searchable: true,
+                                    leadingIcon: LucideIcons.users,
+                                    options: data
+                                        .map(
+                                          (client) => WorkloopPickerOption(
+                                            value: client.id,
+                                            label: client.name,
+                                            subtitle:
+                                                client.address
+                                                        ?.trim()
+                                                        .isNotEmpty ==
+                                                    true
+                                                ? client.address!.trim()
+                                                : null,
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (value) =>
+                                        _selectClient(value, data),
                                   ),
-                                  const WorkloopPickerOption(
-                                    value: _customServiceId,
-                                    label: 'Custom service',
-                                    subtitle: 'Enter a one-off service',
+                                if (_creatingClient) ...[
+                                  _AppointmentTextInput(
+                                    controller: _newClientNameController,
+                                    label: 'Client name',
+                                    hint: 'Client name',
+                                    icon: LucideIcons.user,
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _AppointmentTextInput(
+                                          controller: _newClientPhoneController,
+                                          label: 'Phone number',
+                                          hint: 'Phone',
+                                          icon: LucideIcons.phone,
+                                          keyboardType: TextInputType.phone,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: _AppointmentTextInput(
+                                          controller: _newClientEmailController,
+                                          label: 'Email address',
+                                          hint: 'Email',
+                                          icon: LucideIcons.mail,
+                                          keyboardType:
+                                              TextInputType.emailAddress,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  BookingAddressField(
+                                    controller: _newClientAddressController,
+                                    onChanged: () => setState(() {}),
                                   ),
                                 ],
-                                onChanged: (v) {
-                                  if (v == _customServiceId) {
-                                    setState(() {
-                                      _selectedServiceId = v;
-                                      _customService = true;
-                                      _selectedServiceName = null;
-                                      _priceController.clear();
-                                      _durationController.text = '60';
-                                      _selectedDuration = 60;
-                                      _customDuration = false;
-                                    });
-                                    return;
-                                  }
-                                  final svc = data.firstWhere(
-                                    (s) => s['id'] == v,
-                                    orElse: () => {},
-                                  );
-                                  final price = (svc['price'] as num?)
-                                      ?.toDouble();
-                                  final duration =
-                                      svc['duration_mins'] as int? ?? 60;
-                                  setState(() {
-                                    _selectedServiceId = v;
-                                    _customService = false;
-                                    _selectedServiceName =
-                                        svc['name'] as String?;
-                                    _selectedDuration = duration;
-                                    _customDuration = ![
-                                      30,
-                                      45,
-                                      60,
-                                      90,
-                                      120,
-                                    ].contains(duration);
-                                    _priceController.text = price == null
-                                        ? ''
-                                        : price.toStringAsFixed(0);
-                                    _durationController.text = '$duration';
-                                  });
-                                },
-                              ),
-                              if (_customService) ...[
                                 const SizedBox(height: 10),
-                                _AppointmentTextInput(
-                                  controller: _customServiceController,
-                                  label: 'Service name',
-                                  hint: 'Service name',
-                                  icon: LucideIcons.briefcase,
-                                  onChanged: (_) => setState(() {}),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        _creatingClient = !_creatingClient;
+                                        if (_creatingClient) {
+                                          _selectedClientId = null;
+                                        }
+                                      });
+                                    },
+                                    icon: Icon(
+                                      _creatingClient
+                                          ? Icons.person_search_rounded
+                                          : Icons.person_add_alt_rounded,
+                                      size: 16,
+                                    ),
+                                    label: Text(
+                                      _creatingClient
+                                          ? 'Choose existing client'
+                                          : 'Add new client',
+                                    ),
+                                  ),
                                 ),
                               ],
-                              const SizedBox(height: 10),
-                              _AppointmentTextInput(
-                                controller: _priceController,
-                                label: 'Price',
-                                hint: 'Price',
-                                prefix: '£',
-                                keyboardType: TextInputType.number,
-                                onChanged: (_) => setState(() {}),
-                              ),
-                              const SizedBox(height: 12),
-                              _PaymentDueToggle(
-                                value: _createPaymentDue,
-                                onChanged: (value) =>
-                                    setState(() => _createPaymentDue = value),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // ── Date ─────────────────────────────────────────
-                        const _AppointmentSectionLabel(
-                          'DATE',
-                          subtitle: 'When the work takes place.',
-                        ),
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: _pickDate,
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
                             ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // ── Service ──────────────────────────────────────
+                          const _AppointmentSectionLabel(
+                            'SERVICE',
+                            subtitle: 'What you are doing and what it costs.',
+                          ),
+                          const SizedBox(height: 8),
+                          services.when(
+                            loading: () =>
+                                const _AppointmentSkeleton(height: 54),
+                            error: (_, __) => const _AppointmentErrorBox(
+                              'Error loading services',
+                            ),
+                            data: (data) => Column(
+                              children: [
+                                WorkloopPickerField<String>(
+                                  value: _selectedServiceId,
+                                  title: 'Choose a service',
+                                  hint: 'Select service',
+                                  searchHint: 'Search services',
+                                  leadingIcon: LucideIcons.briefcase,
+                                  options: [
+                                    ...data.map(
+                                      (service) => WorkloopPickerOption(
+                                        value: service['id'] as String,
+                                        label: service['name'] as String,
+                                        subtitle:
+                                            '£${(service['price'] as num).toStringAsFixed(0)} · ${service['duration_mins']} min',
+                                      ),
+                                    ),
+                                    const WorkloopPickerOption(
+                                      value: _customServiceId,
+                                      label: 'Custom service',
+                                      subtitle: 'Enter a one-off service',
+                                    ),
+                                  ],
+                                  onChanged: (v) {
+                                    if (v == _customServiceId) {
+                                      setState(() {
+                                        _selectedServiceId = v;
+                                        _customService = true;
+                                        _selectedServiceName = null;
+                                        _priceController.clear();
+                                        _durationController.text = '60';
+                                        _selectedDuration = 60;
+                                        _customDuration = false;
+                                      });
+                                      return;
+                                    }
+                                    final svc = data.firstWhere(
+                                      (s) => s['id'] == v,
+                                      orElse: () => {},
+                                    );
+                                    final price = (svc['price'] as num?)
+                                        ?.toDouble();
+                                    final duration =
+                                        svc['duration_mins'] as int? ?? 60;
+                                    setState(() {
+                                      _selectedServiceId = v;
+                                      _customService = false;
+                                      _selectedServiceName =
+                                          svc['name'] as String?;
+                                      _selectedDuration = duration;
+                                      _customDuration = ![
+                                        30,
+                                        45,
+                                        60,
+                                        90,
+                                        120,
+                                      ].contains(duration);
+                                      _priceController.text = price == null
+                                          ? ''
+                                          : price.toStringAsFixed(0);
+                                      _durationController.text = '$duration';
+                                    });
+                                  },
+                                ),
+                                if (_customService) ...[
+                                  const SizedBox(height: 10),
+                                  _AppointmentTextInput(
+                                    controller: _customServiceController,
+                                    label: 'Service name',
+                                    hint: 'Service name',
+                                    icon: LucideIcons.briefcase,
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                ],
+                                const SizedBox(height: 10),
+                                _AppointmentTextInput(
+                                  controller: _priceController,
+                                  label: 'Price',
+                                  hint: 'Price',
+                                  prefix: '£',
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                                const SizedBox(height: 12),
+                                _PaymentDueToggle(
+                                  value: _createPaymentDue,
+                                  onChanged: (value) =>
+                                      setState(() => _createPaymentDue = value),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // ── Date ─────────────────────────────────────────
+                          const _AppointmentSectionLabel(
+                            'DATE',
+                            subtitle: 'When the work takes place.',
+                          ),
+                          const SizedBox(height: 8),
+                          GestureDetector(
+                            onTap: _pickDate,
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.bgCard,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_today_rounded,
+                                    color: AppColors.t3,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    _formatAppointmentDate(_selectedDate),
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.t1,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: AppColors.t3,
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // ── Time ─────────────────────────────────────────
+                          const _AppointmentSectionLabel(
+                            'TIME & DURATION',
+                            subtitle:
+                                'Set a clear start time and expected length.',
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: AppColors.bgCard,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(color: AppColors.border),
                             ),
-                            child: Row(
+                            child: Column(
                               children: [
-                                const Icon(
-                                  Icons.calendar_today_rounded,
-                                  color: AppColors.t3,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  _formatAppointmentDate(_selectedDate),
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.t1,
+                                GestureDetector(
+                                  onTap: _pickTime,
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.access_time_rounded,
+                                        color: AppColors.t3,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        '${_selectedHour.toString().padLeft(2, '0')}:${_selectedMinute.toString().padLeft(2, '0')}',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                          color: AppColors.t1,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'to $endStr',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppColors.t3,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: AppColors.t3,
+                                        size: 18,
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const Spacer(),
-                                const Icon(
-                                  Icons.chevron_right_rounded,
-                                  color: AppColors.t3,
-                                  size: 18,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // ── Time ─────────────────────────────────────────
-                        const _AppointmentSectionLabel(
-                          'TIME & DURATION',
-                          subtitle:
-                              'Set a clear start time and expected length.',
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.bgCard,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: Column(
-                            children: [
-                              GestureDetector(
-                                onTap: _pickTime,
-                                child: Row(
+                                const SizedBox(height: 14),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
                                   children: [
-                                    const Icon(
-                                      Icons.access_time_rounded,
-                                      color: AppColors.t3,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      '${_selectedHour.toString().padLeft(2, '0')}:${_selectedMinute.toString().padLeft(2, '0')}',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppColors.t1,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'to $endStr',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: AppColors.t3,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    const Icon(
-                                      Icons.chevron_right_rounded,
-                                      color: AppColors.t3,
-                                      size: 18,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  ...[30, 45, 60, 90, 120].map((minutes) {
-                                    final selected =
-                                        !_customDuration &&
-                                        _selectedDurationValue == minutes;
-                                    return GestureDetector(
-                                      onTap: () => _setDuration(minutes),
+                                    ...[30, 45, 60, 90, 120].map((minutes) {
+                                      final selected =
+                                          !_customDuration &&
+                                          _selectedDurationValue == minutes;
+                                      return GestureDetector(
+                                        onTap: () => _setDuration(minutes),
+                                        child: AnimatedContainer(
+                                          duration: AppMotion.fast,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: selected
+                                                ? AppColors.slateLight
+                                                : AppColors.bgInteract,
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
+                                            border: Border.all(
+                                              color: selected
+                                                  ? AppColors.borderStrong
+                                                  : AppColors.border,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${minutes}m',
+                                            style: TextStyle(
+                                              color: selected
+                                                  ? AppColors.panelInk
+                                                  : AppColors.t2,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                    GestureDetector(
+                                      onTap: _showCustomDuration,
                                       child: AnimatedContainer(
                                         duration: AppMotion.fast,
                                         padding: const EdgeInsets.symmetric(
@@ -780,22 +949,22 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                           vertical: 8,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: selected
+                                          color: _customDuration
                                               ? AppColors.slateLight
                                               : AppColors.bgInteract,
                                           borderRadius: BorderRadius.circular(
                                             999,
                                           ),
                                           border: Border.all(
-                                            color: selected
+                                            color: _customDuration
                                                 ? AppColors.borderStrong
                                                 : AppColors.border,
                                           ),
                                         ),
                                         child: Text(
-                                          '${minutes}m',
+                                          'Custom',
                                           style: TextStyle(
-                                            color: selected
+                                            color: _customDuration
                                                 ? AppColors.panelInk
                                                 : AppColors.t2,
                                             fontWeight: FontWeight.w800,
@@ -803,383 +972,365 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                           ),
                                         ),
                                       ),
-                                    );
-                                  }),
-                                  GestureDetector(
-                                    onTap: _showCustomDuration,
+                                    ),
+                                  ],
+                                ),
+                                if (_customDuration) ...[
+                                  const SizedBox(height: 10),
+                                  _AppointmentTextInput(
+                                    controller: _durationController,
+                                    hint: 'Custom duration',
+                                    suffix: 'min',
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // ── Location ─────────────────────────────────────
+                          const _AppointmentSectionLabel(
+                            'LOCATION',
+                            subtitle: 'Where this booking takes place.',
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children:
+                                const [
+                                  _LocationChoice(
+                                    value: 'business',
+                                    label: 'Business',
+                                  ),
+                                  _LocationChoice(
+                                    value: 'client',
+                                    label: 'Client',
+                                  ),
+                                  _LocationChoice(
+                                    value: 'online',
+                                    label: 'Online',
+                                  ),
+                                ].map((choice) {
+                                  final selected =
+                                      _locationMode == choice.value;
+                                  return GestureDetector(
+                                    onTap: () => _setLocationMode(
+                                      choice.value,
+                                      clients.value ?? const <Client>[],
+                                    ),
                                     child: AnimatedContainer(
                                       duration: AppMotion.fast,
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
+                                        horizontal: 13,
+                                        vertical: 9,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: _customDuration
+                                        color: selected
                                             ? AppColors.slateLight
-                                            : AppColors.bgInteract,
+                                            : AppColors.bgCard,
                                         borderRadius: BorderRadius.circular(
                                           999,
                                         ),
                                         border: Border.all(
-                                          color: _customDuration
+                                          color: selected
                                               ? AppColors.borderStrong
                                               : AppColors.border,
                                         ),
                                       ),
                                       child: Text(
-                                        'Custom',
+                                        choice.label,
                                         style: TextStyle(
-                                          color: _customDuration
+                                          color: selected
                                               ? AppColors.panelInk
                                               : AppColors.t2,
-                                          fontWeight: FontWeight.w800,
                                           fontSize: 13,
+                                          fontWeight: FontWeight.w800,
                                         ),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                          ),
+                          const SizedBox(height: 10),
+                          if (_locationMode == 'online')
+                            _AppointmentTextInput(
+                              controller: _locationController,
+                              hint: 'Call link or phone note',
+                              onChanged: (_) => setState(() {}),
+                            )
+                          else
+                            BookingAddressField(
+                              controller: _locationController,
+                              onChanged: () => setState(() {}),
+                            ),
+                          const SizedBox(height: 20),
+
+                          if (!insideWorkingHours && dayHoursLabel != null) ...[
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: AppColors.warningDim,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: AppColors.warning.withValues(
+                                    alpha: 0.24,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: AppColors.warning,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      '${weekdayName(appointmentStart)} hours are $dayHoursLabel. This booking falls outside your working blocks.',
+                                      style: const TextStyle(
+                                        color: AppColors.t2,
+                                        fontSize: 13,
+                                        height: 1.35,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                              if (_customDuration) ...[
-                                const SizedBox(height: 10),
-                                _AppointmentTextInput(
-                                  controller: _durationController,
-                                  hint: 'Custom duration',
-                                  suffix: 'min',
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
 
-                        // ── Location ─────────────────────────────────────
-                        const _AppointmentSectionLabel(
-                          'LOCATION',
-                          subtitle: 'Where this booking takes place.',
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children:
-                              const [
-                                _LocationChoice(
-                                  value: 'business',
-                                  label: 'Business',
-                                ),
-                                _LocationChoice(
-                                  value: 'client',
-                                  label: 'Client',
-                                ),
-                                _LocationChoice(
-                                  value: 'online',
-                                  label: 'Online',
-                                ),
-                              ].map((choice) {
-                                final selected = _locationMode == choice.value;
-                                return GestureDetector(
-                                  onTap: () => _setLocationMode(
-                                    choice.value,
-                                    clients.value ?? const <Client>[],
+                          if (conflicts.isNotEmpty) ...[
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: AppColors.errorDim,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: AppColors.error.withValues(
+                                    alpha: 0.24,
                                   ),
-                                  child: AnimatedContainer(
-                                    duration: AppMotion.fast,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 13,
-                                      vertical: 9,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: selected
-                                          ? AppColors.slateLight
-                                          : AppColors.bgCard,
-                                      borderRadius: BorderRadius.circular(999),
-                                      border: Border.all(
-                                        color: selected
-                                            ? AppColors.borderStrong
-                                            : AppColors.border,
-                                      ),
-                                    ),
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.event_busy_rounded,
+                                    color: AppColors.error,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
                                     child: Text(
-                                      choice.label,
-                                      style: TextStyle(
-                                        color: selected
-                                            ? AppColors.panelInk
-                                            : AppColors.t2,
+                                      'This overlaps ${conflicts.length} existing booking${conflicts.length == 1 ? '' : 's'}. Move it to another time before saving.',
+                                      style: const TextStyle(
+                                        color: AppColors.t2,
                                         fontSize: 13,
-                                        fontWeight: FontWeight.w800,
+                                        height: 1.35,
                                       ),
                                     ),
                                   ),
-                                );
-                              }).toList(),
-                        ),
-                        const SizedBox(height: 10),
-                        _AppointmentTextInput(
-                          controller: _locationController,
-                          hint: _locationMode == 'business'
-                              ? 'Business address or room'
-                              : _locationMode == 'client'
-                              ? 'Client address'
-                              : 'Call link or phone note',
-                        ),
-                        const SizedBox(height: 20),
-
-                        if (!insideWorkingHours && dayHoursLabel != null) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: AppColors.warningDim,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: AppColors.warning.withValues(
-                                  alpha: 0.24,
-                                ),
+                                ],
                               ),
                             ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.warning_amber_rounded,
-                                  color: AppColors.warning,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    '${weekdayName(appointmentStart)} hours are $dayHoursLabel. This booking falls outside your working blocks.',
-                                    style: const TextStyle(
-                                      color: AppColors.t2,
-                                      fontSize: 13,
-                                      height: 1.35,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
+                            const SizedBox(height: 20),
+                          ],
 
-                        if (conflicts.isNotEmpty) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: AppColors.errorDim,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: AppColors.error.withValues(alpha: 0.24),
+                          // ── Repeat ───────────────────────────────────────
+                          const _AppointmentSectionLabel(
+                            'REPEAT',
+                            subtitle: 'Create future bookings automatically.',
+                          ),
+                          const SizedBox(height: 8),
+                          WorkloopPickerField<String>(
+                            value: _repeatMode,
+                            title: 'Repeat booking',
+                            hint: 'Choose repeat schedule',
+                            leadingIcon: LucideIcons.repeat,
+                            options: const [
+                              WorkloopPickerOption(
+                                value: 'none',
+                                label: "Doesn't repeat",
+                                subtitle: 'One booking only',
                               ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.event_busy_rounded,
-                                  color: AppColors.error,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'This overlaps ${conflicts.length} existing booking${conflicts.length == 1 ? '' : 's'}. Move it to another time before saving.',
-                                    style: const TextStyle(
-                                      color: AppColors.t2,
-                                      fontSize: 13,
-                                      height: 1.35,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                              WorkloopPickerOption(
+                                value: 'weekly',
+                                label: 'Weekly',
+                                subtitle: 'Next 12 weeks',
+                              ),
+                              WorkloopPickerOption(
+                                value: 'fortnightly',
+                                label: 'Fortnightly',
+                                subtitle: 'Next 12 weeks',
+                              ),
+                              WorkloopPickerOption(
+                                value: 'monthly',
+                                label: 'Monthly',
+                                subtitle: 'Next 3 months',
+                              ),
+                            ],
+                            onChanged: (value) =>
+                                setState(() => _repeatMode = value),
                           ),
-                          const SizedBox(height: 20),
-                        ],
-
-                        // ── Repeat ───────────────────────────────────────
-                        const _AppointmentSectionLabel(
-                          'REPEAT',
-                          subtitle: 'Create future bookings automatically.',
-                        ),
-                        const SizedBox(height: 8),
-                        WorkloopPickerField<String>(
-                          value: _repeatMode,
-                          title: 'Repeat booking',
-                          hint: 'Choose repeat schedule',
-                          leadingIcon: LucideIcons.repeat,
-                          options: const [
-                            WorkloopPickerOption(
-                              value: 'none',
-                              label: "Doesn't repeat",
-                              subtitle: 'One booking only',
-                            ),
-                            WorkloopPickerOption(
-                              value: 'weekly',
-                              label: 'Weekly',
-                              subtitle: 'Next 12 weeks',
-                            ),
-                            WorkloopPickerOption(
-                              value: 'fortnightly',
-                              label: 'Fortnightly',
-                              subtitle: 'Next 12 weeks',
-                            ),
-                            WorkloopPickerOption(
-                              value: 'monthly',
-                              label: 'Monthly',
-                              subtitle: 'Next 3 months',
+                          if (_repeatMode != 'none') ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              _repeatSummary,
+                              style: const TextStyle(
+                                color: AppColors.t3,
+                                fontSize: 12,
+                                height: 1.35,
+                              ),
                             ),
                           ],
-                          onChanged: (value) =>
-                              setState(() => _repeatMode = value),
-                        ),
-                        if (_repeatMode != 'none') ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            _repeatSummary,
-                            style: const TextStyle(
-                              color: AppColors.t3,
-                              fontSize: 12,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 20),
 
-                        // ── Tasks ───────────────────────────────────────
-                        const _AppointmentSectionLabel(
-                          'BOOKING TASKS',
-                          subtitle: 'Prep or follow-up linked to this booking.',
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.bgCard,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.border),
+                          // ── Tasks ───────────────────────────────────────
+                          const _AppointmentSectionLabel(
+                            'BOOKING TASKS',
+                            subtitle:
+                                'Prep or follow-up linked to this booking.',
                           ),
-                          child: Column(
-                            children: [
-                              if (_taskControllers.isEmpty)
-                                const Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    'Add prep or follow-up tasks for this booking.',
-                                    style: TextStyle(
-                                      color: AppColors.t3,
-                                      fontSize: 13,
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgCard,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Column(
+                              children: [
+                                if (_taskControllers.isEmpty)
+                                  const Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'Add prep or follow-up tasks for this booking.',
+                                      style: TextStyle(
+                                        color: AppColors.t3,
+                                        fontSize: 13,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ..._taskControllers.asMap().entries.map((entry) {
-                                final index = entry.key;
-                                final controller = entry.value;
-                                return Padding(
-                                  padding: EdgeInsets.only(
-                                    bottom: index == _taskControllers.length - 1
-                                        ? 0
-                                        : 10,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: _AppointmentTextInput(
-                                          controller: controller,
-                                          hint: 'Task title',
+                                ..._taskControllers.asMap().entries.map((
+                                  entry,
+                                ) {
+                                  final index = entry.key;
+                                  final controller = entry.value;
+                                  return Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom:
+                                          index == _taskControllers.length - 1
+                                          ? 0
+                                          : 10,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: _AppointmentTextInput(
+                                            controller: controller,
+                                            hint: 'Task title',
+                                          ),
                                         ),
-                                      ),
-                                      IconButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            _taskControllers.removeAt(index);
-                                          });
-                                          controller.dispose();
-                                        },
-                                        icon: const Icon(
-                                          Icons.close_rounded,
-                                          color: AppColors.t3,
-                                          size: 18,
+                                        IconButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _taskControllers.removeAt(index);
+                                            });
+                                            controller.dispose();
+                                          },
+                                          icon: const Icon(
+                                            Icons.close_rounded,
+                                            color: AppColors.t3,
+                                            size: 18,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
+                                  );
+                                }),
+                                const SizedBox(height: 10),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        _taskControllers.add(
+                                          TextEditingController(),
+                                        );
+                                      });
+                                    },
+                                    icon: const Icon(
+                                      Icons.add_rounded,
+                                      size: 17,
+                                    ),
+                                    label: const Text('Add task'),
                                   ),
-                                );
-                              }),
-                              const SizedBox(height: 10),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: TextButton.icon(
-                                  onPressed: () {
-                                    setState(() {
-                                      _taskControllers.add(
-                                        TextEditingController(),
-                                      );
-                                    });
-                                  },
-                                  icon: const Icon(Icons.add_rounded, size: 17),
-                                  label: const Text('Add task'),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 20),
 
-                        // ── Notes ─────────────────────────────────────────
-                        const _AppointmentSectionLabel(
-                          'BOOKING NOTES',
-                          subtitle: 'Useful context for this visit.',
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _notesController,
-                          maxLines: 3,
-                          style: const TextStyle(
-                            color: AppColors.t1,
-                            fontSize: 15,
+                          // ── Notes ─────────────────────────────────────────
+                          const _AppointmentSectionLabel(
+                            'BOOKING NOTES',
+                            subtitle: 'Useful context for this visit.',
                           ),
-                          decoration: InputDecoration(
-                            hintText: 'Add any notes...',
-                            hintStyle: const TextStyle(color: AppColors.t3),
-                            filled: true,
-                            fillColor: AppColors.bgCard,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(
-                                color: AppColors.border,
-                              ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _notesController,
+                            maxLines: 3,
+                            style: const TextStyle(
+                              color: AppColors.t1,
+                              fontSize: 15,
                             ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(
-                                color: AppColors.border,
+                            decoration: InputDecoration(
+                              hintText: 'Add any notes...',
+                              hintStyle: const TextStyle(color: AppColors.t3),
+                              filled: true,
+                              fillColor: AppColors.bgCard,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(
+                                  color: AppColors.border,
+                                ),
                               ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(
-                                color: AppColors.green,
-                                width: 1.5,
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(
+                                  color: AppColors.border,
+                                ),
                               ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: const BorderSide(
+                                  color: AppColors.green,
+                                  width: 1.5,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.all(16),
                             ),
-                            contentPadding: const EdgeInsets.all(16),
                           ),
-                        ),
-                        const SizedBox(height: 40),
-                      ],
+                          const SizedBox(height: 40),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

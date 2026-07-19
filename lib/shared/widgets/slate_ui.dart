@@ -35,6 +35,132 @@ class SlateHaptics {
   }
 }
 
+enum WorkloopDraftDecision { stay, discard, save }
+
+Future<WorkloopDraftDecision> showWorkloopDraftConfirmation(
+  BuildContext context, {
+  required String title,
+  required String message,
+  String saveLabel = 'Save changes',
+  bool canSave = true,
+}) async {
+  final result = await showModalBottomSheet<WorkloopDraftDecision>(
+    context: context,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.34),
+    builder: (sheetContext) => SlateSheetFrame(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.t1,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            message,
+            style: const TextStyle(
+              color: AppColors.t3,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          SlateButton(
+            label: saveLabel,
+            icon: LucideIcons.check,
+            onPressed: canSave
+                ? () => Navigator.pop(sheetContext, WorkloopDraftDecision.save)
+                : null,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SlateButton(
+            label: 'Keep editing',
+            secondary: true,
+            onPressed: () =>
+                Navigator.pop(sheetContext, WorkloopDraftDecision.stay),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Center(
+            child: TextButton(
+              onPressed: () =>
+                  Navigator.pop(sheetContext, WorkloopDraftDecision.discard),
+              child: const Text(
+                'Discard changes',
+                style: TextStyle(
+                  color: AppColors.error,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+  return result ?? WorkloopDraftDecision.stay;
+}
+
+Future<bool> showWorkloopOutsideHoursConfirmation(
+  BuildContext context, {
+  required String detail,
+  bool repeating = false,
+}) async {
+  final result = await showModalBottomSheet<bool>(
+    context: context,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.34),
+    builder: (sheetContext) => SlateSheetFrame(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Outside working hours',
+            style: TextStyle(
+              color: AppColors.t1,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            repeating
+                ? '$detail At least one booking in this repeat schedule is outside your saved hours. You can still create it.'
+                : '$detail You can still create this booking.',
+            style: const TextStyle(
+              color: AppColors.t3,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          SlateButton(
+            label: 'Book anyway',
+            icon: LucideIcons.calendarCheck,
+            onPressed: () => Navigator.pop(sheetContext, true),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SlateButton(
+            label: 'Go back',
+            secondary: true,
+            onPressed: () => Navigator.pop(sheetContext, false),
+          ),
+        ],
+      ),
+    ),
+  );
+  return result ?? false;
+}
+
 /// Applies Workloop's tap-away keyboard behaviour to every editable field.
 ///
 /// Flutter intentionally keeps the keyboard open for touch taps outside an

@@ -21,6 +21,7 @@ class AppointmentsRepository {
     String? excludeAppointmentId,
     String? recurrenceRule,
     int repeatOccurrences = 1,
+    bool enforceWorkingHours = true,
   }) async {
     final duration = endTime.difference(startTime);
     for (var index = 0; index < repeatOccurrences.clamp(1, 24); index++) {
@@ -30,7 +31,9 @@ class AppointmentsRepository {
         index,
       );
       final occurrenceEnd = occurrenceStart.add(duration);
-      if (workingHours != null && workingHours.isNotEmpty) {
+      if (enforceWorkingHours &&
+          workingHours != null &&
+          workingHours.isNotEmpty) {
         final localStart = occurrenceStart.toLocal();
         final localEnd = occurrenceEnd.toLocal();
         if (!isWithinWorkingHours(
@@ -40,6 +43,7 @@ class AppointmentsRepository {
         )) {
           throw AppointmentScheduleException(
             '${weekdayName(localStart)} is outside your working hours.',
+            issue: AppointmentScheduleIssue.workingHours,
           );
         }
       }
@@ -55,6 +59,7 @@ class AppointmentsRepository {
           rows.length == 1
               ? 'This overlaps an existing booking.'
               : 'This overlaps ${rows.length} existing bookings.',
+          issue: AppointmentScheduleIssue.conflict,
         );
       }
     }
@@ -227,9 +232,16 @@ class AppointmentsRepository {
   }
 }
 
+enum AppointmentScheduleIssue { workingHours, conflict, other }
+
 class AppointmentScheduleException implements Exception {
   final String message;
-  const AppointmentScheduleException(this.message);
+  final AppointmentScheduleIssue issue;
+
+  const AppointmentScheduleException(
+    this.message, {
+    this.issue = AppointmentScheduleIssue.other,
+  });
 
   @override
   String toString() => message;
