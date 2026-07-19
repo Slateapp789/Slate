@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -80,9 +81,8 @@ class _WorkingHoursEditorState extends ConsumerState<WorkingHoursEditor> {
 
   Future<void> _pickTime(String day, int index, {required bool start}) async {
     final block = _blocks[day]![index];
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: start ? block.start : block.end,
+    final picked = await _showScrollingTimePicker(
+      start ? block.start : block.end,
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -90,6 +90,69 @@ class _WorkingHoursEditorState extends ConsumerState<WorkingHoursEditor> {
           ? block.copyWith(start: picked)
           : block.copyWith(end: picked);
     });
+  }
+
+  Future<TimeOfDay?> _showScrollingTimePicker(TimeOfDay initial) async {
+    var selected = DateTime(2026, 1, 1, initial.hour, initial.minute);
+    return showModalBottomSheet<TimeOfDay>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.34),
+      builder: (sheetContext) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.bg,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.pageX,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.xs,
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Select time',
+                        style: TextStyle(
+                          color: AppColors.t1,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    WorkloopTextButton(
+                      label: 'Done',
+                      onPressed: () => Navigator.pop(
+                        sheetContext,
+                        TimeOfDay(hour: selected.hour, minute: selected.minute),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: 220,
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  initialDateTime: selected,
+                  use24hFormat: true,
+                  minuteInterval: 1,
+                  onDateTimeChanged: (value) => selected = value,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _save() async {

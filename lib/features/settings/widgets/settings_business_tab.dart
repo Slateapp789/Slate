@@ -77,6 +77,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   bool _reviewsEnabled = false;
   bool _galleryEnabled = false;
   bool _payNowEnabled = false;
+  late TextEditingController _ownerNameController;
   late TextEditingController _nameController;
   late TextEditingController _industryController;
   late TextEditingController _handleController;
@@ -95,6 +96,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   @override
   void initState() {
     super.initState();
+    _ownerNameController = TextEditingController();
     _nameController = TextEditingController();
     _industryController = TextEditingController();
     _handleController = TextEditingController();
@@ -109,6 +111,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _ownerNameController.dispose();
     _nameController.dispose();
     _industryController.dispose();
     _handleController.dispose();
@@ -132,15 +135,26 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   }
 
   Future<void> _saveInfo(String workspaceId) async {
-    if (_nameController.text.trim().isEmpty) return;
+    final ownerName = _ownerNameController.text.trim();
+    if (ownerName.isEmpty) {
+      _snack('Add your name', AppColors.warning);
+      return;
+    }
+    if (_nameController.text.trim().isEmpty) {
+      _snack('Add your business name', AppColors.warning);
+      return;
+    }
     setState(() => _saving = true);
     try {
-      await ref.read(workspaceRepositoryProvider).update(workspaceId, {
-        'name': _nameController.text.trim(),
-        'industry': _industryController.text.trim().isEmpty
-            ? null
-            : _industryController.text.trim(),
-      });
+      await Future.wait([
+        ref.read(authRepositoryProvider).updateFirstName(ownerName),
+        ref.read(workspaceRepositoryProvider).update(workspaceId, {
+          'name': _nameController.text.trim(),
+          'industry': _industryController.text.trim().isEmpty
+              ? null
+              : _industryController.text.trim(),
+        }),
+      ]);
       ref.invalidate(workspaceProvider);
       setState(() {
         _editingInfo = false;
@@ -813,14 +827,23 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
             // ── Business info ────────────────────────────────────────────────
             KeyedSubtree(
               key: _businessKey,
-              child: sectionLabel('Business Info'),
+              child: Text(
+                'Business info',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: widget.showOnlySelected ? 22 : 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.md),
             workspace.when(
               loading: () => skeletonBox(80),
               error: (_, __) => errorBox('Could not load workspace'),
               data: (ws) {
                 if (!_businessInfoHydrated) {
+                  _ownerNameController.text =
+                      ref.read(authRepositoryProvider).currentFirstName ?? '';
                   _nameController.text = ws?['name'] as String? ?? '';
                   _industryController.text = ws?['industry'] as String? ?? '';
                   _businessInfoHydrated = true;
@@ -843,6 +866,12 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                           ),
                           child: Column(
                             children: [
+                              settingsField(
+                                label: 'YOUR NAME',
+                                controller: _ownerNameController,
+                                hint: 'Your first name',
+                              ),
+                              const SizedBox(height: 12),
                               settingsField(
                                 label: 'BUSINESS NAME',
                                 controller: _nameController,
