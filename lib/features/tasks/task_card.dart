@@ -19,11 +19,11 @@ class _TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDone = task.status == 'done';
     final priorityColor = _priorityColor(task.priority);
-    final metadata = <String>[
-      if (task.dueDate != null) _formatDue(task.dueDate!),
-      if (task.clientName != null) task.clientName!,
-      if (task.priority == 'high') 'High priority',
-    ];
+    final dueLabel = task.dueDate == null ? null : _formatDue(task.dueDate!);
+    final dueColor =
+        !isDone && task.dueDate != null && _isOverdue(task.dueDate!)
+        ? AppColors.error
+        : AppColors.t3;
 
     return Dismissible(
       key: ValueKey(task.id),
@@ -119,21 +119,28 @@ class _TaskCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (metadata.isNotEmpty) ...[
+                    if (dueLabel != null || task.clientName != null) ...[
                       const SizedBox(height: 5),
-                      Text(
-                        metadata.join('  ·  '),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            if (dueLabel != null)
+                              TextSpan(
+                                text: dueLabel,
+                                style: TextStyle(color: dueColor),
+                              ),
+                            if (dueLabel != null && task.clientName != null)
+                              const TextSpan(text: '  ·  '),
+                            if (task.clientName != null)
+                              TextSpan(text: task.clientName!),
+                          ],
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color:
-                              !isDone &&
-                                  task.dueDate != null &&
-                                  _isOverdue(task.dueDate!)
-                              ? AppColors.error
-                              : AppColors.t3,
+                          color: AppColors.t3,
                         ),
                       ),
                     ],

@@ -101,9 +101,9 @@ Last updated: 2026-07-15
 
 ### Tasks
 
-- Open/done/all and priority/section views.
-- Add task.
-- Edit task.
+- Calm Now/Later/Done workspace with Overdue, Today, Anytime, and future sections.
+- Task rows open a dedicated detail screen while preserving deliberate completion actions.
+- Add and Edit task use a full-screen form aligned with Client and Booking creation, including progressive options and Save/Discard/Keep editing protection.
 - Delete task.
 - Reopen task.
 - Deliberate completion.

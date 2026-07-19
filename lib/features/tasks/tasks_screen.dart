@@ -26,7 +26,7 @@ class TasksScreen extends ConsumerStatefulWidget {
 }
 
 class _TasksScreenState extends ConsumerState<TasksScreen> {
-  _TaskView _view = _TaskView.todo;
+  _TaskView _view = _TaskView.now;
 
   @override
   void didUpdateWidget(covariant TasksScreen oldWidget) {
@@ -146,12 +146,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   Widget _emptyState() {
     final title = switch (_view) {
-      _TaskView.todo => 'Nothing to do',
+      _TaskView.now => 'Nothing to do',
       _TaskView.later => 'Nothing planned yet',
       _TaskView.done => 'No completed tasks',
     };
     final subtitle = switch (_view) {
-      _TaskView.todo => 'Your current list is clear.',
+      _TaskView.now => 'Your current list is clear.',
       _TaskView.later => 'Future tasks will appear here.',
       _TaskView.done => 'Completed tasks will appear here.',
     };
@@ -165,127 +165,165 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     );
   }
 
-  void _showTaskDetails(SlateTask task) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => Consumer(
-        builder: (context, ref, _) {
-          final checklist = ref.watch(taskChecklistProvider(task.id));
+  Future<void> _showTaskDetails(SlateTask task) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (ctx) => Consumer(
+          builder: (context, ref, _) {
+            final checklist = ref.watch(taskChecklistProvider(task.id));
 
-          return SlateSheetFrame(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xl,
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(ctx).size.height * 0.78,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      task.title,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: task.status == 'done'
-                            ? AppColors.t3
-                            : AppColors.t1,
-                        decoration: task.status == 'done'
-                            ? TextDecoration.lineThrough
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${task.status == 'done' ? 'Completed' : _priorityLabel(task.priority)} task',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.t3,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    _TaskContextPanel(task: task),
-                    const SizedBox(height: 18),
-                    _TaskChecklistPanel(
-                      items: checklist,
-                      onAdd: () => _showChecklistEditor(task),
-                      onToggle: (item) => _toggleChecklistItem(task, item),
-                      onEdit: (item) => _showChecklistEditor(task, item: item),
-                      onDelete: (item) => _deleteChecklistItem(task, item),
-                    ),
-                    const SizedBox(height: 22),
-                    SlateButton(
-                      label: task.status == 'done'
-                          ? 'Reopen Task'
-                          : 'Mark Complete',
-                      icon: task.status == 'done'
-                          ? LucideIcons.rotateCcw
-                          : LucideIcons.checkCircle,
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        if (task.status == 'done') {
-                          _reopenTask(task);
-                        } else {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (mounted) _confirmComplete(task);
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
+            return Scaffold(
+              backgroundColor: AppColors.bg,
+              body: Stack(
+                children: [
+                  const Positioned.fill(child: WorkloopTexturedBackdrop()),
+                  SafeArea(
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: SlateButton(
-                            label: 'Edit',
-                            icon: LucideIcons.pencil,
-                            secondary: true,
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (mounted) {
-                                  _showTaskEditor(context, task: task);
-                                }
-                              });
-                            },
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.pageX,
+                            AppSpacing.lg,
+                            AppSpacing.pageX,
+                            0,
+                          ),
+                          child: Row(
+                            children: [
+                              WorkloopIconButton(
+                                icon: LucideIcons.chevronLeft,
+                                semanticLabel: 'Back to tasks',
+                                onTap: () => Navigator.pop(ctx),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              const Expanded(
+                                child: Text(
+                                  'Task',
+                                  style: TextStyle(
+                                    color: AppColors.t1,
+                                    fontSize: 26,
+                                    height: 1.05,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              WorkloopIconButton(
+                                icon: LucideIcons.pencil,
+                                semanticLabel: 'Edit task',
+                                color: AppColors.modTasks,
+                                backgroundColor: AppColors.modTasks.withValues(
+                                  alpha: 0.10,
+                                ),
+                                onTap: () async {
+                                  Navigator.pop(ctx);
+                                  await Future<void>.delayed(Duration.zero);
+                                  if (mounted) {
+                                    await _showTaskEditor(
+                                      this.context,
+                                      task: task,
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(height: AppSpacing.xl),
                         Expanded(
-                          child: SlateButton(
-                            label: 'Delete',
-                            destructive: true,
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (mounted) _confirmDelete(task);
-                              });
-                            },
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.pageX,
+                              0,
+                              AppSpacing.pageX,
+                              AppSpacing.xxl,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  task.title,
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                    color: task.status == 'done'
+                                        ? AppColors.t3
+                                        : AppColors.t1,
+                                    decoration: task.status == 'done'
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${task.status == 'done' ? 'Completed' : _priorityLabel(task.priority)} task',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.t3,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.xl),
+                                _TaskContextPanel(task: task),
+                                const SizedBox(height: AppSpacing.xl),
+                                _TaskChecklistPanel(
+                                  items: checklist,
+                                  onAdd: () => _showChecklistEditor(task),
+                                  onToggle: (item) =>
+                                      _toggleChecklistItem(task, item),
+                                  onEdit: (item) =>
+                                      _showChecklistEditor(task, item: item),
+                                  onDelete: (item) =>
+                                      _deleteChecklistItem(task, item),
+                                ),
+                                const SizedBox(height: AppSpacing.xxl),
+                                SlateButton(
+                                  label: task.status == 'done'
+                                      ? 'Reopen Task'
+                                      : 'Mark Complete',
+                                  icon: task.status == 'done'
+                                      ? LucideIcons.rotateCcw
+                                      : LucideIcons.checkCircle,
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    if (task.status == 'done') {
+                                      _reopenTask(task);
+                                    } else {
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                            if (mounted) _confirmComplete(task);
+                                          });
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                SlateButton(
+                                  label: 'Delete Task',
+                                  destructive: true,
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          if (mounted) _confirmDelete(task);
+                                        });
+                                  },
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
+    _refreshTasks();
   }
 
-  void _showTaskEditor(BuildContext context, {SlateTask? task}) {
+  Future<void> _showTaskEditor(BuildContext context, {SlateTask? task}) async {
     final titleController = TextEditingController(text: task?.title ?? '');
     final checklistController = TextEditingController();
     String priority = task?.priority ?? 'medium';
@@ -294,204 +332,332 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     String reminderTiming = task?.reminderTiming ?? 'none';
     final draftChecklist = <String>[];
     var saving = false;
+    var allowPop = false;
     var showOptions =
         task?.priority != null && task!.priority != 'medium' ||
         task?.reminderTiming != null && task!.reminderTiming != 'none';
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModal) {
-          final clients = ref.watch(clientsProvider);
-          return SlateSheetFrame(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xl,
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(ctx).size.height * 0.78,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    bool hasChanges() {
+      return titleController.text != (task?.title ?? '') ||
+          priority != (task?.priority ?? 'medium') ||
+          dueDate != task?.dueDate ||
+          selectedClientId != task?.contactId ||
+          reminderTiming != (task?.reminderTiming ?? 'none') ||
+          draftChecklist.isNotEmpty;
+    }
+
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setModal) {
+            final clients = ref.watch(clientsProvider);
+            Future<void> save() async {
+              if (saving || titleController.text.trim().isEmpty) return;
+              setModal(() => saving = true);
+              final saved = await _saveTask(
+                task: task,
+                title: titleController.text,
+                priority: priority,
+                dueDate: dueDate,
+                clientId: selectedClientId,
+                reminderTiming: reminderTiming,
+                checklistTitles: draftChecklist,
+              );
+              if (!ctx.mounted) return;
+              if (!saved) {
+                setModal(() => saving = false);
+                return;
+              }
+              allowPop = true;
+              setModal(() {});
+              await Future<void>.delayed(Duration.zero);
+              if (ctx.mounted) Navigator.pop(ctx);
+            }
+
+            Future<void> handleBack() async {
+              if (!hasChanges()) {
+                allowPop = true;
+                setModal(() {});
+                await Future<void>.delayed(Duration.zero);
+                if (ctx.mounted) Navigator.pop(ctx);
+                return;
+              }
+              final choice = await _confirmTaskEditorExit(ctx);
+              if (!ctx.mounted || choice == null) return;
+              if (choice == _TaskEditorExit.keepEditing) return;
+              if (choice == _TaskEditorExit.save) {
+                await save();
+                return;
+              }
+              allowPop = true;
+              setModal(() {});
+              await Future<void>.delayed(Duration.zero);
+              if (ctx.mounted) Navigator.pop(ctx);
+            }
+
+            return PopScope(
+              canPop: allowPop || !hasChanges(),
+              onPopInvokedWithResult: (didPop, _) {
+                if (!didPop) handleBack();
+              },
+              child: Scaffold(
+                backgroundColor: AppColors.bg,
+                body: Stack(
                   children: [
-                    Text(
-                      task == null ? 'New task' : 'Edit task',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.t1,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: titleController,
-                      autofocus: task == null,
-                      minLines: 1,
-                      maxLines: 3,
-                      textInputAction: TextInputAction.done,
-                      style: const TextStyle(color: AppColors.t1),
-                      decoration: const InputDecoration(
-                        labelText: 'Task',
-                        hintText: 'What needs doing?',
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    if (task == null) ...[
-                      _TaskTemplatePicker(
-                        onSelect: (template) {
-                          setModal(() {
-                            if (titleController.text.trim().isEmpty) {
-                              titleController.text = template.title;
-                            }
-                            priority = template.priority;
-                            if (template.dueInDays != null) {
-                              dueDate = _dateOnly(
-                                DateTime.now().add(
-                                  Duration(days: template.dueInDays!),
-                                ),
-                              );
-                              reminderTiming = template.dueInDays == 0
-                                  ? 'today'
-                                  : 'day_before';
-                            }
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-                    clients.when(
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, __) => const SizedBox.shrink(),
-                      data: (data) => _ClientPicker(
-                        clients: data,
-                        selectedClientId: selectedClientId,
-                        onChanged: (value) =>
-                            setModal(() => selectedClientId = value),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _DueDatePicker(
-                      dueDate: dueDate,
-                      onChanged: (value) => setModal(() => dueDate = value),
-                    ),
-                    const SizedBox(height: 12),
-                    _TaskOptionsDisclosure(
-                      expanded: showOptions,
-                      onTap: () => setModal(() => showOptions = !showOptions),
-                    ),
-                    if (showOptions) ...[
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Priority',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.t3,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
+                    const Positioned.fill(child: WorkloopTexturedBackdrop()),
+                    SafeArea(
+                      child: Column(
                         children: [
-                          _PriorityChoice(
-                            value: 'high',
-                            label: 'High',
-                            selected: priority,
-                            color: AppColors.error,
-                            onTap: (value) => setModal(() => priority = value),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.pageX,
+                              AppSpacing.lg,
+                              AppSpacing.pageX,
+                              0,
+                            ),
+                            child: Row(
+                              children: [
+                                WorkloopIconButton(
+                                  icon: LucideIcons.chevronLeft,
+                                  semanticLabel: 'Back to tasks',
+                                  onTap: handleBack,
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Text(
+                                    task == null ? 'New task' : 'Edit task',
+                                    style: const TextStyle(
+                                      color: AppColors.t1,
+                                      fontSize: 26,
+                                      height: 1.05,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                _TaskSaveAction(
+                                  label: task == null ? 'Add' : 'Save',
+                                  loading: saving,
+                                  enabled: titleController.text
+                                      .trim()
+                                      .isNotEmpty,
+                                  onTap: save,
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 8),
-                          _PriorityChoice(
-                            value: 'medium',
-                            label: 'Medium',
-                            selected: priority,
-                            color: AppColors.warning,
-                            onTap: (value) => setModal(() => priority = value),
-                          ),
-                          const SizedBox(width: 8),
-                          _PriorityChoice(
-                            value: 'low',
-                            label: 'Low',
-                            selected: priority,
-                            color: AppColors.t3,
-                            onTap: (value) => setModal(() => priority = value),
+                          const SizedBox(height: AppSpacing.xl),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.pageX,
+                                0,
+                                AppSpacing.pageX,
+                                AppSpacing.xxl,
+                              ),
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const _TaskFormSectionLabel(
+                                    'Task details',
+                                    subtitle:
+                                        'Keep the next action clear and specific.',
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  TextField(
+                                    controller: titleController,
+                                    autofocus: task == null,
+                                    minLines: 1,
+                                    maxLines: 3,
+                                    textInputAction: TextInputAction.done,
+                                    style: const TextStyle(color: AppColors.t1),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Task title',
+                                      hintText: 'What needs to happen?',
+                                    ),
+                                    onChanged: (_) => setModal(() {}),
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  if (task == null) ...[
+                                    _TaskTemplatePicker(
+                                      onSelect: (template) {
+                                        setModal(() {
+                                          if (titleController.text
+                                              .trim()
+                                              .isEmpty) {
+                                            titleController.text =
+                                                template.title;
+                                          }
+                                          priority = template.priority;
+                                          if (template.dueInDays != null) {
+                                            dueDate = _dateOnly(
+                                              DateTime.now().add(
+                                                Duration(
+                                                  days: template.dueInDays!,
+                                                ),
+                                              ),
+                                            );
+                                            reminderTiming =
+                                                template.dueInDays == 0
+                                                ? 'today'
+                                                : 'day_before';
+                                          }
+                                        });
+                                      },
+                                    ),
+                                    const SizedBox(height: AppSpacing.xl),
+                                  ],
+                                  const _TaskFormSectionLabel(
+                                    'When and who',
+                                    subtitle:
+                                        'Add timing and client context when useful.',
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  clients.when(
+                                    loading: () => const SizedBox.shrink(),
+                                    error: (_, __) => const SizedBox.shrink(),
+                                    data: (data) => _ClientPicker(
+                                      clients: data,
+                                      selectedClientId: selectedClientId,
+                                      onChanged: (value) => setModal(
+                                        () => selectedClientId = value,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  _DueDatePicker(
+                                    dueDate: dueDate,
+                                    onChanged: (value) =>
+                                        setModal(() => dueDate = value),
+                                  ),
+                                  const SizedBox(height: AppSpacing.lg),
+                                  _TaskOptionsDisclosure(
+                                    expanded: showOptions,
+                                    onTap: () => setModal(
+                                      () => showOptions = !showOptions,
+                                    ),
+                                  ),
+                                  if (showOptions) ...[
+                                    const SizedBox(height: AppSpacing.lg),
+                                    const Text(
+                                      'Priority',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.t3,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        _PriorityChoice(
+                                          value: 'high',
+                                          label: 'High',
+                                          selected: priority,
+                                          color: AppColors.error,
+                                          onTap: (value) =>
+                                              setModal(() => priority = value),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        _PriorityChoice(
+                                          value: 'medium',
+                                          label: 'Medium',
+                                          selected: priority,
+                                          color: AppColors.warning,
+                                          onTap: (value) =>
+                                              setModal(() => priority = value),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        _PriorityChoice(
+                                          value: 'low',
+                                          label: 'Low',
+                                          selected: priority,
+                                          color: AppColors.t3,
+                                          onTap: (value) =>
+                                              setModal(() => priority = value),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: AppSpacing.lg),
+                                    _ReminderPicker(
+                                      value: reminderTiming,
+                                      enabled: dueDate != null,
+                                      onChanged: (value) => setModal(
+                                        () => reminderTiming = value,
+                                      ),
+                                    ),
+                                    if (task == null) ...[
+                                      const SizedBox(height: AppSpacing.xl),
+                                      _DraftChecklistEditor(
+                                        controller: checklistController,
+                                        items: draftChecklist,
+                                        onAdd: () {
+                                          final title = checklistController.text
+                                              .trim();
+                                          if (title.isEmpty) return;
+                                          setModal(() {
+                                            draftChecklist.add(title);
+                                            checklistController.clear();
+                                          });
+                                        },
+                                        onRemove: (index) => setModal(
+                                          () => draftChecklist.removeAt(index),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      _ReminderPicker(
-                        value: reminderTiming,
-                        enabled: dueDate != null,
-                        onChanged: (value) =>
-                            setModal(() => reminderTiming = value),
-                      ),
-                      if (task == null) ...[
-                        const SizedBox(height: 18),
-                        _DraftChecklistEditor(
-                          controller: checklistController,
-                          items: draftChecklist,
-                          onAdd: () {
-                            final title = checklistController.text.trim();
-                            if (title.isEmpty) return;
-                            setModal(() {
-                              draftChecklist.add(title);
-                              checklistController.clear();
-                            });
-                          },
-                          onRemove: (index) =>
-                              setModal(() => draftChecklist.removeAt(index)),
-                        ),
-                      ],
-                    ],
-                    const SizedBox(height: 22),
-                    SlateButton(
-                      label: saving
-                          ? 'Saving...'
-                          : task == null
-                          ? 'Add Task'
-                          : 'Save Changes',
-                      icon: task == null ? LucideIcons.plus : LucideIcons.check,
-                      onPressed: saving
-                          ? null
-                          : () async {
-                              setModal(() => saving = true);
-                              final saved = await _saveTask(
-                                ctx,
-                                task: task,
-                                title: titleController.text,
-                                priority: priority,
-                                dueDate: dueDate,
-                                clientId: selectedClientId,
-                                reminderTiming: reminderTiming,
-                                checklistTitles: draftChecklist,
-                              );
-                              if (!saved && ctx.mounted) {
-                                setModal(() => saving = false);
-                              }
-                            },
                     ),
                   ],
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
-    ).whenComplete(() {
-      _disposeControllerAfterSheetClose(titleController);
-      _disposeControllerAfterSheetClose(checklistController);
-    });
+    );
+    titleController.dispose();
+    checklistController.dispose();
+    if (mounted) {
+      _refreshTasks();
+      _refreshTaskNotifications();
+    }
   }
 
-  Future<bool> _saveTask(
-    BuildContext ctx, {
+  Future<_TaskEditorExit?> _confirmTaskEditorExit(BuildContext context) {
+    return showDialog<_TaskEditorExit>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: const Text('Save task changes?'),
+        content: const Text('You have changes that have not been saved yet.'),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(context, _TaskEditorExit.keepEditing),
+            child: const Text('Keep editing'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, _TaskEditorExit.discard),
+            child: const Text('Discard'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, _TaskEditorExit.save),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _saveTask({
     SlateTask? task,
     required String title,
     required String priority,
@@ -540,12 +706,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       dueDate,
       dueDate == null ? 'none' : reminderTiming,
     );
-    if (ctx.mounted) Navigator.pop(ctx);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _refreshTasks();
-      _refreshTaskNotifications();
-    });
     return true;
   }
 

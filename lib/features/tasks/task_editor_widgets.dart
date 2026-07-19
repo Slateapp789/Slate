@@ -1,5 +1,92 @@
 part of 'tasks_screen.dart';
 
+class _TaskFormSectionLabel extends StatelessWidget {
+  final String text;
+  final String? subtitle;
+
+  const _TaskFormSectionLabel(this.text, {this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            height: 1.12,
+            color: AppColors.t1,
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            subtitle!,
+            style: const TextStyle(
+              color: AppColors.t3,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _TaskSaveAction extends StatelessWidget {
+  final String label;
+  final bool loading;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _TaskSaveAction({
+    required this.label,
+    required this.loading,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: enabled
+          ? AppColors.modTasks.withValues(alpha: 0.14)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: InkWell(
+        onTap: enabled && !loading ? onTap : null,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 58, minHeight: 42),
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: AppColors.modTasks,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Text(
+                    label,
+                    style: TextStyle(
+                      color: enabled ? AppColors.modTasks : AppColors.t3,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TaskTemplatePicker extends StatelessWidget {
   final ValueChanged<_TaskTemplate> onSelect;
 

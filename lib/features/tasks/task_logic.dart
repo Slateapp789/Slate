@@ -1,6 +1,8 @@
 part of 'tasks_screen.dart';
 
-enum _TaskView { todo, later, done }
+enum _TaskView { now, later, done }
+
+enum _TaskEditorExit { save, discard, keepEditing }
 
 class _TaskSection {
   final String title;
@@ -26,7 +28,7 @@ class _TaskCounts {
     required this.open,
   });
 
-  int get todo => overdue + today + noDate;
+  int get now => overdue + today + noDate;
 }
 
 class _TaskTemplate {
@@ -79,9 +81,9 @@ List<_TaskSection> _sectionsForView(List<SlateTask> tasks, _TaskView view) {
   final noDate = open.where((task) => task.dueDate == null).toList();
 
   switch (view) {
-    case _TaskView.todo:
+    case _TaskView.now:
       return [
-        _TaskSection(title: 'Earlier', tasks: overdue),
+        _TaskSection(title: 'Overdue', tasks: overdue),
         _TaskSection(title: 'Today', tasks: today),
         _TaskSection(title: 'Anytime', tasks: noDate),
       ];
@@ -172,7 +174,7 @@ String _reminderLabel(String reminderTiming) {
 
 String _viewLabel(_TaskView view) {
   return switch (view) {
-    _TaskView.todo => 'To do',
+    _TaskView.now => 'Now',
     _TaskView.later => 'Later',
     _TaskView.done => 'Done',
   };
@@ -180,7 +182,7 @@ String _viewLabel(_TaskView view) {
 
 int _viewCount(_TaskView view, _TaskCounts counts) {
   return switch (view) {
-    _TaskView.todo => counts.todo,
+    _TaskView.now => counts.now,
     _TaskView.later => counts.upcoming,
     _TaskView.done => counts.done,
   };
