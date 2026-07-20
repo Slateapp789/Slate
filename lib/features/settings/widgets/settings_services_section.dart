@@ -65,7 +65,7 @@ class SettingsServicesSection extends StatelessWidget {
         const SizedBox(height: 10),
         services.when(
           loading: () => skeletonBox(60),
-          error: (e, _) => errorBox('Error: $e'),
+          error: (e, _) => errorBox('Services could not be loaded.'),
           data: (data) => data.isEmpty
               ? _EmptyServices(onAdd: onAdd)
               : _ServicesList(services: data, onEdit: onEdit),

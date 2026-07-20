@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,6 +34,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final password = _passwordController.text.trim();
     final validationError = _validate(email: email, password: password);
     if (validationError != null) {
+      SlateHaptics.warning();
       setState(() {
         _error = validationError;
         _success = null;
@@ -68,11 +70,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           });
         }
       }
+      TextInput.finishAutofillContext();
+      SlateHaptics.success();
     } on AuthException catch (e) {
+      SlateHaptics.warning();
       setState(() {
         _error = _friendlyAuthError(e);
       });
     } catch (_) {
+      SlateHaptics.warning();
       setState(() {
         _error = 'Something went wrong. Please try again.';
       });
@@ -113,7 +119,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     if (message.contains('rate limit') || message.contains('too many')) {
       return 'Too many attempts. Please wait a moment and try again.';
     }
-    return error.message.isEmpty ? 'Authentication failed.' : error.message;
+    return 'We could not complete that request. Check your details and try again.';
   }
 
   void _setMode(_AuthMode mode) {
@@ -129,129 +135,153 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.pageX),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Spacer(),
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  color: AppColors.t1.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                  border: Border.all(
-                    color: AppColors.t1.withValues(alpha: 0.09),
-                  ),
-                ),
-                child: const Icon(
-                  LucideIcons.layers,
-                  color: AppColors.slateLight,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              AnimatedSwitcher(
-                duration: AppMotion.standard,
-                child: Text(
-                  _mode.title,
-                  key: ValueKey(_mode),
-                  style: const TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.t1,
-                    letterSpacing: 0,
-                    height: 1.05,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                _mode.subtitle,
-                style: TextStyle(fontSize: 15, color: AppColors.t3),
-              ),
-              const Spacer(),
-              _SlateTextField(
-                controller: _emailController,
-                hint: 'Email address',
-                keyboardType: TextInputType.emailAddress,
-              ),
-              if (_mode != _AuthMode.reset) ...[
-                const SizedBox(height: 12),
-                _SlateTextField(
-                  controller: _passwordController,
-                  hint: 'Password',
-                  obscure: true,
-                ),
-                if (_mode == _AuthMode.signup) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Use at least 8 characters.',
-                    style: TextStyle(fontSize: 12, color: AppColors.t3),
-                  ),
-                ],
-              ],
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                SlateErrorState(message: _error!),
-              ],
-              if (_success != null) ...[
-                const SizedBox(height: 12),
-                _AuthSuccessState(message: _success!),
-              ],
-              const SizedBox(height: 16),
-              SlateButton(
-                label: _isLoading ? 'One moment' : _mode.actionLabel,
-                icon: _isLoading ? null : LucideIcons.arrowRight,
-                onPressed: _isLoading ? null : _submit,
-              ),
-              if (_mode == _AuthMode.login) ...[
-                const SizedBox(height: 12),
-                Center(
-                  child: GestureDetector(
-                    onTap: () => _setMode(_AuthMode.reset),
-                    child: Text(
-                      'Forgot password?',
-                      style: TextStyle(
-                        color: AppColors.green,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: AutofillGroup(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.pageX),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Spacer(),
+                    Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: AppColors.t1.withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                        border: Border.all(
+                          color: AppColors.t1.withValues(alpha: 0.09),
+                        ),
+                      ),
+                      child: const Icon(
+                        LucideIcons.layers,
+                        color: AppColors.slateLight,
+                        size: 24,
                       ),
                     ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              Center(
-                child: GestureDetector(
-                  onTap: () => _setMode(_mode.toggleMode),
-                  child: AnimatedSwitcher(
-                    duration: AppMotion.standard,
-                    child: RichText(
-                      key: ValueKey('auth-toggle-$_mode'),
-                      text: TextSpan(
-                        style: TextStyle(fontSize: 14, color: AppColors.t3),
-                        children: [
-                          TextSpan(text: _mode.togglePrompt),
-                          TextSpan(
-                            text: _mode.toggleAction,
+                    const SizedBox(height: AppSpacing.lg),
+                    AnimatedSwitcher(
+                      duration: AppMotion.standard,
+                      child: Text(
+                        _mode.title,
+                        key: ValueKey(_mode),
+                        style: const TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.t1,
+                          letterSpacing: 0,
+                          height: 1.05,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _mode.subtitle,
+                      style: TextStyle(fontSize: 15, color: AppColors.t3),
+                    ),
+                    const Spacer(),
+                    _SlateTextField(
+                      controller: _emailController,
+                      hint: 'Email address',
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.email],
+                      textInputAction: _mode == _AuthMode.reset
+                          ? TextInputAction.done
+                          : TextInputAction.next,
+                      onSubmitted: _mode == _AuthMode.reset
+                          ? (_) => _submit()
+                          : null,
+                    ),
+                    if (_mode != _AuthMode.reset) ...[
+                      const SizedBox(height: 12),
+                      _SlateTextField(
+                        controller: _passwordController,
+                        hint: 'Password',
+                        obscure: true,
+                        autofillHints: [
+                          _mode == _AuthMode.signup
+                              ? AutofillHints.newPassword
+                              : AutofillHints.password,
+                        ],
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _submit(),
+                      ),
+                      if (_mode == _AuthMode.signup) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Use at least 8 characters.',
+                          style: TextStyle(fontSize: 12, color: AppColors.t3),
+                        ),
+                      ],
+                    ],
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      SlateErrorState(message: _error!),
+                    ],
+                    if (_success != null) ...[
+                      const SizedBox(height: 12),
+                      _AuthSuccessState(message: _success!),
+                    ],
+                    const SizedBox(height: 16),
+                    SlateButton(
+                      label: _isLoading ? 'One moment' : _mode.actionLabel,
+                      icon: _isLoading ? null : LucideIcons.arrowRight,
+                      onPressed: _isLoading ? null : _submit,
+                    ),
+                    if (_mode == _AuthMode.login) ...[
+                      const SizedBox(height: 12),
+                      Center(
+                        child: GestureDetector(
+                          onTap: () => _setMode(_AuthMode.reset),
+                          child: Text(
+                            'Forgot password?',
                             style: TextStyle(
                               color: AppColors.green,
+                              fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    Center(
+                      child: GestureDetector(
+                        onTap: () => _setMode(_mode.toggleMode),
+                        child: AnimatedSwitcher(
+                          duration: AppMotion.standard,
+                          child: RichText(
+                            key: ValueKey('auth-toggle-$_mode'),
+                            text: TextSpan(
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.t3,
+                              ),
+                              children: [
+                                TextSpan(text: _mode.togglePrompt),
+                                TextSpan(
+                                  text: _mode.toggleAction,
+                                  style: TextStyle(
+                                    color: AppColors.green,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 32),
+                  ],
                 ),
               ),
-              const SizedBox(height: 32),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -327,27 +357,61 @@ class _AuthSuccessState extends StatelessWidget {
   }
 }
 
-class _SlateTextField extends StatelessWidget {
+class _SlateTextField extends StatefulWidget {
   final TextEditingController controller;
   final String hint;
   final bool obscure;
   final TextInputType keyboardType;
+  final Iterable<String>? autofillHints;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
 
   const _SlateTextField({
     required this.controller,
     required this.hint,
     this.obscure = false,
     this.keyboardType = TextInputType.text,
+    this.autofillHints,
+    this.textInputAction,
+    this.onSubmitted,
   });
+
+  @override
+  State<_SlateTextField> createState() => _SlateTextFieldState();
+}
+
+class _SlateTextFieldState extends State<_SlateTextField> {
+  late bool _obscured = widget.obscure;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
-      controller: controller,
-      obscureText: obscure,
-      keyboardType: keyboardType,
+      controller: widget.controller,
+      obscureText: _obscured,
+      keyboardType: widget.keyboardType,
+      autofillHints: widget.autofillHints,
+      textInputAction: widget.textInputAction,
+      onSubmitted: widget.onSubmitted,
+      autocorrect: !widget.obscure,
+      enableSuggestions: !widget.obscure,
       style: const TextStyle(color: AppColors.t1, fontSize: 15),
-      decoration: InputDecoration(hintText: hint),
+      decoration: InputDecoration(
+        hintText: widget.hint,
+        suffixIcon: widget.obscure
+            ? IconButton(
+                tooltip: _obscured ? 'Show password' : 'Hide password',
+                onPressed: () {
+                  SlateHaptics.selection();
+                  setState(() => _obscured = !_obscured);
+                },
+                icon: Icon(
+                  _obscured ? LucideIcons.eye : LucideIcons.eyeOff,
+                  color: AppColors.t3,
+                  size: 19,
+                ),
+              )
+            : null,
+      ),
     );
   }
 }

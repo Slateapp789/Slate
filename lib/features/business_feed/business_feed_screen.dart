@@ -30,80 +30,86 @@ class _BusinessFeedScreenState extends ConsumerState<BusinessFeedScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: AppColors.accentPrimary,
-          onRefresh: _refreshFeed,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.pageX,
-                  AppSpacing.lg,
-                  AppSpacing.pageX,
-                  0,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: Row(
-                    children: [
-                      WorkloopIconButton(
-                        icon: LucideIcons.chevronLeft,
-                        semanticLabel: 'Back',
-                        onTap: () {
-                          if (Navigator.canPop(context)) {
-                            Navigator.pop(context);
-                            return;
-                          }
-                          context.go('/home');
-                        },
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: RefreshIndicator(
+              color: AppColors.accentPrimary,
+              onRefresh: _refreshFeed,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.pageX,
+                      AppSpacing.lg,
+                      AppSpacing.pageX,
+                      0,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: Row(
+                        children: [
+                          WorkloopIconButton(
+                            icon: LucideIcons.chevronLeft,
+                            semanticLabel: 'Back',
+                            onTap: () {
+                              if (Navigator.canPop(context)) {
+                                Navigator.pop(context);
+                                return;
+                              }
+                              context.go('/home');
+                            },
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          const Expanded(
+                            child: WorkloopPageHeader(
+                              icon: LucideIcons.activity,
+                              title: 'Business Feed',
+                              subtitle:
+                                  'What happened and what needs your attention.',
+                              color: AppColors.modHome,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: AppSpacing.sm),
-                      const Expanded(
-                        child: WorkloopPageHeader(
-                          icon: LucideIcons.activity,
-                          title: 'Business Feed',
-                          subtitle:
-                              'What happened and what needs your attention.',
-                          color: AppColors.modHome,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.md),
-                  child: _FeedFilterRail(
-                    selected: _filter,
-                    onChanged: (filter) => setState(() => _filter = filter),
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.pageX,
-                  AppSpacing.md,
-                  AppSpacing.pageX,
-                  40,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: feed.when(
-                    loading: () => _loadingFeed(),
-                    error: (_, __) =>
-                        const SlateErrorState(message: 'Could not load feed'),
-                    data: (items) => BusinessFeedList(
-                      items: filteredBusinessFeedItems(items, _filter),
-                      emptyMessage: _emptyMessageFor(_filter),
-                      onItemTap: _openFeedItem,
                     ),
                   ),
-                ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.md),
+                      child: _FeedFilterRail(
+                        selected: _filter,
+                        onChanged: (filter) => setState(() => _filter = filter),
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.pageX,
+                      AppSpacing.md,
+                      AppSpacing.pageX,
+                      40,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: feed.when(
+                        loading: () => _loadingFeed(),
+                        error: (_, __) => const SlateErrorState(
+                          message: 'Could not load feed',
+                        ),
+                        data: (items) => BusinessFeedList(
+                          items: filteredBusinessFeedItems(items, _filter),
+                          emptyMessage: _emptyMessageFor(_filter),
+                          onItemTap: _openFeedItem,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

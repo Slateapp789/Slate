@@ -161,9 +161,11 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
         _saving = false;
       });
       if (mounted) _snack('Business details updated', AppColors.green);
-    } catch (e) {
+    } catch (_) {
       setState(() => _saving = false);
-      if (mounted) _snack('Error: $e', AppColors.error);
+      if (mounted) {
+        _snack('Business details could not be saved.', AppColors.error);
+      }
     }
   }
 
@@ -211,9 +213,11 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
         _saving = false;
       });
       if (mounted) _snack('Profile updated', AppColors.green);
-    } catch (e) {
+    } catch (_) {
       setState(() => _saving = false);
-      if (mounted) _snack('Error: $e', AppColors.error);
+      if (mounted) {
+        _snack('The public profile could not be saved.', AppColors.error);
+      }
     }
   }
 

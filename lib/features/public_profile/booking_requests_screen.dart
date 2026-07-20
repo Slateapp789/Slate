@@ -495,7 +495,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
             void refreshForm() => setSheetState(() {});
 
             Future<void> pickDate() async {
-              final picked = await showDatePicker(
+              final picked = await showWorkloopDatePicker(
                 context: context,
                 initialDate: selectedDate,
                 firstDate: DateTime(now.year, now.month, now.day),
@@ -507,7 +507,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
             }
 
             Future<void> pickTime() async {
-              final picked = await showTimePicker(
+              final picked = await showWorkloopTimePicker(
                 context: context,
                 initialTime: selectedTime,
               );
@@ -786,7 +786,9 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not create booking: $e'),
+            content: Text(
+              'The booking could not be created. Please try again.',
+            ),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),

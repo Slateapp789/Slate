@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart'
+    show CupertinoDatePicker, CupertinoDatePickerMode;
 import 'package:flutter/services.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -18,24 +21,158 @@ class SlateTheme {
 class SlateHaptics {
   const SlateHaptics._();
 
-  static void tap() {
-    HapticFeedback.selectionClick();
+  static void _safe(Future<void> Function() feedback) {
+    unawaited(
+      Future<void>.sync(feedback).catchError((Object _, StackTrace __) {}),
+    );
   }
 
-  static void action() {
-    HapticFeedback.lightImpact();
-  }
+  static void selection() => _safe(HapticFeedback.selectionClick);
+  static void light() => _safe(HapticFeedback.lightImpact);
+  static void success() => _safe(HapticFeedback.mediumImpact);
+  static void warning() => _safe(HapticFeedback.heavyImpact);
+  static void destructive() => _safe(HapticFeedback.heavyImpact);
 
-  static void confirm() {
-    HapticFeedback.mediumImpact();
-  }
-
-  static void warning() {
-    HapticFeedback.heavyImpact();
-  }
+  // Compatibility aliases keep existing interactions routed through this one
+  // restrained service while call sites migrate to semantic names.
+  static void tap() => selection();
+  static void action() => light();
+  static void confirm() => success();
 }
 
 enum WorkloopDraftDecision { stay, discard, save }
+
+Future<DateTime?> showWorkloopDatePicker({
+  required BuildContext context,
+  required DateTime initialDate,
+  required DateTime firstDate,
+  required DateTime lastDate,
+  String title = 'Choose date',
+  TransitionBuilder? builder,
+}) async {
+  var selected = initialDate;
+  return showModalBottomSheet<DateTime>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: SlateTheme.of(context).scrim,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (context, setSheetState) => SlateSheetFrame(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: AppSpacing.sm),
+            Builder(
+              builder: (context) {
+                final calendar = CalendarDatePicker(
+                  initialDate: selected,
+                  firstDate: firstDate,
+                  lastDate: lastDate,
+                  onDateChanged: (value) {
+                    SlateHaptics.selection();
+                    setSheetState(() => selected = value);
+                  },
+                );
+                return builder?.call(context, calendar) ?? calendar;
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: WorkloopPrimaryButton(
+                    label: 'Cancel',
+                    secondary: true,
+                    onPressed: () => Navigator.pop(sheetContext),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: WorkloopPrimaryButton(
+                    label: 'Use date',
+                    onPressed: () {
+                      SlateHaptics.success();
+                      Navigator.pop(sheetContext, selected);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Future<TimeOfDay?> showWorkloopTimePicker({
+  required BuildContext context,
+  required TimeOfDay initialTime,
+  String title = 'Choose time',
+}) async {
+  var selected = initialTime;
+  final initialDateTime = DateTime(
+    2000,
+    1,
+    1,
+    initialTime.hour,
+    initialTime.minute,
+  );
+  return showModalBottomSheet<TimeOfDay>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: SlateTheme.of(context).scrim,
+    builder: (sheetContext) => SlateSheetFrame(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            height: 190,
+            child: CupertinoDatePicker(
+              mode: CupertinoDatePickerMode.time,
+              initialDateTime: initialDateTime,
+              use24hFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+              onDateTimeChanged: (value) {
+                selected = TimeOfDay(hour: value.hour, minute: value.minute);
+                SlateHaptics.selection();
+              },
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: WorkloopPrimaryButton(
+                  label: 'Cancel',
+                  secondary: true,
+                  onPressed: () => Navigator.pop(sheetContext),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: WorkloopPrimaryButton(
+                  label: 'Use time',
+                  onPressed: () {
+                    SlateHaptics.success();
+                    Navigator.pop(sheetContext, selected);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
 Future<WorkloopDraftDecision> showWorkloopDraftConfirmation(
   BuildContext context, {
@@ -48,7 +185,7 @@ Future<WorkloopDraftDecision> showWorkloopDraftConfirmation(
     context: context,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.34),
+    barrierColor: SlateTheme.of(context).scrim,
     builder: (sheetContext) => SlateSheetFrame(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -117,7 +254,7 @@ Future<bool> showWorkloopOutsideHoursConfirmation(
     context: context,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.34),
+    barrierColor: SlateTheme.of(context).scrim,
     builder: (sheetContext) => SlateSheetFrame(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -213,21 +350,27 @@ class WorkloopPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     Widget content = scrollable
         ? ListView(controller: controller, padding: padding, children: [child])
         : Padding(padding: padding, child: child);
 
     if (onRefresh != null) {
       content = RefreshIndicator(
-        color: AppColors.accentPrimary,
+        color: tokens.accentInk,
         onRefresh: onRefresh!,
         child: content,
       );
     }
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: safeArea ? SafeArea(child: content) : content,
+      backgroundColor: tokens.background,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          Positioned.fill(child: safeArea ? SafeArea(child: content) : content),
+        ],
+      ),
     );
   }
 }
@@ -238,34 +381,55 @@ class WorkloopTexturedBackdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const IgnorePointer(
+    final tokens = SlateTheme.of(context);
+    return IgnorePointer(
       child: RepaintBoundary(
-        child: CustomPaint(painter: _WorkloopTexturePainter()),
+        child: CustomPaint(
+          painter: _WorkloopTexturePainter(
+            background: tokens.background,
+            raised: tokens.surfaceRaised,
+            accent: tokens.accent,
+            dark: Theme.of(context).brightness == Brightness.dark,
+          ),
+        ),
       ),
     );
   }
 }
 
 class _WorkloopTexturePainter extends CustomPainter {
-  const _WorkloopTexturePainter();
+  final Color background;
+  final Color raised;
+  final Color accent;
+  final bool dark;
+
+  const _WorkloopTexturePainter({
+    required this.background,
+    required this.raised,
+    required this.accent,
+    required this.dark,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final bounds = Offset.zero & size;
-    final background = Paint()
-      ..shader = const LinearGradient(
+    final backgroundPaint = Paint()
+      ..shader = LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Color(0xFFF8FAF5), Color(0xFFFFFFFF), Color(0xFFFBFCFA)],
+        colors: [raised, background, Color.lerp(background, raised, 0.28)!],
         stops: [0, 0.48, 1],
       ).createShader(bounds);
-    canvas.drawRect(bounds, background);
+    canvas.drawRect(bounds, backgroundPaint);
 
     final topGlow = Paint()
-      ..shader = const RadialGradient(
+      ..shader = RadialGradient(
         center: Alignment(-0.82, -0.92),
         radius: 0.9,
-        colors: [Color(0x0F7FB500), Color(0x007FB500)],
+        colors: [
+          accent.withValues(alpha: dark ? 0.055 : 0.075),
+          accent.withValues(alpha: 0),
+        ],
       ).createShader(bounds);
     canvas.drawRect(bounds, topGlow);
 
@@ -275,8 +439,10 @@ class _WorkloopTexturePainter extends CustomPainter {
       return state / 0x7fffffff;
     }
 
-    final neutralGrain = Paint()..color = const Color(0x08000000);
-    final greenGrain = Paint()..color = const Color(0x087FB500);
+    final neutralGrain = Paint()
+      ..color = (dark ? Colors.white : Colors.black).withValues(alpha: 0.026);
+    final greenGrain = Paint()
+      ..color = accent.withValues(alpha: dark ? 0.035 : 0.026);
     final pointCount = (size.width * size.height / 950).round();
     for (var index = 0; index < pointCount; index++) {
       final point = Offset(nextUnit() * size.width, nextUnit() * size.height);
@@ -290,7 +456,12 @@ class _WorkloopTexturePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _WorkloopTexturePainter oldDelegate) => false;
+  bool shouldRepaint(covariant _WorkloopTexturePainter oldDelegate) {
+    return background != oldDelegate.background ||
+        raised != oldDelegate.raised ||
+        accent != oldDelegate.accent ||
+        dark != oldDelegate.dark;
+  }
 }
 
 class WorkloopSurface extends StatelessWidget {
@@ -632,6 +803,114 @@ class WorkloopPickerOption<T> {
   });
 }
 
+/// Canonical search field used by list and picker surfaces.
+class WorkloopSearchField extends StatefulWidget {
+  final TextEditingController? controller;
+  final ValueChanged<String> onChanged;
+  final String hintText;
+  final bool autofocus;
+  final String semanticLabel;
+
+  const WorkloopSearchField({
+    super.key,
+    this.controller,
+    required this.onChanged,
+    this.hintText = 'Search',
+    this.autofocus = false,
+    this.semanticLabel = 'Search',
+  });
+
+  @override
+  State<WorkloopSearchField> createState() => _WorkloopSearchFieldState();
+}
+
+class _WorkloopSearchFieldState extends State<WorkloopSearchField> {
+  late final TextEditingController _controller;
+  late final bool _ownsController;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsController = widget.controller == null;
+    _controller = widget.controller ?? TextEditingController();
+    _controller.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_refresh);
+    if (_ownsController) _controller.dispose();
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  void _clear() {
+    SlateHaptics.selection();
+    _controller.clear();
+    widget.onChanged('');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    return Semantics(
+      textField: true,
+      label: widget.semanticLabel,
+      child: TextField(
+        controller: _controller,
+        autofocus: widget.autofocus,
+        textInputAction: TextInputAction.search,
+        onChanged: widget.onChanged,
+        style: TextStyle(color: tokens.textPrimary, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: widget.hintText,
+          prefixIcon: Icon(
+            LucideIcons.search,
+            color: tokens.textTertiary,
+            size: 18,
+          ),
+          suffixIcon: _controller.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Clear search',
+                  onPressed: _clear,
+                  icon: Icon(
+                    LucideIcons.x,
+                    color: tokens.textTertiary,
+                    size: 17,
+                  ),
+                ),
+          filled: true,
+          fillColor: tokens.surfaceRaised.withValues(alpha: 0.72),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            borderSide: BorderSide(
+              color: tokens.divider.withValues(alpha: 0.72),
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            borderSide: BorderSide(
+              color: tokens.divider.withValues(alpha: 0.72),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            borderSide: BorderSide(color: tokens.accent, width: 1.5),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// A mobile-first alternative to Flutter's desktop-style dropdown menu.
 ///
 /// Long lists become searchable automatically and every picker uses the same
@@ -677,7 +956,7 @@ class WorkloopPickerField<T> extends StatelessWidget {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      barrierColor: AppColors.t1.withValues(alpha: 0.20),
+      barrierColor: SlateTheme.of(context).scrim,
       builder: (sheetContext) => _WorkloopPickerSheet<T>(
         title: title,
         searchHint: searchHint,
@@ -1128,12 +1407,13 @@ class WorkloopNavigationControl<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     final selectedIndex = segments.indexWhere(
       (segment) => segment.value == selected,
     );
     return SlateGlassSurface(
       blur: 22,
-      color: AppColors.bgCard.withValues(alpha: 0.90),
+      color: tokens.surface.withValues(alpha: 0.90),
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
       child: SizedBox(
         height: 54,
@@ -1198,8 +1478,8 @@ class WorkloopNavigationControl<T> extends StatelessWidget {
                                 duration: AppMotion.standard,
                                 style: TextStyle(
                                   color: segment.value == selected
-                                      ? color
-                                      : AppColors.t3,
+                                      ? tokens.accentInk
+                                      : tokens.textTertiary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -1308,6 +1588,7 @@ class WorkloopBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     final bottom = MediaQuery.of(context).padding.bottom;
     final tabCount = items.length;
     return SafeArea(
@@ -1323,7 +1604,7 @@ class WorkloopBottomNav extends StatelessWidget {
           Expanded(
             child: SlateGlassSurface(
               blur: 26,
-              color: AppColors.bgCard.withValues(alpha: 0.90),
+              color: tokens.surface.withValues(alpha: 0.90),
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: SizedBox(
                 height: 62,
@@ -1386,7 +1667,8 @@ class WorkloopBottomNav extends StatelessWidget {
                           Row(
                             children: List.generate(
                               tabCount,
-                              (index) => Expanded(child: _buildTab(index)),
+                              (index) =>
+                                  Expanded(child: _buildTab(context, index)),
                             ),
                           ),
                         ],
@@ -1402,7 +1684,8 @@ class WorkloopBottomNav extends StatelessWidget {
     );
   }
 
-  Widget _buildTab(int index) {
+  Widget _buildTab(BuildContext context, int index) {
+    final tokens = SlateTheme.of(context);
     final tab = items[index];
     final active = index == currentIndex;
     return GestureDetector(
@@ -1425,7 +1708,7 @@ class WorkloopBottomNav extends StatelessWidget {
               curve: AppMotion.curve,
               child: Icon(
                 tab.icon,
-                color: active ? tab.color : AppColors.t3,
+                color: active ? tokens.accentInk : tokens.textTertiary,
                 size: 18,
               ),
             ),
@@ -1444,7 +1727,7 @@ class WorkloopBottomNav extends StatelessWidget {
                           overflow: TextOverflow.fade,
                           softWrap: false,
                           style: TextStyle(
-                            color: tab.color,
+                            color: tokens.accentInk,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
                             height: 1,

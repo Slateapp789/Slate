@@ -109,6 +109,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
       backgroundColor: AppColors.bg,
       body: Stack(
         children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
           Positioned.fill(
             child: profile.when(
               loading: () => const Center(

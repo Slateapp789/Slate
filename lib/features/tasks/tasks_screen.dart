@@ -10,6 +10,7 @@ import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../imports/text_import_screen.dart';
 
 part 'task_logic.dart';
 part 'task_card.dart';
@@ -111,7 +112,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                             if (sections.every(
                               (section) => section.tasks.isEmpty,
                             ))
-                              _emptyState()
+                              _emptyState(context)
                             else
                               ...sections
                                   .where((section) => section.tasks.isNotEmpty)
@@ -153,7 +154,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     );
   }
 
-  Widget _emptyState() {
+  Widget _emptyState(BuildContext context) {
     final title = switch (_view) {
       _TaskView.now => 'Nothing to do',
       _TaskView.later => 'Nothing planned yet',
@@ -166,10 +167,36 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     };
     return Padding(
       padding: const EdgeInsets.only(top: 42),
-      child: WorkloopEmptyState(
-        icon: Icons.check_circle_outline_rounded,
-        title: title,
-        subtitle: subtitle,
+      child: Column(
+        children: [
+          WorkloopEmptyState(
+            icon: Icons.check_circle_outline_rounded,
+            title: title,
+            subtitle: subtitle,
+          ),
+          if (_view != _TaskView.done) ...[
+            const SizedBox(height: AppSpacing.md),
+            WorkloopPrimaryButton(
+              label: 'Add task',
+              icon: LucideIcons.plus,
+              onPressed: () => _showTaskEditor(context),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            WorkloopTextButton(
+              label: 'Import a task list',
+              onPressed: () async {
+                await Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const TextImportScreen(type: TextImportType.tasks),
+                  ),
+                );
+                ref.invalidate(allTasksProvider);
+              },
+            ),
+          ],
+        ],
       ),
     );
   }

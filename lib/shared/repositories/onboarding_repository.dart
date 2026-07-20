@@ -12,7 +12,7 @@ class OnboardingRepository {
   final SupabaseClient _client;
   const OnboardingRepository(this._client);
 
-  Future<void> complete({
+  Future<String?> complete({
     required String firstName,
     required String businessName,
     required String industry,
@@ -23,7 +23,7 @@ class OnboardingRepository {
     Map<String, dynamic>? firstBooking,
   }) async {
     final user = _client.auth.currentUser;
-    if (user == null) return;
+    if (user == null) return null;
 
     await _client.auth.updateUser(
       UserAttributes(data: {'first_name': firstName.trim()}),
@@ -72,7 +72,7 @@ class OnboardingRepository {
       insertedServices = List<Map<String, dynamic>>.from(result);
     }
 
-    if (firstBooking == null) return;
+    if (firstBooking == null) return workspaceId;
 
     final contactResult = await _client
         .from('contacts')
@@ -116,6 +116,7 @@ class OnboardingRepository {
       'price': price,
       'status': 'scheduled',
     });
+    return workspaceId;
   }
 
   String _uuidV4() {

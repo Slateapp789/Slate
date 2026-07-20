@@ -52,7 +52,7 @@ class _ObCompleteState extends ConsumerState<ObComplete>
     });
     try {
       final onboarding = ref.read(onboardingProvider);
-      await ref
+      final workspaceId = await ref
           .read(onboardingRepositoryProvider)
           .complete(
             firstName: onboarding.firstName,
@@ -64,6 +64,12 @@ class _ObCompleteState extends ConsumerState<ObComplete>
             revenueTarget: onboarding.revenueTarget,
             firstBooking: onboarding.firstBooking,
           );
+      if (workspaceId == null) {
+        throw StateError('Workspace was not created');
+      }
+      await ref
+          .read(notificationsRepositoryProvider)
+          .upsertPreferences(workspaceId, onboarding.notificationPreferences);
       ref.invalidate(workspaceProvider);
       if (!mounted) return;
       setState(() => _saved = true);
@@ -81,9 +87,12 @@ class _ObCompleteState extends ConsumerState<ObComplete>
     }
   }
 
-  void _goToDashboard() {
+  Future<void> _goToDashboard() async {
     if (!_saved) return;
-    context.go('/');
+    final importAfterSetup = ref.read(onboardingProvider).importAfterSetup;
+    await ref.read(onboardingProvider.notifier).clearDraft();
+    if (!mounted) return;
+    context.go(importAfterSetup ? '/import-data' : '/');
   }
 
   @override
@@ -178,7 +187,7 @@ class _ObCompleteState extends ConsumerState<ObComplete>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.green,
                   disabledBackgroundColor: AppColors.bgInteract,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppColors.onBrandAccent,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -197,7 +206,9 @@ class _ObCompleteState extends ConsumerState<ObComplete>
                         _saveError != null
                             ? 'Try again'
                             : _saved
-                            ? 'Go to my Dashboard'
+                            ? onboarding.importAfterSetup
+                                  ? 'Import existing data'
+                                  : 'Go to my dashboard'
                             : 'Setting up workspace...',
                         style: TextStyle(
                           fontSize: 16,

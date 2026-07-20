@@ -1,32 +1,86 @@
+import 'dart:ui' show ColorSpace;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// Compatibility bridge for legacy widgets that still reference [AppColors].
+/// New and actively edited widgets should use [WorkloopThemeTokens] instead.
+class WorkloopLegacyPalette {
+  const WorkloopLegacyPalette._();
+
+  static Brightness brightness = Brightness.light;
+
+  static void sync(Brightness value) => brightness = value;
+}
+
+class _AdaptiveColor extends Color {
+  final Color light;
+  final Color dark;
+
+  const _AdaptiveColor(this.light, this.dark) : super(0x00000000);
+
+  Color get _resolved =>
+      WorkloopLegacyPalette.brightness == Brightness.dark ? dark : light;
+
+  @override
+  double get a => _resolved.a;
+
+  @override
+  double get r => _resolved.r;
+
+  @override
+  double get g => _resolved.g;
+
+  @override
+  double get b => _resolved.b;
+
+  @override
+  ColorSpace get colorSpace => _resolved.colorSpace;
+
+  @override
+  int toARGB32() => _resolved.toARGB32();
+}
+
 class AppColors {
   // Backgrounds - pure paper with very quiet operational surfaces.
-  static const bg = Color(0xFFFFFFFF);
-  static const bgCard = Color(0xFFFFFFFF);
-  static const bgRaised = Color(0xFFF8F9F6);
-  static const bgInteract = Color(0xFFF4F6F1);
-  static const border = Color(0xFFE8EDE3);
-  static const borderStrong = Color(0xFFD6DFCE);
+  static const bg = _AdaptiveColor(Color(0xFFFFFFFF), Color(0xFF050604));
+  static const bgCard = _AdaptiveColor(Color(0xFFFFFFFF), Color(0xFF090B08));
+  static const bgRaised = _AdaptiveColor(Color(0xFFF8F9F6), Color(0xFF10130E));
+  static const bgInteract = _AdaptiveColor(
+    Color(0xFFF4F6F1),
+    Color(0xFF151A12),
+  );
+  static const border = _AdaptiveColor(Color(0xFFE8EDE3), Color(0xFF20261D));
+  static const borderStrong = _AdaptiveColor(
+    Color(0xFFD6DFCE),
+    Color(0xFF313A2C),
+  );
 
   // Text
-  static const t1 = Color(0xFF11130F);
-  static const t2 = Color(0xCC11130F);
-  static const t3 = Color(0x8C11130F);
-  static const t4 = Color(0x3D11130F);
+  static const t1 = _AdaptiveColor(Color(0xFF11130F), Color(0xFFF7F8F3));
+  static const t2 = _AdaptiveColor(Color(0xCC11130F), Color(0xCCF7F8F3));
+  static const t3 = _AdaptiveColor(Color(0x8C11130F), Color(0x8CF7F8F3));
+  static const t4 = _AdaptiveColor(Color(0x3D11130F), Color(0x3DF7F8F3));
 
-  // Accent. Green aliases remain for existing code.
-  static const slate = Color(0xFF7FB500);
-  static const slateLight = Color(0xFFD9FF57);
-  static const slateDim = Color(0x337FB500);
-  static const slateGlow = Color(0x55D9FF57);
-  static const accentPrimary = Color(0xFF7FB500);
-  static const accentPrimaryStrong = Color(0xFFD9FF57);
-  static const green = Color(0xFF2E7D5B);
-  static const greenLight = Color(0xFFE7F4EC);
-  static const greenDim = Color(0x242E7D5B);
-  static const greenGlow = Color(0x332E7D5B);
+  // Brand accent. Keep the root accent exact; use accentInk for thin icons and
+  // text that need stronger contrast on light surfaces.
+  static const brandAccent = Color(0xFFC1FF72);
+  static const onBrandAccent = Color(0xFF17200D);
+  static const accentInk = _AdaptiveColor(Color(0xFF4D7317), Color(0xFFC1FF72));
+  static const slate = brandAccent;
+  static const slateLight = brandAccent;
+  static const slateDim = Color(0x33C1FF72);
+  static const slateGlow = Color(0x55C1FF72);
+  static const accentPrimary = brandAccent;
+  static const accentPrimaryStrong = brandAccent;
+  // Compatibility aliases for older brand-colour call sites.
+  static const green = brandAccent;
+  static const greenLight = _AdaptiveColor(
+    Color(0xFFF2FFDF),
+    Color(0xFF1A2410),
+  );
+  static const greenDim = Color(0x33C1FF72);
+  static const greenGlow = Color(0x55C1FF72);
 
   // Aliases so existing code doesn't break
   static const violet = Color(0xFFB05884);
@@ -35,13 +89,19 @@ class AppColors {
 
   // Semantic
   static const statusSuccess = Color(0xFF5C8F25);
-  static const statusSuccessDim = Color(0x295C8F25);
+  static const statusSuccessDim = _AdaptiveColor(
+    Color(0x295C8F25),
+    Color(0x385C8F25),
+  );
   static const success = Color(0xFF5C8F25);
-  static const successDim = Color(0x295C8F25);
+  static const successDim = statusSuccessDim;
   static const warning = Color(0xFFA67300);
-  static const warningDim = Color(0x24A67300);
+  static const warningDim = _AdaptiveColor(
+    Color(0x24A67300),
+    Color(0x382B220D),
+  );
   static const error = Color(0xFFC94A42);
-  static const errorDim = Color(0x24C94A42);
+  static const errorDim = _AdaptiveColor(Color(0x24C94A42), Color(0x4D2C1210));
 
   // Module colours.
   static const modHome = Color(0xFF6F911C);
@@ -52,14 +112,23 @@ class AppColors {
   static const modNotes = Color(0xFF09789A);
 
   // Module icon backgrounds.
-  static const modBg = Color(0xFFF2F5EE);
+  static const modBg = _AdaptiveColor(Color(0xFFF2F5EE), Color(0xFF151A12));
 
   // Hero/summary panels used for financial and high-trust information.
-  static const panelSoft = Color(0xFFF7FAF1);
-  static const panelSoftRaised = Color(0xFFE4ECD9);
-  static const panelInk = Color(0xFF11130F);
-  static const panelMuted = Color(0x9911130F);
-  static const panelFaint = Color(0x24D6DFCE);
+  static const panelSoft = _AdaptiveColor(Color(0xFFF7FAF1), Color(0xFF10130E));
+  static const panelSoftRaised = _AdaptiveColor(
+    Color(0xFFE4ECD9),
+    Color(0xFF18220F),
+  );
+  static const panelInk = _AdaptiveColor(Color(0xFF11130F), Color(0xFFF7F8F3));
+  static const panelMuted = _AdaptiveColor(
+    Color(0x9911130F),
+    Color(0x99F7F8F3),
+  );
+  static const panelFaint = _AdaptiveColor(
+    Color(0x24D6DFCE),
+    Color(0x38313A2C),
+  );
 }
 
 @immutable
@@ -76,9 +145,19 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
   final Color textDisabled;
   final Color accent;
   final Color accentStrong;
+  final Color accentInk;
+  final Color onAccent;
   final Color success;
+  final Color successContainer;
   final Color warning;
+  final Color warningContainer;
   final Color error;
+  final Color errorContainer;
+  final Color info;
+  final Color infoContainer;
+  final Color scrim;
+  final Color skeletonBase;
+  final Color skeletonHighlight;
 
   const WorkloopThemeTokens({
     required this.background,
@@ -93,9 +172,19 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
     required this.textDisabled,
     required this.accent,
     required this.accentStrong,
+    required this.accentInk,
+    required this.onAccent,
     required this.success,
+    required this.successContainer,
     required this.warning,
+    required this.warningContainer,
     required this.error,
+    required this.errorContainer,
+    required this.info,
+    required this.infoContainer,
+    required this.scrim,
+    required this.skeletonBase,
+    required this.skeletonHighlight,
   });
 
   static const light = WorkloopThemeTokens(
@@ -109,11 +198,21 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
     textSecondary: Color(0xCC11130F),
     textTertiary: Color(0x8C11130F),
     textDisabled: Color(0x3D11130F),
-    accent: Color(0xFF7FB500),
-    accentStrong: Color(0xFFD9FF57),
+    accent: Color(0xFFC1FF72),
+    accentStrong: Color(0xFFC1FF72),
+    accentInk: Color(0xFF4D7317),
+    onAccent: Color(0xFF17200D),
     success: Color(0xFF5C8F25),
+    successContainer: Color(0xFFEAF4DE),
     warning: Color(0xFFA67300),
+    warningContainer: Color(0xFFFFF3D6),
     error: Color(0xFFC94A42),
+    errorContainer: Color(0xFFFBEAE8),
+    info: Color(0xFF256C8A),
+    infoContainer: Color(0xFFE5F3F8),
+    scrim: Color(0x52000000),
+    skeletonBase: Color(0xFFE8EDE3),
+    skeletonHighlight: Color(0xFFF7F9F4),
   );
 
   static const dark = WorkloopThemeTokens(
@@ -127,11 +226,21 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
     textSecondary: Color(0xCCF7F8F3),
     textTertiary: Color(0x8CF7F8F3),
     textDisabled: Color(0x3DF7F8F3),
-    accent: Color(0xFF9BDE18),
-    accentStrong: Color(0xFFD9FF57),
+    accent: Color(0xFFC1FF72),
+    accentStrong: Color(0xFFC1FF72),
+    accentInk: Color(0xFFC1FF72),
+    onAccent: Color(0xFF17200D),
     success: Color(0xFF8CBF39),
+    successContainer: Color(0xFF18220F),
     warning: Color(0xFFE2AC38),
+    warningContainer: Color(0xFF2B220D),
     error: Color(0xFFFF6961),
+    errorContainer: Color(0xFF2C1210),
+    info: Color(0xFF72C7EA),
+    infoContainer: Color(0xFF10242C),
+    scrim: Color(0xA6000000),
+    skeletonBase: Color(0xFF20261D),
+    skeletonHighlight: Color(0xFF313A2C),
   );
 
   @override
@@ -148,9 +257,19 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
     Color? textDisabled,
     Color? accent,
     Color? accentStrong,
+    Color? accentInk,
+    Color? onAccent,
     Color? success,
+    Color? successContainer,
     Color? warning,
+    Color? warningContainer,
     Color? error,
+    Color? errorContainer,
+    Color? info,
+    Color? infoContainer,
+    Color? scrim,
+    Color? skeletonBase,
+    Color? skeletonHighlight,
   }) {
     return WorkloopThemeTokens(
       background: background ?? this.background,
@@ -165,9 +284,19 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
       textDisabled: textDisabled ?? this.textDisabled,
       accent: accent ?? this.accent,
       accentStrong: accentStrong ?? this.accentStrong,
+      accentInk: accentInk ?? this.accentInk,
+      onAccent: onAccent ?? this.onAccent,
       success: success ?? this.success,
+      successContainer: successContainer ?? this.successContainer,
       warning: warning ?? this.warning,
+      warningContainer: warningContainer ?? this.warningContainer,
       error: error ?? this.error,
+      errorContainer: errorContainer ?? this.errorContainer,
+      info: info ?? this.info,
+      infoContainer: infoContainer ?? this.infoContainer,
+      scrim: scrim ?? this.scrim,
+      skeletonBase: skeletonBase ?? this.skeletonBase,
+      skeletonHighlight: skeletonHighlight ?? this.skeletonHighlight,
     );
   }
 
@@ -191,9 +320,19 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
       textDisabled: blend(textDisabled, other.textDisabled),
       accent: blend(accent, other.accent),
       accentStrong: blend(accentStrong, other.accentStrong),
+      accentInk: blend(accentInk, other.accentInk),
+      onAccent: blend(onAccent, other.onAccent),
       success: blend(success, other.success),
+      successContainer: blend(successContainer, other.successContainer),
       warning: blend(warning, other.warning),
+      warningContainer: blend(warningContainer, other.warningContainer),
       error: blend(error, other.error),
+      errorContainer: blend(errorContainer, other.errorContainer),
+      info: blend(info, other.info),
+      infoContainer: blend(infoContainer, other.infoContainer),
+      scrim: blend(scrim, other.scrim),
+      skeletonBase: blend(skeletonBase, other.skeletonBase),
+      skeletonHighlight: blend(skeletonHighlight, other.skeletonHighlight),
     );
   }
 }
@@ -227,6 +366,12 @@ class AppMotion {
   static const deliberate = Duration(milliseconds: 360);
   static const curve = Curves.easeOutCubic;
   static const emphasized = Curves.easeOutBack;
+
+  static Duration responsive(BuildContext context, Duration duration) {
+    return MediaQuery.maybeOf(context)?.disableAnimations == true
+        ? Duration.zero
+        : duration;
+  }
 }
 
 class AppShadows {
@@ -248,7 +393,7 @@ class AppShadows {
 }
 
 class AppTheme {
-  static ThemeData get dark => light;
+  static ThemeData get dark => oledDark;
 
   static ThemeData get light {
     return ThemeData(
@@ -258,12 +403,13 @@ class AppTheme {
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: _SlatePageTransitionsBuilder(),
-          TargetPlatform.iOS: _SlatePageTransitionsBuilder(),
-          TargetPlatform.macOS: _SlatePageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
         },
       ),
       colorScheme: const ColorScheme.light(
-        primary: AppColors.accentPrimary,
+        primary: AppColors.brandAccent,
+        onPrimary: AppColors.onBrandAccent,
         surface: AppColors.bgCard,
         onSurface: AppColors.t1,
         error: AppColors.error,
@@ -368,6 +514,53 @@ class AppTheme {
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.bgCard,
+        modalBackgroundColor: AppColors.bgCard,
+        surfaceTintColor: Colors.transparent,
+        showDragHandle: true,
+        dragHandleColor: AppColors.borderStrong,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppRadius.xl),
+          ),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.bgCard,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          side: const BorderSide(color: AppColors.border),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.t1,
+        contentTextStyle: const TextStyle(
+          color: AppColors.bgCard,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        behavior: SnackBarBehavior.floating,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? AppColors.onBrandAccent
+              : AppColors.bgCard,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? AppColors.brandAccent
+              : AppColors.borderStrong,
+        ),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+      ),
       dividerColor: AppColors.border,
       dividerTheme: const DividerThemeData(
         color: AppColors.border,
@@ -386,12 +579,13 @@ class AppTheme {
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: _SlatePageTransitionsBuilder(),
-          TargetPlatform.iOS: _SlatePageTransitionsBuilder(),
-          TargetPlatform.macOS: _SlatePageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
         },
       ),
       colorScheme: ColorScheme.dark(
         primary: tokens.accent,
+        onPrimary: tokens.onAccent,
         surface: tokens.surface,
         onSurface: tokens.textPrimary,
         error: tokens.error,
@@ -492,6 +686,53 @@ class AppTheme {
           ),
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: tokens.surfaceRaised,
+        modalBackgroundColor: tokens.surfaceRaised,
+        surfaceTintColor: Colors.transparent,
+        showDragHandle: true,
+        dragHandleColor: tokens.dividerStrong,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppRadius.xl),
+          ),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: tokens.surfaceRaised,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          side: BorderSide(color: tokens.divider),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: tokens.textPrimary,
+        contentTextStyle: TextStyle(
+          color: tokens.background,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        behavior: SnackBarBehavior.floating,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? tokens.onAccent
+              : tokens.textSecondary,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? tokens.accent
+              : tokens.dividerStrong,
+        ),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
       ),
       dividerColor: tokens.divider,
       dividerTheme: DividerThemeData(

@@ -31,6 +31,15 @@ class _ObProfileState extends ConsumerState<ObProfile> {
   String? _selectedIndustry;
 
   @override
+  void initState() {
+    super.initState();
+    final draft = ref.read(onboardingProvider);
+    _firstNameController.text = draft.firstName;
+    _businessNameController.text = draft.businessName;
+    _selectedIndustry = draft.industry.isEmpty ? null : draft.industry;
+  }
+
+  @override
   void dispose() {
     _firstNameController.dispose();
     _businessNameController.dispose();
@@ -118,7 +127,7 @@ class _ObProfileState extends ConsumerState<ObProfile> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 disabledBackgroundColor: AppColors.bgInteract,
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.onBrandAccent,
                 disabledForegroundColor: AppColors.t3,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),

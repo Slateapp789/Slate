@@ -30,7 +30,7 @@ class ClientPaymentsTab extends ConsumerWidget {
       ),
       error: (e, _) => Center(
         child: Text(
-          'Error: $e',
+          'Money activity could not be loaded.',
           style: const TextStyle(color: AppColors.error),
         ),
       ),

@@ -906,7 +906,9 @@ Widget _actionBtn({
     onPressed: onTap,
     style: ElevatedButton.styleFrom(
       backgroundColor: color,
-      foregroundColor: Colors.white,
+      foregroundColor: color == AppColors.error
+          ? Colors.white
+          : AppColors.onBrandAccent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 0,
     ),

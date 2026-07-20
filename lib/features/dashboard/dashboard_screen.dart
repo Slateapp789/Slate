@@ -11,6 +11,7 @@ import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/notes_provider.dart';
+import '../../shared/providers/setup_checklist_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
@@ -49,6 +50,12 @@ List<Map<String, dynamic>> selectDashboardComingUpBookings(
   now: now,
 ).where((job) => !_isSameDay(_startTime(job), now)).take(3).toList();
 
+int dashboardSetupCompletedCount({
+  required bool hasClient,
+  required bool hasBooking,
+  required bool hasPayment,
+}) => [hasClient, hasBooking, hasPayment].where((value) => value).length;
+
 class DashboardScreen extends ConsumerWidget {
   final void Function(int) onNavigate;
   final VoidCallback onOpenMoneyFollowUps;
@@ -63,6 +70,8 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final workspace = ref.watch(workspaceProvider);
     final appointments = ref.watch(appointmentsProvider);
+    final clients = ref.watch(clientsProvider);
+    final payments = ref.watch(invoicesProvider);
     final finance = ref.watch(financeSummaryProvider);
     final feed = ref.watch(businessFeedProvider);
     final attention = ref.watch(dashboardAttentionProvider);
@@ -71,6 +80,10 @@ class DashboardScreen extends ConsumerWidget {
         .watch(dashboardClockProvider)
         .maybeWhen(data: (value) => value, orElse: DateTime.now);
     final greeting = dashboardGreetingForHour(now.hour);
+    final checklistDismissed = ref
+        .watch(setupChecklistDismissedProvider)
+        .asData
+        ?.value;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -109,6 +122,17 @@ class DashboardScreen extends ConsumerWidget {
                       : '$greeting $displayName',
                   subtitle: dashboardDateLabel(now),
                 ),
+                if (checklistDismissed == false)
+                  _SetupChecklist(
+                    hasClient: clients.asData?.value.isNotEmpty ?? false,
+                    hasBooking: appointments.asData?.value.isNotEmpty ?? false,
+                    hasPayment: payments.asData?.value.isNotEmpty ?? false,
+                    onAddClient: () => context.push('/clients/new'),
+                    onAddBooking: () => context.push('/bookings/new'),
+                    onAddPayment: () => onNavigate(3),
+                    onImport: () => context.push('/import-data'),
+                    onDismiss: () => dismissSetupChecklist(ref),
+                  ),
                 const SizedBox(height: AppSpacing.xxl),
                 _TodaySection(
                   appointments: appointments,
@@ -228,6 +252,163 @@ class DashboardScreen extends ConsumerWidget {
       case DashboardAttentionType.uncontactedLead:
         onNavigate(1);
     }
+  }
+}
+
+class _SetupChecklist extends StatelessWidget {
+  final bool hasClient;
+  final bool hasBooking;
+  final bool hasPayment;
+  final VoidCallback onAddClient;
+  final VoidCallback onAddBooking;
+  final VoidCallback onAddPayment;
+  final VoidCallback onImport;
+  final VoidCallback onDismiss;
+
+  const _SetupChecklist({
+    required this.hasClient,
+    required this.hasBooking,
+    required this.hasPayment,
+    required this.onAddClient,
+    required this.onAddBooking,
+    required this.onAddPayment,
+    required this.onImport,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = dashboardSetupCompletedCount(
+      hasClient: hasClient,
+      hasBooking: hasBooking,
+      hasPayment: hasPayment,
+    );
+    if (completed == 3) return const SizedBox.shrink();
+    final tokens = SlateTheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xl),
+      child: WorkloopSurface(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.sm,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Set up your workspace',
+                        style: TextStyle(
+                          color: tokens.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '$completed of 3 essentials complete',
+                        style: TextStyle(
+                          color: tokens.textTertiary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                WorkloopIconButton(
+                  icon: LucideIcons.x,
+                  semanticLabel: 'Dismiss setup checklist',
+                  onTap: onDismiss,
+                  size: 36,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _SetupStep(
+              complete: hasClient,
+              label: 'Add your first client',
+              onTap: onAddClient,
+            ),
+            _SetupStep(
+              complete: hasBooking,
+              label: 'Create your first booking',
+              onTap: onAddBooking,
+            ),
+            _SetupStep(
+              complete: hasPayment,
+              label: 'Record your first payment',
+              onTap: onAddPayment,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.sm,
+                AppSpacing.xs,
+                AppSpacing.sm,
+                AppSpacing.xs,
+              ),
+              child: WorkloopTextButton(
+                label: 'Import existing data',
+                onPressed: onImport,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SetupStep extends StatelessWidget {
+  final bool complete;
+  final String label;
+  final VoidCallback onTap;
+
+  const _SetupStep({
+    required this.complete,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    return WorkloopListRow(
+      onTap: complete ? null : onTap,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.sm,
+      ),
+      leading: Icon(
+        complete ? LucideIcons.checkCircle2 : LucideIcons.circle,
+        size: 19,
+        color: complete ? tokens.accentInk : tokens.textTertiary,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: complete ? tokens.textTertiary : tokens.textPrimary,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          decoration: complete ? TextDecoration.lineThrough : null,
+        ),
+      ),
+      trailing: complete
+          ? null
+          : Icon(
+              LucideIcons.chevronRight,
+              size: 16,
+              color: tokens.textTertiary,
+            ),
+      showDivider: false,
+    );
   }
 }
 

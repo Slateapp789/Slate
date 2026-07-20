@@ -70,9 +70,14 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
         _confirmPasswordCtrl.clear();
       });
       if (mounted) _snack('Password updated', AppColors.green);
-    } catch (e) {
+    } catch (_) {
       setState(() => _savingPassword = false);
-      if (mounted) _snack('Error: $e', AppColors.error);
+      if (mounted) {
+        _snack(
+          'Password could not be updated. Please try again.',
+          AppColors.error,
+        );
+      }
     }
   }
 
@@ -147,8 +152,13 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
         setState(() {});
         _snack('Name updated', AppColors.green);
       }
-    } catch (e) {
-      if (mounted) _snack('Could not update name: $e', AppColors.error);
+    } catch (_) {
+      if (mounted) {
+        _snack(
+          'Your name could not be updated. Please try again.',
+          AppColors.error,
+        );
+      }
     }
   }
 
@@ -211,9 +221,11 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
       if (!mounted) return;
       setState(() => _exporting = false);
       _showExportSheet(json);
-    } catch (e) {
+    } catch (_) {
       setState(() => _exporting = false);
-      if (mounted) _snack('Could not export data: $e', AppColors.error);
+      if (mounted) {
+        _snack('Your data export could not be prepared.', AppColors.error);
+      }
     }
   }
 
@@ -377,10 +389,10 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
                       if (mounted) {
                         _snack('Deletion request created', AppColors.green);
                       }
-                    } catch (e) {
+                    } catch (_) {
                       if (mounted) {
                         _snack(
-                          'Could not create deletion request: $e',
+                          'The deletion request could not be created.',
                           AppColors.error,
                         );
                       }

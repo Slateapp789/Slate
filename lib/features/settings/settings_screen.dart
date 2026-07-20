@@ -6,6 +6,8 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../notifications/notifications_screen.dart';
+import '../imports/import_data_screen.dart';
+import 'support_screen.dart';
 import 'widgets/settings_account_tab.dart';
 import 'widgets/settings_app_tab.dart';
 
@@ -90,6 +92,43 @@ class SettingsScreen extends ConsumerWidget {
                     ref,
                     title: 'App preferences',
                     child: const SettingsAppTab(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                const WorkloopSectionHeader(label: 'Support'),
+                const SizedBox(height: AppSpacing.xs),
+                _SettingsRow(
+                  icon: LucideIcons.lifeBuoy,
+                  title: 'Help & support',
+                  subtitle: 'Contact support or copy safe diagnostics',
+                  showDivider: false,
+                  onTap: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SupportScreen()),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                const WorkloopSectionHeader(label: 'Your data'),
+                const SizedBox(height: AppSpacing.xs),
+                _SettingsRow(
+                  icon: LucideIcons.import,
+                  title: 'Import data',
+                  subtitle: 'Contacts, calendar events and selected files',
+                  onTap: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ImportDataScreen()),
+                  ),
+                ),
+                _SettingsRow(
+                  icon: LucideIcons.shieldCheck,
+                  title: 'Privacy and data',
+                  subtitle: 'Export your workspace or request account deletion',
+                  showDivider: false,
+                  onTap: () => _open(
+                    context,
+                    ref,
+                    title: 'Account',
+                    child: const SettingsAccountTab(),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xxl),

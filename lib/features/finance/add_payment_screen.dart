@@ -219,7 +219,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
 
   Future<void> _pickDate({required bool dueDate}) async {
     final current = dueDate ? _dueDate : _date;
-    final picked = await showDatePicker(
+    final picked = await showWorkloopDatePicker(
       context: context,
       initialDate: current,
       firstDate: DateTime.now().subtract(const Duration(days: 730)),

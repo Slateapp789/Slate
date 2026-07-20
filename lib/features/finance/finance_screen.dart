@@ -461,7 +461,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setSheetState) {
           Future<void> pickStart() async {
-            final picked = await showDatePicker(
+            final picked = await showWorkloopDatePicker(
               context: context,
               initialDate: start,
               firstDate: DateTime.now().subtract(const Duration(days: 730)),
@@ -471,7 +471,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           }
 
           Future<void> pickEnd() async {
-            final picked = await showDatePicker(
+            final picked = await showWorkloopDatePicker(
               context: context,
               initialDate: end,
               firstDate: start,
@@ -578,7 +578,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Could not update target: $error'),
+                    content: Text('The target could not be updated.'),
                     backgroundColor: AppColors.error,
                     behavior: SnackBarBehavior.floating,
                   ),
@@ -881,7 +881,10 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('£${amount.toStringAsFixed(0)} marked as received'),
+          content: Text(
+            '£${amount.toStringAsFixed(0)} marked as received',
+            style: const TextStyle(color: AppColors.onBrandAccent),
+          ),
           backgroundColor: AppColors.green,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(

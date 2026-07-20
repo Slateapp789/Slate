@@ -357,7 +357,7 @@ class _DueDatePicker extends StatelessWidget {
 
   Future<void> _pickCustomDate(BuildContext context) async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
+    final picked = await showWorkloopDatePicker(
       context: context,
       initialDate: dueDate ?? now,
       firstDate: DateTime(now.year - 1),

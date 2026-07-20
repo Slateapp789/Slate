@@ -110,7 +110,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    final picked = await showWorkloopDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
@@ -365,12 +365,12 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       ref.invalidate(notificationsProvider);
       ref.invalidate(unreadNotificationsProvider);
       if (mounted) await _leaveScreen();
-    } catch (e) {
+    } catch (_) {
       setState(() => _saving = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
+          const SnackBar(
+            content: Text('The booking could not be saved. Please try again.'),
             backgroundColor: AppColors.error,
           ),
         );

@@ -8,6 +8,7 @@ import '../../shared/providers/notes_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/notes_repository.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../imports/text_import_screen.dart';
 
 const _uncheckedChecklistMarker = '○  ';
 const _checkedChecklistMarker = '✓  ';
@@ -71,85 +72,103 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.pageX,
-                AppSpacing.lg,
-                AppSpacing.pageX,
-                0,
-              ),
-              child: Row(
-                children: [
-                  if (widget.showBackButton) ...[
-                    WorkloopIconButton(
-                      icon: LucideIcons.chevronLeft,
-                      semanticLabel: 'Back',
-                      onTap: () => Navigator.maybePop(context),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                  ],
-                  Expanded(
-                    child: WorkloopPageHeader(
-                      icon: LucideIcons.fileText,
-                      title: 'Notes',
-                      subtitle: 'Capture context before it disappears.',
-                      color: AppColors.modNotes,
-                      trailing: WorkloopIconButton(
-                        icon: LucideIcons.plus,
-                        semanticLabel: 'New note',
-                        color: AppColors.modNotes,
-                        backgroundColor: AppColors.modNotes.withValues(
-                          alpha: 0.10,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    AppSpacing.lg,
+                    AppSpacing.pageX,
+                    0,
+                  ),
+                  child: Row(
+                    children: [
+                      if (widget.showBackButton) ...[
+                        WorkloopIconButton(
+                          icon: LucideIcons.chevronLeft,
+                          semanticLabel: 'Back',
+                          onTap: () => Navigator.maybePop(context),
                         ),
-                        onTap: () => _openEditor(),
+                        const SizedBox(width: AppSpacing.sm),
+                      ],
+                      Expanded(
+                        child: WorkloopPageHeader(
+                          icon: LucideIcons.fileText,
+                          title: 'Notes',
+                          subtitle: 'Capture context before it disappears.',
+                          color: AppColors.modNotes,
+                          trailing: WorkloopIconButton(
+                            icon: LucideIcons.plus,
+                            semanticLabel: 'New note',
+                            color: AppColors.modNotes,
+                            backgroundColor: AppColors.modNotes.withValues(
+                              alpha: 0.10,
+                            ),
+                            onTap: () => _openEditor(),
+                          ),
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.pageX,
+                  ),
+                  child: WorkloopSearchField(
+                    onChanged: (value) => setState(() => _query = value),
+                    hintText: 'Search notes',
+                    semanticLabel: 'Search notes',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                notes.maybeWhen(
+                  data: (_) => _NoteFilterRail(
+                    selected: _filter,
+                    onChanged: (value) => setState(() => _filter = value),
+                  ),
+                  orElse: () => const SizedBox.shrink(),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Expanded(
+                  child: notes.when(
+                    loading: () => _loadingList(),
+                    error: (_, __) => const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.pageX,
+                      ),
+                      child: SlateErrorState(message: 'Could not load notes'),
+                    ),
+                    data: (data) => _NotesList(
+                      notes: _filteredNotes(data),
+                      hasSearch: _query.trim().isNotEmpty,
+                      onRefresh: () async => ref.invalidate(allNotesProvider),
+                      onOpen: (note) => _openEditor(note: note),
+                      onCreate: _openEditor,
+                      onImport: () async {
+                        await Navigator.push<void>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const TextImportScreen(
+                              type: TextImportType.notes,
+                            ),
+                          ),
+                        );
+                        ref.invalidate(allNotesProvider);
+                      },
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
-              child: TextField(
-                onChanged: (value) => setState(() => _query = value),
-                textInputAction: TextInputAction.search,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(LucideIcons.search, size: 18),
-                  hintText: 'Search',
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.md),
-            notes.maybeWhen(
-              data: (_) => _NoteFilterRail(
-                selected: _filter,
-                onChanged: (value) => setState(() => _filter = value),
-              ),
-              orElse: () => const SizedBox.shrink(),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Expanded(
-              child: notes.when(
-                loading: () => _loadingList(),
-                error: (_, __) => const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
-                  child: SlateErrorState(message: 'Could not load notes'),
-                ),
-                data: (data) => _NotesList(
-                  notes: _filteredNotes(data),
-                  hasSearch: _query.trim().isNotEmpty,
-                  onRefresh: () async => ref.invalidate(allNotesProvider),
-                  onOpen: (note) => _openEditor(note: note),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -223,12 +242,16 @@ class _NotesList extends StatelessWidget {
   final bool hasSearch;
   final RefreshCallback onRefresh;
   final ValueChanged<SlateNote> onOpen;
+  final VoidCallback onCreate;
+  final VoidCallback onImport;
 
   const _NotesList({
     required this.notes,
     required this.hasSearch,
     required this.onRefresh,
     required this.onOpen,
+    required this.onCreate,
+    required this.onImport,
   });
 
   @override
@@ -251,12 +274,29 @@ class _NotesList extends StatelessWidget {
           if (notes.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 42),
-              child: WorkloopEmptyState(
-                icon: LucideIcons.stickyNote,
-                title: hasSearch ? 'No matching notes' : 'No notes yet',
-                subtitle: hasSearch
-                    ? 'Try a different search term.'
-                    : 'Useful details will appear here.',
+              child: Column(
+                children: [
+                  WorkloopEmptyState(
+                    icon: LucideIcons.stickyNote,
+                    title: hasSearch ? 'No matching notes' : 'No notes yet',
+                    subtitle: hasSearch
+                        ? 'Try a different search term.'
+                        : 'Useful details will appear here.',
+                  ),
+                  if (!hasSearch) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    WorkloopPrimaryButton(
+                      label: 'Add note',
+                      icon: LucideIcons.plus,
+                      onPressed: onCreate,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    WorkloopTextButton(
+                      label: 'Import notes files',
+                      onPressed: onImport,
+                    ),
+                  ],
+                ],
               ),
             )
           else ...[
@@ -403,10 +443,13 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
   late final _NoteTextController _controller;
   late final FocusNode _focusNode;
   late String _lastEditorText;
+  late final String _originalText;
   late bool _pinned;
+  late final bool _originalPinned;
   bool _applyingListContinuation = false;
   bool _repairingListMarker = false;
   bool _saving = false;
+  bool _allowPop = false;
   String? _error;
 
   @override
@@ -416,10 +459,12 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
       text: _normalizeLegacyListMarkers(_editorTextFor(widget.note)),
     );
     _lastEditorText = _controller.text;
+    _originalText = _controller.text;
     _focusNode = FocusNode();
     _controller.addListener(_handleEditorChanged);
     _focusNode.addListener(_handleEditorChanged);
     _pinned = widget.note?.pinned ?? false;
+    _originalPinned = _pinned;
   }
 
   @override
@@ -437,145 +482,154 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final lineFormat = _selectedLineFormat();
 
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      extendBody: true,
-      body: Stack(
-        children: [
-          const Positioned.fill(child: WorkloopTexturedBackdrop()),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.pageX,
-                    AppSpacing.lg,
-                    AppSpacing.pageX,
-                    0,
-                  ),
-                  child: Row(
-                    children: [
-                      WorkloopIconButton(
-                        icon: LucideIcons.chevronLeft,
-                        semanticLabel: 'Back to notes',
-                        onTap: _saving ? () {} : _saveAndClose,
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      const Expanded(
-                        child: Text(
-                          'Note',
-                          style: TextStyle(
-                            color: AppColors.t1,
-                            fontSize: 26,
-                            height: 1.05,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      WorkloopIconButton(
-                        icon: _pinned ? LucideIcons.pinOff : LucideIcons.pin,
-                        semanticLabel: _pinned ? 'Unpin note' : 'Pin note',
-                        color: _pinned ? AppColors.modNotes : AppColors.t2,
-                        backgroundColor: _pinned
-                            ? AppColors.modNotes.withValues(alpha: 0.12)
-                            : null,
-                        size: 42,
-                        onTap: () => setState(() => _pinned = !_pinned),
-                      ),
-                      if (isEditing) ...[
-                        const SizedBox(width: AppSpacing.xs),
-                        WorkloopIconButton(
-                          icon: LucideIcons.moreHorizontal,
-                          semanticLabel: 'Note actions',
-                          color: AppColors.t2,
-                          size: 42,
-                          onTap: _showNoteActions,
-                        ),
-                      ],
-                      const SizedBox(width: AppSpacing.xs),
-                      _NoteDoneAction(loading: _saving, onTap: _saveAndClose),
-                    ],
-                  ),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: AppSpacing.sm),
+    return PopScope(
+      canPop: _allowPop || !_hasChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_saving) _saveAndClose();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.bg,
+        extendBody: true,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: WorkloopTexturedBackdrop()),
+            SafeArea(
+              child: Column(
+                children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.pageX,
-                    ),
-                    child: SlateErrorState(message: _error!),
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.xl),
-                Expanded(
-                  child: Padding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.pageX,
-                      0,
+                      AppSpacing.lg,
                       AppSpacing.pageX,
-                      88,
+                      0,
                     ),
-                    child: Stack(
+                    child: Row(
                       children: [
-                        TextField(
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          autofocus: !isEditing,
-                          expands: true,
-                          maxLines: null,
-                          minLines: null,
-                          keyboardType: TextInputType.multiline,
-                          textCapitalization: TextCapitalization.sentences,
-                          textInputAction: TextInputAction.newline,
-                          style: const TextStyle(
-                            color: AppColors.t1,
-                            fontSize: 17,
-                            height: 1.45,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          decoration: const InputDecoration(
-                            filled: false,
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
-                            hintText: 'Note title\nStart writing...',
-                            hintStyle: TextStyle(
-                              color: AppColors.t3,
-                              fontSize: 17,
-                              height: 1.55,
-                              fontWeight: FontWeight.w500,
+                        WorkloopIconButton(
+                          icon: LucideIcons.chevronLeft,
+                          semanticLabel: 'Back to notes',
+                          onTap: _saving ? () {} : _saveAndClose,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        const Expanded(
+                          child: Text(
+                            'Note',
+                            style: TextStyle(
+                              color: AppColors.t1,
+                              fontSize: 26,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
                         ),
-                        ..._checklistMarkerButtons(),
+                        WorkloopIconButton(
+                          icon: _pinned ? LucideIcons.pinOff : LucideIcons.pin,
+                          semanticLabel: _pinned ? 'Unpin note' : 'Pin note',
+                          color: _pinned ? AppColors.modNotes : AppColors.t2,
+                          backgroundColor: _pinned
+                              ? AppColors.modNotes.withValues(alpha: 0.12)
+                              : null,
+                          size: 42,
+                          onTap: () => setState(() => _pinned = !_pinned),
+                        ),
+                        if (isEditing) ...[
+                          const SizedBox(width: AppSpacing.xs),
+                          WorkloopIconButton(
+                            icon: LucideIcons.moreHorizontal,
+                            semanticLabel: 'Note actions',
+                            color: AppColors.t2,
+                            size: 42,
+                            onTap: _showNoteActions,
+                          ),
+                        ],
+                        const SizedBox(width: AppSpacing.xs),
+                        _NoteDoneAction(loading: _saving, onTap: _saveAndClose),
                       ],
                     ),
                   ),
-                ),
-              ],
+                  if (_error != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.pageX,
+                      ),
+                      child: SlateErrorState(message: _error!),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.xl),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.pageX,
+                        0,
+                        AppSpacing.pageX,
+                        88,
+                      ),
+                      child: Stack(
+                        children: [
+                          TextField(
+                            controller: _controller,
+                            focusNode: _focusNode,
+                            autofocus: !isEditing,
+                            expands: true,
+                            maxLines: null,
+                            minLines: null,
+                            keyboardType: TextInputType.multiline,
+                            textCapitalization: TextCapitalization.sentences,
+                            textInputAction: TextInputAction.newline,
+                            style: const TextStyle(
+                              color: AppColors.t1,
+                              fontSize: 17,
+                              height: 1.45,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            decoration: const InputDecoration(
+                              filled: false,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                              hintText: 'Note title\nStart writing...',
+                              hintStyle: TextStyle(
+                                color: AppColors.t3,
+                                fontSize: 17,
+                                height: 1.55,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          ..._checklistMarkerButtons(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: AnimatedPadding(
-        duration: AppMotion.standard,
-        curve: AppMotion.curve,
-        padding: EdgeInsets.fromLTRB(
-          AppSpacing.pageX,
-          AppSpacing.xs,
-          AppSpacing.pageX,
-          keyboardInset > 0 ? keyboardInset + AppSpacing.xs : AppSpacing.md,
+          ],
         ),
-        child: _NoteFormatToolbar(
-          checklistActive: lineFormat == _LineFormat.checklist,
-          bulletActive: lineFormat == _LineFormat.bullet,
-          onChecklist: _toggleChecklistLines,
-          onBullet: _toggleBulletLines,
+        bottomNavigationBar: AnimatedPadding(
+          duration: AppMotion.standard,
+          curve: AppMotion.curve,
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.pageX,
+            AppSpacing.xs,
+            AppSpacing.pageX,
+            keyboardInset > 0 ? keyboardInset + AppSpacing.xs : AppSpacing.md,
+          ),
+          child: _NoteFormatToolbar(
+            checklistActive: lineFormat == _LineFormat.checklist,
+            bulletActive: lineFormat == _LineFormat.bullet,
+            onChecklist: _toggleChecklistLines,
+            onBullet: _toggleBulletLines,
+          ),
         ),
       ),
     );
   }
+
+  bool get _hasChanges =>
+      _controller.text != _originalText || _pinned != _originalPinned;
 
   Future<void> _showNoteActions() async {
     await showModalBottomSheet<void>(
@@ -690,7 +744,10 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
 
   Future<void> _saveAndClose() async {
     final saved = await _save();
-    if (saved && mounted) Navigator.pop(context);
+    if (saved && mounted) {
+      _allowPop = true;
+      Navigator.pop(context);
+    }
   }
 
   Future<bool> _save() async {
@@ -769,7 +826,10 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
 
     await ref.read(notesRepositoryProvider).delete(note.id);
     ref.invalidate(allNotesProvider);
-    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      _allowPop = true;
+      Navigator.pop(context);
+    }
   }
 
   void _toggleChecklistLines() {

@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -22,6 +23,8 @@ class _WorkingHoursEditorState extends ConsumerState<WorkingHoursEditor> {
   final Map<String, List<_HoursBlock>> _blocks = {};
   bool _hydrated = false;
   bool _saving = false;
+  bool _allowPop = false;
+  String _initialSnapshot = '';
 
   void _hydrate(Map<String, dynamic> settings) {
     if (_hydrated) return;
@@ -60,6 +63,48 @@ class _WorkingHoursEditorState extends ConsumerState<WorkingHoursEditor> {
           : parsed;
     }
     _hydrated = true;
+    _initialSnapshot = _snapshot();
+  }
+
+  String _snapshot() => jsonEncode({
+    for (final day in workingHourDays)
+      day: {
+        'enabled': _enabled[day] ?? false,
+        'blocks': (_blocks[day] ?? const <_HoursBlock>[])
+            .map(
+              (block) => {
+                'start': _storageTime(block.start),
+                'end': _storageTime(block.end),
+              },
+            )
+            .toList(),
+      },
+  });
+
+  bool get _hasChanges =>
+      _hydrated &&
+      _initialSnapshot.isNotEmpty &&
+      _snapshot() != _initialSnapshot;
+
+  Future<void> _attemptExit() async {
+    final decision = await showWorkloopDraftConfirmation(
+      context,
+      title: 'Save working hours?',
+      message: 'Your latest availability changes have not been saved yet.',
+      saveLabel: 'Save hours',
+    );
+    if (!mounted) return;
+    switch (decision) {
+      case WorkloopDraftDecision.save:
+        await _save();
+        return;
+      case WorkloopDraftDecision.discard:
+        _allowPop = true;
+        Navigator.pop(context);
+        return;
+      case WorkloopDraftDecision.stay:
+        return;
+    }
   }
 
   TimeOfDay _parseTime(String value, TimeOfDay fallback) {
@@ -93,66 +138,7 @@ class _WorkingHoursEditorState extends ConsumerState<WorkingHoursEditor> {
   }
 
   Future<TimeOfDay?> _showScrollingTimePicker(TimeOfDay initial) async {
-    var selected = DateTime(2026, 1, 1, initial.hour, initial.minute);
-    return showModalBottomSheet<TimeOfDay>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.34),
-      builder: (sheetContext) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.bg,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.pageX,
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                  AppSpacing.xs,
-                ),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Select time',
-                        style: TextStyle(
-                          color: AppColors.t1,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    WorkloopTextButton(
-                      label: 'Done',
-                      onPressed: () => Navigator.pop(
-                        sheetContext,
-                        TimeOfDay(hour: selected.hour, minute: selected.minute),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(
-                height: 220,
-                child: CupertinoDatePicker(
-                  mode: CupertinoDatePickerMode.time,
-                  initialDateTime: selected,
-                  use24hFormat: true,
-                  minuteInterval: 1,
-                  onDateTimeChanged: (value) => selected = value,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-            ],
-          ),
-        ),
-      ),
-    );
+    return showWorkloopTimePicker(context: context, initialTime: initial);
   }
 
   Future<void> _save() async {
@@ -186,6 +172,7 @@ class _WorkingHoursEditorState extends ConsumerState<WorkingHoursEditor> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Working hours updated')));
+      _allowPop = true;
       Navigator.pop(context);
     } catch (_) {
       if (!mounted) return;
@@ -200,80 +187,87 @@ class _WorkingHoursEditorState extends ConsumerState<WorkingHoursEditor> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsWorkspaceSettingsProvider);
-    return settings.when(
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: AppColors.accentPrimary),
-      ),
-      error: (_, __) => WorkloopEmptyState(
-        icon: LucideIcons.clock3,
-        title: 'Could not load working hours',
-        subtitle: 'Try again in a moment.',
-        action: WorkloopTextButton(
-          label: 'Try again',
-          onPressed: () => ref.invalidate(settingsWorkspaceSettingsProvider),
+    return PopScope(
+      canPop: _allowPop || !_hasChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_saving) _attemptExit();
+      },
+      child: settings.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.accentPrimary),
         ),
-      ),
-      data: (data) {
-        _hydrate(data ?? const {});
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.pageX,
-            0,
-            AppSpacing.pageX,
-            AppSpacing.xxl,
+        error: (_, __) => WorkloopEmptyState(
+          icon: LucideIcons.clock3,
+          title: 'Could not load working hours',
+          subtitle: 'Try again in a moment.',
+          action: WorkloopTextButton(
+            label: 'Try again',
+            onPressed: () => ref.invalidate(settingsWorkspaceSettingsProvider),
           ),
-          children: [
-            const Text(
-              'Set when you usually work. These hours appear on your public profile and guide booking checks.',
-              style: TextStyle(
-                color: AppColors.t3,
-                fontSize: 14,
-                height: 1.45,
-                fontWeight: FontWeight.w500,
-              ),
+        ),
+        data: (data) {
+          _hydrate(data ?? const {});
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pageX,
+              0,
+              AppSpacing.pageX,
+              AppSpacing.xxl,
             ),
-            const SizedBox(height: AppSpacing.xl),
-            for (
-              var dayIndex = 0;
-              dayIndex < workingHourDays.length;
-              dayIndex++
-            ) ...[
-              _DayHoursEditor(
-                day: workingHourDays[dayIndex],
-                enabled: _enabled[workingHourDays[dayIndex]] ?? false,
-                blocks: _blocks[workingHourDays[dayIndex]] ?? const [],
-                onEnabled: (value) =>
-                    setState(() => _enabled[workingHourDays[dayIndex]] = value),
-                onPickStart: (index) =>
-                    _pickTime(workingHourDays[dayIndex], index, start: true),
-                onPickEnd: (index) =>
-                    _pickTime(workingHourDays[dayIndex], index, start: false),
-                onAddBlock: () => setState(
-                  () => _blocks[workingHourDays[dayIndex]]!.add(
-                    const _HoursBlock(
-                      start: TimeOfDay(hour: 16, minute: 0),
-                      end: TimeOfDay(hour: 20, minute: 0),
+            children: [
+              const Text(
+                'Set when you usually work. These hours appear on your public profile and guide booking checks.',
+                style: TextStyle(
+                  color: AppColors.t3,
+                  fontSize: 14,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              for (
+                var dayIndex = 0;
+                dayIndex < workingHourDays.length;
+                dayIndex++
+              ) ...[
+                _DayHoursEditor(
+                  day: workingHourDays[dayIndex],
+                  enabled: _enabled[workingHourDays[dayIndex]] ?? false,
+                  blocks: _blocks[workingHourDays[dayIndex]] ?? const [],
+                  onEnabled: (value) => setState(
+                    () => _enabled[workingHourDays[dayIndex]] = value,
+                  ),
+                  onPickStart: (index) =>
+                      _pickTime(workingHourDays[dayIndex], index, start: true),
+                  onPickEnd: (index) =>
+                      _pickTime(workingHourDays[dayIndex], index, start: false),
+                  onAddBlock: () => setState(
+                    () => _blocks[workingHourDays[dayIndex]]!.add(
+                      const _HoursBlock(
+                        start: TimeOfDay(hour: 16, minute: 0),
+                        end: TimeOfDay(hour: 20, minute: 0),
+                      ),
                     ),
                   ),
+                  onRemoveBlock: (index) => setState(
+                    () => _blocks[workingHourDays[dayIndex]]!.removeAt(index),
+                  ),
                 ),
-                onRemoveBlock: (index) => setState(
-                  () => _blocks[workingHourDays[dayIndex]]!.removeAt(index),
-                ),
+                if (dayIndex != workingHourDays.length - 1)
+                  const WorkloopDivider(
+                    margin: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                  ),
+              ],
+              const SizedBox(height: AppSpacing.xl),
+              WorkloopPrimaryButton(
+                label: _saving ? 'Saving' : 'Save hours',
+                icon: LucideIcons.check,
+                onPressed: _saving ? null : _save,
               ),
-              if (dayIndex != workingHourDays.length - 1)
-                const WorkloopDivider(
-                  margin: EdgeInsets.symmetric(vertical: AppSpacing.md),
-                ),
             ],
-            const SizedBox(height: AppSpacing.xl),
-            WorkloopPrimaryButton(
-              label: _saving ? 'Saving' : 'Save hours',
-              icon: LucideIcons.check,
-              onPressed: _saving ? null : _save,
-            ),
-          ],
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
