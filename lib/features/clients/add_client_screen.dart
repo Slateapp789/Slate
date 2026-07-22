@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+
 import '../../core/theme/app_theme.dart';
+import '../../shared/models/slate_models.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
+import 'widgets/client_form.dart';
 
 class AddClientScreen extends ConsumerStatefulWidget {
   const AddClientScreen({super.key});
@@ -27,7 +30,8 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
   String _preferredContactMethod = 'phone';
   DateTime? _birthday;
   bool _saving = false;
-  bool _moreDetailsExpanded = false;
+  bool _additionalInformationExpanded = false;
+  bool _allowPop = false;
 
   @override
   void dispose() {
@@ -42,15 +46,79 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
     super.dispose();
   }
 
-  bool get _canSave => _nameController.text.trim().isNotEmpty;
+  bool get _canSave =>
+      _nameController.text.trim().isNotEmpty &&
+      isValidClientEmail(_emailController.text);
+
+  bool get _hasChanges =>
+      _nameController.text.trim().isNotEmpty ||
+      _phoneController.text.trim().isNotEmpty ||
+      _emailController.text.trim().isNotEmpty ||
+      _addressController.text.trim().isNotEmpty ||
+      _sourceController.text.trim().isNotEmpty ||
+      _tagsController.text.trim().isNotEmpty ||
+      _notesController.text.trim().isNotEmpty ||
+      _importantNotesController.text.trim().isNotEmpty ||
+      _status != 'active' ||
+      _preferredContactMethod != 'phone' ||
+      _birthday != null;
+
+  Future<void> _handleBack() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (!_hasChanges) {
+      await _leaveScreen();
+      return;
+    }
+    final decision = await showWorkloopDraftConfirmation(
+      context,
+      title: 'Save this client?',
+      message: 'Your client details have not been saved yet.',
+      saveLabel: 'Save client',
+      canSave: _canSave && !_saving,
+    );
+    if (!mounted) return;
+    switch (decision) {
+      case WorkloopDraftDecision.save:
+        await _save();
+        return;
+      case WorkloopDraftDecision.discard:
+        await _leaveScreen();
+        return;
+      case WorkloopDraftDecision.stay:
+        return;
+    }
+  }
+
+  Future<void> _leaveScreen() async {
+    if (!_allowPop && mounted) setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.pop(context);
+  }
 
   Future<void> _save() async {
-    if (!_canSave) return;
-    final workspaceId = await ref.read(workspaceIdProvider.future);
-    if (workspaceId == null) return;
-
+    if (!_canSave || _saving) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _saving = true);
+
     try {
+      final duplicate = await _findDuplicate();
+      if (duplicate != null) {
+        if (mounted) {
+          setState(() => _saving = false);
+          _showMessage(
+            '${duplicate.name} already uses this phone number or email.',
+            AppColors.t2,
+          );
+        }
+        return;
+      }
+
+      final workspaceId = await ref.read(workspaceIdProvider.future);
+      if (workspaceId == null) {
+        if (mounted) setState(() => _saving = false);
+        return;
+      }
+
       await ref
           .read(clientsRepositoryProvider)
           .create(
@@ -65,222 +133,146 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
             preferredContactMethod: _preferredContactMethod,
             source: _sourceController.text,
             birthday: _birthday,
-            tags: _tagsController.text
-                .split(',')
-                .map((tag) => tag.trim())
-                .where((tag) => tag.isNotEmpty)
-                .toList(),
+            tags: _tags,
           );
       ref.invalidate(clientsProvider);
       ref.invalidate(clientCrmRecordsProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${_nameController.text.trim()} added'),
-            backgroundColor: AppColors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-        Navigator.pop(context);
+        _showMessage('${_nameController.text.trim()} added', AppColors.green);
+        await _leaveScreen();
       }
-    } catch (e) {
-      setState(() => _saving = false);
+    } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: AppColors.error,
-          ),
+        setState(() => _saving = false);
+        _showMessage(
+          'Couldn’t add this client. Please try again.',
+          AppColors.error,
         );
       }
     }
   }
 
+  List<String> get _tags => _tagsController.text
+      .split(',')
+      .map((tag) => tag.trim())
+      .where((tag) => tag.isNotEmpty)
+      .toSet()
+      .toList();
+
+  Future<Client?> _findDuplicate() async {
+    final clients = await ref.read(clientsProvider.future);
+    return findDuplicateClient(
+      clients,
+      phone: _phoneController.text,
+      email: _emailController.text,
+    );
+  }
+
+  void _showMessage(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Column(
+    return PopScope(
+      canPop: _allowPop || !_hasChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: Row(
+            const Positioned.fill(child: WorkloopTexturedBackdrop()),
+            SafeArea(
+              child: Column(
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Icon(
-                        LucideIcons.chevronLeft,
-                        color: AppColors.t2,
-                        size: 18,
-                      ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.pageX,
+                      AppSpacing.lg,
+                      AppSpacing.pageX,
+                      0,
+                    ),
+                    child: Row(
+                      children: [
+                        WorkloopIconButton(
+                          icon: LucideIcons.chevronLeft,
+                          semanticLabel: 'Back to clients',
+                          onTap: _handleBack,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        const Expanded(
+                          child: Text(
+                            'New client',
+                            style: TextStyle(
+                              color: AppColors.t1,
+                              fontSize: 26,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        _SaveAction(
+                          label: 'Add',
+                          loading: _saving,
+                          enabled: _canSave,
+                          onTap: _save,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'New client',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.t1,
-                        letterSpacing: 0,
+                  const SizedBox(height: AppSpacing.xl),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.pageX,
+                        0,
+                        AppSpacing.pageX,
+                        AppSpacing.xxl,
+                      ),
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      child: ClientForm(
+                        nameController: _nameController,
+                        phoneController: _phoneController,
+                        emailController: _emailController,
+                        addressController: _addressController,
+                        sourceController: _sourceController,
+                        tagsController: _tagsController,
+                        notesController: _notesController,
+                        importantNotesController: _importantNotesController,
+                        status: _status,
+                        preferredContactMethod: _preferredContactMethod,
+                        birthday: _birthday,
+                        additionalInformationExpanded:
+                            _additionalInformationExpanded,
+                        autofocusName: true,
+                        onStatusChanged: (value) =>
+                            setState(() => _status = value),
+                        onPreferredContactChanged: (value) =>
+                            setState(() => _preferredContactMethod = value),
+                        onBirthdayChanged: (value) =>
+                            setState(() => _birthday = value),
+                        onToggleAdditionalInformation: () => setState(
+                          () => _additionalInformationExpanded =
+                              !_additionalInformationExpanded,
+                        ),
+                        onChanged: () => setState(() {}),
                       ),
                     ),
                   ),
                 ],
-              ),
-            ),
-
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 132),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _sectionTitle('Core details'),
-                    _field(
-                      label: 'NAME',
-                      controller: _nameController,
-                      hint: 'Full name',
-                      autofocus: true,
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 12),
-                    _statusRow(),
-                    const SizedBox(height: 20),
-                    _sectionTitle('Contact'),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _field(
-                            label: 'PHONE',
-                            controller: _phoneController,
-                            hint: 'Mobile number',
-                            keyboardType: TextInputType.phone,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _field(
-                            label: 'EMAIL',
-                            controller: _emailController,
-                            hint: 'Email address',
-                            keyboardType: TextInputType.emailAddress,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _field(
-                      label: 'ADDRESS',
-                      controller: _addressController,
-                      hint: 'Client or usual service address',
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 12),
-                    _choiceRow(
-                      label: 'PREFERRED CONTACT',
-                      value: _preferredContactMethod,
-                      options: const {
-                        'phone': 'Phone',
-                        'sms': 'Text',
-                        'email': 'Email',
-                        'whatsapp': 'WhatsApp',
-                      },
-                      onChanged: (value) =>
-                          setState(() => _preferredContactMethod = value),
-                    ),
-                    const SizedBox(height: 20),
-                    SlateDisclosure(
-                      title: 'Add more details',
-                      subtitle: 'Source, birthday, tags and notes',
-                      icon: LucideIcons.listPlus,
-                      expanded: _moreDetailsExpanded,
-                      onToggle: () => setState(
-                        () => _moreDetailsExpanded = !_moreDetailsExpanded,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _field(
-                            label: 'SOURCE',
-                            controller: _sourceController,
-                            hint: 'Instagram, referral, walk-in, website...',
-                          ),
-                          const SizedBox(height: 12),
-                          _dateTile(),
-                          const SizedBox(height: 12),
-                          _field(
-                            label: 'TAGS',
-                            controller: _tagsController,
-                            hint: 'VIP, monthly, mobile, colour',
-                          ),
-                          const SizedBox(height: 12),
-                          _field(
-                            label: 'NOTES',
-                            controller: _notesController,
-                            hint:
-                                'Preferences, booking context, useful details...',
-                            maxLines: 3,
-                          ),
-                          const SizedBox(height: 12),
-                          _field(
-                            label: 'IMPORTANT',
-                            controller: _importantNotesController,
-                            hint:
-                                'Allergies, access notes, must-know details...',
-                            maxLines: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-                      child: ElevatedButton(
-                        onPressed: _canSave && !_saving ? _save : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.green,
-                          disabledBackgroundColor: AppColors.bgInteract,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: _saving
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text(
-                                'Add Client',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ],
@@ -288,235 +280,54 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
       ),
     );
   }
+}
 
-  Widget _sectionTitle(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 10),
-      child: Text(
-        label.toUpperCase(),
-        style: const TextStyle(
-          color: AppColors.t3,
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0,
-        ),
-      ),
-    );
-  }
+class _SaveAction extends StatelessWidget {
+  final String label;
+  final bool loading;
+  final bool enabled;
+  final VoidCallback onTap;
 
-  Widget _field({
-    required String label,
-    required TextEditingController controller,
-    required String hint,
-    TextInputType? keyboardType,
-    int maxLines = 1,
-    bool autofocus = false,
-    void Function(String)? onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0,
-              color: AppColors.t3,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            maxLines: maxLines,
-            autofocus: autofocus,
-            onChanged: onChanged,
-            style: const TextStyle(color: AppColors.t1, fontSize: 15),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: const TextStyle(color: AppColors.t3, fontSize: 14),
-              border: InputBorder.none,
-              filled: false,
-              contentPadding: EdgeInsets.zero,
-              isDense: true,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  const _SaveAction({
+    required this.label,
+    required this.loading,
+    required this.enabled,
+    required this.onTap,
+  });
 
-  Widget _statusRow() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'STATUS',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0,
-              color: AppColors.t3,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _statusChip('active', 'Active', AppColors.green),
-              const SizedBox(width: 8),
-              _statusChip('lead', 'Lead', AppColors.warning),
-              const SizedBox(width: 8),
-              _statusChip('inactive', 'Inactive', AppColors.t3),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statusChip(String value, String label, Color color) {
-    final active = _status == value;
-    return GestureDetector(
-      onTap: () => setState(() => _status = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: active ? color.withValues(alpha: 0.15) : AppColors.bgInteract,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: active ? color : AppColors.border),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: active ? color : AppColors.t3,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _choiceRow({
-    required String label,
-    required String value,
-    required Map<String, String> options,
-    required ValueChanged<String> onChanged,
-  }) {
-    return SlateSurface(
-      color: AppColors.bgCard,
-      borderColor: AppColors.border,
-      radius: AppRadius.md,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0,
-              color: AppColors.t3,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: options.entries.map((entry) {
-              final active = value == entry.key;
-              return GestureDetector(
-                onTap: () => onChanged(entry.key),
-                child: AnimatedContainer(
-                  duration: AppMotion.standard,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: active
-                        ? AppColors.green.withValues(alpha: 0.14)
-                        : AppColors.bgInteract,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                    border: Border.all(
-                      color: active ? AppColors.green : AppColors.border,
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: enabled
+          ? AppColors.accentPrimary.withValues(alpha: 0.14)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: InkWell(
+        onTap: enabled && !loading ? onTap : null,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 58, minHeight: 42),
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: AppColors.accentPrimary,
+                      strokeWidth: 2,
                     ),
-                  ),
-                  child: Text(
-                    entry.value,
+                  )
+                : Text(
+                    label,
                     style: TextStyle(
-                      color: active ? AppColors.green : AppColors.t3,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      color: enabled ? AppColors.accentPrimary : AppColors.t4,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-              );
-            }).toList(),
           ),
-        ],
+        ),
       ),
     );
-  }
-
-  Widget _dateTile() {
-    return SlateSurface(
-      onTap: _pickBirthday,
-      color: AppColors.bgCard,
-      borderColor: AppColors.border,
-      radius: AppRadius.md,
-      child: Row(
-        children: [
-          const Icon(LucideIcons.cake, color: AppColors.t3, size: 18),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Birthday',
-              style: TextStyle(
-                color: AppColors.t1,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          Text(
-            _birthday == null
-                ? 'Add date'
-                : '${_birthday!.day}/${_birthday!.month}/${_birthday!.year}',
-            style: const TextStyle(
-              color: AppColors.t3,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _pickBirthday() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _birthday ?? DateTime(now.year - 25),
-      firstDate: DateTime(now.year - 100),
-      lastDate: now,
-    );
-    if (picked != null) setState(() => _birthday = picked);
   }
 }

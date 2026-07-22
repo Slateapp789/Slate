@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/slate_ui.dart';
 import '../../clients/client_detail_screen.dart';
 
 // ── Hero card (client + service) ──────────────────────────────────────────────
@@ -46,15 +47,15 @@ class AppointmentHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
+      child: SlateGlassSurface(
+        blur: 18,
+        radius: AppRadius.lg,
+        color: AppColors.bgCard.withValues(alpha: 0.72),
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: editing ? _buildEditMode() : _buildViewMode(context),
       ),
-      child: editing ? _buildEditMode() : _buildViewMode(context),
     );
   }
 
@@ -62,12 +63,11 @@ class AppointmentHeroCard extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 52,
-          height: 52,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
-            color: AppColors.greenDim,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.green.withValues(alpha: 0.3)),
+            color: AppColors.modClients.withValues(alpha: 0.08),
+            shape: BoxShape.circle,
           ),
           child: Center(
             child: Text(
@@ -86,60 +86,56 @@ class AppointmentHeroCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               GestureDetector(
-                onTap: () {
-                  if (contactId == null) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ClientDetailScreen(
-                        client: {
-                          'id': contactId,
-                          'name': clientName,
-                          'phone': appt['contacts']?['phone'] ?? '',
-                          'email': appt['contacts']?['email'] ?? '',
-                          'notes': appt['contacts']?['notes'] ?? '',
-                          'status': appt['contacts']?['status'] ?? 'active',
-                        },
-                      ),
-                    ),
-                  );
-                },
+                onTap: () => _openClient(context),
+                child: Text(
+                  clientName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.t1,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              GestureDetector(
+                onTap: contactId == null ? null : () => _openClient(context),
+                behavior: HitTestBehavior.opaque,
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      clientName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.t1,
-                        letterSpacing: 0,
+                    Flexible(
+                      child: Text(
+                        serviceName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.t3,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     if (contactId != null) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.sm),
                       const Text(
                         'View client',
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.green,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.modClients,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: AppSpacing.xxs),
                       const Icon(
                         LucideIcons.chevronRight,
-                        size: 14,
-                        color: AppColors.green,
+                        size: 12,
+                        color: AppColors.modClients,
                       ),
                     ],
                   ],
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                serviceName,
-                style: const TextStyle(fontSize: 14, color: AppColors.t3),
               ),
             ],
           ),
@@ -148,12 +144,31 @@ class AppointmentHeroCard extends StatelessWidget {
           Text(
             '£${price!.toStringAsFixed(0)}',
             style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
               color: AppColors.t1,
             ),
           ),
       ],
+    );
+  }
+
+  void _openClient(BuildContext context) {
+    if (contactId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClientDetailScreen(
+          client: {
+            'id': contactId,
+            'name': clientName,
+            'phone': appt['contacts']?['phone'] ?? '',
+            'email': appt['contacts']?['email'] ?? '',
+            'notes': appt['contacts']?['notes'] ?? '',
+            'status': appt['contacts']?['status'] ?? 'active',
+          },
+        ),
+      ),
     );
   }
 
@@ -169,17 +184,25 @@ class AppointmentHeroCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel('CLIENT'),
+        _fieldLabel('Client'),
         const SizedBox(height: 8),
         clients.when(
-          data: (data) => _dropdown<String>(
+          data: (data) => WorkloopPickerField<String>(
             value: selectedClientId,
+            title: 'Choose a client',
             hint: 'Select client',
-            items: data
+            searchHint: 'Search clients',
+            searchable: true,
+            leadingIcon: LucideIcons.users,
+            options: data
                 .map(
-                  (c) => DropdownMenuItem(
+                  (c) => WorkloopPickerOption(
                     value: c['id'] as String,
-                    child: _dropdownText(c['name'] as String),
+                    label: c['name'] as String,
+                    subtitle:
+                        (c['address'] as String?)?.trim().isNotEmpty == true
+                        ? (c['address'] as String).trim()
+                        : null,
                   ),
                 )
                 .toList(),
@@ -193,33 +216,34 @@ class AppointmentHeroCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _fieldLabel('SERVICE'),
+        _fieldLabel('Service'),
         const SizedBox(height: 8),
-        _dropdown<String>(
+        WorkloopPickerField<String>(
           value: serviceValue,
+          title: 'Choose a service',
           hint: 'Select service',
-          items: [
+          searchHint: 'Search services',
+          leadingIcon: LucideIcons.briefcase,
+          options: [
             ...services.map(
-              (s) => DropdownMenuItem(
+              (s) => WorkloopPickerOption(
                 value: s['id'] as String,
-                child: _dropdownText(s['name'] as String),
+                label: s['name'] as String,
+                subtitle: s['duration_mins'] == null
+                    ? null
+                    : '${s['duration_mins']} min',
               ),
             ),
-            const DropdownMenuItem(
+            const WorkloopPickerOption(
               value: '__custom__',
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 14),
-                child: Text(
-                  'Custom service',
-                  style: TextStyle(color: AppColors.t1, fontSize: 14),
-                ),
-              ),
+              label: 'Custom service',
+              subtitle: 'Enter a one-off service',
             ),
           ],
           onChanged: onServiceChanged,
         ),
         const SizedBox(height: 12),
-        _fieldLabel('SERVICE NAME'),
+        _fieldLabel('Service name'),
         const SizedBox(height: 8),
         TextField(
           controller: serviceTitleController,
@@ -227,7 +251,7 @@ class AppointmentHeroCard extends StatelessWidget {
           decoration: _inputDecoration('Service name'),
         ),
         const SizedBox(height: 12),
-        _fieldLabel('PRICE (£)'),
+        _fieldLabel('Price (£)'),
         const SizedBox(height: 8),
         TextField(
           controller: priceController,
@@ -242,53 +266,9 @@ class AppointmentHeroCard extends StatelessWidget {
   Widget _fieldLabel(String text) => Text(
     text,
     style: const TextStyle(
-      fontSize: 10,
+      fontSize: 13,
       fontWeight: FontWeight.w700,
-      letterSpacing: 0,
-      color: AppColors.t3,
-    ),
-  );
-
-  Widget _dropdown<T>({
-    T? value,
-    required String hint,
-    required List<DropdownMenuItem<T>> items,
-    required ValueChanged<T?> onChanged,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.bgInteract,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: AppColors.bgRaised,
-          icon: const Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: Icon(LucideIcons.chevronDown, color: AppColors.t3, size: 16),
-          ),
-          hint: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Text(
-              hint,
-              style: const TextStyle(color: AppColors.t3, fontSize: 14),
-            ),
-          ),
-          items: items,
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-
-  Widget _dropdownText(String text) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 14),
-    child: Text(
-      text,
-      style: const TextStyle(color: AppColors.t1, fontSize: 14),
+      color: AppColors.t2,
     ),
   );
 
@@ -370,7 +350,7 @@ class AppointmentDateTimeCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
+        color: AppColors.bgCard.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
@@ -593,7 +573,7 @@ class AppointmentActionSection extends StatelessWidget {
               onPressed: loading ? null : onComplete,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.onBrandAccent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),

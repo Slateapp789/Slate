@@ -1,5 +1,5 @@
-name: slate
-description: "A new Flutter project."
+name: workloop
+description: "A mobile-first operating app for solo appointment-based service businesses."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.8.1
+  sdk: ">=3.9.2 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -44,7 +44,11 @@ dependencies:
   lucide_icons: ^0.257.0
   confetti: ^0.8.0
   native_glass_navbar: ^1.0.1
+  shared_preferences: ^2.5.3
   url_launcher: ^6.3.1
+  flutter_contacts: ^2.1.0
+  device_calendar: ^4.3.3
+  file_picker: ^10.3.10
 
 dev_dependencies:
   flutter_test:

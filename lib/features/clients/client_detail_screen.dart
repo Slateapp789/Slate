@@ -4,10 +4,12 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
+import '../../shared/providers/maps_preference_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/maps_launcher.dart';
 import '../../shared/widgets/slate_ui.dart';
-import 'providers/client_detail_providers.dart';
 import 'widgets/client_appointments_tab.dart';
+import 'widgets/client_form.dart';
 import 'widgets/client_overview_tab.dart';
 import 'widgets/client_payments_tab.dart';
 import 'widgets/client_tasks_tab.dart';
@@ -40,12 +42,14 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   DateTime? _birthday;
   bool _saving = false;
   bool _moreDetailsExpanded = false;
+  bool _allowPop = false;
 
   @override
   void initState() {
     super.initState();
     _client = Map<String, dynamic>.from(widget.client);
     _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(_handleTabChanged);
     _nameController = TextEditingController(
       text: _client['name'] as String? ?? '',
     );
@@ -74,10 +78,15 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     _preferredContactMethod =
         _client['preferred_contact_method'] as String? ?? 'phone';
     _birthday = DateTime.tryParse(_client['birthday']?.toString() ?? '');
+    _moreDetailsExpanded =
+        _sourceController.text.trim().isNotEmpty ||
+        _tagsController.text.trim().isNotEmpty ||
+        _birthday != null;
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
@@ -90,12 +99,106 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     super.dispose();
   }
 
+  void _handleTabChanged() {
+    if (mounted) setState(() {});
+  }
+
+  bool get _canSaveDraft =>
+      _nameController.text.trim().isNotEmpty &&
+      isValidClientEmail(_emailController.text);
+
+  bool get _hasEditChanges {
+    final currentTags = _tagsController.text
+        .split(',')
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .join(',');
+    final savedTags = ((_client['tags'] as List?) ?? const [])
+        .map((tag) => tag.toString().trim())
+        .where((tag) => tag.isNotEmpty)
+        .join(',');
+    final savedBirthday = DateTime.tryParse(
+      _client['birthday']?.toString() ?? '',
+    );
+    return _nameController.text.trim() !=
+            (_client['name'] as String? ?? '').trim() ||
+        _phoneController.text.trim() !=
+            (_client['phone'] as String? ?? '').trim() ||
+        _emailController.text.trim() !=
+            (_client['email'] as String? ?? '').trim() ||
+        _addressController.text.trim() !=
+            (_client['address'] as String? ?? '').trim() ||
+        _sourceController.text.trim() !=
+            (_client['source'] as String? ?? '').trim() ||
+        currentTags != savedTags ||
+        _notesController.text.trim() !=
+            (_client['notes'] as String? ?? '').trim() ||
+        _importantNotesController.text.trim() !=
+            (_client['important_notes'] as String? ?? '').trim() ||
+        _status != (_client['status'] as String? ?? 'active') ||
+        _preferredContactMethod !=
+            (_client['preferred_contact_method'] as String? ?? 'phone') ||
+        _dateKey(_birthday) != _dateKey(savedBirthday);
+  }
+
+  String _dateKey(DateTime? date) => date == null
+      ? ''
+      : '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+  Future<void> _handleBack() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (!_editing || !_hasEditChanges) {
+      await _leaveScreen();
+      return;
+    }
+    final decision = await showWorkloopDraftConfirmation(
+      context,
+      title: 'Save client changes?',
+      message: 'You changed this client. Save before returning to Clients?',
+      canSave: _canSaveDraft && !_saving,
+    );
+    if (!mounted) return;
+    switch (decision) {
+      case WorkloopDraftDecision.save:
+        if (await _save()) await _leaveScreen();
+        return;
+      case WorkloopDraftDecision.discard:
+        await _leaveScreen();
+        return;
+      case WorkloopDraftDecision.stay:
+        return;
+    }
+  }
+
+  Future<void> _leaveScreen() async {
+    if (!_allowPop && mounted) setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.pop(context);
+  }
+
   // ── Save / Delete ─────────────────────────────────────────────────────────
 
-  Future<void> _save() async {
-    if (_nameController.text.trim().isEmpty) return;
+  Future<bool> _save() async {
+    if (!_canSaveDraft) {
+      _snack('Check the client name and email address.', AppColors.error);
+      return false;
+    }
     setState(() => _saving = true);
     try {
+      final duplicate = findDuplicateClient(
+        await ref.read(clientsProvider.future),
+        phone: _phoneController.text,
+        email: _emailController.text,
+        excludingClientId: _client['id'] as String,
+      );
+      if (duplicate != null) {
+        setState(() => _saving = false);
+        _snack(
+          '${duplicate.name} already uses this phone number or email.',
+          AppColors.t2,
+        );
+        return false;
+      }
       await ref
           .read(clientsRepositoryProvider)
           .update(_client['id'] as String, {
@@ -148,9 +251,13 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
       });
       ref.invalidate(clientsProvider);
       ref.invalidate(clientCrmRecordsProvider);
-    } catch (e) {
+      return true;
+    } catch (_) {
       setState(() => _saving = false);
-      if (mounted) _snack('Error: $e', AppColors.error);
+      if (mounted) {
+        _snack('Couldn’t save this client. Please try again.', AppColors.error);
+      }
+      return false;
     }
   }
 
@@ -225,17 +332,52 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   Future<void> _sendEmail(String email) async =>
       launchUrl(Uri(scheme: 'mailto', path: email));
 
+  Future<void> _sendText(String phone) async =>
+      launchUrl(Uri(scheme: 'sms', path: phone.replaceAll(' ', '')));
+
+  Future<void> _openWhatsApp(String phone) async {
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    await launchUrl(
+      Uri.parse('https://wa.me/$digits'),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
+  Future<void> _openDirections(String address) async {
+    if (address.trim().isEmpty) return;
+    try {
+      var preference = await ref.read(preferredMapsAppProvider.future);
+      if (!mounted) return;
+      if (preference == MapsAppPreference.askEveryTime) {
+        final choice = await showMapLaunchSheet(context, address);
+        if (choice == null || !mounted) return;
+        preference = choice.app;
+        if (choice.remember) {
+          await ref
+              .read(preferredMapsAppProvider.notifier)
+              .setPreference(preference);
+        }
+      }
+      final launched = await launchMapDirections(preference, address);
+      if (!launched && mounted) {
+        _snack('Couldn’t open directions on this device.', AppColors.t2);
+      }
+    } catch (_) {
+      if (mounted) {
+        _snack('Couldn’t open directions on this device.', AppColors.t2);
+      }
+    }
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final clientId = _client['id'] as String;
-    final appointments = ref.watch(clientAppointmentsProvider(clientId));
-    final tasks = ref.watch(clientTasksProvider(clientId));
-    final payments = ref.watch(clientPaymentsProvider(clientId));
     final phone = _client['phone'] as String? ?? '';
     final email = _client['email'] as String? ?? '';
-    final address = _client['address'] as String? ?? '';
+    final preferredMethod =
+        _client['preferred_contact_method'] as String? ?? 'phone';
     final name = _client['name'] as String? ?? '?';
     final initials = name
         .trim()
@@ -245,196 +387,159 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
         .join()
         .toUpperCase();
 
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Column(
+    return PopScope(
+      canPop: _allowPop || !_editing || !_hasEditChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Stack(
           children: [
-            // ── Header ──────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: Row(
+            const Positioned.fill(child: WorkloopTexturedBackdrop()),
+            SafeArea(
+              child: Column(
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Icon(
-                        LucideIcons.chevronLeft,
-                        color: AppColors.t2,
-                        size: 18,
-                      ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.pageX,
+                      AppSpacing.lg,
+                      AppSpacing.pageX,
+                      0,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.t1,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                  ),
-                  if (_editing) ...[
-                    GestureDetector(
-                      onTap: _confirmDeleteClient,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        WorkloopIconButton(
+                          icon: LucideIcons.chevronLeft,
+                          semanticLabel: 'Back to clients',
+                          onTap: _handleBack,
                         ),
-                        decoration: BoxDecoration(
-                          color: AppColors.errorDim,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Text(
-                          'Delete',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.error,
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            _editing ? 'Edit client' : name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 26,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.t1,
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  GestureDetector(
-                    onTap: () =>
-                        _editing ? _save() : setState(() => _editing = true),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _editing ? AppColors.green : AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: _editing ? AppColors.green : AppColors.border,
+                        const SizedBox(width: AppSpacing.sm),
+                        _HeaderAction(
+                          label: _editing ? 'Save' : 'Edit',
+                          primary: _editing,
+                          loading: _saving,
+                          onTap: _saving || (_editing && !_canSaveDraft)
+                              ? null
+                              : () => _editing
+                                    ? _save()
+                                    : setState(() => _editing = true),
                         ),
-                      ),
-                      child: _saving
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              _editing ? 'Save' : 'Edit',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: _editing ? Colors.white : AppColors.t2,
-                              ),
-                            ),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: AppSpacing.lg),
+                  if (_editing)
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.pageX,
+                          0,
+                          AppSpacing.pageX,
+                          AppSpacing.xxl,
+                        ),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        child: _editForm(),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: NestedScrollView(
+                        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.pageX,
+                              0,
+                              AppSpacing.pageX,
+                              AppSpacing.sm,
+                            ),
+                            sliver: SliverList.list(
+                              children: [
+                                _ClientCompactHeader(
+                                  initials: initials,
+                                  status:
+                                      _client['status'] as String? ?? 'active',
+                                  preferredContact: _contactLabel(
+                                    preferredMethod,
+                                  ),
+                                  onCall: phone.isEmpty
+                                      ? null
+                                      : () => _callPhone(phone),
+                                  preferredIcon: _preferredContactIcon(
+                                    preferredMethod,
+                                  ),
+                                  onPreferred: switch (preferredMethod) {
+                                    'email' =>
+                                      email.isEmpty
+                                          ? null
+                                          : () => _sendEmail(email),
+                                    'sms' =>
+                                      phone.isEmpty
+                                          ? null
+                                          : () => _sendText(phone),
+                                    'whatsapp' =>
+                                      phone.isEmpty
+                                          ? null
+                                          : () => _openWhatsApp(phone),
+                                    _ =>
+                                      phone.isEmpty
+                                          ? null
+                                          : () => _callPhone(phone),
+                                  },
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                _ClientWorkspaceNavigation(
+                                  index: _tabController.index,
+                                  onChanged: _tabController.animateTo,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        body: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            ClientOverviewTab(
+                              clientId: clientId,
+                              client: _client,
+                              onEdit: () => setState(() => _editing = true),
+                              onOpenBookings: () => _tabController.animateTo(1),
+                              onOpenPayments: () => _tabController.animateTo(2),
+                              onOpenTasks: () => _tabController.animateTo(3),
+                              onOpenAddress: _openDirections,
+                            ),
+                            ClientAppointmentsTab(clientId: clientId),
+                            ClientPaymentsTab(
+                              clientId: clientId,
+                              clientName: name,
+                            ),
+                            ClientTasksTab(
+                              clientId: clientId,
+                              clientName: name,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
-
-            if (_editing)
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.bgCard,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: _editForm(),
-                  ),
-                ),
-              ),
-
-            if (!_editing) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _ClientCompactHeader(
-                  initials: initials,
-                  status: _client['status'] as String? ?? 'active',
-                  preferredContact: _contactLabel(
-                    _client['preferred_contact_method'] as String? ?? 'phone',
-                  ),
-                  phone: phone,
-                  email: email,
-                  address: address,
-                  onCall: phone.isEmpty ? null : () => _callPhone(phone),
-                  onEmail: email.isEmpty ? null : () => _sendEmail(email),
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // ── Tabs ─────────────────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.bgCard,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    indicator: BoxDecoration(
-                      color: AppColors.green,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicatorPadding: const EdgeInsets.all(3),
-                    dividerColor: Colors.transparent,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: AppColors.t3,
-                    labelStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    tabs: [
-                      const Tab(text: 'Overview'),
-                      Tab(
-                        text: 'Bookings (${appointments.value?.length ?? 0})',
-                      ),
-                      Tab(text: 'Payments (${payments.value?.length ?? 0})'),
-                      Tab(text: 'Tasks (${tasks.value?.length ?? 0})'),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // ── Tab content ──────────────────────────────────────────────────
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    ClientOverviewTab(
-                      clientId: clientId,
-                      clientName: name,
-                      client: _client,
-                      notes: _client['notes'] as String? ?? '',
-                    ),
-                    ClientAppointmentsTab(clientId: clientId),
-                    ClientPaymentsTab(clientId: clientId, clientName: name),
-                    ClientTasksTab(clientId: clientId, clientName: name),
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -444,227 +549,47 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   // ── Edit form ─────────────────────────────────────────────────────────────
 
   Widget _editForm() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _editField('Name', _nameController),
-          const SizedBox(height: 12),
-          _editField(
-            'Phone',
-            _phoneController,
-            keyboardType: TextInputType.phone,
-          ),
-          const SizedBox(height: 12),
-          _editField(
-            'Email',
-            _emailController,
-            keyboardType: TextInputType.emailAddress,
-          ),
-          const SizedBox(height: 12),
-          _editField('Address', _addressController, maxLines: 2),
-          const SizedBox(height: 12),
-          _contactMethodEditor(),
-          const SizedBox(height: 12),
-          const Text(
-            'Status',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.t3,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: ['active', 'lead', 'inactive'].map((s) {
-              final active = _status == s;
-              return GestureDetector(
-                onTap: () => setState(() => _status = s),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: active ? AppColors.green : AppColors.bgInteract,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: active ? AppColors.green : AppColors.border,
-                    ),
-                  ),
-                  child: Text(
-                    s,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: active ? Colors.white : AppColors.t3,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 16),
-          SlateDisclosure(
-            title: 'More client details',
-            subtitle: 'Source, birthday, tags and notes',
-            icon: LucideIcons.listPlus,
-            expanded: _moreDetailsExpanded,
-            onToggle: () =>
-                setState(() => _moreDetailsExpanded = !_moreDetailsExpanded),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _editField('Source', _sourceController),
-                const SizedBox(height: 12),
-                _editField('Tags', _tagsController),
-                const SizedBox(height: 12),
-                _dateEditor(),
-                const SizedBox(height: 12),
-                _editField('Important', _importantNotesController, maxLines: 2),
-                const SizedBox(height: 12),
-                _editField('Notes', _notesController, maxLines: 3),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _contactMethodEditor() {
-    const options = {
-      'phone': 'Phone',
-      'sms': 'Text',
-      'email': 'Email',
-      'whatsapp': 'WhatsApp',
-    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Preferred contact',
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.t3,
-            fontWeight: FontWeight.w600,
-          ),
+        ClientForm(
+          nameController: _nameController,
+          phoneController: _phoneController,
+          emailController: _emailController,
+          addressController: _addressController,
+          sourceController: _sourceController,
+          tagsController: _tagsController,
+          notesController: _notesController,
+          importantNotesController: _importantNotesController,
+          status: _status,
+          preferredContactMethod: _preferredContactMethod,
+          birthday: _birthday,
+          additionalInformationExpanded: _moreDetailsExpanded,
+          onStatusChanged: (value) => setState(() => _status = value),
+          onPreferredContactChanged: (value) =>
+              setState(() => _preferredContactMethod = value),
+          onBirthdayChanged: (value) => setState(() => _birthday = value),
+          onToggleAdditionalInformation: () =>
+              setState(() => _moreDetailsExpanded = !_moreDetailsExpanded),
+          onChanged: () => setState(() {}),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: options.entries.map((entry) {
-            final active = _preferredContactMethod == entry.key;
-            return GestureDetector(
-              onTap: () => setState(() => _preferredContactMethod = entry.key),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: active ? AppColors.green : AppColors.bgInteract,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(
-                    color: active ? AppColors.green : AppColors.border,
-                  ),
-                ),
-                child: Text(
-                  entry.value,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: active ? Colors.white : AppColors.t3,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _dateEditor() {
-    return GestureDetector(
-      onTap: _pickBirthday,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: AppColors.bgInteract,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            const Text(
-              'Birthday',
-              style: TextStyle(color: AppColors.t3, fontSize: 13),
-            ),
-            const Spacer(),
-            Text(
-              _birthday == null
-                  ? 'Add date'
-                  : '${_birthday!.day}/${_birthday!.month}/${_birthday!.year}',
-              style: const TextStyle(
-                color: AppColors.t2,
+        const SizedBox(height: AppSpacing.xl),
+        const WorkloopDivider(),
+        const SizedBox(height: AppSpacing.md),
+        Center(
+          child: TextButton(
+            onPressed: _confirmDeleteClient,
+            child: const Text(
+              'Delete client',
+              style: TextStyle(
+                color: AppColors.error,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
             ),
-          ],
+          ),
         ),
-      ),
-    );
-  }
-
-  Future<void> _pickBirthday() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _birthday ?? DateTime(now.year - 25),
-      firstDate: DateTime(now.year - 100),
-      lastDate: now,
-    );
-    if (picked != null) setState(() => _birthday = picked);
-  }
-
-  Widget _editField(
-    String label,
-    TextEditingController controller, {
-    int maxLines = 1,
-    TextInputType? keyboardType,
-  }) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: AppColors.t1, fontSize: 14),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: AppColors.t3, fontSize: 13),
-        filled: true,
-        fillColor: AppColors.bgInteract,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.green, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-      ),
+      ],
     );
   }
 }
@@ -673,127 +598,90 @@ class _ClientCompactHeader extends StatelessWidget {
   final String initials;
   final String status;
   final String preferredContact;
-  final String phone;
-  final String email;
-  final String address;
   final VoidCallback? onCall;
-  final VoidCallback? onEmail;
+  final IconData preferredIcon;
+  final VoidCallback? onPreferred;
 
   const _ClientCompactHeader({
     required this.initials,
     required this.status,
     required this.preferredContact,
-    required this.phone,
-    required this.email,
-    required this.address,
     required this.onCall,
-    required this.onEmail,
+    required this.preferredIcon,
+    required this.onPreferred,
   });
 
   @override
   Widget build(BuildContext context) {
     final statusColor = status == 'active'
-        ? AppColors.green
+        ? AppColors.modClients
         : status == 'lead'
         ? AppColors.warning
         : AppColors.t3;
-    final detail = [
-      if (phone.isNotEmpty) phone,
-      if (email.isNotEmpty) email,
-      if (address.isNotEmpty) address,
-      if (phone.isEmpty && email.isEmpty && address.isEmpty)
-        '$preferredContact preferred',
-    ].join(' · ');
-
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
+    return SlateGlassSurface(
+      blur: 18,
+      color: AppColors.bgCard.withValues(alpha: 0.68),
+      padding: const EdgeInsets.all(AppSpacing.sm),
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: AppColors.greenDim,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.green.withValues(alpha: 0.2)),
+              color: AppColors.modClients.withValues(alpha: 0.09),
+              shape: BoxShape.circle,
             ),
             child: Center(
               child: Text(
                 initials.isEmpty ? '?' : initials,
                 style: const TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.green,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.modClients,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                      ),
-                      child: Text(
-                        status.toUpperCase(),
-                        style: TextStyle(
-                          color: statusColor,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        preferredContact,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.t3,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
                 Text(
-                  detail,
+                  _statusLabel(status),
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Prefers $preferredContact',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: AppColors.t2,
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          if (onCall != null)
-            _CompactContactButton(icon: LucideIcons.phone, onTap: onCall!),
-          if (onEmail != null) ...[
-            const SizedBox(width: 6),
-            _CompactContactButton(icon: LucideIcons.mail, onTap: onEmail!),
-          ],
+          const SizedBox(width: AppSpacing.xs),
+          _CompactContactButton(
+            icon: LucideIcons.phone,
+            label: 'Call',
+            onTap: onCall,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          _CompactContactButton(
+            icon: preferredIcon,
+            label: preferredContact,
+            onTap: onPreferred,
+          ),
         ],
       ),
     );
@@ -802,22 +690,193 @@ class _ClientCompactHeader extends StatelessWidget {
 
 class _CompactContactButton extends StatelessWidget {
   final IconData icon;
-  final VoidCallback onTap;
+  final String label;
+  final VoidCallback? onTap;
 
-  const _CompactContactButton({required this.icon, required this.onTap});
+  const _CompactContactButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      child: Material(
+        color: onTap == null
+            ? AppColors.bgInteract.withValues(alpha: 0.55)
+            : AppColors.modClients.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: SizedBox(
+            width: AppSpacing.minTouch,
+            height: AppSpacing.minTouch,
+            child: Icon(
+              icon,
+              color: onTap == null ? AppColors.t4 : AppColors.modClients,
+              size: 17,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderAction extends StatelessWidget {
+  final String label;
+  final bool primary;
+  final bool loading;
+  final VoidCallback? onTap;
+
+  const _HeaderAction({
+    required this.label,
+    required this.primary,
+    required this.loading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null || loading;
     return Material(
-      color: AppColors.greenDim,
-      borderRadius: BorderRadius.circular(12),
+      color: primary && enabled
+          ? AppColors.accentPrimary.withValues(alpha: 0.14)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(
-          width: 36,
-          height: 36,
-          child: Icon(icon, color: AppColors.green, size: 17),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 58, minHeight: 42),
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: AppColors.accentPrimary,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Text(
+                    label,
+                    style: TextStyle(
+                      color: !enabled
+                          ? AppColors.t4
+                          : primary
+                          ? AppColors.accentPrimary
+                          : AppColors.t2,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ClientWorkspaceNavigation extends StatelessWidget {
+  final int index;
+  final ValueChanged<int> onChanged;
+
+  const _ClientWorkspaceNavigation({
+    required this.index,
+    required this.onChanged,
+  });
+
+  static const _labels = ['Overview', 'Bookings', 'Money', 'Tasks'];
+
+  @override
+  Widget build(BuildContext context) {
+    return SlateGlassSurface(
+      blur: 22,
+      color: AppColors.bgCard.withValues(alpha: 0.90),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      child: SizedBox(
+        height: 54,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final itemWidth = constraints.maxWidth / _labels.length;
+
+            void select(int next) {
+              if (next == index) return;
+              SlateHaptics.tap();
+              onChanged(next);
+            }
+
+            void handleDrag(double dx) {
+              select((dx / itemWidth).floor().clamp(0, _labels.length - 1));
+            }
+
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragStart: (details) {
+                handleDrag(details.localPosition.dx);
+              },
+              onHorizontalDragUpdate: (details) {
+                handleDrag(details.localPosition.dx);
+              },
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  AnimatedPositioned(
+                    duration: AppMotion.deliberate,
+                    curve: AppMotion.emphasized,
+                    left: index * itemWidth,
+                    top: 6,
+                    width: itemWidth,
+                    height: 42,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppColors.accentPrimary.withValues(
+                            alpha: 0.14,
+                          ),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          border: Border.all(
+                            color: AppColors.accentPrimary.withValues(
+                              alpha: 0.22,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: List.generate(
+                      _labels.length,
+                      (tabIndex) => Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => select(tabIndex),
+                          child: Center(
+                            child: AnimatedDefaultTextStyle(
+                              duration: AppMotion.standard,
+                              style: TextStyle(
+                                color: tabIndex == index
+                                    ? AppColors.accentPrimary
+                                    : AppColors.t3,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              child: Text(_labels[tabIndex]),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
@@ -847,7 +906,9 @@ Widget _actionBtn({
     onPressed: onTap,
     style: ElevatedButton.styleFrom(
       backgroundColor: color,
-      foregroundColor: Colors.white,
+      foregroundColor: color == AppColors.error
+          ? Colors.white
+          : AppColors.onBrandAccent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 0,
     ),
@@ -880,5 +941,22 @@ String _contactLabel(String value) {
     'email' => 'Email',
     'whatsapp' => 'WhatsApp',
     _ => 'Phone',
+  };
+}
+
+IconData _preferredContactIcon(String value) {
+  return switch (value) {
+    'sms' => LucideIcons.messageSquare,
+    'email' => LucideIcons.mail,
+    'whatsapp' => LucideIcons.messageCircle,
+    _ => LucideIcons.phone,
+  };
+}
+
+String _statusLabel(String value) {
+  return switch (value) {
+    'lead' => 'LEAD',
+    'inactive' => 'INACTIVE',
+    _ => 'ACTIVE',
   };
 }

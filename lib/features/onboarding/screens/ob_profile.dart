@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/onboarding_provider.dart';
+import '../../../shared/widgets/slate_ui.dart';
 
 const List<String> industries = [
   'Hair & Barbering',
@@ -28,6 +29,15 @@ class _ObProfileState extends ConsumerState<ObProfile> {
   final _firstNameController = TextEditingController();
   final _businessNameController = TextEditingController();
   String? _selectedIndustry;
+
+  @override
+  void initState() {
+    super.initState();
+    final draft = ref.read(onboardingProvider);
+    _firstNameController.text = draft.firstName;
+    _businessNameController.text = draft.businessName;
+    _selectedIndustry = draft.industry.isEmpty ? null : draft.industry;
+  }
 
   @override
   void dispose() {
@@ -95,48 +105,18 @@ class _ObProfileState extends ConsumerState<ObProfile> {
           const SizedBox(height: 20),
           _label('What do you do?'),
           const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedIndustry,
-                hint: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: Text(
-                    'Select your industry',
-                    style: TextStyle(color: AppColors.t3, fontSize: 15),
-                  ),
-                ),
-                isExpanded: true,
-                dropdownColor: AppColors.bgRaised,
-                icon: Padding(
-                  padding: const EdgeInsets.only(right: 14),
-                  child: Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: AppColors.t3,
-                  ),
-                ),
-                items: industries.map((industry) {
-                  return DropdownMenuItem<String>(
-                    value: industry,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
-                      child: Text(
-                        industry,
-                        style: TextStyle(color: AppColors.t1, fontSize: 15),
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() => _selectedIndustry = value);
-                },
-              ),
-            ),
+          WorkloopPickerField<String>(
+            value: _selectedIndustry,
+            title: 'Choose your industry',
+            hint: 'Select your industry',
+            searchHint: 'Search industries',
+            options: industries
+                .map(
+                  (industry) =>
+                      WorkloopPickerOption(value: industry, label: industry),
+                )
+                .toList(),
+            onChanged: (value) => setState(() => _selectedIndustry = value),
           ),
           const SizedBox(height: 40),
           SizedBox(
@@ -147,7 +127,7 @@ class _ObProfileState extends ConsumerState<ObProfile> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 disabledBackgroundColor: AppColors.bgInteract,
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.onBrandAccent,
                 disabledForegroundColor: AppColors.t3,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),

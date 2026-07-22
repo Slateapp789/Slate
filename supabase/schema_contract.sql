@@ -12,6 +12,7 @@
 -- invoices(id, workspace_id, contact_id, invoice_number, type, status, issue_date, due_date, subtotal, tax_rate, tax_amount, discount_value, total, amount_paid, notes, created_at)
 -- expenses(id, workspace_id, amount, category, expense_date, notes, created_at, updated_at)
 -- tasks(id, workspace_id, contact_id, appointment_id, title, priority, due_date, status, reminder_timing, created_at, updated_at)
+-- notes(id, workspace_id, contact_id, appointment_id, title, body, pinned, created_at, updated_at)
 -- business_profiles(id, workspace_id, handle, created_at)
 
 -- V1 extension fields.
@@ -122,6 +123,25 @@ create index if not exists task_checklist_items_workspace_id_idx
 create index if not exists task_checklist_items_task_id_position_idx
   on task_checklist_items(task_id, position);
 
+create table if not exists notes (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  contact_id uuid references contacts(id) on delete set null,
+  appointment_id uuid references appointments(id) on delete set null,
+  title text not null default 'Untitled note',
+  body text not null default '',
+  pinned boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists notes_workspace_updated_idx
+  on notes(workspace_id, pinned desc, updated_at desc);
+create index if not exists notes_contact_id_idx
+  on notes(contact_id);
+create index if not exists notes_appointment_id_idx
+  on notes(appointment_id);
+
 create table if not exists booking_requests (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references workspaces(id) on delete cascade,
@@ -217,6 +237,8 @@ create index if not exists account_deletion_requests_workspace_id_idx
 
 -- RLS expectation:
 -- Every workspace-owned table must enforce access through workspace_members.
+-- Membership helper functions live in app_private, not public, so they are not
+-- exposed as REST/RPC endpoints.
 -- Public profile reads should go through a trusted Edge Function.
 -- Public booking-request writes should go through a trusted Edge Function.
 -- Account deletion should be completed by a trusted server/edge-function path with service-role permissions.
@@ -333,3 +355,17 @@ end $$;
 create unique index if not exists business_profiles_handle_unique_idx
   on public.business_profiles(lower(handle))
   where handle is not null and handle <> '';
+
+create schema if not exists app_private;
+
+create table if not exists app_private.payment_counters (
+  workspace_id uuid primary key references public.workspaces(id) on delete cascade,
+  next_number bigint not null default 1 check (next_number > 0)
+);
+
+create unique index if not exists invoices_workspace_invoice_number_unique_idx
+  on public.invoices(workspace_id, invoice_number)
+  where invoice_number is not null;
+
+-- A private before-insert trigger assigns PAY-### numbers when invoice_number
+-- is omitted. Flutter should not generate payment numbers by counting rows.

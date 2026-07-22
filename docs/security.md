@@ -1,8 +1,8 @@
-# Slate Security Notes
+# Workloop Security Notes
 
 ## Local Configuration
 
-Slate reads Supabase client configuration from Dart defines:
+Workloop reads Supabase client configuration from Dart defines:
 
 ```bash
 flutter run --dart-define-from-file=.env
@@ -16,6 +16,11 @@ Required values:
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-or-publishable-key
 ```
+
+Google Places is called only by the authenticated `places-address-search` Edge
+Function. Store `GOOGLE_PLACES_API_KEY` in Supabase Edge Function secrets and
+restrict it to Places API (New). Never add that key to Flutter `.env`, source
+code, or a mobile application bundle. See `docs/GooglePlacesSetup.md`.
 
 The Supabase anon/publishable key is not a server secret. It is expected to be present in client apps, but database safety depends on correct Supabase Row Level Security policies. Never put a `service_role` key or any other privileged backend secret in Flutter code, `.env`, or mobile app bundles.
 

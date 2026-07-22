@@ -7,11 +7,15 @@ import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
+import '../../shared/providers/maps_preference_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
+import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/maps_launcher.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../clients/widgets/client_form.dart';
 import '../finance/add_payment_screen.dart';
 import 'widgets/appointment_detail_widgets.dart';
 
@@ -26,6 +30,20 @@ const List<String> _cancelReasons = [
   'Other',
 ];
 
+typedef _BookingEditDraft = ({
+  String? clientId,
+  String? serviceId,
+  String date,
+  int hour,
+  int minute,
+  String duration,
+  String title,
+  String locationMode,
+  String location,
+  String notes,
+  String price,
+});
+
 class AppointmentDetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> appointment;
   const AppointmentDetailScreen({super.key, required this.appointment});
@@ -33,6 +51,56 @@ class AppointmentDetailScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<AppointmentDetailScreen> createState() =>
       _AppointmentDetailScreenState();
+}
+
+class _BookingDetailAction extends StatelessWidget {
+  final String label;
+  final bool loading;
+  final bool primary;
+  final VoidCallback onTap;
+
+  const _BookingDetailAction({
+    required this.label,
+    required this.loading,
+    this.primary = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: primary
+          ? AppColors.accentPrimary.withValues(alpha: 0.14)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: InkWell(
+        onTap: loading ? null : onTap,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 58, minHeight: 42),
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: AppColors.accentPrimary,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Text(
+                    label,
+                    style: TextStyle(
+                      color: primary ? AppColors.accentPrimary : AppColors.t2,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _AppointmentDetailScreenState
@@ -56,6 +124,8 @@ class _AppointmentDetailScreenState
   bool _notesExpanded = false;
   bool _paymentExpanded = false;
   bool _tasksExpanded = false;
+  bool _allowPop = false;
+  late _BookingEditDraft _savedEditDraft;
 
   @override
   void initState() {
@@ -101,7 +171,21 @@ class _AppointmentDetailScreenState
     );
     _selectedClientId = _appt['contact_id'] as String?;
     _selectedServiceId = _appt['service_id'] as String? ?? '__custom__';
+    for (final controller in [
+      _serviceTitleController,
+      _durationController,
+      _locationController,
+      _notesController,
+      _priceController,
+    ]) {
+      controller.addListener(_handleDraftChanged);
+    }
+    _savedEditDraft = _currentEditDraft;
     _loadServices();
+  }
+
+  void _handleDraftChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -112,6 +196,54 @@ class _AppointmentDetailScreenState
     _notesController.dispose();
     _priceController.dispose();
     super.dispose();
+  }
+
+  _BookingEditDraft get _currentEditDraft => (
+    clientId: _selectedClientId,
+    serviceId: _selectedServiceId,
+    date:
+        '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
+    hour: _selectedHour,
+    minute: _selectedMinute,
+    duration: _durationController.text.trim(),
+    title: _serviceTitleController.text.trim(),
+    locationMode: _locationMode,
+    location: _locationController.text.trim(),
+    notes: _notesController.text.trim(),
+    price: _priceController.text.trim(),
+  );
+
+  bool get _hasEditChanges => _currentEditDraft != _savedEditDraft;
+
+  Future<void> _handleBack() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (!_editing || !_hasEditChanges) {
+      await _leaveScreen();
+      return;
+    }
+    final decision = await showWorkloopDraftConfirmation(
+      context,
+      title: 'Save booking changes?',
+      message: 'You changed this booking. Save before returning to Bookings?',
+      canSave: !_loading,
+    );
+    if (!mounted) return;
+    switch (decision) {
+      case WorkloopDraftDecision.save:
+        if (await _saveEdit()) await _leaveScreen();
+        return;
+      case WorkloopDraftDecision.discard:
+        await _leaveScreen();
+        return;
+      case WorkloopDraftDecision.stay:
+        return;
+    }
+  }
+
+  Future<void> _leaveScreen() async {
+    if (!_allowPop && mounted) setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.pop(context);
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -162,9 +294,9 @@ class _AppointmentDetailScreenState
       ref.invalidate(notificationsProvider);
       ref.invalidate(unreadNotificationsProvider);
       return true;
-    } catch (e) {
+    } catch (_) {
       setState(() => _loading = false);
-      if (mounted) _snack('Error: $e');
+      if (mounted) _snack('The booking could not be updated.');
       return false;
     }
   }
@@ -246,6 +378,7 @@ class _AppointmentDetailScreenState
         SnackBar(
           content: Text(
             '£${payment.total.toStringAsFixed(0)} marked as received',
+            style: const TextStyle(color: AppColors.onBrandAccent),
           ),
           backgroundColor: AppColors.green,
           behavior: SnackBarBehavior.floating,
@@ -300,7 +433,7 @@ class _AppointmentDetailScreenState
                   : hasPaidLinkedPayment
                   ? 'This booking already has a paid Money item linked.'
                   : amount > 0
-                  ? 'How should Slate handle the £${amount.toStringAsFixed(0)} payment?'
+                  ? 'How should Workloop handle the £${amount.toStringAsFixed(0)} payment?'
                   : 'No booking price is set, so you can complete it without recording money.',
               style: const TextStyle(fontSize: 13, color: AppColors.t3),
             ),
@@ -352,7 +485,7 @@ class _AppointmentDetailScreenState
     );
   }
 
-  Future<void> _saveEdit() async {
+  Future<bool> _saveEdit() async {
     setState(() => _loading = true);
     try {
       final startTime = DateTime(
@@ -373,6 +506,45 @@ class _AppointmentDetailScreenState
             (svc['duration_mins'] as int? ?? 60);
       }
       final endTime = startTime.add(Duration(minutes: durationMins));
+      final workspaceId =
+          _appt['workspace_id'] as String? ??
+          await ref.read(workspaceIdProvider.future);
+      if (workspaceId == null) {
+        throw const AppointmentScheduleException('Workspace unavailable.');
+      }
+      final settings = await ref.read(workspaceSettingsProvider.future);
+      final workingHours = settings?['working_hours'] is Map
+          ? Map<String, dynamic>.from(settings!['working_hours'] as Map)
+          : <String, dynamic>{};
+      final repository = ref.read(appointmentsRepositoryProvider);
+      try {
+        await repository.ensureScheduleAvailable(
+          workspaceId: workspaceId,
+          startTime: startTime,
+          endTime: endTime,
+          workingHours: workingHours,
+          excludeAppointmentId: _appt['id'] as String?,
+        );
+      } on AppointmentScheduleException catch (error) {
+        if (error.issue != AppointmentScheduleIssue.workingHours) rethrow;
+        if (!mounted) return false;
+        final proceed = await showWorkloopOutsideHoursConfirmation(
+          context,
+          detail: error.message,
+        );
+        if (!proceed) {
+          if (mounted) setState(() => _loading = false);
+          return false;
+        }
+        await repository.ensureScheduleAvailable(
+          workspaceId: workspaceId,
+          startTime: startTime,
+          endTime: endTime,
+          workingHours: workingHours,
+          excludeAppointmentId: _appt['id'] as String?,
+          enforceWorkingHours: false,
+        );
+      }
       final updates = {
         'contact_id': _selectedClientId,
         'service_id': _selectedServiceId == '__custom__'
@@ -401,11 +573,14 @@ class _AppointmentDetailScreenState
         };
         _editing = false;
         _loading = false;
+        _savedEditDraft = _currentEditDraft;
       });
       ref.invalidate(appointmentsProvider);
-    } catch (e) {
+      return true;
+    } catch (_) {
       setState(() => _loading = false);
-      if (mounted) _snack('Error: $e');
+      if (mounted) _snack('The booking could not be updated.');
+      return false;
     }
   }
 
@@ -433,6 +608,59 @@ class _AppointmentDetailScreenState
       'online' => 'Online / phone - add link',
       _ => 'Business location - add address',
     };
+  }
+
+  Future<void> _openDirections() async {
+    final address = _locationDisplayValue.trim();
+    if (address.isEmpty ||
+        address.contains('add address') ||
+        address.contains('add link') ||
+        address.startsWith('Online')) {
+      return;
+    }
+    final preference = await ref.read(preferredMapsAppProvider.future);
+    var selected = preference;
+    if (preference == MapsAppPreference.askEveryTime) {
+      if (!mounted) return;
+      final choice = await showMapLaunchSheet(context, address);
+      if (choice == null) return;
+      selected = choice.app;
+      if (choice.remember) {
+        await ref
+            .read(preferredMapsAppProvider.notifier)
+            .setPreference(selected);
+      }
+    }
+    final launched = await launchMapDirections(selected, address);
+    if (!launched && mounted) _snack('Could not open directions');
+  }
+
+  void _selectEditClient(String? clientId, List<Client> clients) {
+    setState(() {
+      _selectedClientId = clientId;
+      if (_locationMode != 'client' || clientId == null) return;
+      for (final client in clients) {
+        final address = client.address?.trim() ?? '';
+        if (client.id == clientId && address.isNotEmpty) {
+          _locationController.text = address;
+          break;
+        }
+      }
+    });
+  }
+
+  void _setEditLocationMode(String mode, List<Client> clients) {
+    setState(() {
+      _locationMode = mode;
+      if (mode != 'client' || _selectedClientId == null) return;
+      for (final client in clients) {
+        final address = client.address?.trim() ?? '';
+        if (client.id == _selectedClientId && address.isNotEmpty) {
+          _locationController.text = address;
+          break;
+        }
+      }
+    });
   }
 
   Future<void> _addLinkedTask(String title) async {
@@ -528,7 +756,7 @@ class _AppointmentDetailScreenState
   // ── Pickers ───────────────────────────────────────────────────────────────
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    final picked = await showWorkloopDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
@@ -757,478 +985,480 @@ class _AppointmentDetailScreenState
         .join()
         .toUpperCase();
 
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header ────────────────────────────────────────────────────
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 36,
-                      height: 36,
+    return PopScope(
+      canPop: _allowPop || !_editing || !_hasEditChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: WorkloopTexturedBackdrop()),
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.pageX,
+                  AppSpacing.lg,
+                  AppSpacing.pageX,
+                  AppSpacing.xxl,
+                ),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Header ────────────────────────────────────────────────────
+                    Row(
+                      children: [
+                        WorkloopIconButton(
+                          icon: LucideIcons.chevronLeft,
+                          semanticLabel: 'Back to bookings',
+                          onTap: _handleBack,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        const Expanded(
+                          child: Text(
+                            'Booking',
+                            style: TextStyle(
+                              color: AppColors.t1,
+                              fontSize: 26,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        if (status == 'scheduled')
+                          _BookingDetailAction(
+                            label: _editing ? 'Save' : 'Edit',
+                            loading: _loading,
+                            primary: _editing,
+                            onTap: () => _editing
+                                ? _saveEdit()
+                                : setState(() => _editing = true),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: statusColor.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Text(
+                              status.replaceAll('_', ' ').toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: statusColor,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── Hero card ─────────────────────────────────────────────────
+                    AppointmentHeroCard(
+                      editing: _editing,
+                      clientName: clientName,
+                      serviceName: serviceName,
+                      price: price as num?,
+                      initials: initials,
+                      contactId: _appt['contact_id'] as String?,
+                      appt: _appt,
+                      clients: clients.whenData(
+                        (data) => data.map((client) => client.toMap()).toList(),
+                      ),
+                      services: _services,
+                      selectedClientId: _selectedClientId,
+                      selectedServiceId: _selectedServiceId,
+                      priceController: _priceController,
+                      serviceTitleController: _serviceTitleController,
+                      onClientChanged: (v) => _selectEditClient(
+                        v,
+                        clients.value ?? const <Client>[],
+                      ),
+                      onServiceChanged: (v) {
+                        if (v == null) return;
+                        if (v == '__custom__') {
+                          setState(() => _selectedServiceId = v);
+                          return;
+                        }
+                        final service = _services.firstWhere(
+                          (s) => s['id'] == v,
+                          orElse: () => {},
+                        );
+                        setState(() {
+                          _selectedServiceId = v;
+                          _serviceTitleController.text =
+                              service['name'] as String? ?? '';
+                          final price = (service['price'] as num?)?.toDouble();
+                          if (price != null) {
+                            _priceController.text = price.toStringAsFixed(0);
+                          }
+                          final duration = service['duration_mins'] as int?;
+                          if (duration != null) {
+                            _durationController.text = '$duration';
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // ── Date + time ───────────────────────────────────────────────
+                    AppointmentDateTimeCard(
+                      editing: _editing,
+                      startTime: startTime,
+                      endTime: endTime,
+                      selectedDate: _selectedDate,
+                      selectedHour: _selectedHour,
+                      selectedMinute: _selectedMinute,
+                      durationController: _durationController,
+                      onPickDate: _pickDate,
+                      onPickTime: _pickTime,
+                      onDurationSelected: (minutes) {
+                        setState(() => _durationController.text = '$minutes');
+                      },
+                      onDurationChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 12),
+
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: AppColors.border),
                       ),
-                      child: const Icon(
-                        LucideIcons.chevronLeft,
-                        color: AppColors.t2,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Booking',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.t1,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                  ),
-                  if (status == 'scheduled')
-                    GestureDetector(
-                      onTap: () => _editing
-                          ? _saveEdit()
-                          : setState(() => _editing = true),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _editing ? AppColors.green : AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: _editing
-                                ? AppColors.green
-                                : AppColors.border,
-                          ),
-                        ),
-                        child: _loading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                _editing ? 'Save' : 'Edit',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: _editing ? Colors.white : AppColors.t2,
-                                ),
-                              ),
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: statusColor.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Text(
-                        status.replaceAll('_', ' ').toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: statusColor,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // ── Hero card ─────────────────────────────────────────────────
-              AppointmentHeroCard(
-                editing: _editing,
-                clientName: clientName,
-                serviceName: serviceName,
-                price: price as num?,
-                initials: initials,
-                contactId: _appt['contact_id'] as String?,
-                appt: _appt,
-                clients: clients.whenData(
-                  (data) => data.map((client) => client.toMap()).toList(),
-                ),
-                services: _services,
-                selectedClientId: _selectedClientId,
-                selectedServiceId: _selectedServiceId,
-                priceController: _priceController,
-                serviceTitleController: _serviceTitleController,
-                onClientChanged: (v) => setState(() => _selectedClientId = v),
-                onServiceChanged: (v) {
-                  if (v == null) return;
-                  if (v == '__custom__') {
-                    setState(() => _selectedServiceId = v);
-                    return;
-                  }
-                  final service = _services.firstWhere(
-                    (s) => s['id'] == v,
-                    orElse: () => {},
-                  );
-                  setState(() {
-                    _selectedServiceId = v;
-                    _serviceTitleController.text =
-                        service['name'] as String? ?? '';
-                    final price = (service['price'] as num?)?.toDouble();
-                    if (price != null) {
-                      _priceController.text = price.toStringAsFixed(0);
-                    }
-                    final duration = service['duration_mins'] as int?;
-                    if (duration != null) {
-                      _durationController.text = '$duration';
-                    }
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-
-              // ── Date + time ───────────────────────────────────────────────
-              AppointmentDateTimeCard(
-                editing: _editing,
-                startTime: startTime,
-                endTime: endTime,
-                selectedDate: _selectedDate,
-                selectedHour: _selectedHour,
-                selectedMinute: _selectedMinute,
-                durationController: _durationController,
-                onPickDate: _pickDate,
-                onPickTime: _pickTime,
-                onDurationSelected: (minutes) {
-                  setState(() => _durationController.text = '$minutes');
-                },
-                onDurationChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 12),
-
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: _editing
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children:
-                                const [
-                                  _BookingLocationOption(
-                                    value: 'business',
-                                    label: 'Business',
-                                  ),
-                                  _BookingLocationOption(
-                                    value: 'client',
-                                    label: 'Client',
-                                  ),
-                                  _BookingLocationOption(
-                                    value: 'online',
-                                    label: 'Online',
-                                  ),
-                                ].map((option) {
-                                  final selected =
-                                      _locationMode == option.value;
-                                  return GestureDetector(
-                                    onTap: () => setState(
-                                      () => _locationMode = option.value,
-                                    ),
-                                    child: AnimatedContainer(
-                                      duration: AppMotion.fast,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 13,
-                                        vertical: 8,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: selected
-                                            ? AppColors.slateLight
-                                            : AppColors.bgInteract,
-                                        borderRadius: BorderRadius.circular(
-                                          999,
+                      child: _editing
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children:
+                                      const [
+                                        _BookingLocationOption(
+                                          value: 'business',
+                                          label: 'Business',
                                         ),
-                                        border: Border.all(
-                                          color: selected
-                                              ? AppColors.borderStrong
-                                              : AppColors.border,
+                                        _BookingLocationOption(
+                                          value: 'client',
+                                          label: 'Client',
+                                        ),
+                                        _BookingLocationOption(
+                                          value: 'online',
+                                          label: 'Online',
+                                        ),
+                                      ].map((option) {
+                                        final selected =
+                                            _locationMode == option.value;
+                                        return GestureDetector(
+                                          onTap: () => _setEditLocationMode(
+                                            option.value,
+                                            clients.value ?? const <Client>[],
+                                          ),
+                                          child: AnimatedContainer(
+                                            duration: AppMotion.fast,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 13,
+                                              vertical: 8,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: selected
+                                                  ? AppColors.slateLight
+                                                  : AppColors.bgInteract,
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                              border: Border.all(
+                                                color: selected
+                                                    ? AppColors.borderStrong
+                                                    : AppColors.border,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              option.label,
+                                              style: TextStyle(
+                                                color: selected
+                                                    ? AppColors.panelInk
+                                                    : AppColors.t2,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+                                ),
+                                const SizedBox(height: 10),
+                                if (_locationMode == 'online')
+                                  TextField(
+                                    controller: _locationController,
+                                    style: const TextStyle(color: AppColors.t1),
+                                    decoration: InputDecoration(
+                                      hintText: 'Call link or phone note',
+                                      hintStyle: const TextStyle(
+                                        color: AppColors.t3,
+                                      ),
+                                      filled: true,
+                                      fillColor: AppColors.bgInteract,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: const BorderSide(
+                                          color: AppColors.border,
                                         ),
                                       ),
-                                      child: Text(
-                                        option.label,
-                                        style: TextStyle(
-                                          color: selected
-                                              ? AppColors.panelInk
-                                              : AppColors.t2,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w800,
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: const BorderSide(
+                                          color: AppColors.border,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: const BorderSide(
+                                          color: AppColors.green,
+                                          width: 1.5,
                                         ),
                                       ),
                                     ),
-                                  );
-                                }).toList(),
-                          ),
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: _locationController,
-                            style: const TextStyle(color: AppColors.t1),
-                            decoration: InputDecoration(
-                              hintText: _locationMode == 'business'
-                                  ? 'Business address or room'
-                                  : _locationMode == 'client'
-                                  ? 'Client address'
-                                  : 'Call link or phone note',
-                              hintStyle: const TextStyle(color: AppColors.t3),
-                              filled: true,
-                              fillColor: AppColors.bgInteract,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(
-                                  color: AppColors.border,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(
-                                  color: AppColors.border,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(
-                                  color: AppColors.green,
-                                  width: 1.5,
-                                ),
+                                  )
+                                else
+                                  BookingAddressField(
+                                    controller: _locationController,
+                                    onChanged: () => setState(() {}),
+                                  ),
+                              ],
+                            )
+                          : InkWell(
+                              onTap: _openDirections,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    LucideIcons.mapPin,
+                                    color: AppColors.t3,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'Location',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.t3,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Flexible(
+                                    child: Text(
+                                      _locationDisplayValue,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.t1,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  const Icon(
+                                    LucideIcons.navigation,
+                                    color: AppColors.modCalendar,
+                                    size: 16,
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          const Icon(
-                            LucideIcons.mapPin,
-                            color: AppColors.t3,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Location',
-                            style: TextStyle(fontSize: 13, color: AppColors.t3),
-                          ),
-                          const Spacer(),
-                          Flexible(
-                            child: Text(
-                              _locationDisplayValue,
-                              overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+
+                    if (recurrenceRule != null &&
+                        recurrenceRule.isNotEmpty) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.bgCard,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              LucideIcons.repeat,
+                              color: AppColors.t3,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _repeatLabel(recurrenceRule),
                               style: const TextStyle(
+                                color: AppColors.t2,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.t1,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-              ),
-              const SizedBox(height: 12),
-
-              if (recurrenceRule != null && recurrenceRule.isNotEmpty) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgCard,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        LucideIcons.repeat,
-                        color: AppColors.t3,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        _repeatLabel(recurrenceRule),
-                        style: const TextStyle(
-                          color: AppColors.t2,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                          ],
                         ),
                       ),
+                      const SizedBox(height: 12),
                     ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
 
-              SlateDisclosure(
-                title: 'Notes',
-                subtitle: notes.isEmpty ? 'No notes added' : 'Booking context',
-                icon: LucideIcons.fileText,
-                expanded: _editing || _notesExpanded,
-                onToggle: () => setState(() {
-                  if (!_editing) _notesExpanded = !_notesExpanded;
-                }),
-                child: _editing
-                    ? TextField(
-                        controller: _notesController,
-                        maxLines: 3,
-                        style: const TextStyle(
-                          color: AppColors.t1,
-                          fontSize: 14,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Notes (optional)',
-                          labelStyle: const TextStyle(
-                            color: AppColors.t3,
-                            fontSize: 13,
-                          ),
-                          filled: true,
-                          fillColor: AppColors.bgInteract,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: AppColors.border,
+                    SlateDisclosure(
+                      title: 'Notes',
+                      subtitle: notes.isEmpty
+                          ? 'No notes added'
+                          : 'Booking context',
+                      icon: LucideIcons.fileText,
+                      expanded: _editing || _notesExpanded,
+                      onToggle: () => setState(() {
+                        if (!_editing) _notesExpanded = !_notesExpanded;
+                      }),
+                      child: _editing
+                          ? TextField(
+                              controller: _notesController,
+                              maxLines: 3,
+                              style: const TextStyle(
+                                color: AppColors.t1,
+                                fontSize: 14,
+                              ),
+                              decoration: InputDecoration(
+                                labelText: 'Notes (optional)',
+                                labelStyle: const TextStyle(
+                                  color: AppColors.t3,
+                                  fontSize: 13,
+                                ),
+                                filled: true,
+                                fillColor: AppColors.bgInteract,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.border,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.border,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                    color: AppColors.green,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                contentPadding: const EdgeInsets.all(12),
+                              ),
+                            )
+                          : Text(
+                              notes.isEmpty ? 'No notes' : notes,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: notes.isEmpty
+                                    ? AppColors.t3
+                                    : AppColors.t2,
+                              ),
                             ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: AppColors.border,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: AppColors.green,
-                              width: 1.5,
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.all(12),
-                        ),
-                      )
-                    : Text(
-                        notes.isEmpty ? 'No notes' : notes,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: notes.isEmpty ? AppColors.t3 : AppColors.t2,
-                        ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    SlateDisclosure(
+                      title: 'Money',
+                      subtitle: linkedPayments.when(
+                        loading: () => 'Loading payment state',
+                        error: (_, __) => 'Payment state unavailable',
+                        data: (rows) => rows.isEmpty
+                            ? bookingPrice > 0
+                                  ? 'No payment linked · £${bookingPrice.toStringAsFixed(0)}'
+                                  : 'No payment linked'
+                            : '${rows.length} linked payment${rows.length == 1 ? '' : 's'}',
                       ),
-              ),
-              const SizedBox(height: 12),
-
-              SlateDisclosure(
-                title: 'Money',
-                subtitle: linkedPayments.when(
-                  loading: () => 'Loading payment state',
-                  error: (_, __) => 'Payment state unavailable',
-                  data: (rows) => rows.isEmpty
-                      ? bookingPrice > 0
-                            ? 'No payment linked · £${bookingPrice.toStringAsFixed(0)}'
-                            : 'No payment linked'
-                      : '${rows.length} linked payment${rows.length == 1 ? '' : 's'}',
-                ),
-                icon: LucideIcons.banknote,
-                expanded: _paymentExpanded,
-                onToggle: () =>
-                    setState(() => _paymentExpanded = !_paymentExpanded),
-                child: _BookingPaymentCard(
-                  payments: linkedPayments,
-                  price: bookingPrice,
-                  onRecordPayment: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AddPaymentScreen(
-                          initialClientId: _appt['contact_id'] as String?,
-                          appointmentId: _appt['id'] as String,
-                        ),
+                      icon: LucideIcons.banknote,
+                      expanded: _paymentExpanded,
+                      onToggle: () =>
+                          setState(() => _paymentExpanded = !_paymentExpanded),
+                      child: _BookingPaymentCard(
+                        payments: linkedPayments,
+                        price: bookingPrice,
+                        onRecordPayment: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => AddPaymentScreen(
+                                initialClientId: _appt['contact_id'] as String?,
+                                appointmentId: _appt['id'] as String,
+                              ),
+                            ),
+                          );
+                          _refreshPaymentState();
+                        },
+                        onMarkPaid: _markLinkedPaymentPaid,
                       ),
-                    );
-                    _refreshPaymentState();
-                  },
-                  onMarkPaid: _markLinkedPaymentPaid,
-                ),
-              ),
-              const SizedBox(height: 12),
+                    ),
+                    const SizedBox(height: 12),
 
-              SlateDisclosure(
-                title: 'Booking tasks',
-                subtitle: linkedTasks.when(
-                  loading: () => 'Loading tasks',
-                  error: (_, __) => 'Tasks unavailable',
-                  data: (items) => items.isEmpty
-                      ? 'Prep and follow-up tasks'
-                      : '${items.length} linked task${items.length == 1 ? '' : 's'}',
-                ),
-                icon: LucideIcons.listChecks,
-                expanded: _tasksExpanded,
-                onToggle: () =>
-                    setState(() => _tasksExpanded = !_tasksExpanded),
-                child: _BookingTasksCard(
-                  tasks: linkedTasks,
-                  onAddTask: _showAddTaskSheet,
-                  onToggle: (task) async {
-                    final done = task.status == 'done';
-                    await ref
-                        .read(tasksRepositoryProvider)
-                        .updateStatus(task.id, done ? 'open' : 'done');
-                    ref.invalidate(
-                      appointmentTasksProvider(_appt['id'] as String),
-                    );
-                    ref.invalidate(tasksProvider);
-                    ref.invalidate(allTasksProvider);
-                  },
-                ),
-              ),
-              const SizedBox(height: 24),
+                    SlateDisclosure(
+                      title: 'Booking tasks',
+                      subtitle: linkedTasks.when(
+                        loading: () => 'Loading tasks',
+                        error: (_, __) => 'Tasks unavailable',
+                        data: (items) => items.isEmpty
+                            ? 'Prep and follow-up tasks'
+                            : '${items.length} linked task${items.length == 1 ? '' : 's'}',
+                      ),
+                      icon: LucideIcons.listChecks,
+                      expanded: _tasksExpanded,
+                      onToggle: () =>
+                          setState(() => _tasksExpanded = !_tasksExpanded),
+                      child: _BookingTasksCard(
+                        tasks: linkedTasks,
+                        onAddTask: _showAddTaskSheet,
+                        onToggle: (task) async {
+                          final done = task.status == 'done';
+                          await ref
+                              .read(tasksRepositoryProvider)
+                              .updateStatus(task.id, done ? 'open' : 'done');
+                          ref.invalidate(
+                            appointmentTasksProvider(_appt['id'] as String),
+                          );
+                          ref.invalidate(tasksProvider);
+                          ref.invalidate(allTasksProvider);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 24),
 
-              // ── Actions ───────────────────────────────────────────────────
-              AppointmentActionSection(
-                status: status,
-                notes: notes,
-                loading: _loading,
-                onComplete: () {
-                  final payments = linkedPayments.value;
-                  if (payments == null) {
-                    _snack('Payment status is still loading');
-                    return;
-                  }
-                  _showCompletionSheet(payments);
-                },
-                onCancel: _showCancelSheet,
+                    // ── Actions ───────────────────────────────────────────────────
+                    AppointmentActionSection(
+                      status: status,
+                      notes: notes,
+                      loading: _loading,
+                      onComplete: () {
+                        final payments = linkedPayments.value;
+                        if (payments == null) {
+                          _snack('Payment status is still loading');
+                          return;
+                        }
+                        _showCompletionSheet(payments);
+                      },
+                      onCancel: _showCancelSheet,
+                    ),
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
-              const SizedBox(height: 40),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

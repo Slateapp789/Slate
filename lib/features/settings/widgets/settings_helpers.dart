@@ -83,7 +83,7 @@ Widget tappableRow({
 Widget skeletonBox(double height) => Container(
   height: height,
   decoration: BoxDecoration(
-    color: AppColors.bgCard,
+    color: AppColors.t1.withValues(alpha: 0.035),
     borderRadius: BorderRadius.circular(16),
   ),
 );
@@ -91,9 +91,9 @@ Widget skeletonBox(double height) => Container(
 Widget errorBox(String msg) => Container(
   padding: const EdgeInsets.all(16),
   decoration: BoxDecoration(
-    color: AppColors.bgCard,
+    color: AppColors.t1.withValues(alpha: 0.028),
     borderRadius: BorderRadius.circular(16),
-    border: Border.all(color: AppColors.border),
+    border: Border.all(color: AppColors.border.withValues(alpha: 0.54)),
   ),
   child: Text(msg, style: const TextStyle(color: AppColors.t3)),
 );
@@ -103,7 +103,7 @@ Widget saveBtn({
   required VoidCallback onTap,
   bool loading = false,
   bool disabled = false,
-  Color color = AppColors.green,
+  Color color = AppColors.accentPrimaryStrong,
 }) => SizedBox(
   width: double.infinity,
   height: 52,
@@ -111,7 +111,7 @@ Widget saveBtn({
     onPressed: loading || disabled ? null : onTap,
     style: ElevatedButton.styleFrom(
       backgroundColor: color,
-      foregroundColor: Colors.white,
+      foregroundColor: AppColors.t1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 0,
     ),
@@ -120,7 +120,7 @@ Widget saveBtn({
             width: 18,
             height: 18,
             child: CircularProgressIndicator(
-              color: Colors.white,
+              color: AppColors.t1,
               strokeWidth: 2,
             ),
           )
@@ -177,7 +177,7 @@ Widget settingsField({
         hintText: hint,
         hintStyle: const TextStyle(color: AppColors.t3),
         filled: true,
-        fillColor: AppColors.bgInteract,
+        fillColor: AppColors.t1.withValues(alpha: 0.028),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.border),
@@ -188,7 +188,10 @@ Widget settingsField({
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+          borderSide: const BorderSide(
+            color: AppColors.accentPrimary,
+            width: 1.5,
+          ),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,

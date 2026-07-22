@@ -4,21 +4,57 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../shared/models/slate_models.dart';
+import '../../shared/models/business_feed_item.dart';
 import '../../shared/providers/appointments_provider.dart';
+import '../../shared/providers/business_feed_provider.dart';
+import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/finance_provider.dart';
-import '../../shared/providers/notifications_provider.dart';
+import '../../shared/providers/notes_provider.dart';
+import '../../shared/providers/setup_checklist_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
+import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/date_format.dart';
 import '../../shared/widgets/slate_ui.dart';
-import '../appointments/add_appointment_screen.dart';
 import '../appointments/appointment_detail_screen.dart';
-import '../clients/add_client_screen.dart';
-import '../clients/client_detail_screen.dart';
-import '../finance/add_payment_screen.dart';
-import '../settings/settings_screen.dart';
+
+final dashboardClockProvider = StreamProvider.autoDispose<DateTime>((
+  ref,
+) async* {
+  yield DateTime.now();
+  yield* Stream<DateTime>.periodic(
+    const Duration(minutes: 1),
+    (_) => DateTime.now(),
+  );
+});
+
+String dashboardGreetingForHour(int hour) {
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+String dashboardDateLabel(DateTime date) => _dashboardDate(date);
+
+List<Map<String, dynamic>> selectDashboardTodayBookings(
+  List<Map<String, dynamic>> rows, {
+  required DateTime now,
+}) => _todayJobs(rows, now: now);
+
+List<Map<String, dynamic>> selectDashboardComingUpBookings(
+  List<Map<String, dynamic>> rows, {
+  required DateTime now,
+}) => _upcomingJobs(
+  rows,
+  now: now,
+).where((job) => !_isSameDay(_startTime(job), now)).take(3).toList();
+
+int dashboardSetupCompletedCount({
+  required bool hasClient,
+  required bool hasBooking,
+  required bool hasPayment,
+}) => [hasClient, hasBooking, hasPayment].where((value) => value).length;
 
 class DashboardScreen extends ConsumerWidget {
   final void Function(int) onNavigate;
@@ -30,125 +66,125 @@ class DashboardScreen extends ConsumerWidget {
     required this.onOpenMoneyFollowUps,
   });
 
-  String get _greeting {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final workspace = ref.watch(workspaceProvider);
-    final todayAppointments = ref.watch(todayAppointmentsProvider);
+    final appointments = ref.watch(appointmentsProvider);
+    final clients = ref.watch(clientsProvider);
+    final payments = ref.watch(invoicesProvider);
     final finance = ref.watch(financeSummaryProvider);
-    final tasks = ref.watch(allTasksProvider);
+    final feed = ref.watch(businessFeedProvider);
     final attention = ref.watch(dashboardAttentionProvider);
-    final unreadNotifications = ref.watch(unreadNotificationsProvider);
+    final displayName = ref.watch(authRepositoryProvider).currentFirstName;
+    final now = ref
+        .watch(dashboardClockProvider)
+        .maybeWhen(data: (value) => value, orElse: DateTime.now);
+    final greeting = dashboardGreetingForHour(now.hour);
+    final checklistDismissed = ref
+        .watch(setupChecklistDismissedProvider)
+        .asData
+        ?.value;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: RefreshIndicator(
-        color: AppColors.green,
-        onRefresh: () async {
-          ref.invalidate(workspaceProvider);
-          ref.invalidate(todayAppointmentsProvider);
-          ref.invalidate(appointmentsProvider);
-          ref.invalidate(financeSummaryProvider);
-          ref.invalidate(invoicesProvider);
-          ref.invalidate(allTasksProvider);
-          ref.invalidate(tasksProvider);
-          ref.invalidate(dashboardAttentionProvider);
-          ref.invalidate(unreadNotificationsProvider);
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.pageX,
-            AppSpacing.pageTop,
-            AppSpacing.pageX,
-            116,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _DashboardHeader(
-                greeting: _greeting,
-                workspaceName: workspace.when(
-                  data: (ws) => ws?['name']?.toString() ?? 'Your Business',
-                  loading: () => '...',
-                  error: (_, __) => 'Slate',
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          RefreshIndicator(
+            color: AppColors.accentPrimary,
+            onRefresh: () async {
+              SlateHaptics.action();
+              ref.invalidate(workspaceProvider);
+              ref.invalidate(appointmentsProvider);
+              ref.invalidate(todayAppointmentsProvider);
+              ref.invalidate(financeSummaryProvider);
+              ref.invalidate(invoicesProvider);
+              ref.invalidate(expensesProvider);
+              ref.invalidate(clientsProvider);
+              ref.invalidate(allTasksProvider);
+              ref.invalidate(tasksProvider);
+              ref.invalidate(allNotesProvider);
+              ref.invalidate(businessFeedProvider);
+              ref.invalidate(dashboardAttentionProvider);
+            },
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                AppSpacing.pageTop + AppSpacing.xxl,
+                AppSpacing.pageX,
+                AppSpacing.bottomNavClearance,
+              ),
+              children: [
+                _DashboardGreeting(
+                  greeting: displayName == null
+                      ? greeting
+                      : '$greeting $displayName',
+                  subtitle: dashboardDateLabel(now),
                 ),
-                unreadNotifications: unreadNotifications,
-                onNotifications: () => context.push('/notifications'),
-                onSettings: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                if (checklistDismissed == false)
+                  _SetupChecklist(
+                    hasClient: clients.asData?.value.isNotEmpty ?? false,
+                    hasBooking: appointments.asData?.value.isNotEmpty ?? false,
+                    hasPayment: payments.asData?.value.isNotEmpty ?? false,
+                    onAddClient: () => context.push('/clients/new'),
+                    onAddBooking: () => context.push('/bookings/new'),
+                    onAddPayment: () => onNavigate(3),
+                    onImport: () => context.push('/import-data'),
+                    onDismiss: () => dismissSetupChecklist(ref),
+                  ),
+                const SizedBox(height: AppSpacing.xxl),
+                _TodaySection(
+                  appointments: appointments,
+                  now: now,
+                  onOpenJob: (appointment) =>
+                      _openAppointment(context, ref, appointment),
+                  onViewBookings: () => onNavigate(2),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _GlanceZone(
-                appointments: todayAppointments,
-                finance: finance,
-                tasks: tasks,
-                onOpenAppointment: (appointment) =>
-                    _openAppointment(context, ref, appointment),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _TodayScheduleSection(
-                appointments: todayAppointments,
-                onOpenAppointment: (appointment) =>
-                    _openAppointment(context, ref, appointment),
-              ),
-              attention.when(
-                data: (items) => items.isEmpty
-                    ? const SizedBox.shrink()
-                    : Padding(
-                        padding: const EdgeInsets.only(top: AppSpacing.lg),
-                        child: _NeedsAttentionSection(
-                          items: items,
-                          onOpenItem: (item) =>
-                              _openAttentionItem(context, ref, item),
+                attention.maybeWhen(
+                  data: (items) => items.isEmpty
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.xxl),
+                          child: _WorthALookSection(
+                            items: items.take(2).toList(),
+                            onOpen: (item) =>
+                                _openAttentionItem(context, ref, item),
+                          ),
                         ),
-                      ),
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _QuickActionsSection(
-                onAddClient: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AddClientScreen()),
-                ).then((_) => ref.invalidate(workspaceProvider)),
-                onAddAppointment: () =>
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => AddAppointmentScreen()),
-                    ).then((_) {
-                      ref.invalidate(todayAppointmentsProvider);
-                      ref.invalidate(appointmentsProvider);
-                    }),
-                onRecordPayment: () =>
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AddPaymentScreen(),
-                      ),
-                    ).then((_) {
-                      ref.invalidate(financeSummaryProvider);
-                      ref.invalidate(invoicesProvider);
-                    }),
-                onAddTask: () => onNavigate(4),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _CompactMoneySection(
-                appointments: todayAppointments,
-                finance: finance,
-                onTap: () => onNavigate(3),
-              ),
-            ],
+                  orElse: () => const SizedBox.shrink(),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                _MoneyPulse(finance: finance, onOpen: () => onNavigate(3)),
+                const SizedBox(height: AppSpacing.xl),
+                _QuickAccessRow(
+                  taskSummary: 'Plan and follow up',
+                  noteSummary: 'Capture useful context',
+                  onOpenTasks: () => onNavigate(4),
+                  onOpenNotes: () => onNavigate(5),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                _UpcomingJobsSection(
+                  appointments: appointments,
+                  now: now,
+                  onOpenJob: (appointment) =>
+                      _openAppointment(context, ref, appointment),
+                  onViewBookings: () => onNavigate(2),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                _CalmFeedSection(
+                  feed: feed,
+                  onOpenFeedItem: (item) => _openFeedItem(context, item),
+                  onViewAllFeed: () => context.push('/business-feed'),
+                ),
+                if (workspace.hasError) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  const SlateErrorState(message: 'Could not refresh workspace'),
+                ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -164,10 +200,36 @@ class DashboardScreen extends ConsumerWidget {
         builder: (_) => AppointmentDetailScreen(appointment: appointment),
       ),
     ).then((_) {
-      ref.invalidate(todayAppointmentsProvider);
       ref.invalidate(appointmentsProvider);
-      ref.invalidate(dashboardAttentionProvider);
+      ref.invalidate(todayAppointmentsProvider);
+      ref.invalidate(businessFeedProvider);
     });
+  }
+
+  void _openFeedItem(BuildContext context, BusinessFeedItem item) {
+    final route = item.routeTarget;
+    if (route == null) return;
+    if (route == '/clients') {
+      onNavigate(1);
+      return;
+    }
+    if (route == '/work') {
+      onNavigate(2);
+      return;
+    }
+    if (route == '/payments') {
+      onNavigate(3);
+      return;
+    }
+    if (route == '/tasks') {
+      onNavigate(4);
+      return;
+    }
+    if (route == '/notes') {
+      onNavigate(5);
+      return;
+    }
+    context.push(route);
   }
 
   void _openAttentionItem(
@@ -178,40 +240,227 @@ class DashboardScreen extends ConsumerWidget {
     switch (item.type) {
       case DashboardAttentionType.unpaid:
         onOpenMoneyFollowUps();
+      case DashboardAttentionType.unconfirmedAppointment:
+        final appointment = item.source;
+        if (appointment is Map<String, dynamic>) {
+          _openAppointment(context, ref, appointment);
+        } else {
+          onNavigate(2);
+        }
       case DashboardAttentionType.overdueTask:
         onNavigate(4);
-      case DashboardAttentionType.unconfirmedAppointment:
-        final source = item.source;
-        if (source is Map<String, dynamic>) {
-          _openAppointment(context, ref, source);
-        }
       case DashboardAttentionType.uncontactedLead:
-        final source = item.source;
-        if (source is Client) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ClientDetailScreen(client: source.toMap()),
-            ),
-          );
-        }
+        onNavigate(1);
     }
   }
 }
 
-class _DashboardHeader extends StatelessWidget {
-  final String greeting;
-  final String workspaceName;
-  final AsyncValue<int> unreadNotifications;
-  final VoidCallback onNotifications;
-  final VoidCallback onSettings;
+class _SetupChecklist extends StatelessWidget {
+  final bool hasClient;
+  final bool hasBooking;
+  final bool hasPayment;
+  final VoidCallback onAddClient;
+  final VoidCallback onAddBooking;
+  final VoidCallback onAddPayment;
+  final VoidCallback onImport;
+  final VoidCallback onDismiss;
 
-  const _DashboardHeader({
-    required this.greeting,
-    required this.workspaceName,
-    required this.unreadNotifications,
-    required this.onNotifications,
-    required this.onSettings,
+  const _SetupChecklist({
+    required this.hasClient,
+    required this.hasBooking,
+    required this.hasPayment,
+    required this.onAddClient,
+    required this.onAddBooking,
+    required this.onAddPayment,
+    required this.onImport,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = dashboardSetupCompletedCount(
+      hasClient: hasClient,
+      hasBooking: hasBooking,
+      hasPayment: hasPayment,
+    );
+    if (completed == 3) return const SizedBox.shrink();
+    final tokens = SlateTheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xl),
+      child: WorkloopSurface(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.sm,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Set up your workspace',
+                        style: TextStyle(
+                          color: tokens.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '$completed of 3 essentials complete',
+                        style: TextStyle(
+                          color: tokens.textTertiary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                WorkloopIconButton(
+                  icon: LucideIcons.x,
+                  semanticLabel: 'Dismiss setup checklist',
+                  onTap: onDismiss,
+                  size: 36,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _SetupStep(
+              complete: hasClient,
+              label: 'Add your first client',
+              onTap: onAddClient,
+            ),
+            _SetupStep(
+              complete: hasBooking,
+              label: 'Create your first booking',
+              onTap: onAddBooking,
+            ),
+            _SetupStep(
+              complete: hasPayment,
+              label: 'Record your first payment',
+              onTap: onAddPayment,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.sm,
+                AppSpacing.xs,
+                AppSpacing.sm,
+                AppSpacing.xs,
+              ),
+              child: WorkloopTextButton(
+                label: 'Import existing data',
+                onPressed: onImport,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SetupStep extends StatelessWidget {
+  final bool complete;
+  final String label;
+  final VoidCallback onTap;
+
+  const _SetupStep({
+    required this.complete,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    return WorkloopListRow(
+      onTap: complete ? null : onTap,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.sm,
+      ),
+      leading: Icon(
+        complete ? LucideIcons.checkCircle2 : LucideIcons.circle,
+        size: 19,
+        color: complete ? tokens.accentInk : tokens.textTertiary,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: complete ? tokens.textTertiary : tokens.textPrimary,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          decoration: complete ? TextDecoration.lineThrough : null,
+        ),
+      ),
+      trailing: complete
+          ? null
+          : Icon(
+              LucideIcons.chevronRight,
+              size: 16,
+              color: tokens.textTertiary,
+            ),
+      showDivider: false,
+    );
+  }
+}
+
+class _DashboardGreeting extends StatelessWidget {
+  final String greeting;
+  final String subtitle;
+
+  const _DashboardGreeting({required this.greeting, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          greeting,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.t1,
+            fontSize: 34,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+            height: 1.04,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            color: AppColors.t2,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            height: 1.32,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickAccessRow extends StatelessWidget {
+  final String taskSummary;
+  final String noteSummary;
+  final VoidCallback onOpenTasks;
+  final VoidCallback onOpenNotes;
+
+  const _QuickAccessRow({
+    required this.taskSummary,
+    required this.noteSummary,
+    required this.onOpenTasks,
+    required this.onOpenNotes,
   });
 
   @override
@@ -219,580 +468,535 @@ class _DashboardHeader extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                greeting,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.t1,
-                  letterSpacing: 0,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                _todayLabel(),
-                style: const TextStyle(
-                  color: AppColors.t3,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                workspaceName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.t3, fontSize: 13),
-              ),
-            ],
+          child: _QuickAccessItem(
+            icon: LucideIcons.listChecks,
+            label: 'Tasks',
+            summary: taskSummary,
+            onTap: onOpenTasks,
           ),
         ),
-        const SizedBox(width: AppSpacing.md),
-        SlateIconButton(
-          icon: LucideIcons.bell,
-          semanticLabel: 'Open notifications',
-          onTap: onNotifications,
-          badge: unreadNotifications.when(
-            data: (count) => count == 0
-                ? null
-                : Positioned(
-                    right: -4,
-                    top: -4,
-                    child: Container(
-                      constraints: const BoxConstraints(
-                        minWidth: 18,
-                        minHeight: 18,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.error,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                        border: Border.all(color: AppColors.bg, width: 2),
-                      ),
-                      child: Text(
-                        count > 9 ? '9+' : '$count',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ),
-            loading: () => null,
-            error: (_, __) => null,
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _QuickAccessItem(
+            icon: LucideIcons.stickyNote,
+            label: 'Notes',
+            summary: noteSummary,
+            onTap: onOpenNotes,
           ),
-        ),
-        const SizedBox(width: AppSpacing.xs),
-        SlateIconButton(
-          icon: Icons.settings_rounded,
-          semanticLabel: 'Open settings',
-          onTap: onSettings,
         ),
       ],
     );
   }
-
-  static String _todayLabel() {
-    final now = DateTime.now();
-    const weekdays = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
-  }
 }
 
-class _GlanceZone extends StatelessWidget {
-  final AsyncValue<List<Map<String, dynamic>>> appointments;
-  final AsyncValue<FinanceSummary> finance;
-  final AsyncValue<List<SlateTask>> tasks;
-  final ValueChanged<Map<String, dynamic>> onOpenAppointment;
-
-  const _GlanceZone({
-    required this.appointments,
-    required this.finance,
-    required this.tasks,
-    required this.onOpenAppointment,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (appointments.isLoading || finance.isLoading || tasks.isLoading) {
-      return const SlateLoadingBlock(height: 154, radius: AppRadius.lg);
-    }
-    if (appointments.hasError || finance.hasError || tasks.hasError) {
-      return const SlateErrorState(message: 'Could not load today');
-    }
-
-    final rows = _sortedToday(appointments.value ?? const []);
-    final next = _nextUpcoming(rows);
-    final summary = _summarySentence(
-      appointments: rows,
-      finance: finance.value!,
-      tasks: tasks.value ?? const [],
-    );
-
-    return SlateSurface(
-      radius: AppRadius.xl,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      color: AppColors.bgCard.withValues(alpha: 0.82),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (summary.isNotEmpty) ...[
-            Text(
-              summary,
-              style: const TextStyle(
-                color: AppColors.t2,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-          ],
-          if (next == null)
-            const _NoMoreAppointments()
-          else
-            _NextAppointmentCard(
-              appointment: next,
-              onTap: () => onOpenAppointment(next),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NextAppointmentCard extends StatelessWidget {
-  final Map<String, dynamic> appointment;
+class _QuickAccessItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String summary;
   final VoidCallback onTap;
 
-  const _NextAppointmentCard({required this.appointment, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final start = _startTime(appointment);
-    final end = _endTime(appointment);
-    final client = _clientName(appointment);
-    final service = _serviceName(appointment);
-    final location = _location(appointment);
-
-    return SlateSurface(
-      onTap: onTap,
-      radius: AppRadius.lg,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      color: AppColors.t1.withValues(alpha: 0.045),
-      borderColor: AppColors.green.withValues(alpha: 0.22),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppColors.green.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: const Icon(
-              LucideIcons.calendarClock,
-              color: AppColors.green,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  start == null
-                      ? 'Next appointment'
-                      : slateTimeRange(start, end),
-                  style: const TextStyle(
-                    color: AppColors.green,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  client,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  [service, if (location != null) location].join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.t3, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 18),
-        ],
-      ),
-    );
-  }
-}
-
-class _NoMoreAppointments extends StatelessWidget {
-  const _NoMoreAppointments();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.t1.withValues(alpha: 0.035),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: const Row(
-        children: [
-          Icon(
-            LucideIcons.checkCircle2,
-            color: AppColors.statusSuccess,
-            size: 20,
-          ),
-          SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              'No more appointments today',
-              style: TextStyle(
-                color: AppColors.t2,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TodayScheduleSection extends StatelessWidget {
-  final AsyncValue<List<Map<String, dynamic>>> appointments;
-  final ValueChanged<Map<String, dynamic>> onOpenAppointment;
-
-  const _TodayScheduleSection({
-    required this.appointments,
-    required this.onOpenAppointment,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return appointments.when(
-      loading: () => const SlateLoadingBlock(height: 160, radius: AppRadius.lg),
-      error: (_, __) =>
-          const SlateErrorState(message: 'Could not load schedule'),
-      data: (rows) {
-        final sorted = _sortedToday(rows);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SlateSectionHeader(label: "TODAY'S SCHEDULE"),
-            const SizedBox(height: AppSpacing.xs),
-            if (sorted.isEmpty)
-              const SlateEmptyState(
-                icon: LucideIcons.calendar,
-                title: 'No appointments today',
-                subtitle: 'Use quick actions to add one.',
-              )
-            else
-              SlateSurface(
-                radius: AppRadius.lg,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.xxs,
-                ),
-                child: Column(
-                  children: sorted.asMap().entries.map((entry) {
-                    return _ScheduleRow(
-                      appointment: entry.value,
-                      isLast: entry.key == sorted.length - 1,
-                      onTap: () => onOpenAppointment(entry.value),
-                    );
-                  }).toList(),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _ScheduleRow extends StatelessWidget {
-  final Map<String, dynamic> appointment;
-  final bool isLast;
-  final VoidCallback onTap;
-
-  const _ScheduleRow({
-    required this.appointment,
-    required this.isLast,
+  const _QuickAccessItem({
+    required this.icon,
+    required this.label,
+    required this.summary,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final start = _startTime(appointment);
-    final end = _endTime(appointment);
-    final location = _location(appointment);
-    final status = appointment['status']?.toString() ?? 'scheduled';
-    final isPast =
-        status == 'completed' ||
-        status == 'cancelled' ||
-        (end ?? start)?.isBefore(DateTime.now()) == true;
-    final alpha = isPast ? 0.48 : 1.0;
-
-    return Opacity(
-      opacity: alpha,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: isLast
-                    ? BorderSide.none
-                    : BorderSide(
-                        color: AppColors.border.withValues(alpha: 0.7),
-                      ),
-              ),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 96,
-                  child: Text(
-                    start == null ? '--:--' : slateTimeRange(start, end),
+    return Semantics(
+      button: true,
+      label: '$label, $summary',
+      child: WorkloopSurface(
+        onTap: () {
+          SlateHaptics.tap();
+          onTap();
+        },
+        radius: AppRadius.md,
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        color: AppColors.t1.withValues(alpha: 0.028),
+        borderColor: AppColors.border.withValues(alpha: 0.52),
+        child: Row(
+          children: [
+            Icon(icon, size: 17, color: AppColors.t3),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
                     style: const TextStyle(
                       color: AppColors.t1,
                       fontSize: 13,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                ),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.green,
-                    shape: BoxShape.circle,
+                  const SizedBox(height: 2),
+                  Text(
+                    summary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _clientName(appointment),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.t1,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        [
-                          _serviceName(appointment),
-                          if (location != null) location,
-                        ].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.t3,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  LucideIcons.chevronRight,
-                  color: AppColors.t3,
-                  size: 16,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+            const Icon(LucideIcons.chevronRight, size: 14, color: AppColors.t3),
+          ],
         ),
       ),
     );
   }
 }
 
-class _NeedsAttentionSection extends StatelessWidget {
-  final List<DashboardAttentionItem> items;
-  final ValueChanged<DashboardAttentionItem> onOpenItem;
+class _TodaySection extends StatelessWidget {
+  final AsyncValue<List<Map<String, dynamic>>> appointments;
+  final DateTime now;
+  final ValueChanged<Map<String, dynamic>> onOpenJob;
+  final VoidCallback onViewBookings;
 
-  const _NeedsAttentionSection({required this.items, required this.onOpenItem});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SlateSectionHeader(label: 'NEEDS ATTENTION'),
-        const SizedBox(height: AppSpacing.xs),
-        SlateSurface(
-          radius: AppRadius.lg,
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: items.take(4).toList().asMap().entries.map((entry) {
-              return _AttentionRow(
-                item: entry.value,
-                isLast: entry.key == items.take(4).length - 1,
-                onTap: () => onOpenItem(entry.value),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _AttentionRow extends StatelessWidget {
-  final DashboardAttentionItem item;
-  final bool isLast;
-  final VoidCallback onTap;
-
-  const _AttentionRow({
-    required this.item,
-    required this.isLast,
-    required this.onTap,
+  const _TodaySection({
+    required this.appointments,
+    required this.now,
+    required this.onOpenJob,
+    required this.onViewBookings,
   });
 
   @override
   Widget build(BuildContext context) {
-    final (icon, color) = switch (item.type) {
-      DashboardAttentionType.unpaid => (LucideIcons.banknote, AppColors.error),
-      DashboardAttentionType.unconfirmedAppointment => (
-        LucideIcons.calendarClock,
-        AppColors.warning,
-      ),
-      DashboardAttentionType.overdueTask => (
-        LucideIcons.listChecks,
-        AppColors.warning,
-      ),
-      DashboardAttentionType.uncontactedLead => (
-        LucideIcons.user,
-        AppColors.green,
-      ),
-    };
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: isLast
-                  ? BorderSide.none
-                  : BorderSide(color: AppColors.border.withValues(alpha: 0.7)),
+    return _DashboardSection(
+      title: 'Today',
+      prominent: true,
+      child: appointments.when(
+        loading: () =>
+            const SlateLoadingBlock(height: 72, radius: AppRadius.md),
+        error: (_, __) => WorkloopListRow(
+          onTap: onViewBookings,
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          leading: const _SoftIcon(icon: LucideIcons.calendarDays),
+          title: const Text(
+            'Open today\'s bookings',
+            style: TextStyle(
+              color: AppColors.t1,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.t1,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      item.detail,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.t3, fontSize: 12),
-                    ),
-                  ],
+          subtitle: const Text(
+            'See the full schedule in Bookings.',
+            style: TextStyle(
+              color: AppColors.t2,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          trailing: const Icon(
+            LucideIcons.chevronRight,
+            color: AppColors.t3,
+            size: 16,
+          ),
+        ),
+        data: (rows) {
+          final jobs = selectDashboardTodayBookings(rows, now: now);
+          if (jobs.isEmpty) {
+            return WorkloopListRow(
+              onTap: onViewBookings,
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+              leading: const _SoftIcon(icon: LucideIcons.sun),
+              title: const Text(
+                'Your day is clear',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const Icon(
+              subtitle: const Text(
+                'There are no more bookings scheduled today.',
+                style: TextStyle(
+                  color: AppColors.t2,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              trailing: const Icon(
                 LucideIcons.chevronRight,
                 color: AppColors.t3,
                 size: 16,
               ),
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _UpcomingJobRow(
+                job: jobs.first,
+                onTap: () => onOpenJob(jobs.first),
+                showDate: false,
+              ),
+              if (jobs.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xs),
+                  child: Text(
+                    jobs.length == 2
+                        ? '1 more booking later today'
+                        : '${jobs.length - 1} more bookings later today',
+                    style: const TextStyle(
+                      color: AppColors.t2,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 }
 
-class _QuickActionsSection extends StatelessWidget {
-  final VoidCallback onAddClient;
-  final VoidCallback onAddAppointment;
-  final VoidCallback onRecordPayment;
-  final VoidCallback onAddTask;
+class _WorthALookSection extends StatelessWidget {
+  final List<DashboardAttentionItem> items;
+  final ValueChanged<DashboardAttentionItem> onOpen;
 
-  const _QuickActionsSection({
-    required this.onAddClient,
-    required this.onAddAppointment,
-    required this.onRecordPayment,
-    required this.onAddTask,
+  const _WorthALookSection({required this.items, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardSection(
+      title: 'Worth a look',
+      child: Column(
+        children: [
+          for (final item in items)
+            WorkloopListRow(
+              onTap: () => onOpen(item),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+              leading: _SoftIcon(icon: _attentionIcon(item.type)),
+              title: Text(
+                _attentionTitle(item),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              subtitle: Text(
+                _attentionDetail(item),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.t2,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              trailing: const Icon(
+                LucideIcons.chevronRight,
+                color: AppColors.t3,
+                size: 16,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MoneyPulse extends StatelessWidget {
+  final AsyncValue<FinanceSummary> finance;
+  final VoidCallback onOpen;
+
+  const _MoneyPulse({required this.finance, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardSection(
+      title: 'Money',
+      child: finance.when(
+        loading: () =>
+            const SlateLoadingBlock(height: 68, radius: AppRadius.md),
+        error: (_, __) => _MoneyRow(onOpen: onOpen),
+        data: (summary) =>
+            _MoneyRow(onOpen: onOpen, amount: summary.thisMonthPaid),
+      ),
+    );
+  }
+}
+
+class _MoneyRow extends StatelessWidget {
+  final VoidCallback onOpen;
+  final double? amount;
+
+  const _MoneyRow({required this.onOpen, this.amount});
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkloopListRow(
+      onTap: onOpen,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      leading: const _SoftIcon(icon: LucideIcons.banknote),
+      title: Text(
+        amount == null
+            ? 'Open Money'
+            : '£${amount!.toStringAsFixed(0)} received',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      subtitle: Text(
+        amount == null
+            ? 'See your latest business progress.'
+            : 'So far this calendar month.',
+        style: const TextStyle(
+          color: AppColors.t2,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      trailing: const Icon(
+        LucideIcons.chevronRight,
+        color: AppColors.t3,
+        size: 16,
+      ),
+    );
+  }
+}
+
+class _UpcomingJobsSection extends StatelessWidget {
+  final AsyncValue<List<Map<String, dynamic>>> appointments;
+  final DateTime now;
+  final ValueChanged<Map<String, dynamic>> onOpenJob;
+  final VoidCallback onViewBookings;
+
+  const _UpcomingJobsSection({
+    required this.appointments,
+    required this.now,
+    required this.onOpenJob,
+    required this.onViewBookings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardSection(
+      title: 'Coming up',
+      actionLabel: 'View all',
+      onAction: onViewBookings,
+      child: appointments.when(
+        loading: () =>
+            const SlateLoadingBlock(height: 150, radius: AppRadius.lg),
+        error: (_, __) =>
+            const SlateErrorState(message: 'Could not load upcoming bookings'),
+        data: (rows) {
+          final jobs = selectDashboardComingUpBookings(rows, now: now);
+          if (jobs.isEmpty) {
+            return WorkloopListRow(
+              onTap: onViewBookings,
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+              leading: const _SoftIcon(icon: LucideIcons.calendarDays),
+              title: const Text(
+                'Nothing else scheduled yet',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              subtitle: const Text(
+                'Your upcoming schedule is open.',
+                style: TextStyle(
+                  color: AppColors.t2,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              trailing: const Icon(
+                LucideIcons.chevronRight,
+                color: AppColors.t3,
+                size: 16,
+              ),
+            );
+          }
+
+          return Column(
+            children: [
+              for (final job in jobs)
+                _UpcomingJobRow(job: job, onTap: () => onOpenJob(job)),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _UpcomingJobRow extends StatelessWidget {
+  final Map<String, dynamic> job;
+  final VoidCallback onTap;
+  final bool showDate;
+
+  const _UpcomingJobRow({
+    required this.job,
+    required this.onTap,
+    this.showDate = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final start = _startTime(job);
+    final end = _endTime(job);
+    final client = _clientName(job);
+    final service = _serviceName(job);
+    final date = start == null ? 'Upcoming' : _friendlyDate(start);
+    final time = start == null ? null : slateTimeRange(start, end);
+
+    return WorkloopListRow(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      leading: _SoftIcon(icon: LucideIcons.calendarClock),
+      title: Text(
+        client,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      subtitle: Text(
+        [if (showDate) date, if (time != null) time, service].join(' · '),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t2,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      trailing: const Icon(
+        LucideIcons.chevronRight,
+        color: AppColors.t3,
+        size: 16,
+      ),
+    );
+  }
+}
+
+class _CalmFeedSection extends StatelessWidget {
+  final AsyncValue<List<BusinessFeedItem>> feed;
+  final ValueChanged<BusinessFeedItem> onOpenFeedItem;
+  final VoidCallback onViewAllFeed;
+
+  const _CalmFeedSection({
+    required this.feed,
+    required this.onOpenFeedItem,
+    required this.onViewAllFeed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardSection(
+      title: 'Recent activity',
+      actionLabel: 'View all',
+      onAction: onViewAllFeed,
+      child: feed.when(
+        loading: () =>
+            const SlateLoadingBlock(height: 190, radius: AppRadius.lg),
+        error: (_, __) => const SlateErrorState(message: 'Could not load feed'),
+        data: (items) {
+          final calmItems = items.where(_isCalmFeedItem).take(3).toList();
+          if (calmItems.isEmpty) {
+            return const WorkloopEmptyState(
+              icon: LucideIcons.activity,
+              title: 'No activity yet.',
+              subtitle:
+                  'Recent bookings, notes, and payments will appear here.',
+            );
+          }
+
+          return Column(
+            children: [
+              for (final item in calmItems) ...[
+                _CalmFeedRow(
+                  item: item,
+                  onTap: item.routeTarget == null
+                      ? null
+                      : () => onOpenFeedItem(item),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CalmFeedRow extends StatelessWidget {
+  final BusinessFeedItem item;
+  final VoidCallback? onTap;
+
+  const _CalmFeedRow({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkloopListRow(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      leading: _SoftIcon(icon: _iconForFeedItem(item)),
+      title: Text(
+        _calmFeedTitle(item),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      subtitle: Text(
+        '${item.subtitle} · ${_relativeTime(item.timestamp)}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.t2,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      trailing: onTap == null
+          ? null
+          : const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
+    );
+  }
+}
+
+class _DashboardSection extends StatelessWidget {
+  final String title;
+  final Widget child;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final bool prominent;
+
+  const _DashboardSection({
+    required this.title,
+    required this.child,
+    this.actionLabel,
+    this.onAction,
+    this.prominent = false,
   });
 
   @override
@@ -800,237 +1004,189 @@ class _QuickActionsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SlateSectionHeader(label: 'QUICK ACTIONS'),
-        const SizedBox(height: AppSpacing.xs),
         Row(
           children: [
             Expanded(
-              child: _QuickActionButton(
-                icon: LucideIcons.userPlus,
-                label: 'Client',
-                onTap: onAddClient,
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: prominent ? 22 : 19,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                ),
               ),
             ),
-            const SizedBox(width: AppSpacing.xs),
-            Expanded(
-              child: _QuickActionButton(
-                icon: LucideIcons.calendarPlus,
-                label: 'Booking',
-                onTap: onAddAppointment,
-              ),
-            ),
+            if (actionLabel != null && onAction != null)
+              WorkloopTextButton(label: actionLabel!, onPressed: onAction),
           ],
         ),
-        const SizedBox(height: AppSpacing.xs),
-        Row(
-          children: [
-            Expanded(
-              child: _QuickActionButton(
-                icon: LucideIcons.banknote,
-                label: 'Payment',
-                onTap: onRecordPayment,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Expanded(
-              child: _QuickActionButton(
-                icon: LucideIcons.listPlus,
-                label: 'Task',
-                onTap: onAddTask,
-              ),
-            ),
-          ],
-        ),
+        const SizedBox(height: AppSpacing.sm),
+        child,
       ],
     );
   }
 }
 
-class _QuickActionButton extends StatelessWidget {
+class _SoftIcon extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final VoidCallback onTap;
 
-  const _QuickActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+  const _SoftIcon({required this.icon});
 
   @override
   Widget build(BuildContext context) {
-    return SlateSurface(
-      onTap: onTap,
-      radius: AppRadius.lg,
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      color: AppColors.t1.withValues(alpha: 0.045),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.t2, size: 17),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.t1,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: AppColors.t1.withValues(alpha: 0.045),
+        shape: BoxShape.circle,
       ),
+      child: Icon(icon, color: AppColors.t3, size: 17),
     );
   }
 }
 
-class _CompactMoneySection extends StatelessWidget {
-  final AsyncValue<List<Map<String, dynamic>>> appointments;
-  final AsyncValue<FinanceSummary> finance;
-  final VoidCallback onTap;
-
-  const _CompactMoneySection({
-    required this.appointments,
-    required this.finance,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (appointments.isLoading || finance.isLoading) {
-      return const SlateLoadingBlock(height: 104, radius: AppRadius.lg);
-    }
-    if (appointments.hasError || finance.hasError) {
-      return const SlateErrorState(message: 'Could not load money');
-    }
-
-    final expectedToday = _expectedToday(appointments.value ?? const []);
-    final weekPaid = finance.value!.thisWeekSummary.paid;
-
-    return SlateSurface(
-      onTap: onTap,
-      radius: AppRadius.lg,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      color: AppColors.panelSoft,
-      borderColor: AppColors.panelSoftRaised,
-      child: Row(
-        children: [
-          const Icon(
-            LucideIcons.banknote,
-            color: AppColors.panelMuted,
-            size: 18,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'MONEY',
-                  style: TextStyle(
-                    color: AppColors.panelMuted,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  '£${expectedToday.toStringAsFixed(0)} expected today · £${weekPaid.toStringAsFixed(0)} this week',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.panelInk,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(
-            LucideIcons.chevronRight,
-            color: AppColors.panelMuted,
-            size: 16,
-          ),
-        ],
-      ),
-    );
-  }
+String _dashboardDate(DateTime date) {
+  const weekdays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
 }
 
-List<Map<String, dynamic>> _sortedToday(List<Map<String, dynamic>> rows) {
-  final sorted = [...rows];
-  sorted.sort((a, b) {
+List<Map<String, dynamic>> _todayJobs(
+  List<Map<String, dynamic>> rows, {
+  required DateTime now,
+}) {
+  return _upcomingJobs(
+    rows,
+    now: now,
+  ).where((row) => _isSameDay(_startTime(row), now)).toList();
+}
+
+bool _isSameDay(DateTime? first, DateTime second) {
+  return first != null &&
+      first.year == second.year &&
+      first.month == second.month &&
+      first.day == second.day;
+}
+
+String _attentionTitle(DashboardAttentionItem item) {
+  return switch (item.type) {
+    DashboardAttentionType.unpaid => 'Payment follow-up',
+    DashboardAttentionType.unconfirmedAppointment => 'Booking to confirm',
+    DashboardAttentionType.overdueTask => item.title,
+    DashboardAttentionType.uncontactedLead => 'Client follow-up',
+  };
+}
+
+String _attentionDetail(DashboardAttentionItem item) {
+  return switch (item.type) {
+    DashboardAttentionType.unpaid => item.detail,
+    DashboardAttentionType.unconfirmedAppointment => item.detail,
+    DashboardAttentionType.overdueTask =>
+      item.detail == 'Overdue task' ? 'A task ready when you are' : item.detail,
+    DashboardAttentionType.uncontactedLead => item.title.replaceFirst(
+      'Contact ',
+      '',
+    ),
+  };
+}
+
+IconData _attentionIcon(DashboardAttentionType type) {
+  return switch (type) {
+    DashboardAttentionType.unpaid => LucideIcons.banknote,
+    DashboardAttentionType.unconfirmedAppointment => LucideIcons.calendarCheck,
+    DashboardAttentionType.overdueTask => LucideIcons.listChecks,
+    DashboardAttentionType.uncontactedLead => LucideIcons.user,
+  };
+}
+
+List<Map<String, dynamic>> _upcomingJobs(
+  List<Map<String, dynamic>> rows, {
+  DateTime? now,
+}) {
+  final current = now ?? DateTime.now();
+  final jobs = rows.where((row) {
+    final status = row['status']?.toString().toLowerCase() ?? 'scheduled';
+    final start = _startTime(row);
+    if (start == null) return false;
+    if (status == 'completed' || status == 'cancelled' || status == 'no_show') {
+      return false;
+    }
+    return start.isAfter(current);
+  }).toList();
+
+  jobs.sort((a, b) {
     final aStart = _startTime(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
     final bStart = _startTime(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
     return aStart.compareTo(bStart);
   });
-  return sorted;
+  return jobs;
 }
 
-Map<String, dynamic>? _nextUpcoming(List<Map<String, dynamic>> rows) {
-  final now = DateTime.now();
-  for (final row in rows) {
-    final status = row['status']?.toString() ?? 'scheduled';
-    final start = _startTime(row);
-    if (start == null) continue;
-    if (status == 'completed' || status == 'cancelled' || status == 'no_show') {
-      continue;
-    }
-    if (start.isAfter(now)) return row;
-  }
-  return null;
+bool _isCalmFeedItem(BusinessFeedItem item) {
+  if (item.priority == BusinessFeedPriority.attention) return false;
+  return switch (item.type) {
+    BusinessFeedItemType.bookingToday ||
+    BusinessFeedItemType.bookingUpcoming ||
+    BusinessFeedItemType.paymentReceived ||
+    BusinessFeedItemType.expenseRecorded ||
+    BusinessFeedItemType.noteCreated ||
+    BusinessFeedItemType.weeklyTargetProgress => true,
+    BusinessFeedItemType.invoiceUnpaid ||
+    BusinessFeedItemType.invoiceOverdue ||
+    BusinessFeedItemType.taskDue ||
+    BusinessFeedItemType.taskOverdue ||
+    BusinessFeedItemType.clientFollowUp ||
+    BusinessFeedItemType.bookingRequestNew ||
+    BusinessFeedItemType.quietDayDetected ||
+    BusinessFeedItemType.dailySummary => false,
+  };
 }
 
-String _summarySentence({
-  required List<Map<String, dynamic>> appointments,
-  required FinanceSummary finance,
-  required List<SlateTask> tasks,
-}) {
-  final parts = <String>[];
-  final appointmentCount = appointments
-      .where((row) => row['status']?.toString() != 'cancelled')
-      .length;
-  final expected = _expectedToday(appointments);
-  final taskCount = _tasksDueToday(tasks);
-
-  if (appointmentCount > 0) {
-    parts.add(
-      '$appointmentCount appointment${appointmentCount == 1 ? '' : 's'} today',
-    );
-  }
-  if (expected > 0) parts.add('£${expected.toStringAsFixed(0)} expected');
-  if (taskCount > 0) {
-    parts.add('$taskCount task${taskCount == 1 ? '' : 's'} due');
-  }
-  return parts.join(' · ');
+String _calmFeedTitle(BusinessFeedItem item) {
+  return switch (item.type) {
+    BusinessFeedItemType.bookingToday => 'Job scheduled today',
+    BusinessFeedItemType.bookingUpcoming => 'Upcoming job added',
+    BusinessFeedItemType.paymentReceived => 'Invoice marked paid',
+    BusinessFeedItemType.expenseRecorded => 'Expense recorded',
+    BusinessFeedItemType.noteCreated => 'Note added',
+    BusinessFeedItemType.weeklyTargetProgress => 'Progress updated',
+    _ => item.title,
+  };
 }
 
-double _expectedToday(List<Map<String, dynamic>> appointments) {
-  return appointments
-      .where((row) {
-        final status = row['status']?.toString() ?? 'scheduled';
-        return status != 'cancelled' && status != 'no_show';
-      })
-      .fold<double>(0, (sum, row) {
-        final value = row['price'];
-        if (value is num) return sum + value.toDouble();
-        return sum + (double.tryParse(value?.toString() ?? '') ?? 0);
-      });
-}
-
-int _tasksDueToday(List<SlateTask> tasks) {
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  return tasks.where((task) {
-    final due = task.dueDate;
-    if (task.status == 'done' || due == null) return false;
-    final dueDay = DateTime(due.year, due.month, due.day);
-    return !dueDay.isAfter(today);
-  }).length;
+IconData _iconForFeedItem(BusinessFeedItem item) {
+  return switch (item.type) {
+    BusinessFeedItemType.bookingToday ||
+    BusinessFeedItemType.bookingUpcoming => LucideIcons.calendarDays,
+    BusinessFeedItemType.paymentReceived => LucideIcons.banknote,
+    BusinessFeedItemType.expenseRecorded => LucideIcons.receipt,
+    BusinessFeedItemType.noteCreated => LucideIcons.stickyNote,
+    BusinessFeedItemType.weeklyTargetProgress => LucideIcons.trendingUp,
+    _ => LucideIcons.activity,
+  };
 }
 
 DateTime? _startTime(Map<String, dynamic> appointment) =>
@@ -1040,15 +1196,50 @@ DateTime? _endTime(Map<String, dynamic> appointment) =>
     DateTime.tryParse(appointment['end_time']?.toString() ?? '')?.toLocal();
 
 String _clientName(Map<String, dynamic> appointment) =>
-    appointment['contacts']?['name']?.toString() ?? 'Walk-in';
+    appointment['contacts']?['name']?.toString() ?? 'Client';
 
 String _serviceName(Map<String, dynamic> appointment) =>
     appointment['services']?['name']?.toString() ??
     appointment['title']?.toString() ??
-    'Booking';
+    'Job';
 
-String? _location(Map<String, dynamic> appointment) {
-  final value = appointment['location']?.toString().trim();
-  if (value == null || value.isEmpty) return null;
-  return value;
+String _friendlyDate(DateTime value) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(value.year, value.month, value.day);
+  if (day == today) return 'Today';
+  if (day == today.add(const Duration(days: 1))) return 'Tomorrow';
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${weekdays[value.weekday - 1]}, ${value.day} ${months[value.month - 1]}';
+}
+
+String _relativeTime(DateTime timestamp) {
+  final now = DateTime.now();
+  if (timestamp.isAfter(now)) {
+    final until = timestamp.difference(now);
+    if (until.inHours < 24) return 'in ${until.inHours.clamp(1, 23)}h';
+    return 'in ${until.inDays}d';
+  }
+
+  final difference = now.difference(timestamp);
+  if (difference.inMinutes < 60) {
+    return '${difference.inMinutes.clamp(0, 59)}m ago';
+  }
+  if (difference.inHours < 24) return '${difference.inHours}h ago';
+  if (difference.inDays < 7) return '${difference.inDays}d ago';
+  return _friendlyDate(timestamp);
 }

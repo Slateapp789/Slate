@@ -39,5 +39,30 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    next unless target.respond_to?(:shell_script_build_phases)
+
+    phase = target.shell_script_build_phases.find { |build_phase| build_phase.name == 'Strip Extended Attributes' }
+    phase ||= target.new_shell_script_build_phase('Strip Extended Attributes')
+    phase.shell_script = <<~SCRIPT
+      if [ -n "$TARGET_BUILD_DIR" ] && [ -n "$WRAPPER_NAME" ]; then
+        /usr/bin/xattr -cr "$TARGET_BUILD_DIR/$WRAPPER_NAME" || true
+      fi
+    SCRIPT
+  end
+
+  Dir.glob(File.join(installer.sandbox.root, 'Target Support Files', 'Pods-Runner', 'Pods-Runner-frameworks.sh')).each do |frameworks_script|
+    contents = File.read(frameworks_script)
+    next if contents.include?('Workloop: strip extended attributes before signing embedded frameworks')
+
+    contents.gsub!(
+      '  code_sign_if_enabled "${destination}/$(basename "$1")"',
+      <<~SCRIPT.chomp
+        # Workloop: strip extended attributes before signing embedded frameworks.
+        /usr/bin/xattr -cr "${destination}/$(basename "$1")" || true
+        code_sign_if_enabled "${destination}/$(basename "$1")"
+      SCRIPT
+    )
+    File.write(frameworks_script, contents)
   end
 end

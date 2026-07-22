@@ -71,12 +71,6 @@ class PaymentsRepository {
     String? appointmentId,
     String? notes,
   }) async {
-    final existing = await _client
-        .from('invoices')
-        .select('id')
-        .eq('workspace_id', workspaceId);
-    final count = List<dynamic>.from(existing).length + 1;
-    final paymentNumber = 'PAY-${count.toString().padLeft(3, '0')}';
     final dateString = date.toIso8601String().split('T').first;
     final dueDateString = (dueDate ?? date).toIso8601String().split('T').first;
 
@@ -84,7 +78,6 @@ class PaymentsRepository {
       'workspace_id': workspaceId,
       'contact_id': contactId,
       'appointment_id': appointmentId,
-      'invoice_number': paymentNumber,
       'type': 'invoice',
       'status': status,
       'issue_date': dateString,

@@ -10,8 +10,17 @@ import 'settings_services_section.dart';
 
 final _profileHandlePattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$');
 
+enum SettingsBusinessSection { business, workingHours, publicProfile, services }
+
 class SettingsBusinessTab extends ConsumerStatefulWidget {
-  const SettingsBusinessTab({super.key});
+  final SettingsBusinessSection initialSection;
+  final bool showOnlySelected;
+
+  const SettingsBusinessTab({
+    super.key,
+    this.initialSection = SettingsBusinessSection.business,
+    this.showOnlySelected = false,
+  });
 
   @override
   ConsumerState<SettingsBusinessTab> createState() =>
@@ -28,13 +37,47 @@ class _HoursBlockControllers {
 }
 
 class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
+  final _scrollController = ScrollController();
+  final _businessKey = GlobalKey();
+  final _workingHoursKey = GlobalKey();
+  final _publicProfileKey = GlobalKey();
+  final _servicesKey = GlobalKey();
   bool _editingInfo = false;
+  bool _businessInfoHydrated = false;
   bool _saving = false;
   bool _profileHydrated = false;
+
+  Future<void> _scrollToSection() async {
+    if (widget.showOnlySelected) return;
+    if (widget.initialSection == SettingsBusinessSection.business) return;
+    await Future<void>.delayed(const Duration(milliseconds: 280));
+    if (!mounted) return;
+    final key = switch (widget.initialSection) {
+      SettingsBusinessSection.business => _businessKey,
+      SettingsBusinessSection.workingHours => _workingHoursKey,
+      SettingsBusinessSection.publicProfile => _publicProfileKey,
+      SettingsBusinessSection.services => _servicesKey,
+    };
+    final target = key.currentContext;
+    if (target == null) return;
+    if (!target.mounted) return;
+    await Scrollable.ensureVisible(
+      target,
+      duration: AppMotion.deliberate,
+      curve: AppMotion.curve,
+      alignment: 0.04,
+    );
+  }
+
+  bool _shows(SettingsBusinessSection section) {
+    return !widget.showOnlySelected || widget.initialSection == section;
+  }
+
   String _bookingMode = 'manual';
   bool _reviewsEnabled = false;
   bool _galleryEnabled = false;
   bool _payNowEnabled = false;
+  late TextEditingController _ownerNameController;
   late TextEditingController _nameController;
   late TextEditingController _industryController;
   late TextEditingController _handleController;
@@ -53,6 +96,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   @override
   void initState() {
     super.initState();
+    _ownerNameController = TextEditingController();
     _nameController = TextEditingController();
     _industryController = TextEditingController();
     _handleController = TextEditingController();
@@ -61,10 +105,13 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     _galleryController = TextEditingController();
     _reviewsController = TextEditingController();
     _noticeController = TextEditingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSection());
   }
 
   @override
   void dispose() {
+    _scrollController.dispose();
+    _ownerNameController.dispose();
     _nameController.dispose();
     _industryController.dispose();
     _handleController.dispose();
@@ -88,24 +135,37 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   }
 
   Future<void> _saveInfo(String workspaceId) async {
-    if (_nameController.text.trim().isEmpty) return;
+    final ownerName = _ownerNameController.text.trim();
+    if (ownerName.isEmpty) {
+      _snack('Add your name', AppColors.warning);
+      return;
+    }
+    if (_nameController.text.trim().isEmpty) {
+      _snack('Add your business name', AppColors.warning);
+      return;
+    }
     setState(() => _saving = true);
     try {
-      await ref.read(workspaceRepositoryProvider).update(workspaceId, {
-        'name': _nameController.text.trim(),
-        'industry': _industryController.text.trim().isEmpty
-            ? null
-            : _industryController.text.trim(),
-      });
+      await Future.wait([
+        ref.read(authRepositoryProvider).updateFirstName(ownerName),
+        ref.read(workspaceRepositoryProvider).update(workspaceId, {
+          'name': _nameController.text.trim(),
+          'industry': _industryController.text.trim().isEmpty
+              ? null
+              : _industryController.text.trim(),
+        }),
+      ]);
       ref.invalidate(workspaceProvider);
       setState(() {
         _editingInfo = false;
         _saving = false;
       });
       if (mounted) _snack('Business details updated', AppColors.green);
-    } catch (e) {
+    } catch (_) {
       setState(() => _saving = false);
-      if (mounted) _snack('Error: $e', AppColors.error);
+      if (mounted) {
+        _snack('Business details could not be saved.', AppColors.error);
+      }
     }
   }
 
@@ -153,9 +213,11 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
         _saving = false;
       });
       if (mounted) _snack('Profile updated', AppColors.green);
-    } catch (e) {
+    } catch (_) {
       setState(() => _saving = false);
-      if (mounted) _snack('Error: $e', AppColors.error);
+      if (mounted) {
+        _snack('The public profile could not be saved.', AppColors.error);
+      }
     }
   }
 
@@ -762,315 +824,328 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
       },
       color: AppColors.green,
       child: ListView(
+        controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
         children: [
-          // ── Business info ────────────────────────────────────────────────
-          sectionLabel('Business Info'),
-          const SizedBox(height: 10),
-          workspace.when(
-            loading: () => skeletonBox(80),
-            error: (_, __) => errorBox('Could not load workspace'),
-            data: (ws) => Container(
-              decoration: BoxDecoration(
-                color: AppColors.bgCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
+          if (_shows(SettingsBusinessSection.business)) ...[
+            // ── Business info ────────────────────────────────────────────────
+            KeyedSubtree(
+              key: _businessKey,
+              child: Text(
+                'Business info',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: widget.showOnlySelected ? 22 : 18,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-              child: _editingInfo
-                  ? Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          settingsField(
-                            label: 'BUSINESS NAME',
-                            controller: _nameController,
-                            hint: 'Your business name',
+            ),
+            const SizedBox(height: AppSpacing.md),
+            workspace.when(
+              loading: () => skeletonBox(80),
+              error: (_, __) => errorBox('Could not load workspace'),
+              data: (ws) {
+                if (!_businessInfoHydrated) {
+                  _ownerNameController.text =
+                      ref.read(authRepositoryProvider).currentFirstName ?? '';
+                  _nameController.text = ws?['name'] as String? ?? '';
+                  _industryController.text = ws?['industry'] as String? ?? '';
+                  _businessInfoHydrated = true;
+                }
+                final editing = widget.showOnlySelected || _editingInfo;
+                return Container(
+                  decoration: BoxDecoration(
+                    color: widget.showOnlySelected
+                        ? Colors.transparent
+                        : AppColors.bgCard,
+                    borderRadius: BorderRadius.circular(16),
+                    border: widget.showOnlySelected
+                        ? null
+                        : Border.all(color: AppColors.border),
+                  ),
+                  child: editing
+                      ? Padding(
+                          padding: EdgeInsets.all(
+                            widget.showOnlySelected ? 0 : 16,
                           ),
-                          const SizedBox(height: 12),
-                          settingsField(
-                            label: 'INDUSTRY',
-                            controller: _industryController,
-                            hint: 'e.g. Health & Fitness',
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
+                          child: Column(
                             children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () =>
-                                      setState(() => _editingInfo = false),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.bgInteract,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: AppColors.border,
-                                      ),
-                                    ),
-                                    child: const Center(
-                                      child: Text(
-                                        'Cancel',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.t3,
+                              settingsField(
+                                label: 'YOUR NAME',
+                                controller: _ownerNameController,
+                                hint: 'Your first name',
+                              ),
+                              const SizedBox(height: 12),
+                              settingsField(
+                                label: 'BUSINESS NAME',
+                                controller: _nameController,
+                                hint: 'Your business name',
+                              ),
+                              const SizedBox(height: 12),
+                              settingsField(
+                                label: 'INDUSTRY',
+                                controller: _industryController,
+                                hint: 'e.g. Health & Fitness',
+                              ),
+                              const SizedBox(height: 16),
+                              if (widget.showOnlySelected)
+                                saveBtn(
+                                  label: 'Save business details',
+                                  loading: _saving,
+                                  onTap: () => _saveInfo(ws?['id'] as String),
+                                )
+                              else
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () => setState(
+                                          () => _editingInfo = false,
+                                        ),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.bgInteract,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            border: Border.all(
+                                              color: AppColors.border,
+                                            ),
+                                          ),
+                                          child: const Center(
+                                            child: Text(
+                                              'Cancel',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.t3,
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: _saving
-                                      ? null
-                                      : () => _saveInfo(ws?['id'] as String),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.green,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Center(
-                                      child: _saving
-                                          ? const SizedBox(
-                                              width: 16,
-                                              height: 16,
-                                              child: CircularProgressIndicator(
-                                                color: Colors.white,
-                                                strokeWidth: 2,
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: _saving
+                                            ? null
+                                            : () => _saveInfo(
+                                                ws?['id'] as String,
                                               ),
-                                            )
-                                          : const Text(
-                                              'Save',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w700,
-                                                color: Colors.white,
-                                              ),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.green,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
                                             ),
+                                          ),
+                                          child: Center(
+                                            child: _saving
+                                                ? const SizedBox(
+                                                    width: 16,
+                                                    height: 16,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          color: Colors.white,
+                                                          strokeWidth: 2,
+                                                        ),
+                                                  )
+                                                : const Text(
+                                                    'Save',
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ),
                             ],
                           ),
-                        ],
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        tappableRow(
-                          label: 'Business name',
-                          value: ws?['name'] as String? ?? '—',
-                          onTap: () {
-                            _nameController.text = ws?['name'] as String? ?? '';
-                            _industryController.text =
-                                ws?['industry'] as String? ?? '';
-                            setState(() => _editingInfo = true);
-                          },
+                        )
+                      : Column(
+                          children: [
+                            tappableRow(
+                              label: 'Business name',
+                              value: ws?['name'] as String? ?? '—',
+                              onTap: () {
+                                _nameController.text =
+                                    ws?['name'] as String? ?? '';
+                                _industryController.text =
+                                    ws?['industry'] as String? ?? '';
+                                setState(() => _editingInfo = true);
+                              },
+                            ),
+                            Divider(height: 1, color: AppColors.border),
+                            tappableRow(
+                              label: 'Industry',
+                              value: ws?['industry'] as String? ?? '—',
+                              onTap: () {
+                                _nameController.text =
+                                    ws?['name'] as String? ?? '';
+                                _industryController.text =
+                                    ws?['industry'] as String? ?? '';
+                                setState(() => _editingInfo = true);
+                              },
+                            ),
+                          ],
                         ),
-                        Divider(height: 1, color: AppColors.border),
-                        tappableRow(
-                          label: 'Industry',
-                          value: ws?['industry'] as String? ?? '—',
-                          onTap: () {
-                            _nameController.text = ws?['name'] as String? ?? '';
-                            _industryController.text =
-                                ws?['industry'] as String? ?? '';
-                            setState(() => _editingInfo = true);
-                          },
-                        ),
-                      ],
-                    ),
+                );
+              },
             ),
-          ),
-          const SizedBox(height: 28),
+            const SizedBox(height: 28),
+          ],
 
-          sectionLabel('Working Hours'),
-          const SizedBox(height: 10),
-          workspaceSettings.when(
-            loading: () => skeletonBox(80),
-            error: (_, __) => errorBox('Could not load working hours'),
-            data: (settings) {
-              final hours = Map<String, dynamic>.from(
-                settings?['working_hours'] as Map? ?? {},
-              );
-              final openDays = hours.entries
-                  .where((entry) {
-                    final value = entry.value;
-                    if (value is! Map) return false;
-                    return Map<String, dynamic>.from(value)['enabled'] == true;
-                  })
-                  .map((entry) => entry.key.substring(0, 3))
-                  .join(', ');
-              return Container(
-                decoration: BoxDecoration(
-                  color: AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: tappableRow(
-                  label: 'Availability',
-                  value: openDays.isEmpty ? 'Not set' : openDays,
-                  onTap: () => _showHoursSheet(settings ?? {}),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 28),
-
-          sectionLabel('Public Profile'),
-          const SizedBox(height: 10),
-          workspace.when(
-            loading: () => skeletonBox(140),
-            error: (_, __) => errorBox('Could not load profile controls'),
-            data: (ws) => profile.when(
-              loading: () => skeletonBox(140),
-              error: (_, __) => errorBox('Could not load public profile'),
-              data: (bp) {
-                if (!_profileHydrated) {
-                  _handleController.text = bp?.handle ?? '';
-                  _bioController.text = bp?.bio ?? '';
-                  _coverPhotoController.text = bp?.coverPhotoUrl ?? '';
-                  _galleryController.text =
-                      bp?.galleryImageUrls.join('\n') ?? '';
-                  _reviewsController.text = bp?.reviewQuotes.join('\n') ?? '';
-                  _noticeController.text = bp?.noticeText ?? '';
-                  _bookingMode = bp?.bookingMode ?? 'manual';
-                  _reviewsEnabled = bp?.reviewsEnabled ?? false;
-                  _galleryEnabled = bp?.galleryEnabled ?? false;
-                  _payNowEnabled = bp?.payNowEnabled ?? false;
-                  _profileHydrated = true;
-                }
+          if (_shows(SettingsBusinessSection.workingHours)) ...[
+            KeyedSubtree(
+              key: _workingHoursKey,
+              child: sectionLabel('Working Hours'),
+            ),
+            const SizedBox(height: 10),
+            workspaceSettings.when(
+              loading: () => skeletonBox(80),
+              error: (_, __) => errorBox('Could not load working hours'),
+              data: (settings) {
+                final hours = Map<String, dynamic>.from(
+                  settings?['working_hours'] as Map? ?? {},
+                );
+                final openDays = hours.entries
+                    .where((entry) {
+                      final value = entry.value;
+                      if (value is! Map) return false;
+                      return Map<String, dynamic>.from(value)['enabled'] ==
+                          true;
+                    })
+                    .map((entry) => entry.key.substring(0, 3))
+                    .join(', ');
                 return Container(
-                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: AppColors.bgCard,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.border),
                   ),
-                  child: Column(
-                    children: [
-                      settingsField(
-                        label: 'HANDLE',
-                        controller: _handleController,
-                        hint: 'your-handle',
-                      ),
-                      const SizedBox(height: 12),
-                      settingsField(
-                        label: 'BIO',
-                        controller: _bioController,
-                        hint: 'A short public description',
-                        maxLines: 3,
-                      ),
-                      const SizedBox(height: 12),
-                      settingsField(
-                        label: 'COVER PHOTO URL',
-                        controller: _coverPhotoController,
-                        hint: 'https://...',
-                        keyboardType: TextInputType.url,
-                      ),
-                      const SizedBox(height: 12),
-                      settingsField(
-                        label: 'NOTICE',
-                        controller: _noticeController,
-                        hint: 'Optional seasonal notice',
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 16),
-                      _BookingModeControl(
-                        value: _bookingMode,
-                        onChanged: (value) =>
-                            setState(() => _bookingMode = value),
-                      ),
-                      const SizedBox(height: 14),
-                      _ProfileToggleRow(
-                        title: 'Reviews',
-                        subtitle: 'Show review sections on the public profile',
-                        value: _reviewsEnabled,
-                        onChanged: (value) =>
-                            setState(() => _reviewsEnabled = value),
-                      ),
-                      _ProfileToggleRow(
-                        title: 'Gallery',
-                        subtitle:
-                            'Show visual work samples when media is added',
-                        value: _galleryEnabled,
-                        onChanged: (value) =>
-                            setState(() => _galleryEnabled = value),
-                      ),
-                      if (_galleryEnabled) ...[
-                        const SizedBox(height: 2),
-                        settingsField(
-                          label: 'GALLERY IMAGE URLS',
-                          controller: _galleryController,
-                          hint: 'One image URL per line',
-                          keyboardType: TextInputType.url,
-                          maxLines: 3,
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                      if (_reviewsEnabled) ...[
-                        const SizedBox(height: 2),
-                        settingsField(
-                          label: 'REVIEW QUOTES',
-                          controller: _reviewsController,
-                          hint: 'One short quote per line',
-                          maxLines: 3,
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                      _ProfileToggleRow(
-                        title: 'Pay now',
-                        subtitle:
-                            'Mark the profile as ready for online payments',
-                        value: _payNowEnabled,
-                        onChanged: (value) =>
-                            setState(() => _payNowEnabled = value),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Profile link: /p/${_handleController.text.isEmpty ? 'your-handle' : _handleController.text}',
-                              style: const TextStyle(
-                                color: AppColors.t3,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          SizedBox(
-                            width: 112,
-                            child: saveBtn(
-                              label: 'Save',
-                              loading: _saving,
-                              onTap: () => _saveProfile(ws?['id'] as String),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  child: tappableRow(
+                    label: 'Availability',
+                    value: openDays.isEmpty ? 'Not set' : openDays,
+                    onTap: () => _showHoursSheet(settings ?? {}),
                   ),
                 );
               },
             ),
-          ),
-          const SizedBox(height: 28),
+            const SizedBox(height: 28),
+          ],
 
-          SettingsServicesSection(
-            services: services,
-            onAdd: _showAddServiceSheet,
-            onEdit: _showEditServiceSheet,
-          ),
+          if (_shows(SettingsBusinessSection.publicProfile)) ...[
+            KeyedSubtree(
+              key: _publicProfileKey,
+              child: sectionLabel('Public Profile'),
+            ),
+            const SizedBox(height: 10),
+            workspace.when(
+              loading: () => skeletonBox(140),
+              error: (_, __) => errorBox('Could not load profile controls'),
+              data: (ws) => profile.when(
+                loading: () => skeletonBox(140),
+                error: (_, __) => errorBox('Could not load public profile'),
+                data: (bp) {
+                  if (!_profileHydrated) {
+                    _handleController.text = bp?.handle ?? '';
+                    _bioController.text = bp?.bio ?? '';
+                    _coverPhotoController.text = bp?.coverPhotoUrl ?? '';
+                    _galleryController.text =
+                        bp?.galleryImageUrls.join('\n') ?? '';
+                    _reviewsController.text = bp?.reviewQuotes.join('\n') ?? '';
+                    _noticeController.text = bp?.noticeText ?? '';
+                    _bookingMode = bp?.bookingMode ?? 'manual';
+                    _reviewsEnabled = bp?.reviewsEnabled ?? false;
+                    _galleryEnabled = bp?.galleryEnabled ?? false;
+                    _payNowEnabled = bp?.payNowEnabled ?? false;
+                    _profileHydrated = true;
+                  }
+                  return Container(
+                    padding: EdgeInsets.all(widget.showOnlySelected ? 0 : 16),
+                    decoration: BoxDecoration(
+                      color: widget.showOnlySelected
+                          ? Colors.transparent
+                          : AppColors.bgCard,
+                      borderRadius: BorderRadius.circular(16),
+                      border: widget.showOnlySelected
+                          ? null
+                          : Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        settingsField(
+                          label: 'HANDLE',
+                          controller: _handleController,
+                          hint: 'your-handle',
+                        ),
+                        const SizedBox(height: 12),
+                        settingsField(
+                          label: 'BIO',
+                          controller: _bioController,
+                          hint: 'A short public description',
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 12),
+                        settingsField(
+                          label: 'NOTICE',
+                          controller: _noticeController,
+                          hint: 'Optional seasonal notice',
+                          maxLines: 2,
+                        ),
+                        const SizedBox(height: 16),
+                        _BookingModeControl(
+                          value: _bookingMode,
+                          onChanged: (value) =>
+                              setState(() => _bookingMode = value),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'workloop.app/${_handleController.text.isEmpty ? 'your-handle' : _handleController.text}',
+                          style: const TextStyle(
+                            color: AppColors.t3,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        saveBtn(
+                          label: 'Save public profile',
+                          loading: _saving,
+                          onTap: () => _saveProfile(ws?['id'] as String),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 28),
+          ],
+
+          if (_shows(SettingsBusinessSection.services))
+            KeyedSubtree(
+              key: _servicesKey,
+              child: SettingsServicesSection(
+                services: services,
+                onAdd: _showAddServiceSheet,
+                onEdit: _showEditServiceSheet,
+              ),
+            ),
         ],
       ),
     );
@@ -1159,65 +1234,6 @@ class _BookingModeChip extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ProfileToggleRow extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  const _ProfileToggleRow({
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.bgInteract,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: AppColors.t3, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            activeThumbColor: AppColors.green,
-            activeTrackColor: AppColors.green.withValues(alpha: 0.24),
-            inactiveThumbColor: AppColors.t3,
-            inactiveTrackColor: AppColors.bgRaised,
-            onChanged: onChanged,
-          ),
-        ],
       ),
     );
   }

@@ -1,6 +1,6 @@
 # Slate UI Design System
 
-Last updated: 2026-06-04
+Last updated: 2026-07-15
 
 ## Design Intent
 
@@ -175,8 +175,9 @@ Current main navigation:
 
 - Bottom pill/glass nav.
 - Labels appear under icons.
-- Tabs: Home, Clients, Bookings, Money, Tasks.
-- Floating action button opens contextual creation actions.
+- Tabs: Home, Clients, Bookings, More.
+- More contains Money, Tasks, Notes, Profile, and Settings.
+- Create-capable feature screens use a compact top-right `+` action instead of a detached global floating action.
 - Body extends behind nav for blur/transparency.
 
 Rules:
@@ -214,3 +215,65 @@ Rules:
 - Large screens still contain local UI variants that should be consolidated.
 - Money and Bookings have evolved quickly and need a final consistency pass.
 - Current palette is intentionally dark graphite with a single bright accent; future colour experiments should be done as a deliberate theme pass, not piecemeal.
+
+## 2026-07-07 Minimal Refoundation
+
+Workloop's active UI direction is now whitespace-first rather than container-first.
+
+Design rule:
+
+- Typography, spacing, alignment, and subtle dividers should solve grouping before any card or surface is introduced.
+- Cards are exceptions for sheets, modal contexts, true controls, and dense framed tools.
+- Lists should generally be `Row -> Divider -> Row`, not repeated rounded cards.
+- Header stats should read as inline metrics, not boxed dashboard tiles.
+- Empty states should be calm inline guidance, not placeholder cards.
+- Lime remains the signature accent and should be reserved for primary actions, active navigation, progress, selected state, and important highlights.
+
+Implementation changes:
+
+- `WorkloopThemeTokens` now defines explicit light and OLED-dark token sets.
+- Shared primitives in `lib/shared/widgets/slate_ui.dart` include token-aware surfaces, icon buttons, empty states, list rows, and filter chips.
+- Main navigation active state uses lime rather than module colours.
+- High-traffic screens have started moving from card-heavy rows to divider/list rhythm.
+
+Current dark-mode status:
+
+- The dark token foundation exists, but the app still runs in light mode while static `AppColors` usages are migrated.
+- Do not enable system dark mode until major screens, forms, sheets, dialogs, and local feature widgets read from theme tokens instead of static light colours.
+
+## 2026-07-07 Final UI System Implementation
+
+Canonical screen-facing primitives now use `Workloop*` names in `lib/shared/widgets/slate_ui.dart`.
+
+Core primitives:
+
+- `WorkloopPage`
+- `WorkloopPageHeader`
+- `WorkloopMetricRow`
+- `WorkloopMetricItem`
+- `WorkloopSectionHeader`
+- `WorkloopListRow`
+- `WorkloopDivider`
+- `WorkloopEmptyState`
+- `WorkloopPrimaryButton`
+- `WorkloopTextButton`
+- `WorkloopIconButton`
+- `WorkloopSegmentedControl`
+- `WorkloopFilterChip`
+- `WorkloopBottomNav`
+- `WorkloopFAB`
+- `WorkloopSurface`
+
+Rules:
+
+- New screen UI should use `Workloop*` primitives first.
+- Existing `Slate*` primitives remain as compatibility foundations while older widgets migrate.
+- Bottom navigation, FAB, feature headers, header metrics, filters, list rows, empty states, and primary actions should not be reimplemented locally.
+- Use `AppSpacing.bottomNavClearance` for scrollable primary screens that sit behind the floating bottom navigation.
+- `WorkloopSegmentedControl` is the preferred control for two-to-four peer filters or tabs when the content is already managed in the screen.
+
+Current scope:
+
+- Dashboard, Business Feed, Clients, Bookings, Money, Tasks, Notes, Settings, Onboarding, bottom navigation, and global workspace error chrome now reference the canonical primitives where they touch shared system UI.
+- Bookings and Settings use the shared segmented control instead of local pill-tab containers.
+- Full dark mode is still intentionally disabled until local feature widgets stop depending on static light `AppColors`.

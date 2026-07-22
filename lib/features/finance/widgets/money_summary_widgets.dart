@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/finance_provider.dart';
@@ -21,132 +20,17 @@ class MoneyPeriodSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateSurface(
-      padding: const EdgeInsets.all(6),
-      radius: AppRadius.pill,
-      color: AppColors.bgInteract,
-      child: Row(
-        children: [
-          _periodOption('Week', FinancePeriod.week),
-          _periodOption('Month', FinancePeriod.month),
-          _periodOption(customLabel ?? 'Custom', FinancePeriod.custom),
-        ],
-      ),
-    );
-  }
-
-  Widget _periodOption(String label, FinancePeriod period) {
-    final active = selected == period;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onSelected(period),
-        child: AnimatedContainer(
-          duration: AppMotion.fast,
-          curve: AppMotion.curve,
-          height: 36,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: active ? AppColors.bgRaised : Colors.transparent,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            border: Border.all(
-              color: active
-                  ? AppColors.t1.withValues(alpha: 0.08)
-                  : Colors.transparent,
-            ),
-          ),
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-              color: active ? AppColors.t1 : AppColors.t3,
-            ),
-          ),
+    return WorkloopSegmentedControl<FinancePeriod>(
+      selected: selected,
+      segments: [
+        const WorkloopSegment(value: FinancePeriod.week, label: 'Week'),
+        const WorkloopSegment(value: FinancePeriod.month, label: 'Month'),
+        WorkloopSegment(
+          value: FinancePeriod.custom,
+          label: customLabel ?? 'Custom',
         ),
-      ),
-    );
-  }
-}
-
-class MoneySnapshot extends StatelessWidget {
-  final PeriodMoneySummary summary;
-
-  const MoneySnapshot({super.key, required this.summary});
-
-  @override
-  Widget build(BuildContext context) {
-    return SlateSurface(
-      padding: const EdgeInsets.all(16),
-      radius: AppRadius.lg,
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'MONEY SUMMARY',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.t3,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ),
-              Text(
-                summary.label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _MoneyMetric(
-                  label: 'Paid',
-                  value: summary.paid,
-                  icon: LucideIcons.checkCircle2,
-                ),
-              ),
-              Expanded(
-                child: _MoneyMetric(
-                  label: 'Unpaid',
-                  value: summary.unpaid,
-                  icon: LucideIcons.clock3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _MoneyMetric(
-                  label: 'Overdue',
-                  value: summary.overdue,
-                  icon: LucideIcons.alertCircle,
-                  danger: summary.overdue > 0,
-                  muted: summary.overdue == 0,
-                ),
-              ),
-              Expanded(
-                child: _MoneyMetric(
-                  label: 'Profit',
-                  value: summary.profit,
-                  icon: LucideIcons.trendingUp,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+      ],
+      onChanged: onSelected,
     );
   }
 }
@@ -161,59 +45,34 @@ class ExpenseCategorySummary extends StatelessWidget {
     final categories = summary.categoryTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    return SlateSurface(
-      padding: const EdgeInsets.all(16),
-      radius: AppRadius.lg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'EXPENSE CATEGORIES',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.t3,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const WorkloopSectionHeader(label: 'Spending by category'),
+        const SizedBox(height: AppSpacing.sm),
+        if (categories.isEmpty)
+          const Text(
+            'No expenses in this period.',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.t3,
+            ),
+          )
+        else
+          ...categories
+              .take(4)
+              .map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _CategoryBar(
+                    label: entry.key,
+                    amount: entry.value,
+                    total: summary.expenses,
                   ),
                 ),
               ),
-              Text(
-                summary.label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (categories.isEmpty)
-            const Text(
-              'No expenses in this period.',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.t3,
-              ),
-            )
-          else
-            ...categories
-                .take(4)
-                .map(
-                  (entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _CategoryBar(
-                      label: entry.key,
-                      amount: entry.value,
-                      total: summary.expenses,
-                    ),
-                  ),
-                ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -341,64 +200,6 @@ class _ModePill extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _MoneyMetric extends StatelessWidget {
-  final String label;
-  final double value;
-  final IconData icon;
-  final bool danger;
-  final bool muted;
-
-  const _MoneyMetric({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.danger = false,
-    this.muted = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = danger ? AppColors.error : AppColors.t1;
-    return Row(
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color.withValues(alpha: 0.72), size: 16),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '£${value.toStringAsFixed(0)}',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  color: muted ? AppColors.t3 : color,
-                ),
-              ),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t3,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

@@ -1,17 +1,14 @@
 part of 'tasks_screen.dart';
 
-enum _TaskView { urgent, upcoming, done, all }
+enum _TaskView { now, later, done }
+
+enum _TaskEditorExit { save, discard, keepEditing }
 
 class _TaskSection {
   final String title;
-  final String subtitle;
   final List<SlateTask> tasks;
 
-  const _TaskSection({
-    required this.title,
-    required this.subtitle,
-    required this.tasks,
-  });
+  const _TaskSection({required this.title, required this.tasks});
 }
 
 class _TaskCounts {
@@ -31,8 +28,7 @@ class _TaskCounts {
     required this.open,
   });
 
-  int get urgent => overdue + today + noDate;
-  int get total => open + done;
+  int get now => overdue + today + noDate;
 }
 
 class _TaskTemplate {
@@ -85,46 +81,25 @@ List<_TaskSection> _sectionsForView(List<SlateTask> tasks, _TaskView view) {
   final noDate = open.where((task) => task.dueDate == null).toList();
 
   switch (view) {
-    case _TaskView.urgent:
+    case _TaskView.now:
       return [
-        _TaskSection(
-          title: 'Overdue',
-          subtitle: 'Needs a decision',
-          tasks: overdue,
-        ),
-        _TaskSection(title: 'Today', subtitle: 'Due today', tasks: today),
-        _TaskSection(
-          title: 'No date',
-          subtitle: 'Clarify when these matter',
-          tasks: noDate,
-        ),
+        _TaskSection(title: 'Overdue', tasks: overdue),
+        _TaskSection(title: 'Today', tasks: today),
+        _TaskSection(title: 'Anytime', tasks: noDate),
       ];
-    case _TaskView.upcoming:
+    case _TaskView.later:
       return [
         _TaskSection(
           title: 'Next 7 days',
-          subtitle: 'Coming soon',
           tasks: upcoming.where(_isWithinWeekTask).toList(),
         ),
         _TaskSection(
           title: 'Later',
-          subtitle: 'Future work',
           tasks: upcoming.where((task) => !_isWithinWeekTask(task)).toList(),
         ),
       ];
     case _TaskView.done:
-      return [
-        _TaskSection(
-          title: 'Completed',
-          subtitle: 'Recently done',
-          tasks: done,
-        ),
-      ];
-    case _TaskView.all:
-      return [
-        _TaskSection(title: 'Open', subtitle: 'Still active', tasks: open),
-        _TaskSection(title: 'Done', subtitle: 'Completed', tasks: done),
-      ];
+      return [_TaskSection(title: 'Completed', tasks: done)];
   }
 }
 
@@ -199,19 +174,17 @@ String _reminderLabel(String reminderTiming) {
 
 String _viewLabel(_TaskView view) {
   return switch (view) {
-    _TaskView.urgent => 'Urgent',
-    _TaskView.upcoming => 'Upcoming',
+    _TaskView.now => 'Now',
+    _TaskView.later => 'Later',
     _TaskView.done => 'Done',
-    _TaskView.all => 'All',
   };
 }
 
 int _viewCount(_TaskView view, _TaskCounts counts) {
   return switch (view) {
-    _TaskView.urgent => counts.urgent,
-    _TaskView.upcoming => counts.upcoming,
+    _TaskView.now => counts.now,
+    _TaskView.later => counts.upcoming,
     _TaskView.done => counts.done,
-    _TaskView.all => counts.total,
   };
 }
 
@@ -242,8 +215,6 @@ bool _isWithinWeekTask(SlateTask task) {
   final dueDay = _dateOnly(due);
   return dueDay.isAfter(today) && !dueDay.isAfter(week);
 }
-
-bool _isDueToday(DateTime dt) => _dateOnly(dt) == _dateOnly(DateTime.now());
 
 bool _isOverdue(DateTime dt) =>
     _dateOnly(dt).isBefore(_dateOnly(DateTime.now()));

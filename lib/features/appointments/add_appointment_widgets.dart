@@ -154,18 +154,98 @@ Future<_PickedAppointmentTime?> _showAppointmentTimePicker({
 
 class _AppointmentSectionLabel extends StatelessWidget {
   final String text;
+  final String? subtitle;
 
-  const _AppointmentSectionLabel(this.text);
+  const _AppointmentSectionLabel(this.text, {this.subtitle});
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 10,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0,
-        color: AppColors.t3,
+    final label = text
+        .toLowerCase()
+        .split(' ')
+        .map(
+          (word) => word.isEmpty
+              ? word
+              : '${word.substring(0, 1).toUpperCase()}${word.substring(1)}',
+        )
+        .join(' ');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            height: 1.12,
+            color: AppColors.t1,
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            subtitle!,
+            style: const TextStyle(
+              color: AppColors.t3,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _BookingSaveAction extends StatelessWidget {
+  final String label;
+  final bool loading;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _BookingSaveAction({
+    required this.label,
+    required this.loading,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: enabled
+          ? AppColors.modCalendar.withValues(alpha: 0.12)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: InkWell(
+        onTap: enabled && !loading ? onTap : null,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 58, minHeight: 42),
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: AppColors.modCalendar,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: enabled ? AppColors.modCalendar : AppColors.t4,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+          ),
+        ),
       ),
     );
   }
@@ -215,6 +295,8 @@ class _AppointmentTextInput extends StatelessWidget {
   final String hint;
   final String? prefix;
   final String? suffix;
+  final String? label;
+  final IconData? icon;
   final TextInputType? keyboardType;
   final ValueChanged<String>? onChanged;
 
@@ -223,43 +305,70 @@ class _AppointmentTextInput extends StatelessWidget {
     required this.hint,
     this.prefix,
     this.suffix,
+    this.label,
+    this.icon,
     this.keyboardType,
     this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      onChanged: onChanged,
-      style: const TextStyle(color: AppColors.t1, fontSize: 15),
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixText: prefix,
-        suffixText: suffix,
-        prefixStyle: const TextStyle(color: AppColors.t2),
-        suffixStyle: const TextStyle(color: AppColors.t3),
-        hintStyle: const TextStyle(color: AppColors.t3),
-        filled: true,
-        fillColor: AppColors.bgCard,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.border),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (label != null) ...[
+          Text(
+            label!,
+            style: const TextStyle(
+              color: AppColors.t2,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          onChanged: onChanged,
+          style: const TextStyle(color: AppColors.t1, fontSize: 15),
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixText: prefix,
+            prefixIcon: icon == null
+                ? null
+                : Icon(icon, color: AppColors.t3, size: 18),
+            suffixText: suffix,
+            prefixStyle: const TextStyle(color: AppColors.t2),
+            suffixStyle: const TextStyle(color: AppColors.t3),
+            hintStyle: const TextStyle(
+              color: AppColors.t3,
+              fontWeight: FontWeight.w500,
+            ),
+            filled: true,
+            fillColor: AppColors.bgCard.withValues(alpha: 0.72),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderSide: const BorderSide(
+                color: AppColors.accentPrimaryStrong,
+                width: 1.5,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 15,
+            ),
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.green, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 15,
-        ),
-      ),
+      ],
     );
   }
 }

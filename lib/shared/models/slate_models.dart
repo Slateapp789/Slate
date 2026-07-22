@@ -435,6 +435,60 @@ class SlateTask {
   };
 }
 
+class SlateNote {
+  final String id;
+  final String workspaceId;
+  final String title;
+  final String body;
+  final String? contactId;
+  final String? appointmentId;
+  final String? clientName;
+  final bool pinned;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  const SlateNote({
+    required this.id,
+    required this.workspaceId,
+    required this.title,
+    required this.body,
+    this.contactId,
+    this.appointmentId,
+    this.clientName,
+    this.pinned = false,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory SlateNote.fromMap(Map<String, dynamic> map) {
+    final contact = _nestedMap(map['contacts']);
+    return SlateNote(
+      id: map['id'] as String,
+      workspaceId: map['workspace_id'] as String? ?? '',
+      title: _cleanDisplayText(map['title']) ?? '',
+      body: _cleanDisplayText(map['body']) ?? '',
+      contactId: map['contact_id'] as String?,
+      appointmentId: map['appointment_id'] as String?,
+      clientName: contact?['name'] as String?,
+      pinned: map['pinned'] as bool? ?? false,
+      createdAt: _dateTimeFrom(map['created_at']),
+      updatedAt: _dateTimeFrom(map['updated_at']),
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'workspace_id': workspaceId,
+    'title': title,
+    'body': body,
+    'contact_id': contactId,
+    'appointment_id': appointmentId,
+    'pinned': pinned,
+    if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+    if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
+  };
+}
+
 class TaskChecklistItem {
   final String id;
   final String workspaceId;

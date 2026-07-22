@@ -123,7 +123,7 @@ Deno.serve(async (req: Request) => {
       email,
       status: "requested",
       requested_at: new Date().toISOString(),
-      notes: "Deletion requested from Slate account settings.",
+      notes: "Deletion requested from Workloop account settings.",
     })
     .select("id, status")
     .single();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/onboarding_provider.dart';
+import '../../../shared/widgets/slate_ui.dart';
 
 class ObFirstBooking extends ConsumerStatefulWidget {
   final VoidCallback onNext;
@@ -18,6 +19,19 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
   DateTime _selectedDate = DateTime.now();
   int _selectedHour = 9;
   int _selectedMinute = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final booking = ref.read(onboardingProvider).firstBooking;
+    if (booking == null) return;
+    _clientNameController.text = booking['clientName'] as String? ?? '';
+    _selectedService = booking['serviceName'] as String?;
+    _selectedDate =
+        DateTime.tryParse(booking['date'] as String? ?? '') ?? DateTime.now();
+    _selectedHour = (booking['hour'] as num?)?.toInt() ?? 9;
+    _selectedMinute = (booking['minute'] as num?)?.toInt() ?? 0;
+  }
 
   @override
   void dispose() {
@@ -40,176 +54,27 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    final picked = await showWorkloopDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: AppColors.green,
-              surface: AppColors.bgCard,
-              onSurface: AppColors.t1,
-            ),
-          ),
-          child: child!,
-        );
-      },
+      title: 'Choose booking date',
     );
     if (picked != null) setState(() => _selectedDate = picked);
   }
 
   Future<void> _pickTime() async {
-    await showModalBottomSheet(
+    final picked = await showWorkloopTimePicker(
       context: context,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        int tempHour = _selectedHour;
-        int tempMinute = _selectedMinute;
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SizedBox(
-              height: 300,
-              child: Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.border,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Select time',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.t1,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedHour = tempHour;
-                              _selectedMinute = tempMinute;
-                            });
-                            Navigator.pop(context);
-                          },
-                          child: Text(
-                            'Done',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.green,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ListWheelScrollView.useDelegate(
-                            itemExtent: 48,
-                            perspective: 0.003,
-                            diameterRatio: 1.8,
-                            physics: const FixedExtentScrollPhysics(),
-                            controller: FixedExtentScrollController(
-                              initialItem: tempHour,
-                            ),
-                            onSelectedItemChanged: (i) =>
-                                setModalState(() => tempHour = i),
-                            childDelegate: ListWheelChildBuilderDelegate(
-                              childCount: 24,
-                              builder: (context, i) {
-                                final selected = i == tempHour;
-                                return Center(
-                                  child: Text(
-                                    i.toString().padLeft(2, '0'),
-                                    style: TextStyle(
-                                      fontSize: selected ? 24 : 18,
-                                      fontWeight: selected
-                                          ? FontWeight.w800
-                                          : FontWeight.w400,
-                                      color: selected
-                                          ? AppColors.t1
-                                          : AppColors.t3,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        Text(
-                          ':',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.t1,
-                          ),
-                        ),
-                        Expanded(
-                          child: ListWheelScrollView.useDelegate(
-                            itemExtent: 48,
-                            perspective: 0.003,
-                            diameterRatio: 1.8,
-                            physics: const FixedExtentScrollPhysics(),
-                            controller: FixedExtentScrollController(
-                              initialItem: tempMinute ~/ 15,
-                            ),
-                            onSelectedItemChanged: (i) =>
-                                setModalState(() => tempMinute = i * 15),
-                            childDelegate: ListWheelChildBuilderDelegate(
-                              childCount: 4,
-                              builder: (context, i) {
-                                final min = i * 15;
-                                final selected = min == tempMinute;
-                                return Center(
-                                  child: Text(
-                                    min.toString().padLeft(2, '0'),
-                                    style: TextStyle(
-                                      fontSize: selected ? 24 : 18,
-                                      fontWeight: selected
-                                          ? FontWeight.w800
-                                          : FontWeight.w400,
-                                      color: selected
-                                          ? AppColors.t1
-                                          : AppColors.t3,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+      initialTime: TimeOfDay(hour: _selectedHour, minute: _selectedMinute),
+      title: 'Choose booking time',
     );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedHour = picked.hour;
+      _selectedMinute = picked.minute;
+    });
   }
 
   String get _formattedDate {
@@ -300,46 +165,23 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
           // Service
           _label('Service'),
           const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedService,
-                hint: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: Text(
-                    'Select a service',
-                    style: TextStyle(color: AppColors.t3, fontSize: 15),
+          WorkloopPickerField<String>(
+            value: _selectedService,
+            title: 'Choose a service',
+            hint: 'Select a service',
+            searchHint: 'Search services',
+            options: services
+                .map(
+                  (service) => WorkloopPickerOption(
+                    value: service['name'] as String,
+                    label: service['name'] as String,
+                    subtitle: service['duration_mins'] == null
+                        ? null
+                        : '${service['duration_mins']} min',
                   ),
-                ),
-                isExpanded: true,
-                dropdownColor: AppColors.bgRaised,
-                icon: Padding(
-                  padding: const EdgeInsets.only(right: 14),
-                  child: Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: AppColors.t3,
-                  ),
-                ),
-                items: services.map((s) {
-                  return DropdownMenuItem<String>(
-                    value: s['name'] as String,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
-                      child: Text(
-                        s['name'] as String,
-                        style: TextStyle(color: AppColors.t1, fontSize: 15),
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) => setState(() => _selectedService = val),
-              ),
-            ),
+                )
+                .toList(),
+            onChanged: (value) => setState(() => _selectedService = value),
           ),
           const SizedBox(height: 20),
 
@@ -421,7 +263,7 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 disabledBackgroundColor: AppColors.bgInteract,
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.onBrandAccent,
                 disabledForegroundColor: AppColors.t3,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),

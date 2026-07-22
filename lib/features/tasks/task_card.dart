@@ -19,6 +19,11 @@ class _TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDone = task.status == 'done';
     final priorityColor = _priorityColor(task.priority);
+    final dueLabel = task.dueDate == null ? null : _formatDue(task.dueDate!);
+    final dueColor =
+        !isDone && task.dueDate != null && _isOverdue(task.dueDate!)
+        ? AppColors.error
+        : AppColors.t3;
 
     return Dismissible(
       key: ValueKey(task.id),
@@ -38,7 +43,7 @@ class _TaskCard extends StatelessWidget {
         alignment: Alignment.centerLeft,
         icon: isDone ? LucideIcons.rotateCcw : LucideIcons.checkCircle,
         label: isDone ? 'Reopen' : 'Complete',
-        color: AppColors.green,
+        color: AppColors.success,
       ),
       secondaryBackground: const _SwipeBackground(
         alignment: Alignment.centerRight,
@@ -71,9 +76,9 @@ class _TaskCard extends StatelessWidget {
                     height: 24,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDone ? AppColors.green : Colors.transparent,
+                      color: isDone ? AppColors.success : Colors.transparent,
                       border: Border.all(
-                        color: isDone ? AppColors.green : AppColors.border,
+                        color: isDone ? AppColors.success : AppColors.border,
                         width: 2,
                       ),
                     ),
@@ -114,34 +119,31 @@ class _TaskCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 7),
-                    Wrap(
-                      spacing: 7,
-                      runSpacing: 7,
-                      children: [
-                        _MetaPill(
-                          icon: LucideIcons.flag,
-                          label: _priorityLabel(task.priority),
-                          color: isDone ? AppColors.t3 : priorityColor,
+                    if (dueLabel != null || task.clientName != null) ...[
+                      const SizedBox(height: 5),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            if (dueLabel != null)
+                              TextSpan(
+                                text: dueLabel,
+                                style: TextStyle(color: dueColor),
+                              ),
+                            if (dueLabel != null && task.clientName != null)
+                              const TextSpan(text: '  ·  '),
+                            if (task.clientName != null)
+                              TextSpan(text: task.clientName!),
+                          ],
                         ),
-                        if (task.dueDate != null)
-                          _MetaPill(
-                            icon: LucideIcons.calendar,
-                            label: _formatDue(task.dueDate!),
-                            color: !isDone && _isOverdue(task.dueDate!)
-                                ? AppColors.error
-                                : !isDone && _isDueToday(task.dueDate!)
-                                ? AppColors.warning
-                                : AppColors.t3,
-                          ),
-                        if (task.clientName != null)
-                          _MetaPill(
-                            icon: LucideIcons.user,
-                            label: task.clientName!,
-                            color: AppColors.t3,
-                          ),
-                      ],
-                    ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.t3,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -194,48 +196,6 @@ class _SwipeBackground extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w900,
               color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetaPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _MetaPill({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.09),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: color,
-              ),
             ),
           ),
         ],

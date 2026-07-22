@@ -1,134 +1,336 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+
 import '../../core/theme/app_theme.dart';
-import 'providers/settings_providers.dart';
-import 'widgets/settings_business_tab.dart';
+import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/widgets/slate_ui.dart';
+import '../notifications/notifications_screen.dart';
+import '../imports/import_data_screen.dart';
+import 'support_screen.dart';
 import 'widgets/settings_account_tab.dart';
 import 'widgets/settings_app_tab.dart';
-import '../notifications/notifications_screen.dart';
 
-export 'providers/settings_providers.dart';
-
-class SettingsScreen extends ConsumerStatefulWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(authRepositoryProvider);
+    final name = auth.currentFirstName?.trim();
+    final email = auth.currentEmail;
+
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                AppSpacing.lg,
+                AppSpacing.pageX,
+                AppSpacing.xxl,
+              ),
+              children: [
+                Row(
+                  children: [
+                    WorkloopIconButton(
+                      icon: LucideIcons.chevronLeft,
+                      semanticLabel: 'Back to more',
+                      onTap: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    const Expanded(
+                      child: Text(
+                        'Settings',
+                        style: TextStyle(
+                          color: AppColors.t1,
+                          fontSize: 26,
+                          height: 1.05,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                _AccountIdentity(name: name, email: email),
+                const SizedBox(height: AppSpacing.xxl),
+                const WorkloopSectionHeader(label: 'Your account'),
+                const SizedBox(height: AppSpacing.xs),
+                _SettingsRow(
+                  icon: LucideIcons.user,
+                  title: 'Account',
+                  subtitle: 'Personal details, password, data and sign out',
+                  onTap: () => _open(
+                    context,
+                    ref,
+                    title: 'Account',
+                    child: const SettingsAccountTab(),
+                  ),
+                ),
+                _SettingsRow(
+                  icon: LucideIcons.bell,
+                  title: 'Notifications',
+                  subtitle: 'Choose the alerts and summaries you receive',
+                  onTap: () => _open(
+                    context,
+                    ref,
+                    title: 'Notifications',
+                    child: const NotificationSettingsView(),
+                  ),
+                ),
+                _SettingsRow(
+                  icon: LucideIcons.slidersHorizontal,
+                  title: 'App preferences',
+                  subtitle: 'Maps, calendar and Workloop information',
+                  showDivider: false,
+                  onTap: () => _open(
+                    context,
+                    ref,
+                    title: 'App preferences',
+                    child: const SettingsAppTab(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                const WorkloopSectionHeader(label: 'Support'),
+                const SizedBox(height: AppSpacing.xs),
+                _SettingsRow(
+                  icon: LucideIcons.lifeBuoy,
+                  title: 'Help & support',
+                  subtitle: 'Contact support or copy safe diagnostics',
+                  showDivider: false,
+                  onTap: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SupportScreen()),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                const WorkloopSectionHeader(label: 'Your data'),
+                const SizedBox(height: AppSpacing.xs),
+                _SettingsRow(
+                  icon: LucideIcons.import,
+                  title: 'Import data',
+                  subtitle: 'Contacts, calendar events and selected files',
+                  onTap: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ImportDataScreen()),
+                  ),
+                ),
+                _SettingsRow(
+                  icon: LucideIcons.shieldCheck,
+                  title: 'Privacy and data',
+                  subtitle: 'Export your workspace or request account deletion',
+                  showDivider: false,
+                  onTap: () => _open(
+                    context,
+                    ref,
+                    title: 'Account',
+                    child: const SettingsAccountTab(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                const Text(
+                  'Workloop 1.0.0',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.t4,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _open(
+    BuildContext context,
+    WidgetRef ref, {
+    required String title,
+    required Widget child,
+  }) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _SettingsDestinationScreen(title: title, child: child),
+      ),
+    );
+    ref.invalidate(authRepositoryProvider);
+  }
 }
 
-class _SettingsScreenState extends ConsumerState<SettingsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _SettingsDestinationScreen extends StatelessWidget {
+  final String title;
+  final Widget child;
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.invalidate(settingsServicesProvider);
-    });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+  const _SettingsDestinationScreen({required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ── Header ──────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.border),
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    AppSpacing.lg,
+                    AppSpacing.pageX,
+                    AppSpacing.xl,
+                  ),
+                  child: Row(
+                    children: [
+                      WorkloopIconButton(
+                        icon: LucideIcons.chevronLeft,
+                        semanticLabel: 'Back to settings',
+                        onTap: () => Navigator.pop(context),
                       ),
-                      child: const Icon(
-                        LucideIcons.chevronLeft,
-                        color: AppColors.t2,
-                        size: 18,
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            color: AppColors.t1,
+                            fontSize: 26,
+                            height: 1.05,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  const Text(
-                    'Settings',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.t1,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── Tab bar ──────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
                 ),
-                child: TabBar(
-                  controller: _tabController,
-                  indicator: BoxDecoration(
-                    color: AppColors.green,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  indicatorPadding: const EdgeInsets.all(3),
-                  dividerColor: Colors.transparent,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: AppColors.t3,
-                  labelStyle: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  tabs: const [
-                    Tab(text: 'Business'),
-                    Tab(text: 'Alerts'),
-                    Tab(text: 'Account'),
-                    Tab(text: 'App'),
-                  ],
-                ),
-              ),
+                Expanded(child: child),
+              ],
             ),
-            const SizedBox(height: 16),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-            // ── Tab content ──────────────────────────────────────────────
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: const [
-                  SettingsBusinessTab(),
-                  NotificationSettingsView(),
-                  SettingsAccountTab(),
-                  SettingsAppTab(),
-                ],
-              ),
+class _AccountIdentity extends StatelessWidget {
+  final String? name;
+  final String email;
+
+  const _AccountIdentity({required this.name, required this.email});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = name?.isNotEmpty == true ? name! : 'Your account';
+    final initial = label[0].toUpperCase();
+    return Row(
+      children: [
+        Container(
+          width: 52,
+          height: 52,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: AppColors.modBg,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            initial,
+            style: const TextStyle(
+              color: AppColors.t1,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
             ),
-          ],
+          ),
         ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                email,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.t3,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool showDivider;
+
+  const _SettingsRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.showDivider = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkloopListRow(
+      onTap: onTap,
+      showDivider: showDivider,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          color: AppColors.modBg,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: AppColors.t2, size: 18),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(
+          color: AppColors.t3,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      trailing: const Icon(
+        LucideIcons.chevronRight,
+        color: AppColors.t3,
+        size: 16,
       ),
     );
   }

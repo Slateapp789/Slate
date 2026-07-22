@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/slate_models.dart';
+import 'appointments_repository.dart';
 import 'supabase_client_provider.dart';
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
@@ -138,6 +139,23 @@ class ProfileRepository {
       if (extraNotes?.trim().isNotEmpty == true) extraNotes!.trim(),
     ].join('\n\n');
     final serviceId = await _validServiceIdForRequest(request);
+    final settings = await _client
+        .from('workspace_settings')
+        .select('working_hours')
+        .eq('workspace_id', request.workspaceId)
+        .maybeSingle();
+    final workingHours = settings?['working_hours'] is Map
+        ? Map<String, dynamic>.from(settings!['working_hours'] as Map)
+        : <String, dynamic>{};
+    final startUtc = startTime.toUtc();
+    final endUtc = endTime.toUtc();
+
+    await AppointmentsRepository(_client).ensureScheduleAvailable(
+      workspaceId: request.workspaceId,
+      startTime: startUtc,
+      endTime: endUtc,
+      workingHours: workingHours,
+    );
 
     final appointment = await _client
         .from('appointments')
@@ -146,8 +164,8 @@ class ProfileRepository {
           'contact_id': contactId,
           if (serviceId != null) 'service_id': serviceId,
           'title': title,
-          'start_time': startTime.toUtc().toIso8601String(),
-          'end_time': endTime.toUtc().toIso8601String(),
+          'start_time': startUtc.toIso8601String(),
+          'end_time': endUtc.toIso8601String(),
           'price': price,
           'status': 'scheduled',
           'notes': notes.isEmpty ? null : notes,
@@ -157,18 +175,11 @@ class ProfileRepository {
         .single();
 
     if (createPaymentDue && price > 0) {
-      final existing = await _client
-          .from('invoices')
-          .select('id')
-          .eq('workspace_id', request.workspaceId);
-      final count = List<dynamic>.from(existing).length + 1;
-      final paymentNumber = 'PAY-${count.toString().padLeft(3, '0')}';
       final dateString = startTime.toIso8601String().split('T').first;
       await _client.from('invoices').insert({
         'workspace_id': request.workspaceId,
         'contact_id': contactId,
         'appointment_id': appointment['id'] as String,
-        'invoice_number': paymentNumber,
         'type': 'invoice',
         'status': 'sent',
         'issue_date': dateString,

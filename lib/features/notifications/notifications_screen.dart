@@ -8,6 +8,7 @@ import '../../shared/models/slate_models.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/widgets/slate_ui.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -25,191 +26,151 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final notifications = ref.watch(notificationsProvider);
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Icon(
-                        LucideIcons.chevronLeft,
-                        color: AppColors.t2,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  const Text(
-                    'Notifications',
-                    style: TextStyle(
-                      color: AppColors.t1,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                  const Spacer(),
-                  notifications.maybeWhen(
-                    data: (items) {
-                      final unread = items.where((item) => !item.read).length;
-                      if (unread == 0) return const SizedBox.shrink();
-                      return GestureDetector(
-                        onTap: () async {
-                          final workspaceId = await ref.read(
-                            workspaceIdProvider.future,
-                          );
-                          if (workspaceId == null) return;
-                          await ref
-                              .read(notificationsRepositoryProvider)
-                              .markAllRead(workspaceId);
-                          ref.invalidate(notificationsProvider);
-                          ref.invalidate(unreadNotificationsProvider);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.bgCard,
-                            borderRadius: BorderRadius.circular(AppRadius.pill),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: const Text(
-                            'Clear',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.t2,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                    orElse: () => const SizedBox.shrink(),
-                  ),
-                ],
-              ),
-            ),
-            notifications.maybeWhen(
-              data: (items) {
-                if (items.isEmpty) return const SizedBox.shrink();
-                final unread = items.where((item) => !item.read).length;
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
                   child: Row(
                     children: [
-                      _NotificationFilterChip(
-                        label: 'All',
-                        active: !_unreadOnly,
-                        onTap: () => setState(() => _unreadOnly = false),
+                      WorkloopIconButton(
+                        icon: LucideIcons.chevronLeft,
+                        semanticLabel: 'Back',
+                        onTap: () => Navigator.pop(context),
                       ),
-                      const SizedBox(width: 8),
-                      _NotificationFilterChip(
-                        label: unread == 0 ? 'Unread' : 'Unread $unread',
-                        active: _unreadOnly,
-                        onTap: () => setState(() => _unreadOnly = true),
+                      const SizedBox(width: 14),
+                      const Text(
+                        'Notifications',
+                        style: TextStyle(
+                          color: AppColors.t1,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      const Spacer(),
+                      notifications.maybeWhen(
+                        data: (items) {
+                          final unread = items
+                              .where((item) => !item.read)
+                              .length;
+                          if (unread == 0) return const SizedBox.shrink();
+                          return GestureDetector(
+                            onTap: () async {
+                              final workspaceId = await ref.read(
+                                workspaceIdProvider.future,
+                              );
+                              if (workspaceId == null) return;
+                              await ref
+                                  .read(notificationsRepositoryProvider)
+                                  .markAllRead(workspaceId);
+                              ref.invalidate(notificationsProvider);
+                              ref.invalidate(unreadNotificationsProvider);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.bgCard,
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.pill,
+                                ),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: const Text(
+                                'Mark all read',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.t2,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        orElse: () => const SizedBox.shrink(),
                       ),
                     ],
                   ),
-                );
-              },
-              orElse: () => const SizedBox.shrink(),
-            ),
-            Expanded(
-              child: notifications.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(color: AppColors.green),
                 ),
-                error: (_, __) => const _EmptyNotifications(
-                  title: 'Could not load notifications',
-                  subtitle: 'Try again in a moment.',
+                notifications.maybeWhen(
+                  data: (items) {
+                    if (items.isEmpty) return const SizedBox.shrink();
+                    final unread = items.where((item) => !item.read).length;
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+                      child: WorkloopSegmentedControl<bool>(
+                        segments: [
+                          const WorkloopSegment(value: false, label: 'All'),
+                          WorkloopSegment(
+                            value: true,
+                            label: 'Unread',
+                            badge: unread == 0 ? null : '$unread',
+                          ),
+                        ],
+                        selected: _unreadOnly,
+                        onChanged: (value) =>
+                            setState(() => _unreadOnly = value),
+                      ),
+                    );
+                  },
+                  orElse: () => const SizedBox.shrink(),
                 ),
-                data: (items) {
-                  final visible = _unreadOnly
-                      ? items.where((item) => !item.read).toList()
-                      : items;
-                  if (items.isEmpty) {
-                    return const _EmptyNotifications(
-                      title: 'No notifications',
-                      subtitle: 'Important updates will appear here.',
-                    );
-                  }
-                  if (visible.isEmpty) {
-                    return const _EmptyNotifications(
-                      title: 'Nothing unread',
-                      subtitle: 'You are caught up for now.',
-                    );
-                  }
-                  return RefreshIndicator(
-                    color: AppColors.green,
-                    onRefresh: () async =>
-                        ref.invalidate(notificationsProvider),
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-                      children: _groupedNotificationChildren(visible),
+                Expanded(
+                  child: notifications.when(
+                    loading: () => const Center(
+                      child: CircularProgressIndicator(color: AppColors.green),
                     ),
-                  );
-                },
-              ),
+                    error: (_, __) => Center(
+                      child: WorkloopEmptyState(
+                        icon: LucideIcons.wifiOff,
+                        title: 'Could not load notifications',
+                        subtitle: 'Check your connection, then try again.',
+                        action: WorkloopTextButton(
+                          label: 'Try again',
+                          onPressed: () =>
+                              ref.invalidate(notificationsProvider),
+                        ),
+                      ),
+                    ),
+                    data: (items) {
+                      final visible = _unreadOnly
+                          ? items.where((item) => !item.read).toList()
+                          : items;
+                      if (items.isEmpty) {
+                        return const _EmptyNotifications(
+                          title: 'No notifications',
+                          subtitle: 'Important updates will appear here.',
+                        );
+                      }
+                      if (visible.isEmpty) {
+                        return const _EmptyNotifications(
+                          title: 'Nothing unread',
+                          subtitle: 'You are caught up for now.',
+                        );
+                      }
+                      return RefreshIndicator(
+                        color: AppColors.green,
+                        onRefresh: () async =>
+                            ref.invalidate(notificationsProvider),
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+                          children: _groupedNotificationChildren(visible),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NotificationFilterChip extends StatelessWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  const _NotificationFilterChip({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppMotion.fast,
-        curve: AppMotion.curve,
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-        decoration: BoxDecoration(
-          color: active
-              ? AppColors.t1.withValues(alpha: 0.10)
-              : AppColors.bgCard,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: active
-                ? AppColors.t1.withValues(alpha: 0.15)
-                : AppColors.border,
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: active ? AppColors.t1 : AppColors.t3,
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -230,16 +191,29 @@ class NotificationSettingsView extends ConsumerWidget {
         style: TextStyle(color: AppColors.error),
       ),
       data: (values) => ListView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.pageX,
+          0,
+          AppSpacing.pageX,
+          AppSpacing.xxl,
+        ),
         children: [
+          const WorkloopSurface(
+            padding: EdgeInsets.all(AppSpacing.md),
+            child: Text(
+              'These choices control Workloop’s in-app notification centre. Device push and scheduled reminders are not enabled in this build.',
+              style: TextStyle(color: AppColors.t2, fontSize: 13, height: 1.4),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
           _PreferenceGroup(
-            title: 'Important alerts',
+            title: 'Business activity',
             values: values,
             items: const [
               _PreferenceItem(
                 'all_notifications',
                 'All notifications',
-                'Push alerts can be turned off at once.',
+                'Turn all in-app activity notifications off at once.',
               ),
               _PreferenceItem(
                 'payment_received',
@@ -263,9 +237,9 @@ class NotificationSettingsView extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: AppSpacing.xl),
           _PreferenceGroup(
-            title: 'Workday',
+            title: 'Follow-ups',
             values: values,
             items: const [
               _PreferenceItem(
@@ -279,41 +253,9 @@ class NotificationSettingsView extends ConsumerWidget {
                 'A lead has gone quiet.',
               ),
               _PreferenceItem(
-                'appointment_reminder_15',
-                '15 min booking reminder',
-                'Optional owner reminder.',
-              ),
-              _PreferenceItem(
                 'task_due_morning',
                 'Tasks due today',
-                'Morning task reminder.',
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          _PreferenceGroup(
-            title: 'Summaries',
-            values: values,
-            items: const [
-              _PreferenceItem(
-                'morning_digest',
-                'Morning digest',
-                'Bookings, tasks and outstanding money.',
-              ),
-              _PreferenceItem(
-                'weekly_summary',
-                'Weekly business summary',
-                'A calm Monday overview.',
-              ),
-              _PreferenceItem(
-                'quiet_hours_enabled',
-                'Quiet hours',
-                'Suppress non-urgent alerts overnight.',
-              ),
-              _PreferenceItem(
-                'quiet_sundays',
-                'Quiet Sundays',
-                'Protect a day off.',
+                'A task has reached its due date.',
               ),
             ],
           ),
@@ -339,47 +281,27 @@ class _PreferenceGroup extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title.toUpperCase(),
-          style: const TextStyle(
-            color: AppColors.t3,
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
+        WorkloopSectionHeader(label: title),
+        const SizedBox(height: AppSpacing.xs),
+        for (var i = 0; i < items.length; i++) ...[
+          _PreferenceRow(
+            item: items[i],
+            value: values[items[i].key] as bool? ?? false,
+            onChanged: (next) async {
+              final workspaceId = await ref.read(workspaceIdProvider.future);
+              if (workspaceId == null) return;
+              await ref.read(notificationsRepositoryProvider).upsertPreferences(
+                workspaceId,
+                {items[i].key: next},
+              );
+              ref.invalidate(notificationPreferencesProvider);
+              ref.invalidate(notificationsProvider);
+              ref.invalidate(unreadNotificationsProvider);
+            },
           ),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              for (var i = 0; i < items.length; i++) ...[
-                _PreferenceRow(
-                  item: items[i],
-                  value: values[items[i].key] as bool? ?? false,
-                  onChanged: (next) async {
-                    final workspaceId = await ref.read(
-                      workspaceIdProvider.future,
-                    );
-                    if (workspaceId == null) return;
-                    await ref
-                        .read(notificationsRepositoryProvider)
-                        .upsertPreferences(workspaceId, {items[i].key: next});
-                    ref.invalidate(notificationPreferencesProvider);
-                    ref.invalidate(notificationsProvider);
-                    ref.invalidate(unreadNotificationsProvider);
-                  },
-                ),
-                if (i < items.length - 1)
-                  Divider(height: 1, color: AppColors.border),
-              ],
-            ],
-          ),
-        ),
+          if (i < items.length - 1)
+            const WorkloopDivider(margin: EdgeInsets.zero),
+        ],
       ],
     );
   }
@@ -406,7 +328,7 @@ class _PreferenceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Row(
         children: [
           Expanded(
@@ -428,9 +350,9 @@ class _PreferenceRow extends StatelessWidget {
               ],
             ),
           ),
-          Switch(
+          Switch.adaptive(
             value: value,
-            activeThumbColor: AppColors.green,
+            activeThumbColor: AppColors.accentPrimary,
             onChanged: onChanged,
           ),
         ],

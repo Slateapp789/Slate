@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/working_hours.dart';
+import '../../shared/widgets/slate_ui.dart';
 
 final publicProfileProvider = FutureProvider.family<PublicProfile?, String>((
   ref,
@@ -15,7 +16,13 @@ final publicProfileProvider = FutureProvider.family<PublicProfile?, String>((
 
 class PublicProfileScreen extends ConsumerStatefulWidget {
   final String handle;
-  const PublicProfileScreen({super.key, required this.handle});
+  final PublicProfile? previewProfile;
+
+  const PublicProfileScreen({
+    super.key,
+    required this.handle,
+    this.previewProfile,
+  });
 
   @override
   ConsumerState<PublicProfileScreen> createState() =>
@@ -94,39 +101,66 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final profile = ref.watch(publicProfileProvider(widget.handle));
+    final AsyncValue<PublicProfile?> profile = widget.previewProfile == null
+        ? ref.watch(publicProfileProvider(widget.handle))
+        : AsyncValue.data(widget.previewProfile);
+    final canGoBack = Navigator.of(context).canPop();
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: profile.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.green),
-        ),
-        error: (_, __) => const _ProfileMessage(
-          title: 'Could not load profile',
-          body: 'Check the link and try again.',
-        ),
-        data: (data) {
-          if (data == null) {
-            return const _ProfileMessage(
-              title: 'Profile not found',
-              body: 'This Slate profile is not available.',
-            );
-          }
-          return _ProfileContent(
-            profile: data,
-            selectedServiceId: _selectedServiceId,
-            nameController: _nameController,
-            phoneController: _phoneController,
-            preferredTimeController: _preferredTimeController,
-            messageController: _messageController,
-            sending: _sending,
-            sent: _sent,
-            onServiceChanged: (id) => setState(() => _selectedServiceId = id),
-            onPreferredTimePicked: (value) =>
-                setState(() => _preferredTimeController.text = value),
-            onSubmit: () => _sendRequest(data),
-          );
-        },
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          Positioned.fill(
+            child: profile.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.green),
+              ),
+              error: (_, __) => const _ProfileMessage(
+                title: 'Could not load profile',
+                body: 'Check the link and try again.',
+              ),
+              data: (data) {
+                if (data == null) {
+                  return const _ProfileMessage(
+                    title: 'Profile not found',
+                    body: 'This Workloop profile is not available.',
+                  );
+                }
+                return _ProfileContent(
+                  profile: data,
+                  selectedServiceId: _selectedServiceId,
+                  nameController: _nameController,
+                  phoneController: _phoneController,
+                  preferredTimeController: _preferredTimeController,
+                  messageController: _messageController,
+                  sending: _sending,
+                  sent: _sent,
+                  topInset: canGoBack ? 84 : 28,
+                  onServiceChanged: (id) =>
+                      setState(() => _selectedServiceId = id),
+                  onPreferredTimePicked: (value) =>
+                      setState(() => _preferredTimeController.text = value),
+                  onSubmit: () => _sendRequest(data),
+                );
+              },
+            ),
+          ),
+          if (canGoBack)
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(
+                  left: AppSpacing.pageX,
+                  top: AppSpacing.sm,
+                ),
+                child: WorkloopIconButton(
+                  icon: LucideIcons.chevronLeft,
+                  semanticLabel: 'Back to profile',
+                  backgroundColor: AppColors.bgCard.withValues(alpha: 0.94),
+                  onTap: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -141,6 +175,7 @@ class _ProfileContent extends StatelessWidget {
   final TextEditingController messageController;
   final bool sending;
   final bool sent;
+  final double topInset;
   final ValueChanged<String?> onServiceChanged;
   final ValueChanged<String> onPreferredTimePicked;
   final VoidCallback onSubmit;
@@ -154,6 +189,7 @@ class _ProfileContent extends StatelessWidget {
     required this.messageController,
     required this.sending,
     required this.sent,
+    required this.topInset,
     required this.onServiceChanged,
     required this.onPreferredTimePicked,
     required this.onSubmit,
@@ -176,7 +212,7 @@ class _ProfileContent extends StatelessWidget {
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 40),
+        padding: EdgeInsets.fromLTRB(20, topInset, 20, 40),
         children: [
           _Hero(profile: profile),
           const SizedBox(height: 24),
@@ -263,20 +299,20 @@ class _ProfileContent extends StatelessWidget {
                         maxLength: 32,
                       ),
                       const SizedBox(height: 10),
-                      DropdownButtonFormField<String?>(
-                        initialValue: selectedServiceId,
-                        dropdownColor: AppColors.bgCard,
-                        style: const TextStyle(color: AppColors.t1),
-                        decoration: _fieldDecoration('Service'),
-                        items: [
-                          const DropdownMenuItem<String?>(
+                      WorkloopPickerField<String?>(
+                        value: selectedServiceId,
+                        title: 'Choose a service',
+                        hint: 'Service',
+                        searchHint: 'Search services',
+                        options: [
+                          const WorkloopPickerOption<String?>(
                             value: null,
-                            child: Text('Not sure yet'),
+                            label: 'Not sure yet',
                           ),
                           ...profile.services.map(
-                            (service) => DropdownMenuItem<String?>(
+                            (service) => WorkloopPickerOption<String?>(
                               value: service.id,
-                              child: Text(service.name),
+                              label: service.name,
                             ),
                           ),
                         ],
@@ -404,7 +440,7 @@ class _Hero extends StatelessWidget {
             const Icon(LucideIcons.link, color: AppColors.t3, size: 15),
             const SizedBox(width: 6),
             Text(
-              'slate.app/${profile.profile.handle}',
+              'workloop.app/${profile.profile.handle}',
               style: const TextStyle(color: AppColors.t3, fontSize: 13),
             ),
           ],

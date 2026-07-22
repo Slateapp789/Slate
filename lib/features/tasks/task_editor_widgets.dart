@@ -1,5 +1,92 @@
 part of 'tasks_screen.dart';
 
+class _TaskFormSectionLabel extends StatelessWidget {
+  final String text;
+  final String? subtitle;
+
+  const _TaskFormSectionLabel(this.text, {this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            height: 1.12,
+            color: AppColors.t1,
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            subtitle!,
+            style: const TextStyle(
+              color: AppColors.t3,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _TaskSaveAction extends StatelessWidget {
+  final String label;
+  final bool loading;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _TaskSaveAction({
+    required this.label,
+    required this.loading,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: enabled
+          ? AppColors.modTasks.withValues(alpha: 0.14)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: InkWell(
+        onTap: enabled && !loading ? onTap : null,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 58, minHeight: 42),
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: AppColors.modTasks,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Text(
+                    label,
+                    style: TextStyle(
+                      color: enabled ? AppColors.modTasks : AppColors.t3,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TaskTemplatePicker extends StatelessWidget {
   final ValueChanged<_TaskTemplate> onSelect;
 
@@ -51,117 +138,103 @@ class _DraftChecklistEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SlateSurface(
-      color: AppColors.t1.withValues(alpha: 0.035),
-      borderColor: AppColors.t1.withValues(alpha: 0.05),
-      radius: AppRadius.lg,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(LucideIcons.listChecks, size: 15, color: AppColors.t3),
-              SizedBox(width: 8),
-              Text(
-                'Checklist',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.t1,
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(LucideIcons.listChecks, size: 15, color: AppColors.t3),
+            SizedBox(width: 8),
+            Text(
+              'Checklist',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: AppColors.t1,
               ),
-              Spacer(),
-              Text(
-                'Saved with task',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t3,
-                ),
+            ),
+            Spacer(),
+            Text(
+              'Saved with task',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppColors.t3,
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => onAdd(),
-                  style: const TextStyle(color: AppColors.t1),
-                  decoration: const InputDecoration(
-                    hintText: 'Add a step',
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => onAdd(),
+                style: const TextStyle(color: AppColors.t1),
+                decoration: const InputDecoration(
+                  hintText: 'Add a step',
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onAdd,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.slateLight,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: const Icon(
-                    LucideIcons.plus,
-                    size: 18,
-                    color: AppColors.panelInk,
-                  ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onAdd,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.slateLight,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-              ),
-            ],
-          ),
-          if (items.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            ...items.asMap().entries.map(
-              (entry) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    const Icon(
-                      LucideIcons.circle,
-                      size: 16,
-                      color: AppColors.t3,
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Text(
-                        entry.value,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.t2,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => onRemove(entry.key),
-                      child: const Padding(
-                        padding: EdgeInsets.all(6),
-                        child: Icon(
-                          LucideIcons.x,
-                          size: 14,
-                          color: AppColors.t3,
-                        ),
-                      ),
-                    ),
-                  ],
+                child: const Icon(
+                  LucideIcons.plus,
+                  size: 18,
+                  color: AppColors.panelInk,
                 ),
               ),
             ),
           ],
+        ),
+        if (items.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          ...items.asMap().entries.map(
+            (entry) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  const Icon(LucideIcons.circle, size: 16, color: AppColors.t3),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      entry.value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.t2,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => onRemove(entry.key),
+                    child: const Padding(
+                      padding: EdgeInsets.all(6),
+                      child: Icon(LucideIcons.x, size: 14, color: AppColors.t3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -184,47 +257,27 @@ class _ClientPicker extends StatelessWidget {
         clients.any((client) => client.id == selectedClientId);
     final safeSelectedClientId = hasSelectedClient ? selectedClientId : null;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: AppColors.bgInteract,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String?>(
-          value: safeSelectedClientId,
-          isExpanded: true,
-          dropdownColor: AppColors.bgRaised,
-          icon: const Icon(
-            LucideIcons.chevronDown,
-            color: AppColors.t3,
-            size: 16,
-          ),
-          hint: const Text(
-            'Link to client',
-            style: TextStyle(color: AppColors.t3, fontSize: 14),
-          ),
-          items: [
-            const DropdownMenuItem<String?>(
-              value: null,
-              child: Text(
-                'No client',
-                style: TextStyle(color: AppColors.t3, fontSize: 14),
-              ),
-            ),
-            ...clients.map(
-              (client) => DropdownMenuItem<String?>(
-                value: client.id as String,
-                child: Text(
-                  client.name as String,
-                  style: const TextStyle(color: AppColors.t1, fontSize: 14),
-                ),
-              ),
-            ),
-          ],
-          onChanged: onChanged,
+    return WorkloopPickerField<String?>(
+      value: safeSelectedClientId,
+      title: 'Link a client',
+      hint: 'Link to client',
+      searchHint: 'Search clients',
+      searchable: true,
+      leadingIcon: LucideIcons.users,
+      options: [
+        const WorkloopPickerOption<String?>(
+          value: null,
+          label: 'No client',
+          subtitle: 'Keep this as a general task',
         ),
-      ),
+        ...clients.map(
+          (client) => WorkloopPickerOption<String?>(
+            value: client.id as String,
+            label: client.name as String,
+          ),
+        ),
+      ],
+      onChanged: onChanged,
     );
   }
 }
@@ -237,6 +290,16 @@ class _DueDatePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final today = _dateOnly(DateTime.now());
+    final tomorrow = today.add(const Duration(days: 1));
+    final nextWeek = today.add(const Duration(days: 7));
+    final selectedDate = dueDate == null ? null : _dateOnly(dueDate!);
+    final customSelected =
+        selectedDate != null &&
+        selectedDate != today &&
+        selectedDate != tomorrow &&
+        selectedDate != nextWeek;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -255,87 +318,99 @@ class _DueDatePicker extends StatelessWidget {
           children: [
             _DateChoice(
               label: 'Today',
-              onTap: () => onChanged(_dateOnly(DateTime.now())),
+              selected: selectedDate == today,
+              onTap: () => onChanged(today),
             ),
             _DateChoice(
               label: 'Tomorrow',
-              onTap: () => onChanged(
-                _dateOnly(DateTime.now().add(const Duration(days: 1))),
-              ),
+              selected: selectedDate == tomorrow,
+              onTap: () => onChanged(tomorrow),
             ),
             _DateChoice(
               label: 'Next week',
-              onTap: () => onChanged(
-                _dateOnly(DateTime.now().add(const Duration(days: 7))),
-              ),
+              selected: selectedDate == nextWeek,
+              onTap: () => onChanged(nextWeek),
             ),
-            _DateChoice(label: 'Custom', onTap: () => _pickCustomDate(context)),
+            _DateChoice(
+              label: 'Custom',
+              selected: customSelected,
+              onTap: () => _pickCustomDate(context),
+            ),
             if (dueDate != null)
               _DateChoice(label: 'Clear date', onTap: () => onChanged(null)),
           ],
         ),
-        const SizedBox(height: 10),
-        GestureDetector(
-          onTap: () async {
-            final now = DateTime.now();
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: dueDate ?? now,
-              firstDate: DateTime(now.year - 1),
-              lastDate: DateTime(now.year + 2),
-            );
-            if (picked != null) onChanged(_dateOnly(picked));
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: AppColors.bgInteract,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  LucideIcons.calendar,
-                  color: dueDate != null ? AppColors.green : AppColors.t3,
-                  size: 16,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    dueDate == null ? 'Custom date' : _formatDate(dueDate!),
-                    style: TextStyle(
-                      color: dueDate != null ? AppColors.t1 : AppColors.t3,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                if (dueDate != null)
-                  GestureDetector(
-                    onTap: () => onChanged(null),
-                    child: const Icon(
-                      LucideIcons.x,
-                      color: AppColors.t3,
-                      size: 14,
-                    ),
-                  ),
-              ],
+        if (dueDate != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Selected: ${_formatDate(dueDate!)}',
+            style: const TextStyle(
+              color: AppColors.t2,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ),
+        ],
       ],
     );
   }
 
   Future<void> _pickCustomDate(BuildContext context) async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
+    final picked = await showWorkloopDatePicker(
       context: context,
       initialDate: dueDate ?? now,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 2),
     );
     if (picked != null) onChanged(_dateOnly(picked));
+  }
+}
+
+class _TaskOptionsDisclosure extends StatelessWidget {
+  final bool expanded;
+  final VoidCallback onTap;
+
+  const _TaskOptionsDisclosure({required this.expanded, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            const Icon(
+              LucideIcons.slidersHorizontal,
+              size: 16,
+              color: AppColors.t3,
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'More options',
+                style: TextStyle(
+                  color: AppColors.t2,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            AnimatedRotation(
+              turns: expanded ? 0.5 : 0,
+              duration: AppMotion.standard,
+              child: const Icon(
+                LucideIcons.chevronDown,
+                size: 16,
+                color: AppColors.t3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -429,26 +504,40 @@ class _ReminderPicker extends StatelessWidget {
 
 class _DateChoice extends StatelessWidget {
   final String label;
+  final bool selected;
   final VoidCallback onTap;
 
-  const _DateChoice({required this.label, required this.onTap});
+  const _DateChoice({
+    required this.label,
+    this.selected = false,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: AppMotion.standard,
+        curve: AppMotion.curve,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: AppColors.t1.withValues(alpha: 0.05),
+          color: selected
+              ? AppColors.modTasks.withValues(alpha: 0.14)
+              : AppColors.t1.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(
+            color: selected
+                ? AppColors.modTasks.withValues(alpha: 0.45)
+                : Colors.transparent,
+          ),
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w800,
-            color: AppColors.t2,
+            color: selected ? AppColors.modTasks : AppColors.t2,
           ),
         ),
       ),

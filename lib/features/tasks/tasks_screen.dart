@@ -10,6 +10,7 @@ import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../imports/text_import_screen.dart';
 
 part 'task_logic.dart';
 part 'task_card.dart';
@@ -17,132 +18,123 @@ part 'task_detail_widgets.dart';
 part 'task_editor_widgets.dart';
 
 class TasksScreen extends ConsumerStatefulWidget {
-  const TasksScreen({super.key});
+  final int createRequest;
+
+  const TasksScreen({super.key, this.createRequest = 0});
 
   @override
   ConsumerState<TasksScreen> createState() => _TasksScreenState();
 }
 
 class _TasksScreenState extends ConsumerState<TasksScreen> {
-  _TaskView _view = _TaskView.urgent;
+  _TaskView _view = _TaskView.now;
+
+  @override
+  void didUpdateWidget(covariant TasksScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.createRequest == oldWidget.createRequest ||
+        widget.createRequest == 0) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showTaskEditor(context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final tasks = ref.watch(allTasksProvider);
-
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.pageX,
-                AppSpacing.lg,
-                AppSpacing.pageX,
-                0,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Tasks',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.t1,
-                      letterSpacing: 0,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    AppSpacing.lg,
+                    AppSpacing.pageX,
+                    0,
+                  ),
+                  child: WorkloopPageHeader(
+                    icon: LucideIcons.listChecks,
+                    title: 'Tasks',
+                    subtitle: 'Keep follow-ups and admin from slipping.',
+                    color: AppColors.modTasks,
+                    trailing: WorkloopIconButton(
+                      icon: LucideIcons.plus,
+                      semanticLabel: 'New task',
+                      color: AppColors.modTasks,
+                      backgroundColor: AppColors.modTasks.withValues(
+                        alpha: 0.10,
+                      ),
+                      onTap: () => _showTaskEditor(context),
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () => _showTaskEditor(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.slateLight,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(
-                            LucideIcons.plus,
-                            color: AppColors.panelInk,
-                            size: 14,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'New',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.panelInk,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: tasks.when(
-                loading: () => _skeletonList(),
-                error: (_, __) => Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.pageX,
-                  ),
-                  child: SlateErrorState(message: 'Could not load tasks'),
                 ),
-                data: (data) {
-                  final sorted = [...data]..sort(_taskSort);
-                  final sections = _sectionsForView(sorted, _view);
-                  final counts = _countsForTasks(sorted);
-
-                  return RefreshIndicator(
-                    onRefresh: () async => ref.invalidate(allTasksProvider),
-                    color: AppColors.green,
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.pageX,
-                        0,
-                        AppSpacing.pageX,
-                        112,
+                const SizedBox(height: 16),
+                Expanded(
+                  child: tasks.when(
+                    loading: () => _skeletonList(),
+                    error: (_, __) => Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.pageX,
                       ),
-                      children: [
-                        _TaskViewSwitcher(
-                          value: _view,
-                          counts: counts,
-                          onChanged: (view) => setState(() => _view = view),
-                        ),
-                        const SizedBox(height: 18),
-                        if (sections.every((section) => section.tasks.isEmpty))
-                          _emptyState()
-                        else
-                          ...sections
-                              .where((section) => section.tasks.isNotEmpty)
-                              .map(
-                                (section) => _TaskSectionView(
-                                  section: section,
-                                  onOpen: _showTaskDetails,
-                                  onCompleteRequest: _confirmComplete,
-                                  onReopen: _reopenTask,
-                                  onDelete: _confirmDelete,
-                                ),
-                              ),
-                      ],
+                      child: SlateErrorState(message: 'Could not load tasks'),
                     ),
-                  );
-                },
-              ),
+                    data: (data) {
+                      final sorted = [...data]..sort(_taskSort);
+                      final sections = _sectionsForView(sorted, _view);
+                      final counts = _countsForTasks(sorted);
+
+                      return RefreshIndicator(
+                        onRefresh: () async => ref.invalidate(allTasksProvider),
+                        color: AppColors.accentPrimary,
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.pageX,
+                            0,
+                            AppSpacing.pageX,
+                            112,
+                          ),
+                          children: [
+                            _TaskViewSwitcher(
+                              value: _view,
+                              counts: counts,
+                              onChanged: (view) => setState(() => _view = view),
+                            ),
+                            const SizedBox(height: 18),
+                            if (sections.every(
+                              (section) => section.tasks.isEmpty,
+                            ))
+                              _emptyState(context)
+                            else
+                              ...sections
+                                  .where((section) => section.tasks.isNotEmpty)
+                                  .map(
+                                    (section) => _TaskSectionView(
+                                      section: section,
+                                      onOpen: _showTaskDetails,
+                                      onCompleteRequest: _confirmComplete,
+                                      onReopen: _reopenTask,
+                                      onDelete: _confirmDelete,
+                                    ),
+                                  ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -162,173 +154,212 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     );
   }
 
-  Widget _emptyState() {
+  Widget _emptyState(BuildContext context) {
     final title = switch (_view) {
-      _TaskView.urgent => 'Nothing urgent',
-      _TaskView.upcoming => 'No upcoming tasks',
+      _TaskView.now => 'Nothing to do',
+      _TaskView.later => 'Nothing planned yet',
       _TaskView.done => 'No completed tasks',
-      _TaskView.all => 'No tasks yet',
     };
     final subtitle = switch (_view) {
-      _TaskView.urgent => 'Add a task or check upcoming work.',
-      _TaskView.upcoming => 'Tasks with future due dates will appear here.',
+      _TaskView.now => 'Your current list is clear.',
+      _TaskView.later => 'Future tasks will appear here.',
       _TaskView.done => 'Completed tasks will appear here.',
-      _TaskView.all => 'Tap New to add the first task.',
     };
     return Padding(
       padding: const EdgeInsets.only(top: 42),
-      child: SlateEmptyState(
-        icon: Icons.check_circle_outline_rounded,
-        title: title,
-        subtitle: subtitle,
+      child: Column(
+        children: [
+          WorkloopEmptyState(
+            icon: Icons.check_circle_outline_rounded,
+            title: title,
+            subtitle: subtitle,
+          ),
+          if (_view != _TaskView.done) ...[
+            const SizedBox(height: AppSpacing.md),
+            WorkloopPrimaryButton(
+              label: 'Add task',
+              icon: LucideIcons.plus,
+              onPressed: () => _showTaskEditor(context),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            WorkloopTextButton(
+              label: 'Import a task list',
+              onPressed: () async {
+                await Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const TextImportScreen(type: TextImportType.tasks),
+                  ),
+                );
+                ref.invalidate(allTasksProvider);
+              },
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  void _showTaskDetails(SlateTask task) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => Consumer(
-        builder: (context, ref, _) {
-          final checklist = ref.watch(taskChecklistProvider(task.id));
+  Future<void> _showTaskDetails(SlateTask task) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (ctx) => Consumer(
+          builder: (context, ref, _) {
+            final checklist = ref.watch(taskChecklistProvider(task.id));
 
-          return SlateSheetFrame(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xl,
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(ctx).size.height * 0.78,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+            return Scaffold(
+              backgroundColor: AppColors.bg,
+              body: Stack(
+                children: [
+                  const Positioned.fill(child: WorkloopTexturedBackdrop()),
+                  SafeArea(
+                    child: Column(
                       children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.pageX,
+                            AppSpacing.lg,
+                            AppSpacing.pageX,
+                            0,
+                          ),
+                          child: Row(
+                            children: [
+                              WorkloopIconButton(
+                                icon: LucideIcons.chevronLeft,
+                                semanticLabel: 'Back to tasks',
+                                onTap: () => Navigator.pop(ctx),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              const Expanded(
+                                child: Text(
+                                  'Task',
+                                  style: TextStyle(
+                                    color: AppColors.t1,
+                                    fontSize: 26,
+                                    height: 1.05,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              WorkloopIconButton(
+                                icon: LucideIcons.pencil,
+                                semanticLabel: 'Edit task',
+                                color: AppColors.modTasks,
+                                backgroundColor: AppColors.modTasks.withValues(
+                                  alpha: 0.10,
+                                ),
+                                onTap: () async {
+                                  Navigator.pop(ctx);
+                                  await Future<void>.delayed(Duration.zero);
+                                  if (mounted) {
+                                    await _showTaskEditor(
+                                      this.context,
+                                      task: task,
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
                         Expanded(
-                          child: Text(
-                            task.title,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              color: task.status == 'done'
-                                  ? AppColors.t3
-                                  : AppColors.t1,
-                              decoration: task.status == 'done'
-                                  ? TextDecoration.lineThrough
-                                  : null,
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.pageX,
+                              0,
+                              AppSpacing.pageX,
+                              AppSpacing.xxl,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  task.title,
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                    color: task.status == 'done'
+                                        ? AppColors.t3
+                                        : AppColors.t1,
+                                    decoration: task.status == 'done'
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${task.status == 'done' ? 'Completed' : _priorityLabel(task.priority)} task',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.t3,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.xl),
+                                _TaskContextPanel(task: task),
+                                const SizedBox(height: AppSpacing.xl),
+                                _TaskChecklistPanel(
+                                  items: checklist,
+                                  onAdd: () => _showChecklistEditor(task),
+                                  onToggle: (item) =>
+                                      _toggleChecklistItem(task, item),
+                                  onEdit: (item) =>
+                                      _showChecklistEditor(task, item: item),
+                                  onDelete: (item) =>
+                                      _deleteChecklistItem(task, item),
+                                ),
+                                const SizedBox(height: AppSpacing.xxl),
+                                SlateButton(
+                                  label: task.status == 'done'
+                                      ? 'Reopen Task'
+                                      : 'Mark Complete',
+                                  icon: task.status == 'done'
+                                      ? LucideIcons.rotateCcw
+                                      : LucideIcons.checkCircle,
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    if (task.status == 'done') {
+                                      _reopenTask(task);
+                                    } else {
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                            if (mounted) _confirmComplete(task);
+                                          });
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                SlateButton(
+                                  label: 'Delete Task',
+                                  destructive: true,
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          if (mounted) _confirmDelete(task);
+                                        });
+                                  },
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                        _PriorityBadge(priority: task.priority),
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _TaskDetailChip(
-                          icon: LucideIcons.circleDot,
-                          label: task.status == 'done' ? 'Done' : 'Open',
-                        ),
-                        if (task.dueDate != null)
-                          _TaskDetailChip(
-                            icon: LucideIcons.calendar,
-                            label: _formatDue(task.dueDate!),
-                          ),
-                        if (task.clientName != null)
-                          _TaskDetailChip(
-                            icon: LucideIcons.user,
-                            label: task.clientName!,
-                          ),
-                        _TaskDetailChip(
-                          icon: LucideIcons.bell,
-                          label: _reminderLabel(task.reminderTiming),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    _TaskContextPanel(task: task),
-                    const SizedBox(height: 18),
-                    _TaskChecklistPanel(
-                      items: checklist,
-                      onAdd: () => _showChecklistEditor(task),
-                      onToggle: (item) => _toggleChecklistItem(task, item),
-                      onEdit: (item) => _showChecklistEditor(task, item: item),
-                      onDelete: (item) => _deleteChecklistItem(task, item),
-                    ),
-                    const SizedBox(height: 22),
-                    SlateButton(
-                      label: task.status == 'done'
-                          ? 'Reopen Task'
-                          : 'Mark Complete',
-                      icon: task.status == 'done'
-                          ? LucideIcons.rotateCcw
-                          : LucideIcons.checkCircle,
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        if (task.status == 'done') {
-                          _reopenTask(task);
-                        } else {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (mounted) _confirmComplete(task);
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SlateButton(
-                            label: 'Edit',
-                            icon: LucideIcons.pencil,
-                            secondary: true,
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (mounted) {
-                                  _showTaskEditor(context, task: task);
-                                }
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: SlateButton(
-                            label: 'Delete',
-                            destructive: true,
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (mounted) _confirmDelete(task);
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
+    _refreshTasks();
   }
 
-  void _showTaskEditor(BuildContext context, {SlateTask? task}) {
+  Future<void> _showTaskEditor(BuildContext context, {SlateTask? task}) async {
     final titleController = TextEditingController(text: task?.title ?? '');
     final checklistController = TextEditingController();
     String priority = task?.priority ?? 'medium';
@@ -337,193 +368,332 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     String reminderTiming = task?.reminderTiming ?? 'none';
     final draftChecklist = <String>[];
     var saving = false;
+    var allowPop = false;
+    var showOptions =
+        task?.priority != null && task!.priority != 'medium' ||
+        task?.reminderTiming != null && task!.reminderTiming != 'none';
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModal) {
-          final clients = ref.watch(clientsProvider);
-          return SlateSheetFrame(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.xl,
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(ctx).size.height * 0.78,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    bool hasChanges() {
+      return titleController.text != (task?.title ?? '') ||
+          priority != (task?.priority ?? 'medium') ||
+          dueDate != task?.dueDate ||
+          selectedClientId != task?.contactId ||
+          reminderTiming != (task?.reminderTiming ?? 'none') ||
+          draftChecklist.isNotEmpty;
+    }
+
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setModal) {
+            final clients = ref.watch(clientsProvider);
+            Future<void> save() async {
+              if (saving || titleController.text.trim().isEmpty) return;
+              setModal(() => saving = true);
+              final saved = await _saveTask(
+                task: task,
+                title: titleController.text,
+                priority: priority,
+                dueDate: dueDate,
+                clientId: selectedClientId,
+                reminderTiming: reminderTiming,
+                checklistTitles: draftChecklist,
+              );
+              if (!ctx.mounted) return;
+              if (!saved) {
+                setModal(() => saving = false);
+                return;
+              }
+              allowPop = true;
+              setModal(() {});
+              await Future<void>.delayed(Duration.zero);
+              if (ctx.mounted) Navigator.pop(ctx);
+            }
+
+            Future<void> handleBack() async {
+              if (!hasChanges()) {
+                allowPop = true;
+                setModal(() {});
+                await Future<void>.delayed(Duration.zero);
+                if (ctx.mounted) Navigator.pop(ctx);
+                return;
+              }
+              final choice = await _confirmTaskEditorExit(ctx);
+              if (!ctx.mounted || choice == null) return;
+              if (choice == _TaskEditorExit.keepEditing) return;
+              if (choice == _TaskEditorExit.save) {
+                await save();
+                return;
+              }
+              allowPop = true;
+              setModal(() {});
+              await Future<void>.delayed(Duration.zero);
+              if (ctx.mounted) Navigator.pop(ctx);
+            }
+
+            return PopScope(
+              canPop: allowPop || !hasChanges(),
+              onPopInvokedWithResult: (didPop, _) {
+                if (!didPop) handleBack();
+              },
+              child: Scaffold(
+                backgroundColor: AppColors.bg,
+                body: Stack(
                   children: [
-                    Text(
-                      task == null ? 'New task' : 'Edit task',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.t1,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: titleController,
-                      autofocus: task == null,
-                      minLines: 1,
-                      maxLines: 3,
-                      textInputAction: TextInputAction.done,
-                      style: const TextStyle(color: AppColors.t1),
-                      decoration: const InputDecoration(
-                        hintText: 'What needs doing?',
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    if (task == null) ...[
-                      _TaskTemplatePicker(
-                        onSelect: (template) {
-                          setModal(() {
-                            if (titleController.text.trim().isEmpty) {
-                              titleController.text = template.title;
-                            }
-                            priority = template.priority;
-                            if (template.dueInDays != null) {
-                              dueDate = _dateOnly(
-                                DateTime.now().add(
-                                  Duration(days: template.dueInDays!),
+                    const Positioned.fill(child: WorkloopTexturedBackdrop()),
+                    SafeArea(
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.pageX,
+                              AppSpacing.lg,
+                              AppSpacing.pageX,
+                              0,
+                            ),
+                            child: Row(
+                              children: [
+                                WorkloopIconButton(
+                                  icon: LucideIcons.chevronLeft,
+                                  semanticLabel: 'Back to tasks',
+                                  onTap: handleBack,
                                 ),
-                              );
-                              reminderTiming = template.dueInDays == 0
-                                  ? 'today'
-                                  : 'day_before';
-                            }
-                          });
-                        },
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Text(
+                                    task == null ? 'New task' : 'Edit task',
+                                    style: const TextStyle(
+                                      color: AppColors.t1,
+                                      fontSize: 26,
+                                      height: 1.05,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                _TaskSaveAction(
+                                  label: task == null ? 'Add' : 'Save',
+                                  loading: saving,
+                                  enabled: titleController.text
+                                      .trim()
+                                      .isNotEmpty,
+                                  onTap: save,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xl),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.pageX,
+                                0,
+                                AppSpacing.pageX,
+                                AppSpacing.xxl,
+                              ),
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const _TaskFormSectionLabel(
+                                    'Task details',
+                                    subtitle:
+                                        'Keep the next action clear and specific.',
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  TextField(
+                                    controller: titleController,
+                                    autofocus: task == null,
+                                    minLines: 1,
+                                    maxLines: 3,
+                                    textInputAction: TextInputAction.done,
+                                    style: const TextStyle(color: AppColors.t1),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Task title',
+                                      hintText: 'What needs to happen?',
+                                    ),
+                                    onChanged: (_) => setModal(() {}),
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  if (task == null) ...[
+                                    _TaskTemplatePicker(
+                                      onSelect: (template) {
+                                        setModal(() {
+                                          if (titleController.text
+                                              .trim()
+                                              .isEmpty) {
+                                            titleController.text =
+                                                template.title;
+                                          }
+                                          priority = template.priority;
+                                          if (template.dueInDays != null) {
+                                            dueDate = _dateOnly(
+                                              DateTime.now().add(
+                                                Duration(
+                                                  days: template.dueInDays!,
+                                                ),
+                                              ),
+                                            );
+                                            reminderTiming =
+                                                template.dueInDays == 0
+                                                ? 'today'
+                                                : 'day_before';
+                                          }
+                                        });
+                                      },
+                                    ),
+                                    const SizedBox(height: AppSpacing.xl),
+                                  ],
+                                  const _TaskFormSectionLabel(
+                                    'When and who',
+                                    subtitle:
+                                        'Add timing and client context when useful.',
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  clients.when(
+                                    loading: () => const SizedBox.shrink(),
+                                    error: (_, __) => const SizedBox.shrink(),
+                                    data: (data) => _ClientPicker(
+                                      clients: data,
+                                      selectedClientId: selectedClientId,
+                                      onChanged: (value) => setModal(
+                                        () => selectedClientId = value,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  _DueDatePicker(
+                                    dueDate: dueDate,
+                                    onChanged: (value) =>
+                                        setModal(() => dueDate = value),
+                                  ),
+                                  const SizedBox(height: AppSpacing.lg),
+                                  _TaskOptionsDisclosure(
+                                    expanded: showOptions,
+                                    onTap: () => setModal(
+                                      () => showOptions = !showOptions,
+                                    ),
+                                  ),
+                                  if (showOptions) ...[
+                                    const SizedBox(height: AppSpacing.lg),
+                                    const Text(
+                                      'Priority',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.t3,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        _PriorityChoice(
+                                          value: 'high',
+                                          label: 'High',
+                                          selected: priority,
+                                          color: AppColors.error,
+                                          onTap: (value) =>
+                                              setModal(() => priority = value),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        _PriorityChoice(
+                                          value: 'medium',
+                                          label: 'Medium',
+                                          selected: priority,
+                                          color: AppColors.warning,
+                                          onTap: (value) =>
+                                              setModal(() => priority = value),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        _PriorityChoice(
+                                          value: 'low',
+                                          label: 'Low',
+                                          selected: priority,
+                                          color: AppColors.t3,
+                                          onTap: (value) =>
+                                              setModal(() => priority = value),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: AppSpacing.lg),
+                                    _ReminderPicker(
+                                      value: reminderTiming,
+                                      enabled: dueDate != null,
+                                      onChanged: (value) => setModal(
+                                        () => reminderTiming = value,
+                                      ),
+                                    ),
+                                    if (task == null) ...[
+                                      const SizedBox(height: AppSpacing.xl),
+                                      _DraftChecklistEditor(
+                                        controller: checklistController,
+                                        items: draftChecklist,
+                                        onAdd: () {
+                                          final title = checklistController.text
+                                              .trim();
+                                          if (title.isEmpty) return;
+                                          setModal(() {
+                                            draftChecklist.add(title);
+                                            checklistController.clear();
+                                          });
+                                        },
+                                        onRemove: (index) => setModal(
+                                          () => draftChecklist.removeAt(index),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 14),
-                    ],
-                    clients.when(
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, __) => const SizedBox.shrink(),
-                      data: (data) => _ClientPicker(
-                        clients: data,
-                        selectedClientId: selectedClientId,
-                        onChanged: (value) =>
-                            setModal(() => selectedClientId = value),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Priority',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.t3,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _PriorityChoice(
-                          value: 'high',
-                          label: 'High',
-                          selected: priority,
-                          color: AppColors.error,
-                          onTap: (value) => setModal(() => priority = value),
-                        ),
-                        const SizedBox(width: 8),
-                        _PriorityChoice(
-                          value: 'medium',
-                          label: 'Medium',
-                          selected: priority,
-                          color: AppColors.warning,
-                          onTap: (value) => setModal(() => priority = value),
-                        ),
-                        const SizedBox(width: 8),
-                        _PriorityChoice(
-                          value: 'low',
-                          label: 'Low',
-                          selected: priority,
-                          color: AppColors.t3,
-                          onTap: (value) => setModal(() => priority = value),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _DueDatePicker(
-                      dueDate: dueDate,
-                      onChanged: (value) => setModal(() => dueDate = value),
-                    ),
-                    const SizedBox(height: 16),
-                    _ReminderPicker(
-                      value: reminderTiming,
-                      enabled: dueDate != null,
-                      onChanged: (value) =>
-                          setModal(() => reminderTiming = value),
-                    ),
-                    if (task == null) ...[
-                      const SizedBox(height: 16),
-                      _DraftChecklistEditor(
-                        controller: checklistController,
-                        items: draftChecklist,
-                        onAdd: () {
-                          final title = checklistController.text.trim();
-                          if (title.isEmpty) return;
-                          setModal(() {
-                            draftChecklist.add(title);
-                            checklistController.clear();
-                          });
-                        },
-                        onRemove: (index) =>
-                            setModal(() => draftChecklist.removeAt(index)),
-                      ),
-                    ],
-                    const SizedBox(height: 22),
-                    SlateButton(
-                      label: saving
-                          ? 'Saving...'
-                          : task == null
-                          ? 'Add Task'
-                          : 'Save Changes',
-                      icon: task == null ? LucideIcons.plus : LucideIcons.check,
-                      onPressed: saving
-                          ? null
-                          : () async {
-                              setModal(() => saving = true);
-                              final saved = await _saveTask(
-                                ctx,
-                                task: task,
-                                title: titleController.text,
-                                priority: priority,
-                                dueDate: dueDate,
-                                clientId: selectedClientId,
-                                reminderTiming: reminderTiming,
-                                checklistTitles: draftChecklist,
-                              );
-                              if (!saved && ctx.mounted) {
-                                setModal(() => saving = false);
-                              }
-                            },
                     ),
                   ],
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
-    ).whenComplete(() {
-      _disposeControllerAfterSheetClose(titleController);
-      _disposeControllerAfterSheetClose(checklistController);
-    });
+    );
+    titleController.dispose();
+    checklistController.dispose();
+    if (mounted) {
+      _refreshTasks();
+      _refreshTaskNotifications();
+    }
   }
 
-  Future<bool> _saveTask(
-    BuildContext ctx, {
+  Future<_TaskEditorExit?> _confirmTaskEditorExit(BuildContext context) {
+    return showDialog<_TaskEditorExit>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: const Text('Save task changes?'),
+        content: const Text('You have changes that have not been saved yet.'),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(context, _TaskEditorExit.keepEditing),
+            child: const Text('Keep editing'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, _TaskEditorExit.discard),
+            child: const Text('Discard'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, _TaskEditorExit.save),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _saveTask({
     SlateTask? task,
     required String title,
     required String priority,
@@ -572,12 +742,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       dueDate,
       dueDate == null ? 'none' : reminderTiming,
     );
-    if (ctx.mounted) Navigator.pop(ctx);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _refreshTasks();
-      _refreshTaskNotifications();
-    });
     return true;
   }
 
@@ -843,40 +1007,19 @@ class _TaskViewSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: _TaskView.values.map((view) {
-          final active = value == view;
-          final count = _viewCount(view, counts);
-          return GestureDetector(
-            onTap: () => onChanged(view),
-            child: Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-              decoration: BoxDecoration(
-                color: active
-                    ? AppColors.t1.withValues(alpha: 0.12)
-                    : AppColors.t1.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                border: Border.all(
-                  color: active
-                      ? AppColors.t1.withValues(alpha: 0.18)
-                      : AppColors.t1.withValues(alpha: 0.07),
-                ),
-              ),
-              child: Text(
-                '${_viewLabel(view)} $count',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: active ? AppColors.t1 : AppColors.t2,
-                ),
-              ),
+    return WorkloopNavigationControl<_TaskView>(
+      selected: value,
+      color: AppColors.modTasks,
+      onChanged: onChanged,
+      segments: _TaskView.values
+          .map(
+            (view) => WorkloopSegment<_TaskView>(
+              value: view,
+              label: _viewLabel(view),
+              badge: '${_viewCount(view, counts)}',
             ),
-          );
-        }).toList(),
-      ),
+          )
+          .toList(),
     );
   }
 }
@@ -903,33 +1046,10 @@ class _TaskSectionView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                section.title.toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.t3,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${section.tasks.length}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.t3,
-                ),
-              ),
-            ],
+          WorkloopSectionHeader(
+            label: '${section.title}  ${section.tasks.length}',
           ),
-          const SizedBox(height: 4),
-          Text(
-            section.subtitle,
-            style: const TextStyle(fontSize: 12, color: AppColors.t3),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           ...section.tasks.map(
             (task) => _TaskCard(
               task: task,
