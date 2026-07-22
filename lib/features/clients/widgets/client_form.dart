@@ -958,7 +958,7 @@ class _BirthdayField extends StatelessWidget {
 
   Future<void> _pickDate(BuildContext context) async {
     final now = DateTime.now();
-    final selected = await showDatePicker(
+    final selected = await showWorkloopDatePicker(
       context: context,
       initialDate: birthday ?? DateTime(now.year - 25),
       firstDate: DateTime(now.year - 100),

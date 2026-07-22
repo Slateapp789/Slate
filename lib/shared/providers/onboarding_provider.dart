@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OnboardingState {
   final String firstName;
@@ -10,6 +14,9 @@ class OnboardingState {
   final double revenueTarget;
   final Map<String, dynamic>?
   firstBooking; // {clientName, serviceName, date, hour, minute}
+  final bool importAfterSetup;
+  final Map<String, bool> notificationPreferences;
+  final int currentStep;
 
   const OnboardingState({
     this.firstName = '',
@@ -20,6 +27,16 @@ class OnboardingState {
     this.workingHours = const {},
     this.revenueTarget = 0,
     this.firstBooking,
+    this.importAfterSetup = false,
+    this.notificationPreferences = const {
+      'all_notifications': true,
+      'new_booking': true,
+      'booking_request': true,
+      'payment_received': true,
+      'invoice_overdue': true,
+      'task_due_morning': true,
+    },
+    this.currentStep = 0,
   });
 
   OnboardingState copyWith({
@@ -31,6 +48,9 @@ class OnboardingState {
     Map<String, dynamic>? workingHours,
     double? revenueTarget,
     Map<String, dynamic>? firstBooking,
+    bool? importAfterSetup,
+    Map<String, bool>? notificationPreferences,
+    int? currentStep,
   }) {
     return OnboardingState(
       firstName: firstName ?? this.firstName,
@@ -41,40 +61,137 @@ class OnboardingState {
       workingHours: workingHours ?? this.workingHours,
       revenueTarget: revenueTarget ?? this.revenueTarget,
       firstBooking: firstBooking ?? this.firstBooking,
+      importAfterSetup: importAfterSetup ?? this.importAfterSetup,
+      notificationPreferences:
+          notificationPreferences ?? this.notificationPreferences,
+      currentStep: currentStep ?? this.currentStep,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'firstName': firstName,
+    'businessName': businessName,
+    'industry': industry,
+    'handle': handle,
+    'services': services,
+    'workingHours': workingHours,
+    'revenueTarget': revenueTarget,
+    'firstBooking': firstBooking,
+    'importAfterSetup': importAfterSetup,
+    'notificationPreferences': notificationPreferences,
+    'currentStep': currentStep,
+  };
+
+  factory OnboardingState.fromJson(Map<String, dynamic> json) {
+    return OnboardingState(
+      firstName: json['firstName'] as String? ?? '',
+      businessName: json['businessName'] as String? ?? '',
+      industry: json['industry'] as String? ?? '',
+      handle: json['handle'] as String? ?? '',
+      services: (json['services'] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList(),
+      workingHours: Map<String, dynamic>.from(
+        json['workingHours'] as Map? ?? const {},
+      ),
+      revenueTarget: (json['revenueTarget'] as num?)?.toDouble() ?? 0,
+      firstBooking: json['firstBooking'] is Map
+          ? Map<String, dynamic>.from(json['firstBooking'] as Map)
+          : null,
+      importAfterSetup: json['importAfterSetup'] as bool? ?? false,
+      notificationPreferences:
+          (json['notificationPreferences'] as Map?)?.map(
+            (key, value) => MapEntry(key.toString(), value == true),
+          ) ??
+          const {
+            'all_notifications': true,
+            'new_booking': true,
+            'booking_request': true,
+            'payment_received': true,
+            'invoice_overdue': true,
+            'task_due_morning': true,
+          },
+      currentStep: (json['currentStep'] as num?)?.toInt() ?? 0,
     );
   }
 }
 
 class OnboardingNotifier extends Notifier<OnboardingState> {
+  static const _draftKey = 'workloop.onboarding.draft.v1';
+  final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
+  bool _restored = false;
+
   @override
   OnboardingState build() => const OnboardingState();
 
+  Future<void> restore() async {
+    if (_restored) return;
+    _restored = true;
+    final value = await _preferences.getString(_draftKey);
+    if (value == null || value.isEmpty) return;
+    try {
+      state = OnboardingState.fromJson(
+        Map<String, dynamic>.from(jsonDecode(value) as Map),
+      );
+    } catch (_) {
+      await _preferences.remove(_draftKey);
+    }
+  }
+
+  void _set(OnboardingState next) {
+    state = next;
+    unawaited(_preferences.setString(_draftKey, jsonEncode(next.toJson())));
+  }
+
   void setName(String firstName, String businessName) {
-    state = state.copyWith(firstName: firstName, businessName: businessName);
+    _set(state.copyWith(firstName: firstName, businessName: businessName));
   }
 
   void setIndustry(String industry) {
-    state = state.copyWith(industry: industry);
+    _set(state.copyWith(industry: industry));
   }
 
   void setHandle(String handle) {
-    state = state.copyWith(handle: handle);
+    _set(state.copyWith(handle: handle));
   }
 
   void setServices(List<Map<String, dynamic>> services) {
-    state = state.copyWith(services: services);
+    _set(state.copyWith(services: services));
   }
 
   void setWorkingHours(Map<String, dynamic> hours) {
-    state = state.copyWith(workingHours: hours);
+    _set(state.copyWith(workingHours: hours));
   }
 
   void setRevenueTarget(double target) {
-    state = state.copyWith(revenueTarget: target);
+    _set(state.copyWith(revenueTarget: target));
   }
 
   void setFirstBooking(Map<String, dynamic> booking) {
-    state = state.copyWith(firstBooking: booking);
+    _set(state.copyWith(firstBooking: booking));
+  }
+
+  void setImportAfterSetup(bool enabled) {
+    _set(state.copyWith(importAfterSetup: enabled));
+  }
+
+  void setNotificationPreference(String key, bool enabled) {
+    _set(
+      state.copyWith(
+        notificationPreferences: {
+          ...state.notificationPreferences,
+          key: enabled,
+        },
+      ),
+    );
+  }
+
+  void setStep(int step) => _set(state.copyWith(currentStep: step));
+
+  Future<void> clearDraft() async {
+    state = const OnboardingState();
+    await _preferences.remove(_draftKey);
   }
 }
 

@@ -23,10 +23,9 @@ class _ObHandleState extends ConsumerState<ObHandle> {
     super.initState();
     // Pre-fill from business name
     final state = ref.read(onboardingProvider);
-    final suggested = state.businessName.toLowerCase().replaceAll(
-      RegExp(r'[^a-z0-9]'),
-      '',
-    );
+    final suggested = state.handle.isNotEmpty
+        ? state.handle
+        : state.businessName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     _handleController.text = suggested;
   }
 
@@ -221,7 +220,7 @@ class _ObHandleState extends ConsumerState<ObHandle> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 disabledBackgroundColor: AppColors.bgInteract,
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.onBrandAccent,
                 disabledForegroundColor: AppColors.t3,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),

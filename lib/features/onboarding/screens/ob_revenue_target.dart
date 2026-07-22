@@ -23,6 +23,19 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
   final List<double> _presets = [1000, 2000, 3000, 5000, 7500, 10000];
 
   @override
+  void initState() {
+    super.initState();
+    final target = ref.read(onboardingProvider).revenueTarget;
+    if (target > 0) {
+      if (_presets.contains(target)) {
+        _selected = target;
+      } else {
+        _controller.text = target.toStringAsFixed(0);
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -181,7 +194,7 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 disabledBackgroundColor: AppColors.bgInteract,
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.onBrandAccent,
                 disabledForegroundColor: AppColors.t3,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),

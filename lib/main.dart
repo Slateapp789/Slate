@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
@@ -10,17 +11,21 @@ import 'features/auth/auth_screen.dart';
 import 'features/business_feed/business_feed_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/clients/clients_screen.dart';
+import 'features/clients/add_client_screen.dart';
 import 'features/appointments/appointments_screen.dart';
+import 'features/appointments/add_appointment_screen.dart';
 import 'features/finance/finance_screen.dart';
 import 'features/notes/notes_screen.dart';
 import 'features/tasks/tasks_screen.dart';
 import 'features/more/more_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/calendar_sync/calendar_sync_screen.dart';
+import 'features/imports/import_data_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/public_profile/booking_requests_screen.dart';
 import 'features/public_profile/public_profile_screen.dart';
 import 'shared/providers/debug_demo_data_provider.dart';
+import 'shared/providers/theme_mode_provider.dart';
 import 'shared/providers/workspace_provider.dart';
 import 'shared/widgets/slate_ui.dart';
 
@@ -55,16 +60,35 @@ class SlateApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final appearance = ref.watch(workloopAppearanceProvider);
     return MaterialApp.router(
       title: 'Workloop',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.oledDark,
-      themeMode: ThemeMode.light,
+      themeMode: appearance.value?.themeMode ?? ThemeMode.system,
       routerConfig: _router,
-      builder: (context, child) => WorkloopKeyboardDismissRegion(
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) {
+        final brightness = Theme.of(context).brightness;
+        WorkloopLegacyPalette.sync(brightness);
+        final overlayStyle = brightness == Brightness.dark
+            ? SystemUiOverlayStyle.light.copyWith(
+                statusBarColor: Colors.transparent,
+                systemNavigationBarColor: SlateTheme.of(context).background,
+                systemNavigationBarIconBrightness: Brightness.light,
+              )
+            : SystemUiOverlayStyle.dark.copyWith(
+                statusBarColor: Colors.transparent,
+                systemNavigationBarColor: SlateTheme.of(context).background,
+                systemNavigationBarIconBrightness: Brightness.dark,
+              );
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlayStyle,
+          child: WorkloopKeyboardDismissRegion(
+            child: child ?? const SizedBox.shrink(),
+          ),
+        );
+      },
     );
   }
 }
@@ -87,12 +111,20 @@ final _router = GoRouter(
       builder: (context, state) => const MainShell(initialIndex: 1),
     ),
     GoRoute(
+      path: '/clients/new',
+      builder: (context, state) => const AddClientScreen(),
+    ),
+    GoRoute(
       path: '/tasks',
       builder: (context, state) => const MainShell(initialIndex: 4),
     ),
     GoRoute(
       path: '/work',
       builder: (context, state) => const MainShell(initialIndex: 2),
+    ),
+    GoRoute(
+      path: '/bookings/new',
+      builder: (context, state) => const AddAppointmentScreen(),
     ),
     GoRoute(
       path: '/payments',
@@ -113,6 +145,10 @@ final _router = GoRouter(
     GoRoute(
       path: '/calendar-sync',
       builder: (context, state) => const CalendarSyncScreen(),
+    ),
+    GoRoute(
+      path: '/import-data',
+      builder: (context, state) => const ImportDataScreen(),
     ),
     GoRoute(
       path: '/p/:handle',
@@ -166,7 +202,8 @@ class WorkspaceGate extends ConsumerWidget {
     return workspace.when(
       loading: () => const _LoadingScreen(),
       error: (e, _) => _WorkspaceErrorScreen(
-        message: e.toString(),
+        message:
+            'Your workspace could not be opened. Check your connection and try again.',
         onRetry: () => ref.invalidate(workspaceProvider),
         onSignOut: () async {
           await Supabase.instance.client.auth.signOut();
@@ -205,8 +242,9 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: tokens.background,
       extendBody: true,
       body: AnimatedSwitcher(
         duration: AppMotion.standard,
@@ -284,8 +322,9 @@ class _WorkspaceErrorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: tokens.background,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
@@ -296,16 +335,16 @@ class _WorkspaceErrorScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
+                  Icon(
                     LucideIcons.alertTriangle,
-                    color: AppColors.warning,
+                    color: tokens.warning,
                     size: 32,
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  const Text(
+                  Text(
                     'Could not open your workspace',
                     style: TextStyle(
-                      color: AppColors.t1,
+                      color: tokens.textPrimary,
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
                     ),
@@ -315,8 +354,8 @@ class _WorkspaceErrorScreen extends StatelessWidget {
                     message,
                     maxLines: 4,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.t3,
+                    style: TextStyle(
+                      color: tokens.textTertiary,
                       fontSize: 13,
                       height: 1.35,
                     ),
@@ -359,8 +398,9 @@ class _LoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: tokens.background,
       body: Center(
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.92, end: 1),
@@ -372,14 +412,14 @@ class _LoadingScreen extends StatelessWidget {
               child: Transform.scale(scale: value, child: child),
             );
           },
-          child: const Column(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
                 width: 30,
                 height: 30,
                 child: CircularProgressIndicator(
-                  color: AppColors.accentPrimaryStrong,
+                  color: tokens.accent,
                   strokeWidth: 2.4,
                 ),
               ),
@@ -387,7 +427,7 @@ class _LoadingScreen extends StatelessWidget {
               Text(
                 'Opening Workloop',
                 style: TextStyle(
-                  color: AppColors.t3,
+                  color: tokens.textTertiary,
                   fontWeight: FontWeight.w700,
                 ),
               ),

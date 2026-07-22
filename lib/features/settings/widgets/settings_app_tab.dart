@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/maps_preference_provider.dart';
+import '../../../shared/providers/theme_mode_provider.dart';
 import '../../../shared/utils/maps_launcher.dart';
 import '../../../shared/widgets/slate_ui.dart';
 
@@ -15,6 +16,9 @@ class SettingsAppTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final mapsPreference = ref.watch(preferredMapsAppProvider);
     final preference = mapsPreference.value ?? MapsAppPreference.askEveryTime;
+    final appearance =
+        ref.watch(workloopAppearanceProvider).value ??
+        WorkloopAppearance.system;
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.pageX,
@@ -25,6 +29,31 @@ class SettingsAppTab extends ConsumerWidget {
       children: [
         const WorkloopSectionHeader(label: 'General'),
         const SizedBox(height: AppSpacing.xs),
+        WorkloopPickerField<WorkloopAppearance>(
+          value: appearance,
+          title: 'Appearance',
+          hint: 'Choose appearance',
+          leadingIcon: LucideIcons.sunMoon,
+          options: [
+            for (final option in WorkloopAppearance.values)
+              WorkloopPickerOption(
+                value: option,
+                label: option.label,
+                subtitle: option.description,
+                leading: Icon(switch (option) {
+                  WorkloopAppearance.system => LucideIcons.monitor,
+                  WorkloopAppearance.light => LucideIcons.sun,
+                  WorkloopAppearance.dark => LucideIcons.moon,
+                }, size: 18),
+              ),
+          ],
+          onChanged: (selected) async {
+            await ref
+                .read(workloopAppearanceProvider.notifier)
+                .setAppearance(selected);
+          },
+        ),
+        const SizedBox(height: AppSpacing.sm),
         _PreferenceRow(
           icon: LucideIcons.navigation,
           title: 'Default maps app',
@@ -52,9 +81,7 @@ class SettingsAppTab extends ConsumerWidget {
         const SizedBox(height: AppSpacing.xs),
         const _InformationRow(label: 'Version', value: '1.0.0'),
         const WorkloopDivider(margin: EdgeInsets.zero),
-        const _InformationRow(label: 'Build', value: 'MVP'),
-        const WorkloopDivider(margin: EdgeInsets.zero),
-        const _InformationRow(label: 'Technology', value: 'Flutter + Supabase'),
+        const _InformationRow(label: 'Build', value: '1'),
       ],
     );
   }
@@ -75,6 +102,7 @@ class _PreferenceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return WorkloopListRow(
       onTap: onTap,
       showDivider: false,
@@ -82,27 +110,27 @@ class _PreferenceRow extends StatelessWidget {
       leading: Container(
         width: 40,
         height: 40,
-        decoration: const BoxDecoration(
-          color: AppColors.modBg,
+        decoration: BoxDecoration(
+          color: tokens.surfaceSubtle,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: AppColors.t2, size: 18),
+        child: Icon(icon, color: tokens.textSecondary, size: 18),
       ),
       title: Text(
         title,
-        style: const TextStyle(
-          color: AppColors.t1,
+        style: TextStyle(
+          color: tokens.textPrimary,
           fontSize: 15,
           fontWeight: FontWeight.w800,
         ),
       ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(color: AppColors.t3, fontSize: 13),
+        style: TextStyle(color: tokens.textTertiary, fontSize: 13),
       ),
-      trailing: const Icon(
+      trailing: Icon(
         LucideIcons.chevronRight,
-        color: AppColors.t3,
+        color: tokens.textTertiary,
         size: 16,
       ),
     );
@@ -117,6 +145,7 @@ class _InformationRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Row(
@@ -124,13 +153,13 @@ class _InformationRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(color: AppColors.t2, fontSize: 14),
+              style: TextStyle(color: tokens.textSecondary, fontSize: 14),
             ),
           ),
           Text(
             value,
-            style: const TextStyle(
-              color: AppColors.t1,
+            style: TextStyle(
+              color: tokens.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),

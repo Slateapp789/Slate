@@ -22,79 +22,86 @@ class MoreScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.pageX,
-            AppSpacing.lg,
-            AppSpacing.pageX,
-            AppSpacing.bottomNavClearance,
-          ),
-          children: [
-            const WorkloopPageHeader(
-              icon: LucideIcons.menu,
-              title: 'More',
-              subtitle: 'Everything else, kept close without the clutter.',
-              color: AppColors.accentPrimary,
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            _MoreSection(
-              label: 'Business',
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                AppSpacing.lg,
+                AppSpacing.pageX,
+                AppSpacing.bottomNavClearance,
+              ),
               children: [
-                _MoreRow(
-                  icon: LucideIcons.banknote,
-                  title: 'Money',
-                  subtitle: 'Income, expenses, and payments',
-                  color: AppColors.modFinance,
-                  onTap: onOpenMoney,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            _MoreSection(
-              label: 'Organise',
-              children: [
-                _MoreRow(
-                  icon: LucideIcons.listChecks,
-                  title: 'Tasks',
-                  subtitle: 'Follow-ups and business admin',
-                  color: AppColors.modTasks,
-                  onTap: onOpenTasks,
-                ),
-                _MoreRow(
-                  icon: LucideIcons.stickyNote,
-                  title: 'Notes',
-                  subtitle: 'Business and client context',
-                  color: AppColors.modNotes,
-                  onTap: onOpenNotes,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            _MoreSection(
-              label: 'You',
-              children: [
-                _MoreRow(
-                  icon: LucideIcons.userCircle,
-                  title: 'Profile',
-                  subtitle: 'Business details and public profile',
+                const WorkloopPageHeader(
+                  icon: LucideIcons.menu,
+                  title: 'More',
+                  subtitle: 'Everything else, kept close without the clutter.',
                   color: AppColors.accentPrimary,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                  ),
                 ),
-                _MoreRow(
-                  icon: LucideIcons.settings,
-                  title: 'Settings',
-                  subtitle: 'Alerts, account, and app preferences',
-                  color: AppColors.t2,
-                  onTap: () => _openSettings(context),
+                const SizedBox(height: AppSpacing.xxl),
+                _MoreSection(
+                  label: 'Business',
+                  children: [
+                    _MoreRow(
+                      icon: LucideIcons.banknote,
+                      title: 'Money',
+                      subtitle: 'Income, expenses, and payments',
+                      color: AppColors.modFinance,
+                      onTap: onOpenMoney,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                _MoreSection(
+                  label: 'Organise',
+                  children: [
+                    _MoreRow(
+                      icon: LucideIcons.listChecks,
+                      title: 'Tasks',
+                      subtitle: 'Follow-ups and business admin',
+                      color: AppColors.modTasks,
+                      onTap: onOpenTasks,
+                    ),
+                    _MoreRow(
+                      icon: LucideIcons.stickyNote,
+                      title: 'Notes',
+                      subtitle: 'Business and client context',
+                      color: AppColors.modNotes,
+                      onTap: onOpenNotes,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                _MoreSection(
+                  label: 'You',
+                  children: [
+                    _MoreRow(
+                      icon: LucideIcons.userCircle,
+                      title: 'Profile',
+                      subtitle: 'Business details and public profile',
+                      color: AppColors.accentPrimary,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileScreen(),
+                        ),
+                      ),
+                    ),
+                    _MoreRow(
+                      icon: LucideIcons.settings,
+                      title: 'Settings',
+                      subtitle: 'Alerts, account, and app preferences',
+                      color: AppColors.t2,
+                      onTap: () => _openSettings(context),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

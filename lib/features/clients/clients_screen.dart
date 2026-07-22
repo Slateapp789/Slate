@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../imports/contacts_import_screen.dart';
 import 'add_client_screen.dart';
 import 'client_detail_screen.dart';
 import 'client_sort.dart';
@@ -126,7 +127,10 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                       if (data.isEmpty)
                         SliverFillRemaining(
                           hasScrollBody: false,
-                          child: _EmptyState(onAdd: _openAddClient),
+                          child: _EmptyState(
+                            onAdd: _openAddClient,
+                            onImport: _openContactsImport,
+                          ),
                         )
                       else if (filtered.isEmpty)
                         SliverFillRemaining(
@@ -240,6 +244,15 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
     ref.invalidate(clientCrmRecordsProvider);
   }
 
+  Future<void> _openContactsImport() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => const ContactsImportScreen()),
+    );
+    ref.invalidate(clientsProvider);
+    ref.invalidate(clientCrmRecordsProvider);
+  }
+
   Future<void> _openClient(ClientCrmRecord record) async {
     await Navigator.push(
       context,
@@ -313,43 +326,11 @@ class _SearchAndSort extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return WorkloopSearchField(
       controller: controller,
       onChanged: onQueryChanged,
-      style: const TextStyle(color: AppColors.t1, fontSize: 14),
-      decoration: InputDecoration(
-        hintText: 'Search clients or tags',
-        prefixIcon: const Icon(
-          LucideIcons.search,
-          color: AppColors.t3,
-          size: 16,
-        ),
-        filled: true,
-        fillColor: AppColors.t1.withValues(alpha: 0.028),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: BorderSide(
-            color: AppColors.border.withValues(alpha: 0.62),
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: BorderSide(
-            color: AppColors.border.withValues(alpha: 0.62),
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: const BorderSide(
-            color: AppColors.accentPrimary,
-            width: 1.5,
-          ),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
-        ),
-      ),
+      hintText: 'Search clients or tags',
+      semanticLabel: 'Search clients or tags',
     );
   }
 }
@@ -835,7 +816,9 @@ class _ClientsLoading extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   final VoidCallback onAdd;
-  const _EmptyState({required this.onAdd});
+  final VoidCallback onImport;
+
+  const _EmptyState({required this.onAdd, required this.onImport});
 
   @override
   Widget build(BuildContext context) {
@@ -856,6 +839,11 @@ class _EmptyState extends StatelessWidget {
               label: 'Add client',
               icon: LucideIcons.userPlus,
               onPressed: onAdd,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            WorkloopTextButton(
+              label: 'Import selected contacts',
+              onPressed: onImport,
             ),
           ],
         ),

@@ -1,8 +1,18 @@
 # Workloop Current State
 
-Last updated: 2026-07-15
+Last updated: 2026-07-19
 
 ## Completed / Mostly Working Features
+
+### Final application foundation
+
+- System, Light, and OLED-aware Dark appearance modes use one semantic theme and a centralised `#C1FF72` brand accent.
+- A shared, restrained textured backdrop now connects the main application, onboarding, profile, settings, support, calendar tools, notifications, and import flows.
+- Shared fields, search, pickers, sheets, dialogs, buttons, switches, haptics, motion, loading, empty, error, and success states form the canonical interaction system.
+- A resumable onboarding preferences step, real-record dashboard setup checklist, and action-led empty states guide first value without inserting demo data.
+- Privacy-first import supports selected contacts, one-time calendar events, client CSV, task text, and note text/Markdown. Unsupported private stores are labelled honestly.
+- In-app notifications are supported. Push delivery and scheduled local reminders are explicitly not claimed as enabled.
+- See `docs/FinalPolishAudit.md` for the route/state matrix, integration truth table, and release blockers.
 
 ### Auth
 
@@ -254,7 +264,7 @@ Post-V1 / V2:
 
 ## Technical Debt
 
-- UI system: the 2026-07-07 whitespace-first refoundation now has canonical `Workloop*` screen primitives for headers, metrics, rows, filters, segmented controls, empty states, buttons, bottom nav, FAB, and surfaces. Some settings child tabs, onboarding steps, auth, notification, public profile, form, sheet, and detail widgets still contain local `Container`/`AppColors` styling that should be migrated to shared theme tokens and row/divider primitives before enabling real dark mode.
+- UI system: the canonical `Workloop*` primitives now cover headers, metrics, rows, filters, segmented controls, empty states, buttons, bottom navigation, fields, search, sheets, dialogs, pickers, haptics, motion, texture, and theme semantics. System/Light/Dark modes are enabled. Some large legacy screens still mix shared primitives with local layout containers and should be migrated gradually when those screens next change.
 - Large files:
   - `lib/features/tasks/tasks_screen.dart` ~946 lines after extracting task card, task logic, task detail, and task editor parts.
   - `lib/features/tasks/task_logic.dart` ~280 lines.

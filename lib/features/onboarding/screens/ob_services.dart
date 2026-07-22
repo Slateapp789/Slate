@@ -65,10 +65,12 @@ class _ObServicesState extends ConsumerState<ObServices> {
   @override
   void initState() {
     super.initState();
-    final industry = ref.read(onboardingProvider).industry;
-    _services = List<Map<String, dynamic>>.from(
-      industryServices[industry] ?? industryServices['Other']!,
-    );
+    final draft = ref.read(onboardingProvider);
+    _services = draft.services.isNotEmpty
+        ? draft.services.map((item) => Map<String, dynamic>.from(item)).toList()
+        : List<Map<String, dynamic>>.from(
+            industryServices[draft.industry] ?? industryServices['Other']!,
+          );
   }
 
   void _removeService(int index) {
@@ -201,7 +203,7 @@ class _ObServicesState extends ConsumerState<ObServices> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 disabledBackgroundColor: AppColors.bgInteract,
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.onBrandAccent,
                 disabledForegroundColor: AppColors.t3,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),

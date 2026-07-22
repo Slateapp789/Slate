@@ -1,6 +1,6 @@
 # Slate Decisions Log
 
-Last updated: 2026-07-15
+Last updated: 2026-07-19
 
 This log consolidates Notion decisions, Git history, and codebase reality.
 
@@ -609,3 +609,24 @@ Consequences:
 - Settings is a calm overview that opens dedicated Account, Notifications, and App preferences screens. It no longer duplicates Profile routes or unfinished feature placeholders.
 - Profile-link copying uses the platform clipboard without adding a sharing package.
 - No Supabase schema, RLS, repository contract, or CRUD path changes.
+
+## 2026-07-19 - Final Polish Uses One Honest Product System
+
+Decision:
+
+Treat the final application pass as a consolidation of Workloop's existing operating-system workflow, not a collection of isolated redesigns. Use one semantic light/dark theme, shared textured shell, shared interaction primitives, progressive onboarding, real-record activation guidance, and explicit capability labels across every module.
+
+Reasoning:
+
+Workloop should feel calm and premium because its behaviour and hierarchy are predictable. Visual consistency without behavioural consistency would leave users carrying the same mental load. Similarly, presenting imports, notifications, or calendar connections as live when only part of the pipeline exists would damage trust.
+
+Consequences:
+
+- The approved `#C1FF72` accent, spacing, type, shape, depth, motion, haptic, field, picker, sheet, dialog, loading, error, and empty-state treatments are centralised.
+- System, Light, and OLED-aware Dark modes share semantic roles rather than per-screen colour fixes.
+- New-user setup progress is computed from existing client, booking, and payment data and can be permanently dismissed.
+- Contacts, calendar snapshots, client CSV, task text, and note text/Markdown are the supported import surfaces; unsupported private OS/app stores are not advertised.
+- Notifications remain explicitly in-app until a real push/local scheduling delivery layer exists.
+- Calendar import and ICS export do not imply continuous two-way sync.
+- No new Supabase schema or unverified optional feature was introduced during this pass.
+- `docs/FinalPolishAudit.md` is the release truth table for supported, unavailable, and externally dependent capability states.

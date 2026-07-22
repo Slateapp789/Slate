@@ -62,4 +62,23 @@ void main() {
 
     expect(selectDashboardComingUpBookings(rows, now: now), hasLength(3));
   });
+
+  test('setup progress reflects the real first-value records', () {
+    expect(
+      dashboardSetupCompletedCount(
+        hasClient: true,
+        hasBooking: false,
+        hasPayment: true,
+      ),
+      2,
+    );
+    expect(
+      dashboardSetupCompletedCount(
+        hasClient: true,
+        hasBooking: true,
+        hasPayment: true,
+      ),
+      3,
+    );
+  });
 }

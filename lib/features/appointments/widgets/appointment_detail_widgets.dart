@@ -573,7 +573,7 @@ class AppointmentActionSection extends StatelessWidget {
               onPressed: loading ? null : onComplete,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.onBrandAccent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),

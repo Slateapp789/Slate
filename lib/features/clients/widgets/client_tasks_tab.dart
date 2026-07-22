@@ -131,7 +131,7 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
               const SizedBox(height: 12),
               GestureDetector(
                 onTap: () async {
-                  final picked = await showDatePicker(
+                  final picked = await showWorkloopDatePicker(
                     context: context,
                     initialDate: DateTime.now(),
                     firstDate: DateTime.now(),
@@ -236,7 +236,7 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.green,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.onBrandAccent,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -387,7 +387,7 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
       ),
       error: (e, _) => Center(
         child: Text(
-          'Error: $e',
+          'Tasks could not be loaded.',
           style: const TextStyle(color: AppColors.error),
         ),
       ),
@@ -656,7 +656,9 @@ Widget _actionBtn({
     onPressed: onTap,
     style: ElevatedButton.styleFrom(
       backgroundColor: color,
-      foregroundColor: Colors.white,
+      foregroundColor: color == AppColors.error
+          ? Colors.white
+          : AppColors.onBrandAccent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 0,
     ),

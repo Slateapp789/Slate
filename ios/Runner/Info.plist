@@ -31,6 +31,12 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSContactsUsageDescription</key>
+	<string>Choose the contacts you want to add as Workloop clients.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Choose calendar events you want to review and import as Workloop bookings.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Choose calendar events you want to review and import as Workloop bookings.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

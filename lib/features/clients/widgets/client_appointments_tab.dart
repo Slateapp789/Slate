@@ -42,7 +42,7 @@ class ClientAppointmentsTab extends ConsumerWidget {
       ),
       error: (e, _) => Center(
         child: Text(
-          'Error: $e',
+          'Bookings could not be loaded.',
           style: const TextStyle(color: AppColors.error),
         ),
       ),

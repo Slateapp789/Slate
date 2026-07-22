@@ -1,0 +1,196 @@
+import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+
+import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/slate_ui.dart';
+import 'calendar_import_screen.dart';
+import 'contacts_import_screen.dart';
+import 'csv_import_screen.dart';
+import 'text_import_screen.dart';
+
+class ImportDataScreen extends StatelessWidget {
+  const ImportDataScreen({super.key});
+
+  Future<void> _open(BuildContext context, Widget screen) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => screen),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkloopPage(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              WorkloopIconButton(
+                icon: LucideIcons.chevronLeft,
+                semanticLabel: 'Back to settings',
+                onTap: () => Navigator.pop(context),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              const Expanded(
+                child: Text(
+                  'Import data',
+                  style: TextStyle(
+                    color: AppColors.t1,
+                    fontSize: 26,
+                    height: 1.05,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const Text(
+            'Bring your work into one place',
+            style: TextStyle(
+              color: AppColors.t1,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          const Text(
+            'You always review what Workloop will create. Source data stays on your device unless you confirm an import.',
+            style: TextStyle(color: AppColors.t3, height: 1.45),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const WorkloopSectionHeader(label: 'People and bookings'),
+          _ImportRow(
+            icon: LucideIcons.contact,
+            title: 'Device contacts',
+            subtitle: 'Choose specific people and check likely duplicates',
+            onTap: () => _open(context, const ContactsImportScreen()),
+          ),
+          _ImportRow(
+            icon: LucideIcons.calendarDays,
+            title: 'Calendar events',
+            subtitle: 'Review a one-time snapshot before creating bookings',
+            onTap: () => _open(context, const CalendarImportScreen()),
+          ),
+          _ImportRow(
+            icon: LucideIcons.fileSpreadsheet,
+            title: 'Client CSV',
+            subtitle: 'Map columns, preview rows and skip duplicates',
+            showDivider: false,
+            onTap: () => _open(context, const CsvImportScreen()),
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+          const WorkloopSectionHeader(label: 'Files'),
+          _ImportRow(
+            icon: LucideIcons.listTodo,
+            title: 'Task list',
+            subtitle: 'Turn each line of a text file into an open task',
+            onTap: () => _open(
+              context,
+              const TextImportScreen(type: TextImportType.tasks),
+            ),
+          ),
+          _ImportRow(
+            icon: LucideIcons.fileText,
+            title: 'Notes files',
+            subtitle: 'Import selected plain-text or Markdown files',
+            showDivider: false,
+            onTap: () => _open(
+              context,
+              const TextImportScreen(type: TextImportType.notes),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+          WorkloopSurface(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  LucideIcons.shieldCheck,
+                  color: AppColors.t2,
+                  size: 20,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Private by design',
+                        style: TextStyle(
+                          color: AppColors.t1,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        'Permissions are requested only when you choose a source. Workloop reads the minimum data needed and imports only your selections into your workspace.',
+                        style: TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 12,
+                          height: 1.45,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImportRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool showDivider;
+
+  const _ImportRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.showDivider = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkloopListRow(
+      onTap: onTap,
+      showDivider: showDivider,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          color: AppColors.modBg,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: AppColors.t2, size: 18),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: AppColors.t1,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: AppColors.t3, fontSize: 12, height: 1.35),
+      ),
+      trailing: const Icon(
+        LucideIcons.chevronRight,
+        color: AppColors.t4,
+        size: 18,
+      ),
+    );
+  }
+}

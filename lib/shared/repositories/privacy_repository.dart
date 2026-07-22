@@ -14,37 +14,52 @@ class PrivacyRepository {
   const PrivacyRepository(this._client);
 
   Future<String> exportWorkspaceData(String workspaceId) async {
+    final warnings = <String>[];
     final data = <String, dynamic>{
       'exported_at': DateTime.now().toUtc().toIso8601String(),
       'workspace_id': workspaceId,
-      'workspace': await _maybeSingle('workspaces', 'id', workspaceId),
+      'workspace': await _maybeSingle(
+        'workspaces',
+        'id',
+        workspaceId,
+        warnings,
+      ),
       'workspace_settings': await _maybeSingle(
         'workspace_settings',
         'workspace_id',
         workspaceId,
+        warnings,
       ),
       'business_profile': await _maybeSingle(
         'business_profiles',
         'workspace_id',
         workspaceId,
+        warnings,
       ),
-      'contacts': await _list('contacts', workspaceId),
-      'services': await _list('services', workspaceId),
-      'appointments': await _list('appointments', workspaceId),
-      'payments': await _list('invoices', workspaceId),
-      'tasks': await _list('tasks', workspaceId),
-      'booking_requests': await _list('booking_requests', workspaceId),
+      'contacts': await _list('contacts', workspaceId, warnings),
+      'services': await _list('services', workspaceId, warnings),
+      'appointments': await _list('appointments', workspaceId, warnings),
+      'payments': await _list('invoices', workspaceId, warnings),
+      'tasks': await _list('tasks', workspaceId, warnings),
+      'booking_requests': await _list(
+        'booking_requests',
+        workspaceId,
+        warnings,
+      ),
       'notification_preferences': await _maybeSingle(
         'notification_preferences',
         'workspace_id',
         workspaceId,
+        warnings,
       ),
-      'notifications': await _list('notifications', workspaceId),
+      'notifications': await _list('notifications', workspaceId, warnings),
       'calendar_sync_accounts': await _list(
         'calendar_sync_accounts',
         workspaceId,
+        warnings,
       ),
     };
+    data['warnings'] = warnings;
 
     return const JsonEncoder.withIndent('  ').convert(data);
   }
@@ -60,6 +75,7 @@ class PrivacyRepository {
     String table,
     String column,
     String value,
+    List<String> warnings,
   ) async {
     try {
       final row = await _client
@@ -70,6 +86,7 @@ class PrivacyRepository {
       if (row == null) return null;
       return Map<String, dynamic>.from(row);
     } catch (_) {
+      warnings.add('$table could not be included in this export.');
       return null;
     }
   }
@@ -77,6 +94,7 @@ class PrivacyRepository {
   Future<List<Map<String, dynamic>>> _list(
     String table,
     String workspaceId,
+    List<String> warnings,
   ) async {
     try {
       final rows = await _client
@@ -85,6 +103,7 @@ class PrivacyRepository {
           .eq('workspace_id', workspaceId);
       return List<Map<String, dynamic>>.from(rows);
     } catch (_) {
+      warnings.add('$table could not be included in this export.');
       return [];
     }
   }

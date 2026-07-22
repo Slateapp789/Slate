@@ -294,9 +294,9 @@ class _AppointmentDetailScreenState
       ref.invalidate(notificationsProvider);
       ref.invalidate(unreadNotificationsProvider);
       return true;
-    } catch (e) {
+    } catch (_) {
       setState(() => _loading = false);
-      if (mounted) _snack('Error: $e');
+      if (mounted) _snack('The booking could not be updated.');
       return false;
     }
   }
@@ -378,6 +378,7 @@ class _AppointmentDetailScreenState
         SnackBar(
           content: Text(
             '£${payment.total.toStringAsFixed(0)} marked as received',
+            style: const TextStyle(color: AppColors.onBrandAccent),
           ),
           backgroundColor: AppColors.green,
           behavior: SnackBarBehavior.floating,
@@ -576,9 +577,9 @@ class _AppointmentDetailScreenState
       });
       ref.invalidate(appointmentsProvider);
       return true;
-    } catch (e) {
+    } catch (_) {
       setState(() => _loading = false);
-      if (mounted) _snack('Error: $e');
+      if (mounted) _snack('The booking could not be updated.');
       return false;
     }
   }
@@ -755,7 +756,7 @@ class _AppointmentDetailScreenState
   // ── Pickers ───────────────────────────────────────────────────────────────
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    final picked = await showWorkloopDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
