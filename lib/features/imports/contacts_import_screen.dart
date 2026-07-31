@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart' as device;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
@@ -24,6 +24,7 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
   final Set<String> _selected = {};
   bool _loading = false;
   bool _importing = false;
+  bool _reviewing = false;
   bool _includeDuplicates = false;
   String _query = '';
   String? _message;
@@ -35,6 +36,7 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
   }
 
   Future<void> _loadContacts() async {
+    if (_loading || _importing || _reviewing) return;
     setState(() {
       _loading = true;
       _message = null;
@@ -143,6 +145,7 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
   }
 
   Future<void> _reviewImport() async {
+    if (_reviewing || _importing) return;
     final candidates = _contacts
         .where((item) => _selected.contains(item.sourceId))
         .where((item) => _includeDuplicates || !item.likelyDuplicate)
@@ -153,55 +156,66 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
       );
       return;
     }
-    final confirmed = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: SlateTheme.of(context).scrim,
-      builder: (context) => SlateSheetFrame(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Review contact import',
-              style: TextStyle(
-                color: AppColors.t1,
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
+    setState(() => _reviewing = true);
+    try {
+      final confirmed = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: SlateTheme.of(context).scrim,
+        builder: (context) => SlateSheetFrame(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Review contact import',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              '${candidates.length} ${candidates.length == 1 ? 'client' : 'clients'} will be created with available name, phone, email and postal address details.',
-              style: const TextStyle(
-                color: AppColors.t3,
-                fontSize: 14,
-                height: 1.45,
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                '${candidates.length} ${candidates.length == 1 ? 'client' : 'clients'} will be created with available name, phone, email and postal address details.',
+                style: const TextStyle(
+                  color: AppColors.t3,
+                  fontSize: 14,
+                  height: 1.45,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            WorkloopPrimaryButton(
-              label: 'Import ${candidates.length}',
-              icon: LucideIcons.download,
-              onPressed: () => Navigator.pop(context, true),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            WorkloopPrimaryButton(
-              label: 'Keep reviewing',
-              secondary: true,
-              onPressed: () => Navigator.pop(context, false),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.lg),
+              WorkloopPrimaryButton(
+                label: 'Import ${candidates.length}',
+                icon: LucideIcons.download,
+                onPressed: () => Navigator.pop(context, true),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              WorkloopPrimaryButton(
+                label: 'Keep reviewing',
+                secondary: true,
+                onPressed: () => Navigator.pop(context, false),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-    if (confirmed == true) await _import(candidates);
+      );
+      if (confirmed == true) await _import(candidates);
+    } finally {
+      if (mounted) setState(() => _reviewing = false);
+    }
   }
 
   Future<void> _import(List<ImportCandidate> candidates) async {
-    setState(() => _importing = true);
+    if (_importing || candidates.isEmpty) return;
+    final attemptedIds = candidates.map((candidate) => candidate.sourceId);
+    setState(() {
+      _importing = true;
+      _message = null;
+    });
     var success = 0;
+    final completedIds = <String>{};
     final failures = <String>[];
     try {
       final workspaceId = await ref.read(workspaceIdProvider.future);
@@ -223,22 +237,46 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
             tags: const ['imported'],
           );
           success++;
+          completedIds.add(candidate.sourceId);
         } catch (_) {
           failures.add(candidate.name);
         }
       }
+      final result = reconcileImportAttempt(
+        attempted: attemptedIds,
+        completed: completedIds,
+      );
+      final summary = failures.isEmpty
+          ? '$success ${success == 1 ? 'client was' : 'clients were'} added.'
+          : '$success ${success == 1 ? 'client was' : 'clients were'} added. '
+                '${result.retryable.length} ${result.retryable.length == 1 ? 'contact remains' : 'contacts remain'} selected to retry.';
+      if (mounted) {
+        setState(() {
+          _contacts = _contacts
+              .where((contact) => !result.completed.contains(contact.sourceId))
+              .toList();
+          _selected
+            ..removeAll(result.completed)
+            ..addAll(result.retryable);
+          _message = summary;
+        });
+      }
       ref.invalidate(clientsProvider);
       ref.invalidate(clientCrmRecordsProvider);
       if (!mounted) return;
-      SlateHaptics.success();
+      if (success > 0) {
+        SlateHaptics.success();
+      } else {
+        SlateHaptics.warning();
+      }
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Import complete'),
           content: Text(
             failures.isEmpty
-                ? '$success ${success == 1 ? 'client was' : 'clients were'} added.'
-                : '$success added. ${failures.length} could not be added: ${failures.take(3).join(', ')}${failures.length > 3 ? '…' : ''}',
+                ? summary
+                : '$summary Could not add: ${failures.take(3).join(', ')}${failures.length > 3 ? '…' : ''}',
           ),
           actions: [
             TextButton(
@@ -249,6 +287,13 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
         ),
       );
       if (failures.isEmpty && mounted) Navigator.pop(context, success);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _message =
+              'The selected contacts could not be imported. They remain selected to retry.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _importing = false);
     }
@@ -267,21 +312,12 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
         children: [
           _ImportHeader(
             title: 'Import contacts',
-            onBack: () => Navigator.pop(context),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          const Text(
-            'Choose who to bring into Workloop',
-            style: TextStyle(
-              color: AppColors.t1,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
+            onBack: () => workloopGoBack(context),
           ),
           const SizedBox(height: AppSpacing.xs),
           const Text(
-            'Workloop reads only the contacts you review here. Nothing is imported until you confirm.',
-            style: TextStyle(color: AppColors.t3, fontSize: 14, height: 1.45),
+            'Choose exactly which device contacts to bring in. Only the people you confirm are added to your workspace.',
+            style: TextStyle(color: AppColors.t2, fontSize: 15, height: 1.45),
           ),
           const SizedBox(height: AppSpacing.lg),
           if (_contacts.isEmpty && !_loading) ...[
@@ -303,7 +339,9 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
                   WorkloopPrimaryButton(
                     label: 'Choose contacts',
                     icon: LucideIcons.contact,
-                    onPressed: _loadContacts,
+                    onPressed: _loading || _importing || _reviewing
+                        ? null
+                        : _loadContacts,
                   ),
                   if (_message?.contains('settings') == true) ...[
                     const SizedBox(height: AppSpacing.xs),
@@ -332,7 +370,7 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
                     '${_selected.length} selected',
                     style: const TextStyle(
                       color: AppColors.t2,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -340,13 +378,17 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
                   label: _selected.length == visible.length
                       ? 'Clear'
                       : 'Select all',
-                  onPressed: () => setState(() {
-                    if (_selected.length == visible.length) {
-                      _selected.clear();
-                    } else {
-                      _selected.addAll(visible.map((item) => item.sourceId));
-                    }
-                  }),
+                  onPressed: _importing || _reviewing
+                      ? null
+                      : () => setState(() {
+                          if (_selected.length == visible.length) {
+                            _selected.clear();
+                          } else {
+                            _selected.addAll(
+                              visible.map((item) => item.sourceId),
+                            );
+                          }
+                        }),
                 ),
               ],
             ),
@@ -371,14 +413,18 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
                         itemBuilder: (context, index) => _ContactRow(
                           contact: visible[index],
                           selected: _selected.contains(visible[index].sourceId),
+                          enabled: !_importing && !_reviewing,
                           showDivider: index != visible.length - 1,
-                          onChanged: (selected) => setState(() {
-                            if (selected) {
-                              _selected.add(visible[index].sourceId);
-                            } else {
-                              _selected.remove(visible[index].sourceId);
-                            }
-                          }),
+                          onChanged: (selected) {
+                            if (_importing || _reviewing) return;
+                            setState(() {
+                              if (selected) {
+                                _selected.add(visible[index].sourceId);
+                              } else {
+                                _selected.remove(visible[index].sourceId);
+                              }
+                            });
+                          },
                         ),
                       ),
               ),
@@ -388,8 +434,9 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
                 value: _includeDuplicates,
-                onChanged: (value) =>
-                    setState(() => _includeDuplicates = value),
+                onChanged: _importing || _reviewing
+                    ? null
+                    : (value) => setState(() => _includeDuplicates = value),
                 title: const Text('Create likely duplicates separately'),
                 subtitle: Text(
                   _includeDuplicates
@@ -398,11 +445,35 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
                 ),
               ),
             ],
+            if (_message != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Semantics(
+                container: true,
+                liveRegion: true,
+                label: _message!,
+                child: ExcludeSemantics(
+                  child: Text(
+                    _message!,
+                    style: const TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: AppSpacing.lg),
             WorkloopPrimaryButton(
-              label: _importing ? 'Importing…' : 'Review import',
+              label: _importing
+                  ? 'Importing…'
+                  : _reviewing
+                  ? 'Reviewing…'
+                  : 'Review import',
               icon: LucideIcons.arrowRight,
-              onPressed: _selected.isEmpty || _importing ? null : _reviewImport,
+              onPressed: _selected.isEmpty || _importing || _reviewing
+                  ? null
+                  : _reviewImport,
             ),
           ],
         ],
@@ -414,12 +485,14 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
 class _ContactRow extends StatelessWidget {
   final ImportCandidate contact;
   final bool selected;
+  final bool enabled;
   final bool showDivider;
   final ValueChanged<bool> onChanged;
 
   const _ContactRow({
     required this.contact,
     required this.selected,
+    required this.enabled,
     required this.showDivider,
     required this.onChanged,
   });
@@ -431,17 +504,17 @@ class _ContactRow extends StatelessWidget {
       contact.email,
     ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
     return WorkloopListRow(
-      onTap: () => onChanged(!selected),
+      onTap: enabled ? () => onChanged(!selected) : null,
       showDivider: showDivider,
       leading: Checkbox.adaptive(
         value: selected,
-        onChanged: (value) => onChanged(value ?? false),
+        onChanged: enabled ? (value) => onChanged(value ?? false) : null,
       ),
       title: Text(
         contact.name,
         style: const TextStyle(
           color: AppColors.t1,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: subtitle.isEmpty
@@ -458,7 +531,7 @@ class _ContactRow extends StatelessWidget {
               style: TextStyle(
                 color: AppColors.warning,
                 fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
               ),
             )
           : null,
@@ -474,26 +547,6 @@ class _ImportHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        WorkloopIconButton(
-          icon: LucideIcons.chevronLeft,
-          semanticLabel: 'Back',
-          onTap: onBack,
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.t1,
-              fontSize: 26,
-              height: 1.05,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ],
-    );
+    return WorkloopRouteHeader(title: title, onBack: onBack);
   }
 }

@@ -31,8 +31,7 @@ List<WorkingHourBlock> workingHourBlocks(dynamic value) {
   final map = value is Map
       ? Map<String, dynamic>.from(value)
       : <String, dynamic>{};
-  final enabled = map['enabled'] as bool? ?? false;
-  if (!enabled) return const [];
+  if (map['enabled'] != true) return const [];
 
   final blocks = map['blocks'];
   if (blocks is List) {
@@ -40,9 +39,11 @@ List<WorkingHourBlock> workingHourBlocks(dynamic value) {
         .whereType<Map>()
         .map((block) {
           final data = Map<String, dynamic>.from(block);
+          final start = data['start'];
+          final end = data['end'];
           return WorkingHourBlock(
-            start: data['start'] as String? ?? '09:00',
-            end: data['end'] as String? ?? '17:00',
+            start: start is String ? start : '',
+            end: end is String ? end : '',
           );
         })
         .where(
@@ -52,8 +53,8 @@ List<WorkingHourBlock> workingHourBlocks(dynamic value) {
         .toList();
   }
 
-  final start = map['start'] as String? ?? map['open'] as String? ?? '09:00';
-  final end = map['end'] as String? ?? map['close'] as String? ?? '17:00';
+  final start = _legacyTimeValue(map, const ['start', 'open'], '09:00');
+  final end = _legacyTimeValue(map, const ['end', 'close'], '17:00');
   return [WorkingHourBlock(start: start, end: end)];
 }
 
@@ -78,17 +79,30 @@ bool isWithinWorkingHours({
   required DateTime start,
   required DateTime end,
 }) {
-  final value = workingHoursValueForDate(hours, start);
+  final localStart = start.toLocal();
+  final localEnd = end.toLocal();
+  if (!localEnd.isAfter(localStart) ||
+      localStart.year != localEnd.year ||
+      localStart.month != localEnd.month ||
+      localStart.day != localEnd.day) {
+    return false;
+  }
+
+  final value = workingHoursValueForDate(hours, localStart);
   final blocks = workingHourBlocks(value);
   if (blocks.isEmpty) return false;
 
-  final startMins = start.hour * 60 + start.minute;
-  final endMins = end.hour * 60 + end.minute;
+  final startSeconds =
+      localStart.hour * 3600 + localStart.minute * 60 + localStart.second;
+  final endSeconds =
+      localEnd.hour * 3600 + localEnd.minute * 60 + localEnd.second;
   return blocks.any((block) {
     final blockStart = _timeToMinutes(block.start);
     final blockEnd = _timeToMinutes(block.end);
-    if (blockStart == null || blockEnd == null) return false;
-    return startMins >= blockStart && endMins <= blockEnd;
+    if (blockStart == null || blockEnd == null || blockEnd <= blockStart) {
+      return false;
+    }
+    return startSeconds >= blockStart * 60 && endSeconds <= blockEnd * 60;
   });
 }
 
@@ -108,10 +122,25 @@ Map<String, dynamic> defaultWorkingHours() => {
 };
 
 int? _timeToMinutes(String value) {
+  if (!RegExp(r'^\d{1,2}:\d{2}$').hasMatch(value)) return null;
   final parts = value.split(':');
   if (parts.length != 2) return null;
   final hour = int.tryParse(parts[0]);
   final minute = int.tryParse(parts[1]);
   if (hour == null || minute == null) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
   return hour * 60 + minute;
+}
+
+String _legacyTimeValue(
+  Map<String, dynamic> map,
+  List<String> keys,
+  String fallback,
+) {
+  for (final key in keys) {
+    if (!map.containsKey(key)) continue;
+    final value = map[key];
+    return value is String ? value : '';
+  }
+  return fallback;
 }

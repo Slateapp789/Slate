@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/providers/clients_provider.dart';
@@ -203,33 +201,16 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                       AppSpacing.pageX,
                       0,
                     ),
-                    child: Row(
-                      children: [
-                        WorkloopIconButton(
-                          icon: LucideIcons.chevronLeft,
-                          semanticLabel: 'Back to clients',
-                          onTap: _handleBack,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        const Expanded(
-                          child: Text(
-                            'New client',
-                            style: TextStyle(
-                              color: AppColors.t1,
-                              fontSize: 26,
-                              height: 1.05,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        _SaveAction(
-                          label: 'Add',
-                          loading: _saving,
-                          enabled: _canSave,
-                          onTap: _save,
-                        ),
-                      ],
+                    child: WorkloopRouteHeader(
+                      title: 'New client',
+                      backSemanticLabel: 'Back to clients',
+                      onBack: _handleBack,
+                      trailing: _SaveAction(
+                        label: 'Add',
+                        loading: _saving,
+                        enabled: _canSave,
+                        onTap: _save,
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
@@ -306,7 +287,10 @@ class _SaveAction extends StatelessWidget {
         onTap: enabled && !loading ? onTap : null,
         borderRadius: BorderRadius.circular(AppRadius.pill),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 58, minHeight: 42),
+          constraints: const BoxConstraints(
+            minWidth: 58,
+            minHeight: AppSpacing.minTouch,
+          ),
           child: Center(
             child: loading
                 ? const SizedBox(
@@ -322,7 +306,7 @@ class _SaveAction extends StatelessWidget {
                     style: TextStyle(
                       color: enabled ? AppColors.accentPrimary : AppColors.t4,
                       fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
           ),

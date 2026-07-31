@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/utils/currency_format.dart';
 import '../../../shared/widgets/slate_ui.dart';
 import 'settings_helpers.dart';
 
@@ -10,12 +11,14 @@ class SettingsServicesSection extends StatelessWidget {
   final AsyncValue<List<Map<String, dynamic>>> services;
   final VoidCallback onAdd;
   final ValueChanged<Map<String, dynamic>> onEdit;
+  final VoidCallback onRetry;
 
   const SettingsServicesSection({
     super.key,
     required this.services,
     required this.onAdd,
     required this.onEdit,
+    required this.onRetry,
   });
 
   @override
@@ -26,46 +29,16 @@ class SettingsServicesSection extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             sectionLabel('Services'),
-            GestureDetector(
-              onTap: () {
-                SlateHaptics.tap();
-                onAdd();
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.accentPrimaryStrong.withValues(alpha: 0.30),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(
-                      LucideIcons.plus,
-                      size: 13,
-                      color: AppColors.accentPrimary,
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      'Add',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.accentPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            WorkloopTextButton(label: 'Add', onPressed: onAdd),
           ],
         ),
         const SizedBox(height: 10),
         services.when(
           loading: () => skeletonBox(60),
-          error: (e, _) => errorBox('Services could not be loaded.'),
+          error: (_, _) => SlateErrorState(
+            message: 'Services could not be loaded.',
+            onRetry: onRetry,
+          ),
           data: (data) => data.isEmpty
               ? _EmptyServices(onAdd: onAdd)
               : _ServicesList(services: data, onEdit: onEdit),
@@ -93,17 +66,7 @@ class _EmptyServices extends StatelessWidget {
             style: TextStyle(fontSize: 14, color: AppColors.t3),
           ),
           const SizedBox(height: 12),
-          GestureDetector(
-            onTap: onAdd,
-            child: const Text(
-              '+ Add your first service',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.accentPrimary,
-              ),
-            ),
-          ),
+          WorkloopTextButton(label: 'Add your first service', onPressed: onAdd),
         ],
       ),
     );
@@ -123,9 +86,8 @@ class _ServicesList extends StatelessWidget {
         final index = entry.key;
         final service = entry.value;
         final isLast = index == services.length - 1;
-        final price = service['price'] is num
-            ? (service['price'] as num).toStringAsFixed(0)
-            : '0';
+        final rawPrice = service['price'];
+        final price = formatPounds(rawPrice is num ? rawPrice : 0);
 
         return SlateListRow(
           onTap: () => onEdit(service),
@@ -139,7 +101,7 @@ class _ServicesList extends StatelessWidget {
             service['name'] as String? ?? 'Service',
             style: const TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: AppColors.t1,
             ),
           ),
@@ -151,10 +113,10 @@ class _ServicesList extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '£$price',
+                price,
                 style: const TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.t1,
                 ),
               ),

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/slate_models.dart';
+import 'repository_pagination.dart';
 import 'supabase_client_provider.dart';
 
 final tasksRepositoryProvider = Provider<TasksRepository>((ref) {
@@ -13,55 +14,70 @@ class TasksRepository {
   const TasksRepository(this._client);
 
   Future<List<SlateTask>> list(String workspaceId) async {
-    final rows = await _client
-        .from('tasks')
-        .select('*, contacts(name)')
-        .eq('workspace_id', workspaceId)
-        .order('due_date', ascending: true);
-    return rows
-        .map<SlateTask>(
-          (row) => SlateTask.fromMap(Map<String, dynamic>.from(row)),
-        )
-        .toList();
+    final rows = await fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('tasks')
+            .select('*, contacts(name)')
+            .eq('workspace_id', workspaceId)
+            .order('due_date', ascending: true)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
+    return rows.map<SlateTask>(SlateTask.fromMap).toList();
   }
 
   Future<List<SlateTask>> dueOpen(String workspaceId) async {
     final today = DateTime.now().toIso8601String().split('T').first;
-    final rows = await _client
-        .from('tasks')
-        .select('*, contacts(name)')
-        .eq('workspace_id', workspaceId)
-        .eq('status', 'open')
-        .lte('due_date', today)
-        .order('due_date', ascending: true);
-    return rows
-        .map<SlateTask>(
-          (row) => SlateTask.fromMap(Map<String, dynamic>.from(row)),
-        )
-        .toList();
+    final rows = await fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('tasks')
+            .select('*, contacts(name)')
+            .eq('workspace_id', workspaceId)
+            .eq('status', 'open')
+            .lte('due_date', today)
+            .order('due_date', ascending: true)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
+    return rows.map<SlateTask>(SlateTask.fromMap).toList();
   }
 
   Future<List<Map<String, dynamic>>> forClientRows(String clientId) async {
-    final rows = await _client
-        .from('tasks')
-        .select('*, contacts(name)')
-        .eq('contact_id', clientId)
-        .order('due_date', ascending: true);
-    return List<Map<String, dynamic>>.from(rows);
+    return fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('tasks')
+            .select('*, contacts(name)')
+            .eq('contact_id', clientId)
+            .order('due_date', ascending: true)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
   }
 
   Future<List<SlateTask>> forAppointment(String appointmentId) async {
-    final rows = await _client
-        .from('tasks')
-        .select('*, contacts(name)')
-        .eq('appointment_id', appointmentId)
-        .order('due_date', ascending: true)
-        .order('created_at', ascending: true);
-    return rows
-        .map<SlateTask>(
-          (row) => SlateTask.fromMap(Map<String, dynamic>.from(row)),
-        )
-        .toList();
+    final rows = await fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('tasks')
+            .select('*, contacts(name)')
+            .eq('appointment_id', appointmentId)
+            .order('due_date', ascending: true)
+            .order('created_at', ascending: true)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
+    return rows.map<SlateTask>(SlateTask.fromMap).toList();
   }
 
   Future<List<SlateTask>> forClient(String clientId) async {
@@ -95,6 +111,41 @@ class TasksRepository {
     return row['id'] as String;
   }
 
+  Future<String> createWithChecklist({
+    required String workspaceId,
+    required String title,
+    required String priority,
+    required String reminderTiming,
+    required List<String> checklistTitles,
+    required String idempotencyKey,
+    DateTime? dueDate,
+    String? contactId,
+    String? appointmentId,
+  }) async {
+    final response = await _client.rpc(
+      'create_task_workflow',
+      params: {
+        'p_payload': buildCreateTaskWorkflowPayload(
+          workspaceId: workspaceId,
+          title: title,
+          priority: priority,
+          reminderTiming: reminderTiming,
+          checklistTitles: checklistTitles,
+          idempotencyKey: idempotencyKey,
+          dueDate: dueDate,
+          contactId: contactId,
+          appointmentId: appointmentId,
+        ),
+      },
+    );
+    final result = Map<String, dynamic>.from(response as Map);
+    final taskId = result['task_id'] as String?;
+    if (taskId == null || taskId.isEmpty) {
+      throw const FormatException('Task workflow returned no task identifier.');
+    }
+    return taskId;
+  }
+
   Future<void> updateStatus(String taskId, String status) async {
     await _client
         .from('tasks')
@@ -102,7 +153,9 @@ class TasksRepository {
           'status': status,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
-        .eq('id', taskId);
+        .eq('id', taskId)
+        .select('id')
+        .single();
   }
 
   Future<void> update({
@@ -125,25 +178,30 @@ class TasksRepository {
           'appointment_id': appointmentId,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
-        .eq('id', taskId);
+        .eq('id', taskId)
+        .select('id')
+        .single();
   }
 
   Future<void> delete(String taskId) async {
-    await _client.from('tasks').delete().eq('id', taskId);
+    await _client.from('tasks').delete().eq('id', taskId).select('id').single();
   }
 
   Future<List<TaskChecklistItem>> checklistItems(String taskId) async {
-    final rows = await _client
-        .from('task_checklist_items')
-        .select()
-        .eq('task_id', taskId)
-        .order('position', ascending: true)
-        .order('created_at', ascending: true);
-    return rows
-        .map<TaskChecklistItem>(
-          (row) => TaskChecklistItem.fromMap(Map<String, dynamic>.from(row)),
-        )
-        .toList();
+    final rows = await fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('task_checklist_items')
+            .select()
+            .eq('task_id', taskId)
+            .order('position', ascending: true)
+            .order('created_at', ascending: true)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
+    return rows.map<TaskChecklistItem>(TaskChecklistItem.fromMap).toList();
   }
 
   Future<void> addChecklistItem({
@@ -195,7 +253,9 @@ class TasksRepository {
           'title': title.trim(),
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
-        .eq('id', itemId);
+        .eq('id', itemId)
+        .select('id')
+        .single();
   }
 
   Future<void> updateChecklistItemStatus({
@@ -208,10 +268,44 @@ class TasksRepository {
           'completed': completed,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
-        .eq('id', itemId);
+        .eq('id', itemId)
+        .select('id')
+        .single();
   }
 
   Future<void> deleteChecklistItem(String itemId) async {
-    await _client.from('task_checklist_items').delete().eq('id', itemId);
+    await _client
+        .from('task_checklist_items')
+        .delete()
+        .eq('id', itemId)
+        .select('id')
+        .single();
   }
+}
+
+Map<String, dynamic> buildCreateTaskWorkflowPayload({
+  required String workspaceId,
+  required String title,
+  required String priority,
+  required String reminderTiming,
+  required List<String> checklistTitles,
+  required String idempotencyKey,
+  DateTime? dueDate,
+  String? contactId,
+  String? appointmentId,
+}) {
+  return {
+    'workspace_id': workspaceId,
+    'title': title.trim(),
+    'priority': priority,
+    'reminder_timing': reminderTiming,
+    'due_date': dueDate?.toIso8601String().split('T').first,
+    'contact_id': contactId,
+    'appointment_id': appointmentId,
+    'checklist_titles': checklistTitles
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false),
+    'idempotency_key': idempotencyKey,
+  };
 }

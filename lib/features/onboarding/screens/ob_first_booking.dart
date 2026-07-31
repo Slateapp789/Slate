@@ -117,7 +117,7 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
             'Create your\nfirst booking.',
             style: TextStyle(
               fontSize: 32,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
               color: AppColors.t1,
               letterSpacing: 0,
               height: 1.1,
@@ -125,7 +125,7 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Add a real appointment to get started.',
+            'Add your first booking to get started.',
             style: TextStyle(fontSize: 15, color: AppColors.t3),
           ),
           const SizedBox(height: 32),
@@ -194,24 +194,34 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
                   children: [
                     _label('Date'),
                     const SizedBox(height: 8),
-                    GestureDetector(
+                    Semantics(
+                      button: true,
+                      label: 'Booking date',
+                      value: _formattedDate,
                       onTap: _pickDate,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Text(
-                          _formattedDate,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.t1,
+                      child: ExcludeSemantics(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _pickDate,
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 52),
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgCard,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Text(
+                              _formattedDate,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.t1,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -226,24 +236,34 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
                   children: [
                     _label('Time'),
                     const SizedBox(height: 8),
-                    GestureDetector(
+                    Semantics(
+                      button: true,
+                      label: 'Booking time',
+                      value: _formattedTime,
                       onTap: _pickTime,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Text(
-                          _formattedTime,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.t1,
+                      child: ExcludeSemantics(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _pickTime,
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 52),
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgCard,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Text(
+                              _formattedTime,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.t1,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -261,7 +281,7 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
             child: ElevatedButton(
               onPressed: _canContinue ? _saveAndContinue : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.green,
+                backgroundColor: AppColors.brandAccent,
                 disabledBackgroundColor: AppColors.bgInteract,
                 foregroundColor: AppColors.onBrandAccent,
                 disabledForegroundColor: AppColors.t3,
@@ -271,23 +291,16 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
                 elevation: 0,
               ),
               child: const Text(
-                'Create Booking',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                'Create booking',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),
           const SizedBox(height: 16),
           Center(
-            child: GestureDetector(
-              onTap: widget.onNext,
-              child: Text(
-                'Skip — I\'ll do this later',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.t3,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+            child: WorkloopTextButton(
+              label: 'Skip — I’ll do this later',
+              onPressed: widget.onNext,
             ),
           ),
           const SizedBox(height: 32),
@@ -301,7 +314,7 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
       text,
       style: TextStyle(
         fontSize: 13,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w500,
         color: AppColors.t2,
         letterSpacing: 0,
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/finance_provider.dart';
+import '../../../shared/utils/currency_format.dart';
 import '../../../shared/widgets/slate_ui.dart';
 
 enum FinancePeriod { week, month, custom }
@@ -55,7 +56,7 @@ class ExpenseCategorySummary extends StatelessWidget {
             'No expenses in this period.',
             style: TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: AppColors.t3,
             ),
           )
@@ -107,7 +108,7 @@ class DatePickTile extends StatelessWidget {
               label.toUpperCase(),
               style: const TextStyle(
                 fontSize: 9,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w600,
                 color: AppColors.t3,
               ),
             ),
@@ -118,7 +119,7 @@ class DatePickTile extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w600,
                 color: AppColors.t1,
               ),
             ),
@@ -195,7 +196,7 @@ class _ModePill extends StatelessWidget {
           entry.value,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w600,
             color: active ? AppColors.t1 : AppColors.t3,
           ),
         ),
@@ -227,16 +228,16 @@ class _CategoryBar extends StatelessWidget {
                 label,
                 style: const TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.t2,
                 ),
               ),
             ),
             Text(
-              '£${amount.toStringAsFixed(0)}',
+              formatPounds(amount),
               style: const TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w600,
                 color: AppColors.t1,
               ),
             ),

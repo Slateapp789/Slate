@@ -1,0 +1,42 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:workloop/core/theme/app_theme.dart';
+import 'package:workloop/features/settings/legal_document_screen.dart';
+
+void main() {
+  Widget buildScreen(WorkloopLegalDocument document) {
+    return MaterialApp(
+      theme: AppTheme.dark,
+      home: LegalDocumentScreen(document: document),
+    );
+  }
+
+  testWidgets('privacy policy remains readable inside the app', (tester) async {
+    await tester.pumpWidget(buildScreen(WorkloopLegalDocument.privacy));
+
+    expect(find.text('Privacy policy'), findsOneWidget);
+    expect(find.text('Last updated 25 July 2026'), findsOneWidget);
+    expect(find.text('1. Who this policy covers'), findsOneWidget);
+    expect(find.text('2. Data you provide'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Open public copy'),
+      600,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Open public copy'), findsOneWidget);
+  });
+
+  testWidgets('terms remain readable inside the app', (tester) async {
+    await tester.pumpWidget(buildScreen(WorkloopLegalDocument.terms));
+
+    expect(find.text('Terms of use'), findsOneWidget);
+    expect(find.text('1. Agreement'), findsOneWidget);
+    expect(find.text('2. The service'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Open public copy'),
+      600,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Open public copy'), findsOneWidget);
+  });
+}

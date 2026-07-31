@@ -1,0 +1,212 @@
+name: Mobile CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-and-android:
+    name: Quality and Android profile build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI_SUPABASE_URL: https://example.supabase.co
+      CI_SUPABASE_ANON_KEY: ci-public-anon-key
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          deno-version: "2.9.4"
+          cache: true
+
+      - name: Set up Java
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.44.8"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: >-
+          dart format --output=none --set-exit-if-changed
+          lib test integration_test tool
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: >-
+          flutter test
+          --coverage
+          --dart-define=SUPABASE_URL="$CI_SUPABASE_URL"
+          --dart-define=SUPABASE_ANON_KEY="$CI_SUPABASE_ANON_KEY"
+
+      - name: Upload coverage evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: flutter-coverage
+          path: coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Validate deterministic data profiles
+        run: |
+          for profile in small medium large scale-50000; do
+            dart run tool/quality/generate_test_data.dart \
+              "--profile=$profile" \
+              --dry-run
+          done
+
+      - name: Check Edge Function formatting
+        run: deno fmt --check supabase/functions
+
+      - name: Check Edge Functions
+        run: |
+          deno check --config supabase/functions/complete-account-deletion/deno.json supabase/functions/complete-account-deletion/index.ts
+          deno check --config supabase/functions/create-booking-request/deno.json supabase/functions/create-booking-request/index.ts
+          deno check --config supabase/functions/get-public-profile/deno.json supabase/functions/get-public-profile/index.ts
+          deno check --config supabase/functions/places-address-search/deno.json supabase/functions/places-address-search/index.ts
+          deno check --config supabase/functions/request-account-deletion/deno.json supabase/functions/request-account-deletion/index.ts
+          deno check supabase/functions/workloop-ai-assistant/index.ts
+
+      - name: Test Edge Function logic
+        run: deno test supabase/functions
+
+      - name: Build Android profile APK
+        run: >-
+          flutter build apk --profile
+          --dart-define=SUPABASE_URL="$CI_SUPABASE_URL"
+          --dart-define=SUPABASE_ANON_KEY="$CI_SUPABASE_ANON_KEY"
+
+      - name: Build web release
+        run: >-
+          flutter build web --release
+          --dart-define=SUPABASE_URL="$CI_SUPABASE_URL"
+          --dart-define=SUPABASE_ANON_KEY="$CI_SUPABASE_ANON_KEY"
+
+  ios-profile:
+    name: iOS profile build
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      CI_SUPABASE_URL: https://example.supabase.co
+      CI_SUPABASE_ANON_KEY: ci-public-anon-key
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.44.8"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS profile without signing
+        run: >-
+          flutter build ios --profile --no-codesign
+          --dart-define=SUPABASE_URL="$CI_SUPABASE_URL"
+          --dart-define=SUPABASE_ANON_KEY="$CI_SUPABASE_ANON_KEY"
+
+  database-contract:
+    name: Local Supabase security and contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1.7.1
+        with:
+          version: 2.109.1
+
+      - name: Start isolated local stack
+        run: supabase start
+
+      - name: Rebuild schema from migrations
+        run: supabase db reset --local
+
+      - name: Run pgTAP security tests
+        run: supabase test db
+
+  android-integration:
+    name: Android signed-out integration smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI_SUPABASE_URL: https://example.supabase.co
+      CI_SUPABASE_ANON_KEY: ci-public-anon-key
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Enable KVM for the Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up Java
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.44.8"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run integration smoke on Android emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: >-
+            flutter test integration_test
+            -d emulator-5554
+            --dart-define=SUPABASE_URL="$CI_SUPABASE_URL"
+            --dart-define=SUPABASE_ANON_KEY="$CI_SUPABASE_ANON_KEY"

@@ -69,4 +69,97 @@ void main() {
       );
     });
   });
+
+  group('partial import reconciliation', () {
+    test('removes completed items and leaves failures retryable', () {
+      final result = reconcileImportAttempt(
+        attempted: const {'calendar-1', 'calendar-2', 'calendar-3'},
+        completed: const {'calendar-1', 'calendar-3'},
+      );
+
+      expect(result.completed, {'calendar-1', 'calendar-3'});
+      expect(result.retryable, {'calendar-2'});
+    });
+
+    test('does not mark an item outside the attempt as completed', () {
+      final result = reconcileImportAttempt(
+        attempted: const {1, 2},
+        completed: const {1, 99},
+      );
+
+      expect(result.completed, {1});
+      expect(result.retryable, {2});
+    });
+  });
+
+  group('calendar import idempotency', () {
+    test('is stable for the same calendar event identity', () {
+      final first = calendarImportIdempotencyKey(
+        calendarId: 'calendar-1',
+        eventId: 'event-42',
+        startTime: DateTime.utc(2026, 8, 1, 9),
+        title: 'Original title',
+      );
+      final edited = calendarImportIdempotencyKey(
+        calendarId: 'calendar-1',
+        eventId: 'event-42',
+        startTime: DateTime.utc(2026, 8, 2, 11),
+        title: 'Edited title',
+      );
+
+      expect(edited, first);
+      expect(first, startsWith('calendar-import-v1-'));
+      expect(first.length, inInclusiveRange(16, 128));
+    });
+
+    test('separates events and has a deterministic provider fallback', () {
+      final firstEvent = calendarImportIdempotencyKey(
+        calendarId: 'calendar-1',
+        eventId: 'event-1',
+        startTime: DateTime.utc(2026, 8, 1, 9),
+      );
+      final secondEvent = calendarImportIdempotencyKey(
+        calendarId: 'calendar-1',
+        eventId: 'event-2',
+        startTime: DateTime.utc(2026, 8, 1, 9),
+      );
+      final fallback = calendarImportIdempotencyKey(
+        calendarId: 'calendar-1',
+        startTime: DateTime.utc(2026, 8, 1, 9),
+        endTime: DateTime.utc(2026, 8, 1, 10),
+        title: 'Consultation',
+        location: 'Studio',
+      );
+      final sameFallback = calendarImportIdempotencyKey(
+        calendarId: 'calendar-1',
+        startTime: DateTime.utc(2026, 8, 1, 9),
+        endTime: DateTime.utc(2026, 8, 1, 10),
+        title: ' Consultation ',
+        location: ' studio ',
+      );
+
+      expect(secondEvent, isNot(firstEvent));
+      expect(sameFallback, fallback);
+    });
+  });
+
+  group('task text import', () {
+    test(
+      'normalises list markers into independently retryable task titles',
+      () {
+        final titles = taskTitlesFromImportText(
+          '- Confirm booking\n* Send invoice\n3. Follow up\n\n',
+        );
+
+        expect(titles, ['Confirm booking', 'Send invoice', 'Follow up']);
+      },
+    );
+
+    test('keeps unbulleted lines and drops empty lines', () {
+      expect(taskTitlesFromImportText('Call Maya\r\n\r\n  Email quote  '), [
+        'Call Maya',
+        'Email quote',
+      ]);
+    });
+  });
 }

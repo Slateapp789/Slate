@@ -44,24 +44,17 @@ Future<_PickedAppointmentTime?> _showAppointmentTimePicker({
                     'Select time',
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.t1,
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(
+                  WorkloopTextButton(
+                    label: 'Done',
+                    onPressed: () => Navigator.pop(
                       context,
                       _PickedAppointmentTime(
                         hour: tempHour,
                         minute: tempMinute,
-                      ),
-                    ),
-                    child: const Text(
-                      'Done',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.green,
                       ),
                     ),
                   ),
@@ -92,7 +85,7 @@ Future<_PickedAppointmentTime?> _showAppointmentTimePicker({
                               style: TextStyle(
                                 fontSize: selected ? 24 : 18,
                                 fontWeight: selected
-                                    ? FontWeight.w800
+                                    ? FontWeight.w600
                                     : FontWeight.w400,
                                 color: selected ? AppColors.t1 : AppColors.t3,
                               ),
@@ -106,7 +99,7 @@ Future<_PickedAppointmentTime?> _showAppointmentTimePicker({
                     ':',
                     style: TextStyle(
                       fontSize: 28,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.t1,
                     ),
                   ),
@@ -132,7 +125,7 @@ Future<_PickedAppointmentTime?> _showAppointmentTimePicker({
                               style: TextStyle(
                                 fontSize: selected ? 24 : 18,
                                 fontWeight: selected
-                                    ? FontWeight.w800
+                                    ? FontWeight.w600
                                     : FontWeight.w400,
                                 color: selected ? AppColors.t1 : AppColors.t3,
                               ),
@@ -176,7 +169,7 @@ class _AppointmentSectionLabel extends StatelessWidget {
           label,
           style: const TextStyle(
             fontSize: 20,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
             height: 1.12,
             color: AppColors.t1,
           ),
@@ -188,7 +181,7 @@ class _AppointmentSectionLabel extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.t3,
               fontSize: 14,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w400,
               height: 1.35,
             ),
           ),
@@ -222,7 +215,10 @@ class _BookingSaveAction extends StatelessWidget {
         onTap: enabled && !loading ? onTap : null,
         borderRadius: BorderRadius.circular(AppRadius.pill),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 58, minHeight: 42),
+          constraints: const BoxConstraints(
+            minWidth: 58,
+            minHeight: AppSpacing.minTouch,
+          ),
           child: Center(
             child: loading
                 ? const SizedBox(
@@ -240,7 +236,7 @@ class _BookingSaveAction extends StatelessWidget {
                       style: TextStyle(
                         color: enabled ? AppColors.modCalendar : AppColors.t4,
                         fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -270,8 +266,9 @@ class _AppointmentSkeleton extends StatelessWidget {
 
 class _AppointmentErrorBox extends StatelessWidget {
   final String message;
+  final VoidCallback onRetry;
 
-  const _AppointmentErrorBox(this.message);
+  const _AppointmentErrorBox(this.message, {required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -282,10 +279,50 @@ class _AppointmentErrorBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
-      child: Text(
-        message,
-        style: const TextStyle(color: AppColors.error, fontSize: 13),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.circleAlert, color: AppColors.error, size: 18),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: AppColors.error, fontSize: 13),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          TextButton(onPressed: onRetry, child: const Text('Try again')),
+        ],
       ),
+    );
+  }
+}
+
+class _ResponsiveBookingPair extends StatelessWidget {
+  final Widget first;
+  final Widget second;
+
+  const _ResponsiveBookingPair({required this.first, required this.second});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scaledBody = MediaQuery.textScalerOf(context).scale(14);
+        final stacked = constraints.maxWidth < 360 || scaledBody > 18;
+        if (stacked) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [first, const SizedBox(height: 10), second],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: first),
+            const SizedBox(width: 10),
+            Expanded(child: second),
+          ],
+        );
+      },
     );
   }
 }
@@ -322,7 +359,7 @@ class _AppointmentTextInput extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.t2,
               fontSize: 14,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -343,7 +380,7 @@ class _AppointmentTextInput extends StatelessWidget {
             suffixStyle: const TextStyle(color: AppColors.t3),
             hintStyle: const TextStyle(
               color: AppColors.t3,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w400,
             ),
             filled: true,
             fillColor: AppColors.bgCard.withValues(alpha: 0.72),
@@ -358,7 +395,7 @@ class _AppointmentTextInput extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.md),
               borderSide: const BorderSide(
-                color: AppColors.accentPrimaryStrong,
+                color: AppColors.accentPrimary,
                 width: 1.5,
               ),
             ),
@@ -412,7 +449,7 @@ class _PaymentDueToggle extends StatelessWidget {
                   'Create payment due',
                   style: TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.t1,
                   ),
                 ),
@@ -424,12 +461,7 @@ class _PaymentDueToggle extends StatelessWidget {
               ],
             ),
           ),
-          Switch(
-            value: value,
-            activeThumbColor: AppColors.t1,
-            activeTrackColor: AppColors.slateLight,
-            onChanged: onChanged,
-          ),
+          Switch(value: value, onChanged: onChanged),
         ],
       ),
     );

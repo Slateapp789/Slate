@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/workspace_provider.dart';
@@ -196,7 +196,7 @@ class _WorkingHoursEditorState extends ConsumerState<WorkingHoursEditor> {
         loading: () => const Center(
           child: CircularProgressIndicator(color: AppColors.accentPrimary),
         ),
-        error: (_, __) => WorkloopEmptyState(
+        error: (_, _) => WorkloopEmptyState(
           icon: LucideIcons.clock3,
           title: 'Could not load working hours',
           subtitle: 'Try again in a moment.',
@@ -221,7 +221,7 @@ class _WorkingHoursEditorState extends ConsumerState<WorkingHoursEditor> {
                   color: AppColors.t3,
                   fontSize: 14,
                   height: 1.45,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
@@ -306,7 +306,7 @@ class _DayHoursEditor extends StatelessWidget {
                 style: const TextStyle(
                   color: AppColors.t1,
                   fontSize: 16,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -315,15 +315,11 @@ class _DayHoursEditor extends StatelessWidget {
               style: const TextStyle(
                 color: AppColors.t3,
                 fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(width: AppSpacing.xs),
-            Switch.adaptive(
-              value: enabled,
-              activeThumbColor: AppColors.accentPrimary,
-              onChanged: onEnabled,
-            ),
+            Switch.adaptive(value: enabled, onChanged: onEnabled),
           ],
         ),
         if (enabled) ...[
@@ -348,11 +344,14 @@ class _DayHoursEditor extends StatelessWidget {
                 ),
                 if (blocks.length > 1) ...[
                   const SizedBox(width: AppSpacing.xs),
-                  WorkloopIconButton(
-                    icon: LucideIcons.x,
-                    semanticLabel: 'Remove time block',
-                    size: 40,
-                    onTap: () => onRemoveBlock(index),
+                  Tooltip(
+                    message: 'Remove $day time block ${index + 1}',
+                    child: WorkloopIconButton(
+                      icon: LucideIcons.x,
+                      semanticLabel: 'Remove $day time block ${index + 1}',
+                      size: AppSpacing.minTouch,
+                      onTap: () => onRemoveBlock(index),
+                    ),
                   ),
                 ],
               ],
@@ -404,7 +403,7 @@ class _TimeButton extends StatelessWidget {
                     style: const TextStyle(
                       color: AppColors.t3,
                       fontSize: 10,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -413,7 +412,7 @@ class _TimeButton extends StatelessWidget {
                     style: const TextStyle(
                       color: AppColors.t1,
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],

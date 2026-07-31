@@ -1,13 +1,19 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/workloop_font_license.dart';
 import 'core/supabase/supabase_config.dart';
+import 'core/workloop_app_info.dart';
 import 'features/auth/auth_screen.dart';
+import 'features/auth/password_recovery_screen.dart';
 import 'features/business_feed/business_feed_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/clients/clients_screen.dart';
@@ -25,11 +31,12 @@ import 'features/notifications/notifications_screen.dart';
 import 'features/public_profile/booking_requests_screen.dart';
 import 'features/public_profile/public_profile_screen.dart';
 import 'shared/providers/debug_demo_data_provider.dart';
-import 'shared/providers/theme_mode_provider.dart';
 import 'shared/providers/workspace_provider.dart';
+import 'shared/notifications/local_reminder_bootstrap.dart';
+import 'shared/utils/public_profile_routes.dart';
 import 'shared/widgets/slate_ui.dart';
 
-const workloopMinimumLaunchDuration = Duration(milliseconds: 1400);
+const workloopMinimumLaunchDuration = Duration(milliseconds: 700);
 
 Duration remainingLaunchDuration(
   Duration elapsed, {
@@ -42,50 +49,77 @@ Duration remainingLaunchDuration(
 void main() async {
   final launchClock = Stopwatch()..start();
   WidgetsFlutterBinding.ensureInitialized();
+  registerWorkloopFontLicenses();
   usePathUrlStrategy();
   SupabaseConfig.validate();
+  final appInfoFuture = WorkloopAppInfo.initialize();
   await Supabase.initialize(
     url: SupabaseConfig.supabaseUrl,
-    anonKey: SupabaseConfig.supabaseAnonKey,
+    publishableKey: SupabaseConfig.supabaseAnonKey,
   );
+  await appInfoFuture;
   final remaining = remainingLaunchDuration(launchClock.elapsed);
   if (remaining > Duration.zero) {
     await Future<void>.delayed(remaining);
   }
-  runApp(const ProviderScope(child: SlateApp()));
+  runApp(const ProviderScope(child: WorkloopApp()));
 }
 
-class SlateApp extends ConsumerWidget {
-  const SlateApp({super.key});
+class WorkloopApp extends StatefulWidget {
+  const WorkloopApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final appearance = ref.watch(workloopAppearanceProvider);
+  State<WorkloopApp> createState() => _WorkloopAppState();
+}
+
+class _WorkloopAppState extends State<WorkloopApp> {
+  StreamSubscription<AuthState>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      state,
+    ) {
+      if (state.event != AuthChangeEvent.passwordRecovery) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _router.go('/reset-password');
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Workloop',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.oledDark,
-      themeMode: appearance.value?.themeMode ?? ThemeMode.system,
+      theme: AppTheme.dark,
+      darkTheme: AppTheme.dark,
+      themeMode: AppTheme.themeMode,
+      themeAnimationDuration: Duration.zero,
+      scrollBehavior: const WorkloopScrollBehavior(),
       routerConfig: _router,
       builder: (context, child) {
-        final brightness = Theme.of(context).brightness;
-        WorkloopLegacyPalette.sync(brightness);
-        final overlayStyle = brightness == Brightness.dark
-            ? SystemUiOverlayStyle.light.copyWith(
-                statusBarColor: Colors.transparent,
-                systemNavigationBarColor: SlateTheme.of(context).background,
-                systemNavigationBarIconBrightness: Brightness.light,
-              )
-            : SystemUiOverlayStyle.dark.copyWith(
-                statusBarColor: Colors.transparent,
-                systemNavigationBarColor: SlateTheme.of(context).background,
-                systemNavigationBarIconBrightness: Brightness.dark,
-              );
+        final overlayStyle = SystemUiOverlayStyle.light.copyWith(
+          statusBarColor: Colors.transparent,
+          systemNavigationBarColor: SlateTheme.of(context).background,
+          systemNavigationBarIconBrightness: Brightness.light,
+        );
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: overlayStyle,
-          child: WorkloopKeyboardDismissRegion(
-            child: child ?? const SizedBox.shrink(),
+          child: WorkloopNavigationAssistRegion(
+            observer: _navigationObserver,
+            child: WorkloopLocalReminderBootstrap(
+              child: WorkloopKeyboardDismissRegion(
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
           ),
         );
       },
@@ -93,62 +127,82 @@ class SlateApp extends ConsumerWidget {
   }
 }
 
+final _navigationObserver = WorkloopNavigationObserver();
+
 final _router = GoRouter(
+  observers: [_navigationObserver],
   routes: [
     GoRoute(path: '/', builder: (context, state) => const AuthGate()),
     GoRoute(path: '/auth', builder: (context, state) => const AuthScreen()),
     GoRoute(
-      path: '/onboarding',
-      builder: (context, state) => const OnboardingScreen(),
+      path: '/reset-password',
+      builder: (context, state) => const PasswordRecoveryScreen(),
     ),
-    GoRoute(path: '/home', builder: (context, state) => const MainShell()),
+    GoRoute(path: '/onboarding', builder: (context, state) => const AuthGate()),
+    GoRoute(
+      path: '/home',
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: MainShell()),
+    ),
     GoRoute(
       path: '/business-feed',
-      builder: (context, state) => const BusinessFeedScreen(),
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: BusinessFeedScreen()),
     ),
     GoRoute(
       path: '/clients',
-      builder: (context, state) => const MainShell(initialIndex: 1),
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: MainShell(initialIndex: 1)),
     ),
     GoRoute(
       path: '/clients/new',
-      builder: (context, state) => const AddClientScreen(),
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: AddClientScreen()),
     ),
     GoRoute(
       path: '/tasks',
-      builder: (context, state) => const MainShell(initialIndex: 4),
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: MainShell(initialIndex: 4)),
     ),
     GoRoute(
       path: '/work',
-      builder: (context, state) => const MainShell(initialIndex: 2),
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: MainShell(initialIndex: 2)),
     ),
     GoRoute(
       path: '/bookings/new',
-      builder: (context, state) => const AddAppointmentScreen(),
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: AddAppointmentScreen()),
     ),
     GoRoute(
       path: '/payments',
-      builder: (context, state) => const MainShell(initialIndex: 3),
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: MainShell(initialIndex: 3)),
     ),
     GoRoute(
       path: '/notifications',
-      builder: (context, state) => const NotificationsScreen(),
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: NotificationsScreen()),
     ),
     GoRoute(
       path: '/notes',
-      builder: (context, state) => const MainShell(initialIndex: 5),
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: MainShell(initialIndex: 5)),
     ),
     GoRoute(
       path: '/booking-requests',
-      builder: (context, state) => const BookingRequestsScreen(),
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: BookingRequestsScreen()),
     ),
     GoRoute(
       path: '/calendar-sync',
-      builder: (context, state) => const CalendarSyncScreen(),
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: CalendarSyncScreen()),
     ),
     GoRoute(
       path: '/import-data',
-      builder: (context, state) => const ImportDataScreen(),
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: ImportDataScreen()),
     ),
     GoRoute(
       path: '/p/:handle',
@@ -158,11 +212,22 @@ final _router = GoRouter(
         );
       },
     ),
+    GoRoute(
+      path: '/:handle',
+      redirect: (context, state) {
+        final handle = state.pathParameters['handle'] ?? '';
+        return isReservedPublicHandle(handle) ? '/' : null;
+      },
+      builder: (context, state) =>
+          PublicProfileScreen(handle: state.pathParameters['handle'] ?? ''),
+    ),
   ],
 );
 
 class AuthGate extends ConsumerStatefulWidget {
-  const AuthGate({super.key});
+  final Widget authenticatedChild;
+
+  const AuthGate({super.key, this.authenticatedChild = const MainShell()});
 
   @override
   ConsumerState<AuthGate> createState() => _AuthGateState();
@@ -187,14 +252,16 @@ class _AuthGateState extends ConsumerState<AuthGate> {
           });
         }
         if (session == null) return const AuthScreen();
-        return const WorkspaceGate();
+        return WorkspaceGate(child: widget.authenticatedChild);
       },
     );
   }
 }
 
 class WorkspaceGate extends ConsumerWidget {
-  const WorkspaceGate({super.key});
+  final Widget child;
+
+  const WorkspaceGate({super.key, this.child = const MainShell()});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -213,10 +280,10 @@ class WorkspaceGate extends ConsumerWidget {
       data: (ws) {
         if (ws == null) return const OnboardingScreen();
         const seedDemoData = bool.fromEnvironment('SEED_DEMO_DATA');
-        if (seedDemoData) {
+        if (kDebugMode && seedDemoData) {
           ref.watch(debugDemoSeedProvider);
         }
-        return const MainShell();
+        return child;
       },
     );
   }
@@ -232,45 +299,121 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   late int _currentIndex;
+  int? _secondaryReturnIndex;
   FinanceInitialFocus _financeInitialFocus = FinanceInitialFocus.top;
+  late final List<Widget?> _destinations;
+  late final List<ScrollController> _navigationScrollControllers;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _destinations = List<Widget?>.filled(7, null);
+    _navigationScrollControllers = List<ScrollController>.generate(
+      7,
+      (_) => ScrollController(),
+    );
+    _ensureDestination(_currentIndex);
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _navigationScrollControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _ensureDestination(int index) {
+    _destinations[index] ??= switch (index) {
+      0 => DashboardScreen(
+        onNavigate: _navigateTo,
+        onOpenMoneyFollowUps: () =>
+            _navigateTo(3, financeFocus: FinanceInitialFocus.followUps),
+      ),
+      1 => const ClientsScreen(),
+      2 => const AppointmentsScreen(),
+      3 => FinanceScreen(initialFocus: _financeInitialFocus),
+      4 => const TasksScreen(),
+      5 => const NotesScreen(showBackButton: false),
+      6 => MoreScreen(
+        onOpenMoney: () => _navigateTo(3),
+        onOpenTasks: () => _navigateTo(4),
+        onOpenNotes: () => _navigateTo(5),
+      ),
+      _ => const SizedBox.shrink(),
+    };
+  }
+
+  Object _navigationScopeId(int index) => 'main-shell-$index';
+
+  bool _isSecondaryWorkspace(int index) => index >= 3 && index <= 5;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    WorkloopNavigationAssistRegion.activateScope(
+      context,
+      _navigationScopeId(_currentIndex),
+      controller: _navigationScrollControllers[_currentIndex],
+    );
+  }
+
+  void _navigateTo(
+    int index, {
+    FinanceInitialFocus financeFocus = FinanceInitialFocus.top,
+  }) {
+    if (index == 3 && _financeInitialFocus != financeFocus) {
+      _financeInitialFocus = financeFocus;
+      _destinations[3] = FinanceScreen(initialFocus: financeFocus);
+    }
+    _ensureDestination(index);
+    if (index == _currentIndex) return;
+    setState(() {
+      if (_isSecondaryWorkspace(index)) {
+        _secondaryReturnIndex ??= _currentIndex;
+      } else {
+        _secondaryReturnIndex = null;
+      }
+      _currentIndex = index;
+    });
+    WorkloopNavigationAssistRegion.activateScope(
+      context,
+      _navigationScopeId(index),
+      controller: _navigationScrollControllers[index],
+    );
+  }
+
+  void _returnFromSecondaryWorkspace() {
+    final returnIndex = _secondaryReturnIndex;
+    if (returnIndex == null) return;
+    _navigateTo(returnIndex);
   }
 
   @override
   Widget build(BuildContext context) {
     final tokens = SlateTheme.of(context);
+    final destinationChildren = List<Widget>.generate(
+      _destinations.length,
+      (index) => PrimaryScrollController(
+        controller: _navigationScrollControllers[index],
+        child: WorkloopNavigationScope(
+          id: _navigationScopeId(index),
+          child: _destinations[index] ?? const SizedBox.shrink(),
+        ),
+      ),
+    );
     return Scaffold(
       backgroundColor: tokens.background,
       extendBody: true,
-      body: AnimatedSwitcher(
-        duration: AppMotion.standard,
-        child: IndexedStack(
-          key: const ValueKey('main-shell-tabs'),
-          index: _currentIndex,
-          children: [
-            DashboardScreen(
-              onNavigate: (i) => setState(() => _currentIndex = i),
-              onOpenMoneyFollowUps: () => setState(() {
-                _financeInitialFocus = FinanceInitialFocus.followUps;
-                _currentIndex = 3;
-              }),
-            ),
-            const ClientsScreen(),
-            const AppointmentsScreen(),
-            FinanceScreen(initialFocus: _financeInitialFocus),
-            const TasksScreen(),
-            const NotesScreen(showBackButton: false),
-            MoreScreen(
-              onOpenMoney: () => setState(() => _currentIndex = 3),
-              onOpenTasks: () => setState(() => _currentIndex = 4),
-              onOpenNotes: () => setState(() => _currentIndex = 5),
-            ),
-          ],
-        ),
+      body: WorkloopInteractiveWorkspaceStack(
+        key: const ValueKey('main-shell-tabs'),
+        index: _currentIndex,
+        previousIndex: _isSecondaryWorkspace(_currentIndex)
+            ? _secondaryReturnIndex
+            : null,
+        onBack: _returnFromSecondaryWorkspace,
+        children: destinationChildren,
       ),
       bottomNavigationBar: WorkloopBottomNav(
         currentIndex: _currentIndex <= 2 ? _currentIndex : 3,
@@ -291,18 +434,15 @@ class _MainShellState extends State<MainShell> {
             color: AppColors.accentPrimary,
           ),
           WorkloopNavItem(
-            label: 'More',
-            icon: LucideIcons.menu,
+            label: 'Tools',
+            icon: LucideIcons.layoutGrid,
             color: AppColors.accentPrimary,
           ),
         ],
         onTap: (i) {
           final destination = i == 3 ? 6 : i;
           if (destination == _currentIndex) return;
-          setState(() {
-            _financeInitialFocus = FinanceInitialFocus.top;
-            _currentIndex = destination;
-          });
+          _navigateTo(destination);
         },
       ),
     );
@@ -346,7 +486,7 @@ class _WorkspaceErrorScreen extends StatelessWidget {
                     style: TextStyle(
                       color: tokens.textPrimary,
                       fontSize: 22,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
@@ -404,7 +544,7 @@ class _LoadingScreen extends StatelessWidget {
       body: Center(
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.92, end: 1),
-          duration: AppMotion.deliberate,
+          duration: AppMotion.responsive(context, AppMotion.deliberate),
           curve: AppMotion.curve,
           builder: (context, value, child) {
             return Opacity(
@@ -428,7 +568,7 @@ class _LoadingScreen extends StatelessWidget {
                 'Opening Workloop',
                 style: TextStyle(
                   color: tokens.textTertiary,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],

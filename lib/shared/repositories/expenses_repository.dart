@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/slate_models.dart';
+import 'repository_pagination.dart';
 import 'supabase_client_provider.dart';
 
 final expensesRepositoryProvider = Provider<ExpensesRepository>((ref) {
@@ -14,17 +15,20 @@ class ExpensesRepository {
 
   Future<List<Expense>> list(String workspaceId) async {
     try {
-      final rows = await _client
-          .from('expenses')
-          .select()
-          .eq('workspace_id', workspaceId)
-          .order('expense_date', ascending: false)
-          .order('created_at', ascending: false);
-      return rows
-          .map<Expense>(
-            (row) => Expense.fromMap(Map<String, dynamic>.from(row)),
-          )
-          .toList();
+      final rows = await fetchAllRepositoryPages<Map<String, dynamic>>(
+        loadPage: (from, to) async {
+          final page = await _client
+              .from('expenses')
+              .select()
+              .eq('workspace_id', workspaceId)
+              .order('expense_date', ascending: false)
+              .order('created_at', ascending: false)
+              .order('id', ascending: true)
+              .range(from, to);
+          return List<Map<String, dynamic>>.from(page);
+        },
+      );
+      return rows.map<Expense>(Expense.fromMap).toList();
     } on PostgrestException catch (error) {
       if (_tableMissing(error)) return [];
       rethrow;
@@ -63,11 +67,18 @@ class ExpensesRepository {
           'notes': notes?.trim().isEmpty ?? true ? null : notes!.trim(),
           'updated_at': DateTime.now().toIso8601String(),
         })
-        .eq('id', expenseId);
+        .eq('id', expenseId)
+        .select('id')
+        .single();
   }
 
   Future<void> delete(String expenseId) async {
-    await _client.from('expenses').delete().eq('id', expenseId);
+    await _client
+        .from('expenses')
+        .delete()
+        .eq('id', expenseId)
+        .select('id')
+        .single();
   }
 
   bool _tableMissing(PostgrestException error) {

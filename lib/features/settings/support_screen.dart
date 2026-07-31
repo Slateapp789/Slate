@@ -1,16 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/workloop_app_info.dart';
 import '../../shared/widgets/slate_ui.dart';
+import 'legal_document_screen.dart';
 
 class SupportScreen extends StatelessWidget {
   const SupportScreen({super.key});
-
-  static const _supportEmail = 'support@workloop.app';
 
   @override
   Widget build(BuildContext context) {
@@ -28,26 +28,9 @@ class SupportScreen extends StatelessWidget {
                 AppSpacing.xxl,
               ),
               children: [
-                Row(
-                  children: [
-                    WorkloopIconButton(
-                      icon: LucideIcons.chevronLeft,
-                      semanticLabel: 'Back to settings',
-                      onTap: () => Navigator.pop(context),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    const Expanded(
-                      child: Text(
-                        'Help & support',
-                        style: TextStyle(
-                          color: AppColors.t1,
-                          fontSize: 26,
-                          height: 1.05,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
+                const WorkloopRouteHeader(
+                  title: 'Help & support',
+                  backSemanticLabel: 'Back to settings',
                 ),
                 const SizedBox(height: AppSpacing.xxl),
                 const WorkloopSectionHeader(label: 'Get help'),
@@ -68,25 +51,41 @@ class SupportScreen extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xxl),
                 const WorkloopSectionHeader(label: 'Privacy'),
                 const SizedBox(height: AppSpacing.xs),
-                const WorkloopSurface(
-                  padding: EdgeInsets.all(AppSpacing.md),
-                  child: Text(
-                    'Workloop keeps business records inside your workspace. Imports are reviewed before saving, and account export and deletion controls are available under Account settings.',
-                    style: TextStyle(
-                      color: AppColors.t2,
-                      fontSize: 14,
-                      height: 1.45,
+                _SupportRow(
+                  icon: LucideIcons.shieldCheck,
+                  title: 'Privacy policy',
+                  subtitle: 'Read how Workloop handles and protects data.',
+                  onTap: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const LegalDocumentScreen(
+                        document: WorkloopLegalDocument.privacy,
+                      ),
+                    ),
+                  ),
+                ),
+                _SupportRow(
+                  icon: LucideIcons.fileText,
+                  title: 'Terms of use',
+                  subtitle: 'Read the agreement for using Workloop.',
+                  showDivider: false,
+                  onTap: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const LegalDocumentScreen(
+                        document: WorkloopLegalDocument.terms,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xxl),
-                const Center(
+                Center(
                   child: Text(
-                    'Workloop 1.0.0 (1)',
+                    'Workloop ${WorkloopAppInfo.versionLabel}',
                     style: TextStyle(
                       color: AppColors.t4,
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
@@ -102,14 +101,16 @@ class SupportScreen extends StatelessWidget {
     SlateHaptics.action();
     final uri = Uri(
       scheme: 'mailto',
-      path: _supportEmail,
+      path: WorkloopAppInfo.supportEmail,
       queryParameters: {
         'subject': 'Workloop support',
         'body': '${_diagnostics()}\n\nPlease describe what happened:\n',
       },
     );
     if (await launchUrl(uri)) return;
-    await Clipboard.setData(const ClipboardData(text: _supportEmail));
+    await Clipboard.setData(
+      const ClipboardData(text: WorkloopAppInfo.supportEmail),
+    );
     if (!context.mounted) return;
     ScaffoldMessenger.of(
       context,
@@ -126,7 +127,7 @@ class SupportScreen extends StatelessWidget {
   }
 
   String _diagnostics() {
-    return 'Workloop 1.0.0 (1)\nPlatform: ${defaultTargetPlatform.name}\nMode: ${kReleaseMode
+    return 'Workloop ${WorkloopAppInfo.versionLabel}\nPlatform: ${defaultTargetPlatform.name}\nMode: ${kReleaseMode
         ? 'release'
         : kProfileMode
         ? 'profile'
@@ -170,7 +171,7 @@ class _SupportRow extends StatelessWidget {
         style: TextStyle(
           color: tokens.textPrimary,
           fontSize: 15,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(

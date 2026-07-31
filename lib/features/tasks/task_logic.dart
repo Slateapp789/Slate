@@ -122,29 +122,7 @@ _TaskCounts _countsForTasks(List<SlateTask> tasks) {
 }
 
 int _taskSort(SlateTask a, SlateTask b) {
-  if (a.status != b.status) {
-    if (a.status == 'done') return 1;
-    if (b.status == 'done') return -1;
-  }
-  final aDate = a.dueDate;
-  final bDate = b.dueDate;
-  if (aDate != null && bDate != null) {
-    final dateCompare = aDate.compareTo(bDate);
-    if (dateCompare != 0) return dateCompare;
-  } else if (aDate != null) {
-    return -1;
-  } else if (bDate != null) {
-    return 1;
-  }
-  return _priorityRank(a.priority).compareTo(_priorityRank(b.priority));
-}
-
-int _priorityRank(String priority) {
-  return switch (priority) {
-    'high' => 0,
-    'medium' => 1,
-    _ => 2,
-  };
+  return compareTasksForDisplay(a, b);
 }
 
 Color _priorityColor(String priority) {
@@ -189,31 +167,19 @@ int _viewCount(_TaskView view, _TaskCounts counts) {
 }
 
 bool _isOverdueTask(SlateTask task) {
-  final due = task.dueDate;
-  if (due == null || task.status == 'done') return false;
-  return _dateOnly(due).isBefore(_dateOnly(DateTime.now()));
+  return taskDateBucketFor(task) == TaskDateBucket.overdue;
 }
 
 bool _isTodayTask(SlateTask task) {
-  final due = task.dueDate;
-  if (due == null || task.status == 'done') return false;
-  final today = _dateOnly(DateTime.now());
-  return _dateOnly(due) == today;
+  return taskDateBucketFor(task) == TaskDateBucket.today;
 }
 
 bool _isUpcomingTask(SlateTask task) {
-  final due = task.dueDate;
-  if (due == null || task.status == 'done') return false;
-  return _dateOnly(due).isAfter(_dateOnly(DateTime.now()));
+  return taskDateBucketFor(task) == TaskDateBucket.upcoming;
 }
 
 bool _isWithinWeekTask(SlateTask task) {
-  final due = task.dueDate;
-  if (due == null) return false;
-  final today = _dateOnly(DateTime.now());
-  final week = today.add(const Duration(days: 7));
-  final dueDay = _dateOnly(due);
-  return dueDay.isAfter(today) && !dueDay.isAfter(week);
+  return taskIsWithinNextSevenDays(task);
 }
 
 bool _isOverdue(DateTime dt) =>

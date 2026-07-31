@@ -1,5 +1,8 @@
 # Slate Code, Product, and Platform Audit
 
+> Historical snapshot from 2026-06-01. It does not describe the current
+> Workloop release candidate; use `CurrentState.md` and `LaunchReadiness.md`.
+
 Date: 2026-06-01
 Scope: Read-only audit of the Flutter + Supabase codebase, SQL contracts, docs, tests, platform config, dependency posture, and a local web smoke test. No app code was changed.
 Method: Static source review, `flutter analyze`, `flutter test --dart-define-from-file=.env`, local web browser smoke test, Supabase live advisors/table metadata, and dependency/config checks.

@@ -36,8 +36,13 @@ The public booking/profile Edge Functions are deployed with JWT verification ena
 ## Account Deletion Boundary
 
 - The app no longer writes deletion requests directly to the database.
-- Deletion requests go through the `request-account-deletion` Edge Function, which verifies the signed-in user and workspace membership before creating or refreshing an open request.
-- Destructive completion goes through the `complete-account-deletion` Edge Function. It deletes the workspace rows through cascade, deletes the Supabase Auth user through the admin API, and writes a non-identifying audit row with a hashed email.
+- Deletion requests go through the `request-account-deletion` Edge Function,
+  which verifies the signed-in user is the workspace's sole member before
+  creating or refreshing an open request.
+- Destructive completion goes through the `complete-account-deletion` Edge
+  Function. It revalidates sole ownership before claiming the request, deletes
+  the workspace rows through cascade, deletes the Supabase Auth user through
+  the admin API, and writes a non-identifying audit row with a hashed email.
 - `complete-account-deletion` requires an `ACCOUNT_DELETION_ADMIN_TOKEN` Edge Function secret. Do not put this token in Flutter, `.env`, docs, commits, screenshots, or logs.
 - `account_deletion_audit` has RLS enabled with an explicit deny-all client policy. It is service-role/admin-only.
 

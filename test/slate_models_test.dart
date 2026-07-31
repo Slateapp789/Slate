@@ -286,7 +286,7 @@ void main() {
   });
 
   test('calendar export builds valid ICS events', () {
-    final ics = buildSlateIcs([
+    final ics = buildWorkloopIcs([
       {
         'id': 'appointment-1',
         'title': 'Cut, colour',

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/business_feed_item.dart';
 import '../models/slate_models.dart';
 import '../repositories/slate_repositories.dart';
+import '../utils/currency_format.dart';
 import 'appointments_provider.dart';
 import 'clients_provider.dart';
 import 'finance_provider.dart';
@@ -23,31 +24,18 @@ final businessFeedProvider = FutureProvider<List<BusinessFeedItem>>((
   final financeFuture = ref.watch(financeSummaryProvider.future);
 
   final workspaceId = await workspaceIdFuture;
-  final appointments = await safeBusinessFeedSource(
-    appointmentsFuture,
-    const <Map<String, dynamic>>[],
-  );
-  final payments = await safeBusinessFeedSource(
-    paymentsFuture,
-    const <Payment>[],
-  );
-  final expenses = await safeBusinessFeedSource(
-    expensesFuture,
-    const <Expense>[],
-  );
-  final tasks = await safeBusinessFeedSource(tasksFuture, const <SlateTask>[]);
-  final notes = await safeBusinessFeedSource(notesFuture, const <SlateNote>[]);
-  final clients = await safeBusinessFeedSource(clientsFuture, const <Client>[]);
-  final finance = await safeBusinessFeedSource(
-    financeFuture,
-    _emptyFinanceSummary(),
-  );
+  final appointments = await appointmentsFuture;
+  final payments = await paymentsFuture;
+  final expenses = await expensesFuture;
+  final tasks = await tasksFuture;
+  final notes = await notesFuture;
+  final clients = await clientsFuture;
+  final finance = await financeFuture;
   var bookingRequests = <BookingRequest>[];
   if (workspaceId != null && ref.mounted) {
-    bookingRequests = await safeBusinessFeedSource(
-      ref.read(profileRepositoryProvider).bookingRequests(workspaceId),
-      const <BookingRequest>[],
-    );
+    bookingRequests = await ref
+        .read(profileRepositoryProvider)
+        .bookingRequests(workspaceId);
   }
 
   return buildBusinessFeedItems(
@@ -73,10 +61,10 @@ List<BusinessFeedItem> buildBusinessFeedItems({
   required FinanceSummary finance,
   DateTime? now,
 }) {
-  final current = now ?? DateTime.now();
+  final current = (now ?? DateTime.now()).toLocal();
   final today = _startOfDay(current);
-  final tomorrow = today.add(const Duration(days: 1));
-  final weekAgo = today.subtract(const Duration(days: 7));
+  final tomorrow = addBusinessCalendarDays(today, 1);
+  final weekAgo = addBusinessCalendarDays(today, -7);
   final typedAppointments = appointments
       .map(Appointment.fromMap)
       .where((item) => item.startTime.year > 1970)
@@ -111,8 +99,8 @@ List<BusinessFeedItem> buildBusinessFeedItems({
       .where((task) => _startOfDay(task.dueDate!).isBefore(today))
       .toList();
   final overduePayments = payments.where((payment) {
-    return payment.status != 'paid' &&
-        _startOfDay(payment.dueDate ?? payment.issueDate).isBefore(today);
+    return moneyStatusFor(payment, now: current) == MoneyStatus.overdue &&
+        outstandingAmountFor(payment) > 0;
   }).toList();
   final pendingRequests = bookingRequests
       .where((request) => request.status == 'pending')
@@ -159,7 +147,7 @@ List<BusinessFeedItem> buildBusinessFeedItems({
   );
 
   _addBookingItems(items, typedAppointments, current, today, tomorrow);
-  _addPaymentItems(items, payments, current, today, weekAgo);
+  _addPaymentItems(items, payments, today, weekAgo);
   _addExpenseItems(items, expenses, weekAgo, today);
   _addTaskItems(items, tasks, today);
   _addNoteItems(items, notes, weekAgo);
@@ -231,14 +219,15 @@ void _addBookingItems(
 void _addPaymentItems(
   List<BusinessFeedItem> items,
   List<Payment> payments,
-  DateTime current,
   DateTime today,
   DateTime weekAgo,
 ) {
   for (final payment in payments) {
     final due = _startOfDay(payment.dueDate ?? payment.issueDate);
     if (payment.status == 'paid') {
-      final paidDay = _startOfDay(payment.issueDate);
+      final received = receivedAmountFor(payment);
+      if (received <= 0) continue;
+      final paidDay = _startOfDay(payment.receivedDate);
       if (paidDay.isBefore(weekAgo)) continue;
       items.add(
         BusinessFeedItem(
@@ -246,8 +235,8 @@ void _addPaymentItems(
           type: BusinessFeedItemType.paymentReceived,
           title: 'Paid payment',
           subtitle:
-              '£${payment.total.toStringAsFixed(0)}${payment.clientName == null ? '' : ' from ${payment.clientName}'} · Business date ${_businessDateLabel(paidDay, today)}',
-          timestamp: payment.issueDate,
+              '${formatPounds(received)}${payment.clientName == null ? '' : ' from ${payment.clientName}'} · Business date ${_businessDateLabel(paidDay, today)}',
+          timestamp: payment.receivedDate,
           priority: BusinessFeedPriority.positive,
           sourceType: BusinessFeedSourceType.payment,
           sourceId: payment.id,
@@ -260,6 +249,8 @@ void _addPaymentItems(
       continue;
     }
 
+    final outstanding = outstandingAmountFor(payment);
+    if (outstanding <= 0) continue;
     if (due.isBefore(today)) {
       final days = today.difference(due).inDays;
       items.add(
@@ -268,7 +259,7 @@ void _addPaymentItems(
           type: BusinessFeedItemType.invoiceOverdue,
           title: 'Invoice overdue',
           subtitle:
-              '£${payment.total.toStringAsFixed(0)}${payment.clientName == null ? '' : ' from ${payment.clientName}'} was due $days day${days == 1 ? '' : 's'} ago',
+              '${formatPounds(outstanding)}${payment.clientName == null ? '' : ' from ${payment.clientName}'} was due $days day${days == 1 ? '' : 's'} ago',
           timestamp: due,
           priority: BusinessFeedPriority.attention,
           sourceType: BusinessFeedSourceType.payment,
@@ -279,14 +270,14 @@ void _addPaymentItems(
           moduleKey: 'money',
         ),
       );
-    } else if (!due.isAfter(today.add(const Duration(days: 7)))) {
+    } else if (!due.isAfter(addBusinessCalendarDays(today, 7))) {
       items.add(
         BusinessFeedItem(
           id: 'payment-unpaid-${payment.id}',
           type: BusinessFeedItemType.invoiceUnpaid,
           title: 'Payment still open',
           subtitle:
-              '£${payment.total.toStringAsFixed(0)}${payment.clientName == null ? '' : ' from ${payment.clientName}'} due ${_relativeDay(due, today)}',
+              '${formatPounds(outstanding)}${payment.clientName == null ? '' : ' from ${payment.clientName}'} due ${_relativeDay(due, today)}',
           timestamp: due,
           priority: BusinessFeedPriority.normal,
           sourceType: BusinessFeedSourceType.payment,
@@ -317,7 +308,7 @@ void _addExpenseItems(
         type: BusinessFeedItemType.expenseRecorded,
         title: 'Expense logged',
         subtitle:
-            '£${expense.amount.toStringAsFixed(0)} · ${expense.category} · Business date ${_businessDateLabel(expense.expenseDate, today)}',
+            '${formatPounds(expense.amount)} · ${expense.category} · Business date ${_businessDateLabel(expense.expenseDate, today)}',
         timestamp: expense.expenseDate,
         priority: BusinessFeedPriority.normal,
         sourceType: BusinessFeedSourceType.expense,
@@ -514,7 +505,7 @@ void _addWeeklyProgressItem(
       type: BusinessFeedItemType.weeklyTargetProgress,
       title: '$percent% of weekly target reached',
       subtitle:
-          '£${finance.thisWeekPaid.toStringAsFixed(0)} of £${finance.weeklyTarget.toStringAsFixed(0)}',
+          '${formatPounds(finance.thisWeekPaid)} of ${formatPounds(finance.weeklyTarget)}',
       timestamp: current,
       priority: finance.weeklyProgress >= 1
           ? BusinessFeedPriority.positive
@@ -536,7 +527,7 @@ String _dailySummaryTitle({
 }) {
   final parts = <String>[
     '$appointmentCount booking${appointmentCount == 1 ? '' : 's'}',
-    '£${expectedToday.toStringAsFixed(0)} expected',
+    '${formatPounds(expectedToday)} expected',
     '$dueTaskCount task${dueTaskCount == 1 ? '' : 's'} due',
   ];
   if (overduePaymentCount > 0) {
@@ -565,13 +556,9 @@ List<BusinessFeedItem> _dedupeById(List<BusinessFeedItem> items) {
   return items.where((item) => seen.add(item.id)).toList();
 }
 
-DateTime _startOfDay(DateTime date) =>
-    DateTime(date.year, date.month, date.day);
+DateTime _startOfDay(DateTime date) => startOfDay(date);
 
-DateTime _startOfWeek(DateTime now) {
-  final monday = now.subtract(Duration(days: now.weekday - 1));
-  return DateTime(monday.year, monday.month, monday.day);
-}
+DateTime _startOfWeek(DateTime now) => startOfWeek(now);
 
 String _dateKey(DateTime date) =>
     '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -582,58 +569,17 @@ String _timeLabel(DateTime date) =>
 String _relativeDay(DateTime date, DateTime today) {
   final day = _startOfDay(date);
   if (day == today) return 'today';
-  if (day == today.subtract(const Duration(days: 1))) return 'yesterday';
-  if (day == today.add(const Duration(days: 1))) return 'tomorrow';
+  if (day == addBusinessCalendarDays(today, -1)) return 'yesterday';
+  if (day == addBusinessCalendarDays(today, 1)) return 'tomorrow';
   return _dateKey(day);
 }
 
 String _businessDateLabel(DateTime date, DateTime today) {
   final day = _startOfDay(date);
   if (day == today) return 'today';
-  if (day == today.subtract(const Duration(days: 1))) return 'yesterday';
-  if (day == today.add(const Duration(days: 1))) return 'tomorrow';
+  if (day == addBusinessCalendarDays(today, -1)) return 'yesterday';
+  if (day == addBusinessCalendarDays(today, 1)) return 'tomorrow';
   return _dateKey(day);
-}
-
-Future<T> safeBusinessFeedSource<T>(Future<T> future, T fallback) async {
-  try {
-    return await future;
-  } catch (_) {
-    return fallback;
-  }
-}
-
-FinanceSummary _emptyFinanceSummary() {
-  return const FinanceSummary(
-    monthlyTarget: 0,
-    weeklyTarget: 0,
-    thisWeekPaid: 0,
-    lastWeekPaid: 0,
-    thisMonthPaid: 0,
-    lastMonthPaid: 0,
-    unpaid: 0,
-    overdue: 0,
-    thisWeekExpenses: 0,
-    thisMonthExpenses: 0,
-    thisWeekNet: 0,
-    thisMonthNet: 0,
-    thisWeekSummary: PeriodMoneySummary(
-      label: 'This week',
-      paid: 0,
-      unpaid: 0,
-      overdue: 0,
-      expenses: 0,
-      categoryTotals: {},
-    ),
-    thisMonthSummary: PeriodMoneySummary(
-      label: 'This month',
-      paid: 0,
-      unpaid: 0,
-      overdue: 0,
-      expenses: 0,
-      categoryTotals: {},
-    ),
-  );
 }
 
 class _FeedNote {

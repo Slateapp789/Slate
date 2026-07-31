@@ -63,7 +63,7 @@ class _TaskContextRow extends StatelessWidget {
           style: const TextStyle(
             fontSize: 12,
             color: AppColors.t3,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const Spacer(),
@@ -76,7 +76,7 @@ class _TaskContextRow extends StatelessWidget {
             style: const TextStyle(
               fontSize: 13,
               color: AppColors.t2,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -88,6 +88,7 @@ class _TaskContextRow extends StatelessWidget {
 class _TaskChecklistPanel extends StatelessWidget {
   final AsyncValue<List<TaskChecklistItem>> items;
   final VoidCallback onAdd;
+  final VoidCallback onRetry;
   final ValueChanged<TaskChecklistItem> onToggle;
   final ValueChanged<TaskChecklistItem> onEdit;
   final ValueChanged<TaskChecklistItem> onDelete;
@@ -95,6 +96,7 @@ class _TaskChecklistPanel extends StatelessWidget {
   const _TaskChecklistPanel({
     required this.items,
     required this.onAdd,
+    required this.onRetry,
     required this.onToggle,
     required this.onEdit,
     required this.onDelete,
@@ -115,7 +117,7 @@ class _TaskChecklistPanel extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   color: AppColors.t1,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -126,9 +128,9 @@ class _TaskChecklistPanel extends StatelessWidget {
         items.when(
           loading: () =>
               const SlateLoadingBlock(height: 48, radius: AppRadius.md),
-          error: (_, __) => const Text(
-            'Checklist could not load',
-            style: TextStyle(color: AppColors.error, fontSize: 12),
+          error: (_, _) => SlateErrorState(
+            message: 'Checklist could not load.',
+            onRetry: onRetry,
           ),
           data: (data) {
             if (data.isEmpty) {
@@ -175,53 +177,90 @@ class _ChecklistRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          GestureDetector(
+          Semantics(
+            button: true,
+            checked: item.completed,
+            label: item.completed
+                ? 'Mark ${item.title} incomplete'
+                : 'Mark ${item.title} complete',
             onTap: onToggle,
-            child: AnimatedContainer(
-              duration: AppMotion.standard,
-              curve: AppMotion.curve,
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: item.completed ? AppColors.green : Colors.transparent,
-                border: Border.all(
-                  color: item.completed ? AppColors.green : AppColors.border,
-                  width: 2,
+            child: ExcludeSemantics(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onToggle,
+                child: SizedBox(
+                  width: AppSpacing.minTouch,
+                  height: AppSpacing.minTouch,
+                  child: Center(
+                    child: AnimatedContainer(
+                      key: ValueKey(Theme.of(context).brightness),
+                      duration: AppMotion.responsive(
+                        context,
+                        AppMotion.standard,
+                      ),
+                      curve: AppMotion.curve,
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: item.completed
+                            ? AppColors.success
+                            : Colors.transparent,
+                        border: Border.all(
+                          color: item.completed
+                              ? AppColors.success
+                              : AppColors.border,
+                          width: 2,
+                        ),
+                      ),
+                      child: item.completed
+                          ? const Icon(
+                              Icons.check_rounded,
+                              color: AppColors.bg,
+                              size: 13,
+                            )
+                          : null,
+                    ),
+                  ),
                 ),
               ),
-              child: item.completed
-                  ? const Icon(
-                      Icons.check_rounded,
-                      color: Colors.white,
-                      size: 13,
-                    )
-                  : null,
             ),
           ),
-          const SizedBox(width: 10),
           Expanded(
-            child: GestureDetector(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               onTap: onEdit,
-              child: Text(
-                item.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: item.completed ? AppColors.t3 : AppColors.t1,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  decoration: item.completed
-                      ? TextDecoration.lineThrough
-                      : null,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minHeight: AppSpacing.minTouch,
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: item.completed ? AppColors.t3 : AppColors.t1,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      decoration: item.completed
+                          ? TextDecoration.lineThrough
+                          : null,
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            onPressed: onDelete,
-            icon: const Icon(LucideIcons.x, size: 15, color: AppColors.t3),
+          Tooltip(
+            message: 'Remove ${item.title} from checklist',
+            child: WorkloopIconButton(
+              icon: LucideIcons.x,
+              semanticLabel: 'Remove ${item.title} from checklist',
+              size: AppSpacing.minTouch,
+              onTap: onDelete,
+            ),
           ),
         ],
       ),

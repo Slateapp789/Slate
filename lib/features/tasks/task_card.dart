@@ -64,31 +64,52 @@ class _TaskCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
+              Semantics(
+                button: true,
+                checked: isDone,
+                label: isDone
+                    ? 'Reopen ${task.title}'
+                    : 'Complete ${task.title}',
                 onTap: isDone ? onReopen : onCompleteRequest,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 2, right: 12, bottom: 18),
-                  child: AnimatedContainer(
-                    duration: AppMotion.standard,
-                    curve: AppMotion.curve,
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDone ? AppColors.success : Colors.transparent,
-                      border: Border.all(
-                        color: isDone ? AppColors.success : AppColors.border,
-                        width: 2,
+                child: ExcludeSemantics(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: isDone ? onReopen : onCompleteRequest,
+                    child: SizedBox(
+                      width: AppSpacing.minTouch,
+                      height: AppSpacing.minTouch,
+                      child: Center(
+                        child: AnimatedContainer(
+                          key: ValueKey(Theme.of(context).brightness),
+                          duration: AppMotion.responsive(
+                            context,
+                            AppMotion.standard,
+                          ),
+                          curve: AppMotion.curve,
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isDone
+                                ? AppColors.success
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: isDone
+                                  ? AppColors.success
+                                  : AppColors.border,
+                              width: 2,
+                            ),
+                          ),
+                          child: isDone
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  color: AppColors.bg,
+                                  size: 14,
+                                )
+                              : null,
+                        ),
                       ),
                     ),
-                    child: isDone
-                        ? const Icon(
-                            Icons.check_rounded,
-                            color: Colors.white,
-                            size: 14,
-                          )
-                        : null,
                   ),
                 ),
               ),
@@ -105,7 +126,7 @@ class _TaskCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 15,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w600,
                               color: isDone ? AppColors.t3 : AppColors.t1,
                               decoration: isDone
                                   ? TextDecoration.lineThrough
@@ -139,7 +160,7 @@ class _TaskCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w400,
                           color: AppColors.t3,
                         ),
                       ),
@@ -194,7 +215,7 @@ class _SwipeBackground extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
               color: color,
             ),
           ),

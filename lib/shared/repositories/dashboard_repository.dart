@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'repository_pagination.dart';
 import 'supabase_client_provider.dart';
 
 final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
@@ -11,65 +12,25 @@ class DashboardRepository {
   final SupabaseClient _client;
   const DashboardRepository(this._client);
 
-  Future<List<Map<String, dynamic>>> invoiceTotals({
-    required String workspaceId,
-    required String status,
-    String? issueDateFrom,
-    List<String>? statuses,
-  }) async {
-    var query = _client
-        .from('invoices')
-        .select('total,amount_paid')
-        .eq('workspace_id', workspaceId);
-    if (statuses != null) {
-      query = query.inFilter('status', statuses);
-    } else {
-      query = query.eq('status', status);
-    }
-    if (issueDateFrom != null) {
-      query = query.gte('issue_date', issueDateFrom);
-    }
-    final rows = await query;
-    return List<Map<String, dynamic>>.from(rows);
-  }
-
-  Future<List<Map<String, dynamic>>> expenseTotals({
-    required String workspaceId,
-    String? expenseDateFrom,
-  }) async {
-    var query = _client
-        .from('expenses')
-        .select('amount')
-        .eq('workspace_id', workspaceId);
-    if (expenseDateFrom != null) {
-      query = query.gte('expense_date', expenseDateFrom);
-    }
-    final rows = await query;
-    return List<Map<String, dynamic>>.from(rows);
-  }
-
-  Future<double> revenueTarget(String workspaceId) async {
-    final settings = await _client
-        .from('workspace_settings')
-        .select('revenue_target')
-        .eq('workspace_id', workspaceId)
-        .maybeSingle();
-    return (settings?['revenue_target'] as num?)?.toDouble() ?? 0;
-  }
-
   Future<List<Map<String, dynamic>>> todayAppointments({
     required String workspaceId,
     required DateTime start,
     required DateTime end,
   }) async {
-    final rows = await _client
-        .from('appointments')
-        .select('*, contacts(name), services(name)')
-        .eq('workspace_id', workspaceId)
-        .gte('start_time', start.toUtc().toIso8601String())
-        .lt('start_time', end.toUtc().toIso8601String())
-        .order('start_time', ascending: true);
-    return List<Map<String, dynamic>>.from(rows);
+    return fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('appointments')
+            .select('*, contacts(name), services(name)')
+            .eq('workspace_id', workspaceId)
+            .gte('start_time', start.toUtc().toIso8601String())
+            .lt('start_time', end.toUtc().toIso8601String())
+            .order('start_time', ascending: true)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
   }
 
   Future<Map<String, dynamic>?> nextAppointment({
@@ -88,31 +49,19 @@ class DashboardRepository {
     return row == null ? null : Map<String, dynamic>.from(row);
   }
 
-  Future<List<Map<String, dynamic>>> overduePayments(String workspaceId) async {
-    final rows = await _client
-        .from('invoices')
-        .select('id,total,amount_paid,contacts(name)')
-        .eq('workspace_id', workspaceId)
-        .eq('status', 'overdue')
-        .order('due_date', ascending: true);
-    return List<Map<String, dynamic>>.from(rows);
-  }
-
-  Future<bool> calendarSyncEnabled(String workspaceId) async {
-    final row = await _client
-        .from('workspace_settings')
-        .select('calendar_sync_enabled')
-        .eq('workspace_id', workspaceId)
-        .maybeSingle();
-    return row?['calendar_sync_enabled'] as bool? ?? false;
-  }
-
   Future<int> pendingBookingRequests(String workspaceId) async {
-    final rows = await _client
-        .from('booking_requests')
-        .select('id')
-        .eq('workspace_id', workspaceId)
-        .eq('status', 'pending');
-    return List<Map<String, dynamic>>.from(rows).length;
+    final rows = await fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('booking_requests')
+            .select('id')
+            .eq('workspace_id', workspaceId)
+            .eq('status', 'pending')
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
+    return rows.length;
   }
 }

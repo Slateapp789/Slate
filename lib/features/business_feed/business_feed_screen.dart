@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/business_feed_item.dart';
 import '../../shared/providers/appointments_provider.dart';
@@ -43,32 +41,22 @@ class _BusinessFeedScreenState extends ConsumerState<BusinessFeedScreen> {
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.pageX,
-                      AppSpacing.lg,
+                      AppSpacing.screenTop,
                       AppSpacing.pageX,
                       0,
                     ),
-                    sliver: SliverToBoxAdapter(
-                      child: Row(
+                    sliver: const SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          WorkloopIconButton(
-                            icon: LucideIcons.chevronLeft,
-                            semanticLabel: 'Back',
-                            onTap: () {
-                              if (Navigator.canPop(context)) {
-                                Navigator.pop(context);
-                                return;
-                              }
-                              context.go('/home');
-                            },
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          const Expanded(
-                            child: WorkloopPageHeader(
-                              icon: LucideIcons.activity,
-                              title: 'Business Feed',
-                              subtitle:
-                                  'What happened and what needs your attention.',
-                              color: AppColors.modHome,
+                          WorkloopRouteHeader(title: 'Business Feed'),
+                          SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'What happened and what needs your attention.',
+                            style: TextStyle(
+                              color: AppColors.t2,
+                              fontSize: 15,
+                              height: 1.35,
                             ),
                           ),
                         ],
@@ -77,7 +65,7 @@ class _BusinessFeedScreenState extends ConsumerState<BusinessFeedScreen> {
                   ),
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.md),
+                      padding: const EdgeInsets.only(top: AppSpacing.xl),
                       child: _FeedFilterRail(
                         selected: _filter,
                         onChanged: (filter) => setState(() => _filter = filter),
@@ -94,8 +82,9 @@ class _BusinessFeedScreenState extends ConsumerState<BusinessFeedScreen> {
                     sliver: SliverToBoxAdapter(
                       child: feed.when(
                         loading: () => _loadingFeed(),
-                        error: (_, __) => const SlateErrorState(
+                        error: (_, _) => SlateErrorState(
                           message: 'Could not load feed',
+                          onRetry: () => _refreshFeed().ignore(),
                         ),
                         data: (items) => BusinessFeedList(
                           items: filteredBusinessFeedItems(items, _filter),

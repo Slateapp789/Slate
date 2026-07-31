@@ -1,6 +1,10 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workloop/shared/models/slate_models.dart';
+import 'package:workloop/shared/providers/clients_provider.dart';
 import 'package:workloop/shared/providers/dashboard_provider.dart';
+import 'package:workloop/shared/providers/finance_provider.dart';
+import 'package:workloop/shared/providers/tasks_provider.dart';
 
 void main() {
   group('dashboard attention composer', () {
@@ -70,22 +74,32 @@ void main() {
         ]),
       );
       expect(items.map((item) => item.title), isNot(contains('Collect £80')));
-      expect(
-        items.map((item) => item.sortTime).toList(),
-        orderedEquals(
-          items.map((item) => item.sortTime).toList()
-            ..sort((a, b) => a.compareTo(b)),
-        ),
-      );
+      expect(items.map((item) => item.type), [
+        DashboardAttentionType.unconfirmedAppointment,
+        DashboardAttentionType.overdueTask,
+        DashboardAttentionType.unpaid,
+        DashboardAttentionType.uncontactedLead,
+      ]);
     });
 
-    test('source fallback returns safe defaults when a source fails', () async {
-      final tasks = await safeDashboardSource<List<SlateTask>>(
-        Future<List<SlateTask>>.error(Exception('tasks unavailable')),
-        const <SlateTask>[],
+    test('provider surfaces a source failure instead of hiding attention', () {
+      final sourceError = StateError('tasks unavailable');
+      final container = ProviderContainer(
+        overrides: [
+          invoicesProvider.overrideWith((ref) async => const <Payment>[]),
+          allTasksProvider.overrideWith((ref) async => throw sourceError),
+          todayAppointmentsProvider.overrideWith(
+            (ref) async => const <Map<String, dynamic>>[],
+          ),
+          clientsProvider.overrideWith((ref) async => const <Client>[]),
+        ],
       );
+      addTearDown(container.dispose);
 
-      expect(tasks, isEmpty);
+      expect(
+        container.read(dashboardAttentionProvider.future),
+        throwsA(same(sourceError)),
+      );
     });
   });
 }

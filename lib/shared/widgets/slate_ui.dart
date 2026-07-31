@@ -4,8 +4,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart'
     show CupertinoDatePicker, CupertinoDatePickerMode;
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 
@@ -14,8 +16,20 @@ class SlateTheme {
 
   static WorkloopThemeTokens of(BuildContext context) {
     return Theme.of(context).extension<WorkloopThemeTokens>() ??
-        WorkloopThemeTokens.light;
+        WorkloopThemeTokens.dark;
   }
+}
+
+/// Pops a routed detail screen when possible and otherwise returns to the
+/// authenticated home route. This keeps top-level deep links from leaving a
+/// back control that silently does nothing.
+void workloopGoBack(BuildContext context, {String fallbackLocation = '/home'}) {
+  final navigator = Navigator.of(context);
+  if (navigator.canPop()) {
+    navigator.pop();
+    return;
+  }
+  context.go(fallbackLocation);
 }
 
 class SlateHaptics {
@@ -23,7 +37,7 @@ class SlateHaptics {
 
   static void _safe(Future<void> Function() feedback) {
     unawaited(
-      Future<void>.sync(feedback).catchError((Object _, StackTrace __) {}),
+      Future<void>.sync(feedback).catchError((Object _, StackTrace _) {}),
     );
   }
 
@@ -196,7 +210,7 @@ Future<WorkloopDraftDecision> showWorkloopDraftConfirmation(
             style: const TextStyle(
               color: AppColors.t1,
               fontSize: 18,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -233,7 +247,7 @@ Future<WorkloopDraftDecision> showWorkloopDraftConfirmation(
                 style: TextStyle(
                   color: AppColors.error,
                   fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -265,7 +279,7 @@ Future<bool> showWorkloopOutsideHoursConfirmation(
             style: TextStyle(
               color: AppColors.t1,
               fontSize: 18,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -325,6 +339,648 @@ class WorkloopKeyboardDismissRegion extends StatelessWidget {
   }
 }
 
+/// Tracks the route currently presented by Workloop's root navigator.
+///
+/// [WorkloopNavigationAssistRegion] uses route identity to target only the
+/// visible screen and to avoid a second pop when Flutter's native iOS gesture
+/// has already completed.
+class WorkloopNavigationObserver extends NavigatorObserver {
+  Route<dynamic>? topRoute;
+
+  @override
+  void didChangeTop(Route<dynamic> topRoute, Route<dynamic>? previousTopRoute) {
+    this.topRoute = topRoute;
+    super.didChangeTop(topRoute, previousTopRoute);
+  }
+}
+
+/// Ensures every vertical [Scrollable] participates in Workloop's app-wide
+/// navigation shortcuts, including scroll views that own an implicit
+/// controller rather than inheriting a [PrimaryScrollController].
+class WorkloopScrollBehavior extends MaterialScrollBehavior {
+  const WorkloopScrollBehavior();
+
+  @override
+  Widget buildScrollbar(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    final decorated = super.buildScrollbar(context, child, details);
+    final controller = details.controller;
+    if (axisDirectionToAxis(details.direction) != Axis.vertical ||
+        controller == null) {
+      return decorated;
+    }
+    return _WorkloopScrollRegistration(
+      controller: controller,
+      child: decorated,
+    );
+  }
+}
+
+/// Identifies retained shell destinations that share the same modal route.
+///
+/// Main-shell tabs live in an [IndexedStack], so route identity alone cannot
+/// distinguish the visible tab from an offstage tab when choosing which scroll
+/// position should return to the top.
+class WorkloopNavigationScope extends InheritedWidget {
+  final Object id;
+
+  const WorkloopNavigationScope({
+    super.key,
+    required this.id,
+    required super.child,
+  });
+
+  static Object? maybeId(BuildContext context) {
+    return context.getInheritedWidgetOfExactType<WorkloopNavigationScope>()?.id;
+  }
+
+  @override
+  bool updateShouldNotify(WorkloopNavigationScope oldWidget) {
+    return id != oldWidget.id;
+  }
+}
+
+/// Adds Workloop's app-wide navigation shortcuts without replacing native
+/// platform navigation.
+///
+/// A short tap in the status/top-edge area returns the visible vertical
+/// scrollable to its beginning. On iOS, clean routes first use Flutter's native
+/// Cupertino gesture; a deliberate right swipe from the left edge falls back
+/// to the route's existing back decision only if that gesture has not changed
+/// the route. Draft-protected screens therefore keep their existing
+/// Save/Discard/Keep editing prompt.
+class WorkloopNavigationAssistRegion extends StatefulWidget {
+  final WorkloopNavigationObserver observer;
+  final Widget child;
+
+  const WorkloopNavigationAssistRegion({
+    super.key,
+    required this.observer,
+    required this.child,
+  });
+
+  static void activateScope(
+    BuildContext context,
+    Object id, {
+    ScrollController? controller,
+  }) {
+    context
+        .getInheritedWidgetOfExactType<_WorkloopNavigationAssistScope>()
+        ?.state
+        .activateScope(id, ModalRoute.of(context), controller);
+  }
+
+  static void registerScrollController(
+    BuildContext context,
+    ScrollController controller,
+  ) {
+    final state = context
+        .getInheritedWidgetOfExactType<_WorkloopNavigationAssistScope>()
+        ?.state;
+    if (state == null) return;
+    state.registerScrollController(
+      controller,
+      ModalRoute.of(context),
+      WorkloopNavigationScope.maybeId(context),
+    );
+  }
+
+  static void registerBackAction(
+    BuildContext context,
+    Object registration,
+    VoidCallback action,
+  ) {
+    context
+        .getInheritedWidgetOfExactType<_WorkloopNavigationAssistScope>()
+        ?.state
+        .registerBackAction(registration, action, ModalRoute.of(context));
+  }
+
+  static void unregisterBackAction(BuildContext context, Object registration) {
+    context
+        .getInheritedWidgetOfExactType<_WorkloopNavigationAssistScope>()
+        ?.state
+        .unregisterBackAction(registration);
+  }
+
+  @override
+  State<WorkloopNavigationAssistRegion> createState() =>
+      _WorkloopNavigationAssistRegionState();
+}
+
+class _WorkloopNavigationAssistRegionState
+    extends State<WorkloopNavigationAssistRegion> {
+  static const _nativeNavigationChannel = MethodChannel(
+    'com.ismaeel.workloop/navigation',
+  );
+  final Map<Route<dynamic>, Set<ScrollController>> _routeControllers = {};
+  final Map<Object, Set<ScrollController>> _scopedControllers = {};
+  final Map<Object, _WorkloopScrollTarget> _scrollRegistrations = {};
+  final Map<Object, _WorkloopBackAction> _backActions = {};
+  Object? _activeScope;
+  Route<dynamic>? _activeScopeRoute;
+  int? _pointer;
+  Offset? _pointerDown;
+  DateTime? _pointerDownAt;
+  Route<dynamic>? _backSwipeRoute;
+
+  @override
+  void initState() {
+    super.initState();
+    _nativeNavigationChannel.setMethodCallHandler(_handleNativeNavigation);
+  }
+
+  @override
+  void dispose() {
+    _nativeNavigationChannel.setMethodCallHandler(null);
+    super.dispose();
+  }
+
+  Future<void> _handleNativeNavigation(MethodCall call) async {
+    if (call.method == 'scrollToTop' && mounted) {
+      _scrollVisiblePositionsToTop();
+    }
+  }
+
+  void activateScope(
+    Object id,
+    Route<dynamic>? route,
+    ScrollController? controller,
+  ) {
+    _activeScope = id;
+    _activeScopeRoute = route;
+    if (controller != null) {
+      _scopedControllers.putIfAbsent(id, () => {}).add(controller);
+    }
+  }
+
+  void registerScrollController(
+    ScrollController controller,
+    Route<dynamic>? route,
+    Object? scopeId,
+  ) {
+    if (route == null) return;
+    if (scopeId == null) {
+      _routeControllers.putIfAbsent(route, () => {}).add(controller);
+    } else {
+      _scopedControllers.putIfAbsent(scopeId, () => {}).add(controller);
+    }
+  }
+
+  void registerScrollable(
+    Object registration,
+    ScrollController controller,
+    Route<dynamic>? route,
+    Object? scopeId,
+    bool Function() isVisible,
+  ) {
+    unregisterScrollable(registration);
+    if (route == null) return;
+    _scrollRegistrations[registration] = _WorkloopScrollTarget(
+      controller: controller,
+      route: route,
+      scopeId: scopeId,
+      isVisible: isVisible,
+    );
+    registerScrollController(controller, route, scopeId);
+  }
+
+  void unregisterScrollable(Object registration) {
+    final target = _scrollRegistrations.remove(registration);
+    if (target == null) return;
+    final controllers = target.scopeId == null
+        ? _routeControllers[target.route]
+        : _scopedControllers[target.scopeId];
+    final stillRegistered = _scrollRegistrations.values.any(
+      (candidate) =>
+          identical(candidate.controller, target.controller) &&
+          identical(candidate.route, target.route) &&
+          candidate.scopeId == target.scopeId,
+    );
+    if (!stillRegistered) controllers?.remove(target.controller);
+    if (controllers?.isEmpty ?? false) {
+      if (target.scopeId == null) {
+        _routeControllers.remove(target.route);
+      } else {
+        _scopedControllers.remove(target.scopeId);
+      }
+    }
+  }
+
+  void registerBackAction(
+    Object registration,
+    VoidCallback action,
+    Route<dynamic>? route,
+  ) {
+    if (route == null) return;
+    _backActions[registration] = _WorkloopBackAction(
+      route: route,
+      action: action,
+    );
+  }
+
+  void unregisterBackAction(Object registration) {
+    _backActions.remove(registration);
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    if (_pointer != null) return;
+    _pointer = event.pointer;
+    _pointerDown = event.position;
+    _pointerDownAt = DateTime.now();
+
+    final route = widget.observer.topRoute;
+    final iosBackCandidate =
+        Theme.of(context).platform == TargetPlatform.iOS &&
+        event.position.dx <= AppSpacing.minTouch &&
+        route is PageRoute<dynamic> &&
+        !route.popGestureEnabled &&
+        (_backActionFor(route) != null ||
+            widget.observer.navigator?.canPop() == true);
+    _backSwipeRoute = iosBackCandidate ? route : null;
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    // Clean routes are owned by Flutter's native Cupertino gesture. Fallback
+    // routes deliberately wait for pointer-up so a cancelled drag never
+    // navigates or opens a draft decision while the user's finger is moving.
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    if (event.pointer != _pointer) return;
+    final start = _pointerDown;
+    final startedAt = _pointerDownAt;
+    final swipeRoute = _backSwipeRoute;
+    _resetPointer();
+    if (start == null || startedAt == null) return;
+
+    final delta = event.position - start;
+    final elapsed = DateTime.now().difference(startedAt);
+    final backSwipe =
+        swipeRoute != null &&
+        identical(swipeRoute, widget.observer.topRoute) &&
+        _isBackSwipe(delta, elapsed);
+    if (backSwipe) {
+      unawaited(_completeBackSwipe(swipeRoute));
+    }
+  }
+
+  bool _isBackSwipe(Offset delta, Duration elapsed) {
+    return delta.dx >= 56 &&
+        delta.dy.abs() <= 72 &&
+        delta.dx > delta.dy.abs() * 1.25 &&
+        elapsed <= const Duration(milliseconds: 1300);
+  }
+
+  void _handleTopTap(TapUpDetails details) {
+    final topTapExtent = MediaQuery.paddingOf(context).top + 72;
+    if (details.globalPosition.dy <= topTapExtent) {
+      _scrollVisiblePositionsToTop();
+    }
+  }
+
+  void _handlePointerCancel(PointerCancelEvent event) {
+    if (event.pointer == _pointer) _resetPointer();
+  }
+
+  void _resetPointer() {
+    _pointer = null;
+    _pointerDown = null;
+    _pointerDownAt = null;
+    _backSwipeRoute = null;
+  }
+
+  void _scrollVisiblePositionsToTop() {
+    final route = widget.observer.topRoute;
+    if (route == null) return;
+    final activeScope = identical(route, _activeScopeRoute)
+        ? _activeScope
+        : null;
+    final visibleControllers = _scrollRegistrations.values
+        .where(
+          (target) =>
+              identical(target.route, route) &&
+              (activeScope == null
+                  ? target.scopeId == null
+                  : target.scopeId == activeScope) &&
+              target.isVisible(),
+        )
+        .map((target) => target.controller)
+        .toSet();
+    if (visibleControllers.isEmpty) {
+      visibleControllers.addAll(
+        activeScope == null
+            ? _routeControllers[route] ?? const <ScrollController>{}
+            : _scopedControllers[activeScope] ?? const <ScrollController>{},
+      );
+    }
+    if (visibleControllers.isEmpty && route is ModalRoute<dynamic>) {
+      final routeContext = route.subtreeContext;
+      if (routeContext != null) {
+        final primary = PrimaryScrollController.maybeOf(routeContext);
+        if (primary != null) visibleControllers.add(primary);
+      }
+    }
+    for (final controller in visibleControllers) {
+      if (!controller.hasClients) continue;
+      final positions = controller.positions
+          .where(
+            (position) =>
+                position.context.storageContext.mounted &&
+                position.hasPixels &&
+                position.hasContentDimensions &&
+                position.pixels > position.minScrollExtent + 0.5,
+          )
+          .toList(growable: false);
+      for (final position in positions) {
+        if (MediaQuery.disableAnimationsOf(context)) {
+          position.jumpTo(position.minScrollExtent);
+        } else {
+          final distance = (position.pixels - position.minScrollExtent).abs();
+          final durationMs = (220 + (distance / 12)).round().clamp(220, 600);
+          unawaited(
+            position
+                .animateTo(
+                  position.minScrollExtent,
+                  duration: Duration(milliseconds: durationMs),
+                  curve: AppMotion.curve,
+                )
+                .catchError((Object _, StackTrace _) {}),
+          );
+        }
+      }
+    }
+  }
+
+  _WorkloopBackAction? _backActionFor(Route<dynamic> route) {
+    for (final action in _backActions.values.toList(growable: false).reversed) {
+      if (identical(action.route, route)) return action;
+    }
+    return null;
+  }
+
+  Future<void> _completeBackSwipe(Route<dynamic> route) async {
+    final navigator = widget.observer.navigator;
+    if (navigator == null) return;
+
+    // Give Flutter's native Cupertino gesture first refusal. If it completes,
+    // route identity changes. If it cancels after crossing Workloop's
+    // deliberate threshold, continue with the same registered back action.
+    await WidgetsBinding.instance.endOfFrame;
+    final nativeGestureDeadline = DateTime.now().add(
+      const Duration(seconds: 3),
+    );
+    while (mounted &&
+        identical(route, widget.observer.topRoute) &&
+        navigator.userGestureInProgress &&
+        DateTime.now().isBefore(nativeGestureDeadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 32));
+    }
+    if (!mounted ||
+        !identical(route, widget.observer.topRoute) ||
+        navigator.userGestureInProgress) {
+      return;
+    }
+
+    SlateHaptics.selection();
+    final registeredAction = _backActionFor(route);
+    if (registeredAction != null) {
+      registeredAction.action();
+      return;
+    }
+    await navigator.maybePop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _WorkloopNavigationAssistScope(
+      state: this,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTapUp: _handleTopTap,
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: _handlePointerDown,
+          onPointerMove: _handlePointerMove,
+          onPointerUp: _handlePointerUp,
+          onPointerCancel: _handlePointerCancel,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkloopScrollTarget {
+  final ScrollController controller;
+  final Route<dynamic> route;
+  final Object? scopeId;
+  final bool Function() isVisible;
+
+  const _WorkloopScrollTarget({
+    required this.controller,
+    required this.route,
+    required this.scopeId,
+    required this.isVisible,
+  });
+}
+
+class _WorkloopBackAction {
+  final Route<dynamic> route;
+  final VoidCallback action;
+
+  const _WorkloopBackAction({required this.route, required this.action});
+}
+
+class _WorkloopScrollRegistration extends StatefulWidget {
+  final ScrollController controller;
+  final Widget child;
+
+  const _WorkloopScrollRegistration({
+    required this.controller,
+    required this.child,
+  });
+
+  @override
+  State<_WorkloopScrollRegistration> createState() =>
+      _WorkloopScrollRegistrationState();
+}
+
+class _WorkloopScrollRegistrationState
+    extends State<_WorkloopScrollRegistration> {
+  _WorkloopNavigationAssistRegionState? _assist;
+  Route<dynamic>? _route;
+  Object? _scopeId;
+  bool _tickerModeEnabled = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _register();
+  }
+
+  @override
+  void didUpdateWidget(_WorkloopScrollRegistration oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) _register();
+  }
+
+  void _register() {
+    final assist = context
+        .getInheritedWidgetOfExactType<_WorkloopNavigationAssistScope>()
+        ?.state;
+    final route = ModalRoute.of(context);
+    final scopeId = WorkloopNavigationScope.maybeId(context);
+    if (identical(_assist, assist) &&
+        identical(_route, route) &&
+        _scopeId == scopeId) {
+      assist?.registerScrollable(
+        this,
+        widget.controller,
+        route,
+        scopeId,
+        _isVisible,
+      );
+      return;
+    }
+    _assist?.unregisterScrollable(this);
+    _assist = assist;
+    _route = route;
+    _scopeId = scopeId;
+    assist?.registerScrollable(
+      this,
+      widget.controller,
+      route,
+      scopeId,
+      _isVisible,
+    );
+  }
+
+  bool _isVisible() {
+    if (!mounted || !_tickerModeEnabled) return false;
+    final renderObject = context.findRenderObject();
+    if (renderObject == null ||
+        !renderObject.attached ||
+        renderObject.paintBounds.isEmpty) {
+      return false;
+    }
+    final visibleRect = MatrixUtils.transformRect(
+      renderObject.getTransformTo(null),
+      renderObject.paintBounds,
+    );
+    final screenRect = Offset.zero & MediaQuery.sizeOf(context);
+    if (!visibleRect.overlaps(screenRect)) return false;
+
+    final paintedRect = visibleRect.intersect(screenRect);
+    final samplePoints = <Offset>[
+      paintedRect.center,
+      Offset(paintedRect.center.dx, paintedRect.top + 1),
+      Offset(paintedRect.center.dx, paintedRect.bottom - 1),
+    ];
+    return samplePoints.any((point) => _hitTestContains(renderObject, point));
+  }
+
+  bool _hitTestContains(RenderObject renderObject, Offset position) {
+    final result = HitTestResult();
+    RendererBinding.instance.hitTestInView(
+      result,
+      position,
+      View.of(context).viewId,
+    );
+    for (final entry in result.path) {
+      final target = entry.target;
+      if (target is! RenderObject) continue;
+      RenderObject? candidate = target;
+      while (candidate != null) {
+        if (identical(candidate, renderObject)) return true;
+        final parent = candidate.parent;
+        candidate = parent is RenderObject ? parent : null;
+      }
+    }
+    return false;
+  }
+
+  @override
+  void dispose() {
+    _assist?.unregisterScrollable(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _tickerModeEnabled = TickerMode.valuesOf(context).enabled;
+    return widget.child;
+  }
+}
+
+class _WorkloopBackActionRegistration extends StatefulWidget {
+  final VoidCallback action;
+  final Widget child;
+
+  const _WorkloopBackActionRegistration({
+    required this.action,
+    required this.child,
+  });
+
+  @override
+  State<_WorkloopBackActionRegistration> createState() =>
+      _WorkloopBackActionRegistrationState();
+}
+
+class _WorkloopBackActionRegistrationState
+    extends State<_WorkloopBackActionRegistration> {
+  _WorkloopNavigationAssistRegionState? _assist;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _register();
+  }
+
+  @override
+  void didUpdateWidget(_WorkloopBackActionRegistration oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _register();
+  }
+
+  void _register() {
+    final assist = context
+        .getInheritedWidgetOfExactType<_WorkloopNavigationAssistScope>()
+        ?.state;
+    if (!identical(_assist, assist)) {
+      _assist?.unregisterBackAction(this);
+      _assist = assist;
+    }
+    assist?.registerBackAction(this, widget.action, ModalRoute.of(context));
+  }
+
+  @override
+  void dispose() {
+    _assist?.unregisterBackAction(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+class _WorkloopNavigationAssistScope extends InheritedWidget {
+  final _WorkloopNavigationAssistRegionState state;
+
+  const _WorkloopNavigationAssistScope({
+    required this.state,
+    required super.child,
+  });
+
+  @override
+  bool updateShouldNotify(_WorkloopNavigationAssistScope oldWidget) {
+    return !identical(state, oldWidget.state);
+  }
+}
+
 class WorkloopPage extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -338,7 +994,7 @@ class WorkloopPage extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.fromLTRB(
       AppSpacing.pageX,
-      AppSpacing.lg,
+      AppSpacing.screenTop,
       AppSpacing.pageX,
       AppSpacing.bottomNavClearance,
     ),
@@ -417,8 +1073,12 @@ class _WorkloopTexturePainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [raised, background, Color.lerp(background, raised, 0.28)!],
-        stops: [0, 0.48, 1],
+        colors: [
+          Color.lerp(background, raised, 0.34)!,
+          background,
+          Color.lerp(background, raised, 0.12)!,
+        ],
+        stops: const [0, 0.5, 1],
       ).createShader(bounds);
     canvas.drawRect(bounds, backgroundPaint);
 
@@ -427,7 +1087,7 @@ class _WorkloopTexturePainter extends CustomPainter {
         center: Alignment(-0.82, -0.92),
         radius: 0.9,
         colors: [
-          accent.withValues(alpha: dark ? 0.055 : 0.075),
+          accent.withValues(alpha: dark ? 0.045 : 0.035),
           accent.withValues(alpha: 0),
         ],
       ).createShader(bounds);
@@ -440,9 +1100,9 @@ class _WorkloopTexturePainter extends CustomPainter {
     }
 
     final neutralGrain = Paint()
-      ..color = (dark ? Colors.white : Colors.black).withValues(alpha: 0.026);
+      ..color = (dark ? Colors.white : Colors.black).withValues(alpha: 0.018);
     final greenGrain = Paint()
-      ..color = accent.withValues(alpha: dark ? 0.035 : 0.026);
+      ..color = accent.withValues(alpha: dark ? 0.025 : 0.016);
     final pointCount = (size.width * size.height / 950).round();
     for (var index = 0; index < pointCount; index++) {
       final point = Offset(nextUnit() * size.width, nextUnit() * size.height);
@@ -499,7 +1159,7 @@ class WorkloopSurface extends StatelessWidget {
 }
 
 class WorkloopPageHeader extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
   final String title;
   final String subtitle;
   final Color color;
@@ -508,7 +1168,7 @@ class WorkloopPageHeader extends StatelessWidget {
 
   const WorkloopPageHeader({
     super.key,
-    required this.icon,
+    this.icon,
     required this.title,
     required this.subtitle,
     required this.color,
@@ -525,6 +1185,313 @@ class WorkloopPageHeader extends StatelessWidget {
       color: color,
       trailing: trailing,
       stats: metrics,
+    );
+  }
+}
+
+/// A retained, Cupertino-style workspace stack for destinations that live
+/// inside the main shell rather than on the root [Navigator].
+///
+/// The active workspace follows the user's finger from the left edge while
+/// the remembered workspace is revealed with restrained parallax. Releasing
+/// early restores the current workspace; sufficient distance or velocity
+/// completes exactly one back action.
+class WorkloopInteractiveWorkspaceStack extends StatefulWidget {
+  final List<Widget> children;
+  final int index;
+  final int? previousIndex;
+  final VoidCallback onBack;
+
+  const WorkloopInteractiveWorkspaceStack({
+    super.key,
+    required this.children,
+    required this.index,
+    required this.previousIndex,
+    required this.onBack,
+  });
+
+  @override
+  State<WorkloopInteractiveWorkspaceStack> createState() =>
+      _WorkloopInteractiveWorkspaceStackState();
+}
+
+class _WorkloopInteractiveWorkspaceStackState
+    extends State<WorkloopInteractiveWorkspaceStack>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _progress = AnimationController(
+    vsync: this,
+    duration: AppMotion.standard,
+  );
+  double _availableWidth = 1;
+  bool _settling = false;
+
+  bool get _canGoBack =>
+      widget.previousIndex != null &&
+      widget.previousIndex != widget.index &&
+      widget.previousIndex! >= 0 &&
+      widget.previousIndex! < widget.children.length;
+
+  @override
+  void didUpdateWidget(WorkloopInteractiveWorkspaceStack oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.index != widget.index ||
+        oldWidget.previousIndex != widget.previousIndex) {
+      _progress.value = 0;
+      _settling = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _progress.dispose();
+    super.dispose();
+  }
+
+  void _handleDragStart(DragStartDetails details) {
+    if (!_canGoBack || _settling) return;
+    _progress.stop();
+  }
+
+  void _handleDragUpdate(DragUpdateDetails details) {
+    if (!_canGoBack || _settling) return;
+    final delta = details.primaryDelta ?? 0;
+    _progress.value = (_progress.value + (delta / _availableWidth)).clamp(
+      0.0,
+      1.0,
+    );
+  }
+
+  Future<void> _handleDragEnd(DragEndDetails details) async {
+    if (!_canGoBack || _settling) return;
+    final velocity = details.primaryVelocity ?? 0;
+    final complete = _progress.value >= 0.32 || velocity >= 650;
+    await _settle(complete);
+  }
+
+  Future<void> _handleDragCancel() => _settle(false);
+
+  Future<void> _settle(bool complete) async {
+    if (!_canGoBack || _settling) return;
+    _settling = true;
+    final target = complete ? 1.0 : 0.0;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _progress.value = target;
+    } else {
+      final remaining = (target - _progress.value).abs();
+      await _progress.animateTo(
+        target,
+        duration: Duration(milliseconds: (140 + (remaining * 120)).round()),
+        curve: complete ? Curves.easeOutCubic : Curves.easeOutQuart,
+      );
+    }
+    if (!mounted) return;
+    if (complete) {
+      SlateHaptics.selection();
+      widget.onBack();
+    } else {
+      _settling = false;
+    }
+  }
+
+  Widget _retainedChild(int index, {required bool visible}) {
+    return Positioned.fill(
+      child: Offstage(
+        offstage: !visible,
+        child: TickerMode(enabled: visible, child: widget.children[index]),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _availableWidth = constraints.maxWidth <= 0 ? 1 : constraints.maxWidth;
+        final previousIndex = _canGoBack ? widget.previousIndex : null;
+
+        return AnimatedBuilder(
+          animation: _progress,
+          builder: (context, _) {
+            final value = _progress.value;
+            final layers = <Widget>[
+              for (var index = 0; index < widget.children.length; index++)
+                if (index != widget.index && index != previousIndex)
+                  _retainedChild(index, visible: false),
+            ];
+
+            if (previousIndex != null) {
+              layers.add(
+                Positioned.fill(
+                  child: ExcludeSemantics(
+                    child: IgnorePointer(
+                      child: Transform.translate(
+                        key: const ValueKey('workloop-workspace-previous'),
+                        offset: Offset(
+                          -_availableWidth * 0.18 * (1 - value),
+                          0,
+                        ),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            widget.children[previousIndex],
+                            ColoredBox(
+                              color: Colors.black.withValues(
+                                alpha: 0.16 * (1 - value),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            layers.add(
+              Positioned.fill(
+                child: Transform.translate(
+                  key: const ValueKey('workloop-workspace-current'),
+                  offset: Offset(_availableWidth * value, 0),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      boxShadow: value <= 0
+                          ? const []
+                          : [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.22),
+                                blurRadius: 24,
+                                offset: const Offset(-8, 0),
+                              ),
+                            ],
+                    ),
+                    child: widget.children[widget.index],
+                  ),
+                ),
+              ),
+            );
+
+            if (_canGoBack) {
+              layers.add(
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: AppSpacing.minTouch,
+                  child: GestureDetector(
+                    key: const ValueKey('workloop-workspace-back-edge'),
+                    behavior: HitTestBehavior.translucent,
+                    onHorizontalDragStart: _handleDragStart,
+                    onHorizontalDragUpdate: _handleDragUpdate,
+                    onHorizontalDragEnd: _handleDragEnd,
+                    onHorizontalDragCancel: _handleDragCancel,
+                  ),
+                ),
+              );
+            }
+
+            return ClipRect(child: Stack(children: layers));
+          },
+        );
+      },
+    );
+  }
+}
+
+/// Registers an in-place workspace transition with the same app-wide iOS
+/// edge-swipe system used by pushed routes.
+///
+/// This is intentionally separate from [Navigator] history for retained shell
+/// destinations such as Money, Tasks, and Notes.
+class WorkloopBackSwipeScope extends StatelessWidget {
+  final VoidCallback onBack;
+  final Widget child;
+
+  const WorkloopBackSwipeScope({
+    super.key,
+    required this.onBack,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _WorkloopBackActionRegistration(action: onBack, child: child);
+  }
+}
+
+/// Canonical header for pushed routes outside the four-tab shell.
+class WorkloopRouteHeader extends StatelessWidget {
+  final String title;
+  final String backSemanticLabel;
+  final VoidCallback? onBack;
+  final Widget? trailing;
+
+  const WorkloopRouteHeader({
+    super.key,
+    required this.title,
+    this.backSemanticLabel = 'Back',
+    this.onBack,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final backAction = onBack ?? () => workloopGoBack(context);
+    final titleWidget = Text(
+      title,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(
+        color: AppColors.t1,
+        fontSize: 26,
+        height: 1.05,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+    final backButton = WorkloopIconButton(
+      icon: LucideIcons.chevronLeft,
+      semanticLabel: backSemanticLabel,
+      onTap: backAction,
+    );
+
+    return _WorkloopBackActionRegistration(
+      action: backAction,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stackTrailing =
+              trailing != null &&
+              (constraints.maxWidth < 340 ||
+                  MediaQuery.textScalerOf(context).scale(16) > 21);
+          final titleRow = Row(
+            children: [
+              backButton,
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: titleWidget),
+            ],
+          );
+          if (stackTrailing) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                titleRow,
+                const SizedBox(height: AppSpacing.xxs),
+                Align(alignment: Alignment.centerRight, child: trailing),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              backButton,
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: titleWidget),
+              if (trailing != null) ...[
+                const SizedBox(width: AppSpacing.sm),
+                trailing!,
+              ],
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -586,20 +1553,55 @@ class WorkloopSectionHeader extends StatelessWidget {
   final String label;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final bool quiet;
 
   const WorkloopSectionHeader({
     super.key,
     required this.label,
     this.actionLabel,
     this.onAction,
+    this.quiet = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SlateSectionHeader(
-      label: label,
-      actionLabel: actionLabel,
-      onAction: onAction,
+    final tokens = SlateTheme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (!quiet) ...[
+          Container(
+            width: 3,
+            height: 20,
+            decoration: BoxDecoration(
+              color: tokens.dividerStrong,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+        ],
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: quiet
+                ? Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: tokens.textTertiary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  )
+                : Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: tokens.textPrimary,
+                    height: 1.15,
+                  ),
+          ),
+        ),
+        if (actionLabel != null) ...[
+          const SizedBox(width: AppSpacing.xs),
+          WorkloopTextButton(label: actionLabel!, onPressed: onAction),
+        ],
+      ],
     );
   }
 }
@@ -665,6 +1667,7 @@ class WorkloopEmptyState extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget? action;
+  final bool contained;
 
   const WorkloopEmptyState({
     super.key,
@@ -672,21 +1675,60 @@ class WorkloopEmptyState extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.action,
+    this.contained = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (action == null) {
-      return SlateEmptyState(icon: icon, title: title, subtitle: subtitle);
-    }
-
-    return Column(
+    final tokens = SlateTheme.of(context);
+    final content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SlateEmptyState(icon: icon, title: title, subtitle: subtitle),
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: tokens.surfaceSubtle,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: tokens.accentInk, size: 22),
+        ),
         const SizedBox(height: AppSpacing.sm),
-        action!,
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: tokens.textPrimary,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: tokens.textSecondary),
+        ),
+        if (action != null) ...[const SizedBox(height: AppSpacing.md), action!],
       ],
+    );
+
+    if (!contained) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        child: content,
+      );
+    }
+    return WorkloopSurface(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xl,
+      ),
+      child: content,
     );
   }
 }
@@ -742,14 +1784,14 @@ class WorkloopTextButton extends StatelessWidget {
             },
       style: TextButton.styleFrom(
         foregroundColor: destructive ? AppColors.error : AppColors.t2,
-        minimumSize: const Size(0, 42),
+        minimumSize: const Size(AppSpacing.minTouch, AppSpacing.minTouch),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
         shape: const StadiumBorder(),
       ),
       child: Text(
         label,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -785,6 +1827,86 @@ class WorkloopIconButton extends StatelessWidget {
       size: size,
       badge: badge,
       semanticLabel: semanticLabel,
+    );
+  }
+}
+
+/// The one unmistakable action in a root-screen header.
+///
+/// Filters and selected navigation deliberately use quieter treatments so this
+/// labelled neon control remains the clearest place to act.
+class WorkloopTopAction extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final IconData icon;
+  final String? semanticLabel;
+
+  const WorkloopTopAction({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.icon = LucideIcons.plus,
+    this.semanticLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+
+    void handleTap() {
+      SlateHaptics.action();
+      onTap();
+    }
+
+    return Semantics(
+      button: true,
+      label: semanticLabel ?? label,
+      onTap: handleTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            onTap: handleTap,
+            child: Container(
+              height: 48,
+              constraints: const BoxConstraints(minWidth: 48, maxWidth: 148),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              decoration: BoxDecoration(
+                color: tokens.accentStrong,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                boxShadow: [
+                  BoxShadow(
+                    color: tokens.accent.withValues(alpha: 0.12),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: tokens.onAccent, size: 18),
+                  const SizedBox(width: AppSpacing.xs),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: tokens.onAccent,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -884,22 +2006,18 @@ class _WorkloopSearchFieldState extends State<WorkloopSearchField> {
                   ),
                 ),
           filled: true,
-          fillColor: tokens.surfaceRaised.withValues(alpha: 0.72),
+          fillColor: tokens.surface,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.pill),
-            borderSide: BorderSide(
-              color: tokens.divider.withValues(alpha: 0.72),
-            ),
+            borderSide: BorderSide(color: tokens.divider),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.pill),
-            borderSide: BorderSide(
-              color: tokens.divider.withValues(alpha: 0.72),
-            ),
+            borderSide: BorderSide(color: tokens.divider),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.pill),
-            borderSide: BorderSide(color: tokens.accent, width: 1.5),
+            borderSide: BorderSide(color: tokens.accentInk, width: 1.5),
           ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
@@ -977,49 +2095,59 @@ class WorkloopPickerField<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = SlateTheme.of(context);
     final selected = _selectedOption;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: enabled ? () => _showPicker(context) : null,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: Ink(
-          height: 58,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          decoration: BoxDecoration(
-            color: tokens.surfaceRaised.withValues(alpha: 0.72),
+    return Semantics(
+      button: true,
+      enabled: enabled && options.isNotEmpty,
+      label: title,
+      value: selected?.label ?? hint,
+      hint: enabled && options.isNotEmpty ? 'Double tap to choose' : null,
+      onTap: enabled && options.isNotEmpty ? () => _showPicker(context) : null,
+      child: ExcludeSemantics(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: enabled ? () => _showPicker(context) : null,
             borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: tokens.divider.withValues(alpha: 0.72)),
-          ),
-          child: Row(
-            children: [
-              if (selected?.leading != null || leadingIcon != null) ...[
-                selected?.leading ??
-                    Icon(leadingIcon, color: tokens.textTertiary, size: 18),
-                const SizedBox(width: AppSpacing.sm),
-              ],
-              Expanded(
-                child: Text(
-                  selected?.label ?? hint,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: selected == null
-                        ? tokens.textTertiary
-                        : tokens.textPrimary,
-                    fontSize: 15,
-                    fontWeight: selected == null
-                        ? FontWeight.w600
-                        : FontWeight.w700,
+            child: Ink(
+              height: 58,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              decoration: BoxDecoration(
+                color: tokens.surface,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: tokens.divider),
+              ),
+              child: Row(
+                children: [
+                  if (selected?.leading != null || leadingIcon != null) ...[
+                    selected?.leading ??
+                        Icon(leadingIcon, color: tokens.textTertiary, size: 18),
+                    const SizedBox(width: AppSpacing.sm),
+                  ],
+                  Expanded(
+                    child: Text(
+                      selected?.label ?? hint,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: selected == null
+                            ? tokens.textTertiary
+                            : tokens.textPrimary,
+                        fontSize: 15,
+                        fontWeight: selected == null
+                            ? FontWeight.w500
+                            : FontWeight.w600,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Icon(
+                    LucideIcons.chevronDown,
+                    size: 18,
+                    color: enabled ? tokens.textTertiary : tokens.textDisabled,
+                  ),
+                ],
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Icon(
-                LucideIcons.chevronDown,
-                size: 18,
-                color: enabled ? tokens.textTertiary : tokens.textDisabled,
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1115,7 +2243,7 @@ class _WorkloopPickerSheetState<T> extends State<_WorkloopPickerSheet<T>> {
                         style: TextStyle(
                           color: tokens.textPrimary,
                           fontSize: 22,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w600,
                           height: 1.08,
                         ),
                       ),
@@ -1147,6 +2275,7 @@ class _WorkloopPickerSheetState<T> extends State<_WorkloopPickerSheet<T>> {
                       suffixIcon: _query.isEmpty
                           ? null
                           : IconButton(
+                              tooltip: 'Clear search',
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() => _query = '');
@@ -1169,9 +2298,7 @@ class _WorkloopPickerSheetState<T> extends State<_WorkloopPickerSheet<T>> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(AppRadius.pill),
-                        borderSide: BorderSide(
-                          color: widget.accentColor.withValues(alpha: 0.72),
-                        ),
+                        borderSide: BorderSide(color: tokens.accentInk),
                       ),
                     ),
                   ),
@@ -1184,7 +2311,7 @@ class _WorkloopPickerSheetState<T> extends State<_WorkloopPickerSheet<T>> {
                           style: TextStyle(
                             color: tokens.textTertiary,
                             fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       )
@@ -1235,68 +2362,79 @@ class _WorkloopPickerRow<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = SlateTheme.of(context);
-    return Material(
-      color: selected
-          ? accentColor.withValues(alpha: 0.09)
-          : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.md,
-          ),
-          child: Row(
-            children: [
-              if (option.leading != null) ...[
-                option.leading!,
-                const SizedBox(width: AppSpacing.md),
-              ],
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      option.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: tokens.textPrimary,
-                        fontSize: 15,
-                        fontWeight: selected
-                            ? FontWeight.w800
-                            : FontWeight.w700,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: option.label,
+      value: option.subtitle,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: selected ? tokens.surfaceSubtle : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.md,
+              ),
+              child: Row(
+                children: [
+                  if (option.leading != null) ...[
+                    option.leading!,
+                    const SizedBox(width: AppSpacing.md),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          option.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: tokens.textPrimary,
+                            fontSize: 15,
+                            fontWeight: selected
+                                ? FontWeight.w600
+                                : FontWeight.w600,
+                          ),
+                        ),
+                        if (option.subtitle?.isNotEmpty == true) ...[
+                          const SizedBox(height: AppSpacing.xxs),
+                          Text(
+                            option.subtitle!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: tokens.textTertiary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (selected)
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: tokens.accentStrong,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        LucideIcons.check,
+                        color: tokens.onAccent,
+                        size: 16,
                       ),
                     ),
-                    if (option.subtitle?.isNotEmpty == true) ...[
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        option.subtitle!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: tokens.textTertiary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                ],
               ),
-              if (selected)
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.14),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(LucideIcons.check, color: accentColor, size: 16),
-                ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1332,11 +2470,11 @@ class WorkloopSegmentedControl<T> extends StatelessWidget {
     );
 
     return Container(
-      height: 42,
+      height: 44,
       decoration: BoxDecoration(
-        color: tokens.textPrimary.withValues(alpha: 0.028),
+        color: tokens.surface,
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        border: Border.all(color: tokens.divider.withValues(alpha: 0.54)),
+        border: Border.all(color: tokens.divider),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -1344,7 +2482,7 @@ class WorkloopSegmentedControl<T> extends StatelessWidget {
           return Stack(
             children: [
               AnimatedPositioned(
-                duration: AppMotion.deliberate,
+                duration: AppMotion.responsive(context, AppMotion.deliberate),
                 curve: AppMotion.emphasized,
                 left: (selectedIndex < 0 ? 0 : selectedIndex) * width,
                 top: 3,
@@ -1354,11 +2492,9 @@ class WorkloopSegmentedControl<T> extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 3),
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: tokens.accentStrong.withValues(alpha: 0.34),
+                      color: tokens.surfaceRaised,
                       borderRadius: BorderRadius.circular(AppRadius.pill),
-                      border: Border.all(
-                        color: tokens.accentStrong.withValues(alpha: 0.54),
-                      ),
+                      border: Border.all(color: tokens.dividerStrong),
                     ),
                   ),
                 ),
@@ -1396,6 +2532,7 @@ class WorkloopNavigationControl<T> extends StatelessWidget {
   final T selected;
   final ValueChanged<T> onChanged;
   final Color color;
+  final bool emphasized;
 
   const WorkloopNavigationControl({
     super.key,
@@ -1403,6 +2540,7 @@ class WorkloopNavigationControl<T> extends StatelessWidget {
     required this.selected,
     required this.onChanged,
     this.color = AppColors.accentPrimary,
+    this.emphasized = true,
   });
 
   @override
@@ -1412,8 +2550,8 @@ class WorkloopNavigationControl<T> extends StatelessWidget {
       (segment) => segment.value == selected,
     );
     return SlateGlassSurface(
-      blur: 22,
-      color: tokens.surface.withValues(alpha: 0.90),
+      blur: 16,
+      color: tokens.surface,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
       child: SizedBox(
         height: 54,
@@ -1447,7 +2585,10 @@ class WorkloopNavigationControl<T> extends StatelessWidget {
                 alignment: Alignment.center,
                 children: [
                   AnimatedPositioned(
-                    duration: AppMotion.deliberate,
+                    duration: AppMotion.responsive(
+                      context,
+                      AppMotion.deliberate,
+                    ),
                     curve: AppMotion.emphasized,
                     left: (selectedIndex < 0 ? 0 : selectedIndex) * itemWidth,
                     top: 6,
@@ -1457,10 +2598,14 @@ class WorkloopNavigationControl<T> extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 2),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.14),
+                          color: emphasized
+                              ? tokens.accentStrong
+                              : tokens.surfaceRaised,
                           borderRadius: BorderRadius.circular(AppRadius.pill),
                           border: Border.all(
-                            color: color.withValues(alpha: 0.22),
+                            color: emphasized
+                                ? tokens.accentStrong
+                                : tokens.dividerStrong,
                           ),
                         ),
                       ),
@@ -1470,25 +2615,42 @@ class WorkloopNavigationControl<T> extends StatelessWidget {
                     children: [
                       for (final segment in segments)
                         Expanded(
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
+                          child: Semantics(
+                            button: true,
+                            selected: segment.value == selected,
+                            inMutuallyExclusiveGroup: true,
+                            label: segment.label,
+                            value: segment.badge,
                             onTap: () => select(segment.value),
-                            child: Center(
-                              child: AnimatedDefaultTextStyle(
-                                duration: AppMotion.standard,
-                                style: TextStyle(
-                                  color: segment.value == selected
-                                      ? tokens.accentInk
-                                      : tokens.textTertiary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                child: Text(
-                                  segment.badge == null
-                                      ? segment.label
-                                      : '${segment.label} ${segment.badge}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                            child: ExcludeSemantics(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => select(segment.value),
+                                child: Center(
+                                  child: AnimatedDefaultTextStyle(
+                                    key: ValueKey(Theme.of(context).brightness),
+                                    duration: AppMotion.responsive(
+                                      context,
+                                      AppMotion.standard,
+                                    ),
+                                    style: TextStyle(
+                                      fontFamily: 'Instrument Sans',
+                                      color: segment.value == selected
+                                          ? emphasized
+                                                ? tokens.onAccent
+                                                : tokens.accentInk
+                                          : tokens.textSecondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    child: Text(
+                                      segment.badge == null
+                                          ? segment.label
+                                          : '${segment.label} ${segment.badge}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -1520,22 +2682,33 @@ class _WorkloopSegmentButton<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = SlateTheme.of(context);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return Semantics(
+      button: true,
+      selected: selected,
+      inMutuallyExclusiveGroup: true,
+      label: segment.label,
+      value: segment.badge,
       onTap: onTap,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-          child: Text(
-            segment.badge == null
-                ? segment.label
-                : '${segment.label} ${segment.badge}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: selected ? tokens.textPrimary : tokens.textTertiary,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+              child: Text(
+                segment.badge == null
+                    ? segment.label
+                    : '${segment.label} ${segment.badge}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'Instrument Sans',
+                  color: selected ? tokens.accentInk : tokens.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ),
@@ -1603,11 +2776,11 @@ class WorkloopBottomNav extends StatelessWidget {
         children: [
           Expanded(
             child: SlateGlassSurface(
-              blur: 26,
-              color: tokens.surface.withValues(alpha: 0.90),
+              blur: 18,
+              color: tokens.surface,
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: SizedBox(
-                height: 62,
+                height: 60,
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final tabWidth = constraints.maxWidth / tabCount;
@@ -1637,7 +2810,10 @@ class WorkloopBottomNav extends StatelessWidget {
                         alignment: Alignment.center,
                         children: [
                           AnimatedPositioned(
-                            duration: AppMotion.deliberate,
+                            duration: AppMotion.responsive(
+                              context,
+                              AppMotion.deliberate,
+                            ),
                             curve: AppMotion.emphasized,
                             left: left,
                             top: 9,
@@ -1649,16 +2825,12 @@ class WorkloopBottomNav extends StatelessWidget {
                               ),
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
-                                  color: items[currentIndex].color.withValues(
-                                    alpha: 0.14,
-                                  ),
+                                  color: tokens.accentStrong,
                                   borderRadius: BorderRadius.circular(
                                     AppRadius.pill,
                                   ),
                                   border: Border.all(
-                                    color: items[currentIndex].color.withValues(
-                                      alpha: 0.22,
-                                    ),
+                                    color: tokens.accentStrong,
                                   ),
                                 ),
                               ),
@@ -1688,56 +2860,67 @@ class WorkloopBottomNav extends StatelessWidget {
     final tokens = SlateTheme.of(context);
     final tab = items[index];
     final active = index == currentIndex;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        if (index != currentIndex) SlateHaptics.tap();
-        onTap(index);
-      },
-      child: Container(
-        height: 62,
-        margin: const EdgeInsets.symmetric(horizontal: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedScale(
-              scale: active ? 1.08 : 1,
-              duration: AppMotion.standard,
-              curve: AppMotion.curve,
-              child: Icon(
-                tab.icon,
-                color: active ? tokens.accentInk : tokens.textTertiary,
-                size: 18,
-              ),
-            ),
-            AnimatedSize(
-              duration: AppMotion.standard,
-              curve: AppMotion.curve,
-              alignment: Alignment.topCenter,
-              child: active
-                  ? Padding(
-                      padding: const EdgeInsets.only(top: 3),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          tab.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.fade,
-                          softWrap: false,
-                          style: TextStyle(
-                            color: tokens.accentInk,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            height: 1,
+
+    void handleTap() {
+      if (index != currentIndex) SlateHaptics.tap();
+      onTap(index);
+    }
+
+    return Semantics(
+      button: true,
+      selected: active,
+      label: tab.label,
+      onTap: handleTap,
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: handleTap,
+          child: Container(
+            height: 60,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedScale(
+                  scale: active ? 1.08 : 1,
+                  duration: AppMotion.responsive(context, AppMotion.standard),
+                  curve: AppMotion.curve,
+                  child: Icon(
+                    tab.icon,
+                    color: active ? tokens.onAccent : tokens.textSecondary,
+                    size: 19,
+                  ),
+                ),
+                AnimatedSize(
+                  duration: AppMotion.responsive(context, AppMotion.standard),
+                  curve: AppMotion.curve,
+                  alignment: Alignment.topCenter,
+                  child: active
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              tab.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.fade,
+                              softWrap: false,
+                              style: TextStyle(
+                                color: tokens.onAccent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                height: 1,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -1763,10 +2946,11 @@ class _WorkloopFABState extends State<WorkloopFAB> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return SlateGlassSurface(
       radius: AppRadius.pill,
       blur: 24,
-      color: AppColors.accentPrimaryStrong,
+      color: tokens.accentStrong,
       child: GestureDetector(
         onTapDown: (_) => setState(() => _pressed = true),
         onTapCancel: () => setState(() => _pressed = false),
@@ -1776,13 +2960,13 @@ class _WorkloopFABState extends State<WorkloopFAB> {
           widget.onTap();
         },
         child: AnimatedScale(
-          duration: AppMotion.fast,
+          duration: AppMotion.responsive(context, AppMotion.fast),
           curve: AppMotion.curve,
           scale: _pressed ? 0.96 : 1,
           child: SizedBox(
             width: 60,
             height: 60,
-            child: Icon(widget.icon, color: AppColors.t1, size: 26),
+            child: Icon(widget.icon, color: tokens.onAccent, size: 25),
           ),
         ),
       ),
@@ -1814,16 +2998,15 @@ class SlateSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = SlateTheme.of(context);
     final content = AnimatedContainer(
-      duration: AppMotion.standard,
+      key: ValueKey(Theme.of(context).brightness),
+      duration: AppMotion.responsive(context, AppMotion.standard),
       curve: AppMotion.curve,
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
         color: color ?? tokens.surface,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(
-          color: borderColor ?? tokens.divider.withValues(alpha: 0.42),
-        ),
+        border: Border.all(color: borderColor ?? tokens.divider),
         boxShadow: elevated ? AppShadows.soft : null,
       ),
       child: child,
@@ -1873,7 +3056,7 @@ class SlateGlassSurface extends StatelessWidget {
           decoration: BoxDecoration(
             color: color ?? tokens.surfaceRaised.withValues(alpha: 0.78),
             borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: tokens.divider.withValues(alpha: 0.52)),
+            border: Border.all(color: tokens.divider),
             boxShadow: AppShadows.glass,
           ),
           child: child,
@@ -1921,38 +3104,46 @@ class _SlateIconButtonState extends State<SlateIconButton> {
     return Semantics(
       button: true,
       label: widget.semanticLabel,
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapCancel: () => setState(() => _pressed = false),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTap: _handleTap,
-        child: AnimatedScale(
-          scale: _pressed ? 0.94 : 1,
-          duration: AppMotion.fast,
-          curve: AppMotion.curve,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: widget.size,
-                height: widget.size,
-                decoration: BoxDecoration(
-                  color:
-                      widget.backgroundColor ??
-                      tokens.textPrimary.withValues(alpha: 0.035),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(
-                    color: tokens.divider.withValues(alpha: 0.46),
-                  ),
-                ),
-                child: Icon(
-                  widget.icon,
-                  color: widget.color ?? tokens.textSecondary,
-                  size: 19,
+      onTap: _handleTap,
+      child: ExcludeSemantics(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouch,
+            minHeight: AppSpacing.minTouch,
+          ),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (_) => setState(() => _pressed = true),
+            onTapCancel: () => setState(() => _pressed = false),
+            onTapUp: (_) => setState(() => _pressed = false),
+            onTap: _handleTap,
+            child: AnimatedScale(
+              scale: _pressed ? 0.94 : 1,
+              duration: AppMotion.responsive(context, AppMotion.fast),
+              curve: AppMotion.curve,
+              child: Center(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: widget.size,
+                      height: widget.size,
+                      decoration: BoxDecoration(
+                        color: widget.backgroundColor ?? tokens.surfaceSubtle,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        border: Border.all(color: tokens.divider),
+                      ),
+                      child: Icon(
+                        widget.icon,
+                        color: widget.color ?? tokens.textSecondary,
+                        size: 19,
+                      ),
+                    ),
+                    if (widget.badge != null) widget.badge!,
+                  ],
                 ),
               ),
-              if (widget.badge != null) widget.badge!,
-            ],
+            ),
           ),
         ),
       ),
@@ -1978,42 +3169,55 @@ class SlateSectionHeader extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label.toUpperCase(),
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
-            color: tokens.textTertiary,
+        Expanded(
+          child: Text(
+            label.toUpperCase(),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0,
+              color: tokens.textTertiary,
+            ),
           ),
         ),
-        if (actionLabel != null)
-          TextButton(
-            onPressed: onAction == null
-                ? null
-                : () {
-                    SlateHaptics.tap();
-                    onAction!();
-                  },
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.accentPrimary,
-              minimumSize: const Size(0, 34),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              shape: const StadiumBorder(),
-            ),
-            child: Text(
-              actionLabel!,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        if (actionLabel != null) ...[
+          const SizedBox(width: AppSpacing.xs),
+          Flexible(
+            child: TextButton(
+              onPressed: onAction == null
+                  ? null
+                  : () {
+                      SlateHaptics.tap();
+                      onAction!();
+                    },
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.accentPrimary,
+                minimumSize: const Size(0, AppSpacing.minTouch),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: const StadiumBorder(),
+              ),
+              child: Text(
+                actionLabel!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
+        ],
       ],
     );
   }
 }
 
 class SlateFeatureHeader extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
   final String title;
   final String subtitle;
   final Color color;
@@ -2022,7 +3226,7 @@ class SlateFeatureHeader extends StatelessWidget {
 
   const SlateFeatureHeader({
     super.key,
-    required this.icon,
+    this.icon,
     required this.title,
     required this.subtitle,
     required this.color,
@@ -2039,16 +3243,18 @@ class SlateFeatureHeader extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.09),
-                shape: BoxShape.circle,
+            if (icon != null) ...[
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 20),
               ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const SizedBox(width: AppSpacing.md),
+              const SizedBox(width: AppSpacing.sm),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2057,24 +3263,19 @@ class SlateFeatureHeader extends StatelessWidget {
                     title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
                       color: tokens.textPrimary,
-                      fontSize: 31,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0,
-                      height: 1.04,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: 6),
                   Text(
                     subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: tokens.textTertiary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      height: 1.28,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: tokens.textSecondary,
+                      fontSize: 15,
+                      height: 1.32,
                     ),
                   ),
                 ],
@@ -2148,7 +3349,7 @@ class SlateHeaderStat extends StatelessWidget {
             style: TextStyle(
               color: color,
               fontSize: 22,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
               letterSpacing: 0,
               height: 1.05,
             ),
@@ -2161,7 +3362,7 @@ class SlateHeaderStat extends StatelessWidget {
             style: TextStyle(
               color: tokens.textTertiary,
               fontSize: 12,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -2185,14 +3386,15 @@ class SlateEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = SlateTheme.of(context);
-    return Padding(
+    return SlateSurface(
+      color: tokens.surface,
       padding: const EdgeInsets.symmetric(
         vertical: AppSpacing.xl,
         horizontal: AppSpacing.lg,
       ),
       child: TweenAnimationBuilder<double>(
         tween: Tween(begin: 0.92, end: 1),
-        duration: AppMotion.deliberate,
+        duration: AppMotion.responsive(context, AppMotion.deliberate),
         curve: AppMotion.curve,
         builder: (context, value, child) {
           return Opacity(
@@ -2206,26 +3408,30 @@ class SlateEmptyState extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: tokens.textPrimary.withValues(alpha: 0.045),
+                color: tokens.surfaceSubtle,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: tokens.textTertiary, size: 23),
+              child: Icon(icon, color: tokens.accentInk, size: 23),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: tokens.textSecondary,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: tokens.textPrimary,
               ),
             ),
             const SizedBox(height: AppSpacing.xxs),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: tokens.textTertiary),
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: tokens.textSecondary,
+              ),
             ),
           ],
         ),
@@ -2320,37 +3526,49 @@ class SlateFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = SlateTheme.of(context);
-    return GestureDetector(
-      onTap: () {
-        SlateHaptics.tap();
-        onTap();
-      },
-      child: AnimatedContainer(
-        duration: AppMotion.fast,
-        curve: AppMotion.curve,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: selected
-              ? tokens.accentStrong.withValues(alpha: 0.34)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: selected
-                ? tokens.accentStrong.withValues(alpha: 0.54)
-                : tokens.divider.withValues(alpha: 0.58),
-          ),
-        ),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: selected ? tokens.textPrimary : tokens.textSecondary,
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
+    void handleTap() {
+      SlateHaptics.tap();
+      onTap();
+    }
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      onTap: handleTap,
+      child: ExcludeSemantics(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: AppSpacing.minTouch),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: handleTap,
+            child: AnimatedContainer(
+              key: ValueKey(Theme.of(context).brightness),
+              duration: AppMotion.responsive(context, AppMotion.fast),
+              curve: AppMotion.curve,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                color: selected ? tokens.surfaceRaised : tokens.surface,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(
+                  color: selected ? tokens.dividerStrong : tokens.divider,
+                ),
+              ),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? tokens.accentInk : tokens.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -2372,7 +3590,10 @@ class SlateLoadingBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.35, end: 0.70),
-      duration: const Duration(milliseconds: 900),
+      duration: AppMotion.responsive(
+        context,
+        const Duration(milliseconds: 900),
+      ),
       curve: Curves.easeInOut,
       builder: (context, value, child) {
         return Container(
@@ -2391,27 +3612,57 @@ class SlateLoadingBlock extends StatelessWidget {
 
 class SlateErrorState extends StatelessWidget {
   final String message;
+  final VoidCallback? onRetry;
+  final String retryLabel;
 
-  const SlateErrorState({super.key, required this.message});
+  const SlateErrorState({
+    super.key,
+    required this.message,
+    this.onRetry,
+    this.retryLabel = 'Try again',
+  });
 
   @override
   Widget build(BuildContext context) {
     return SlateSurface(
       color: AppColors.errorDim,
       borderColor: AppColors.error.withValues(alpha: 0.22),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(LucideIcons.alertCircle, color: AppColors.error, size: 18),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: AppColors.t2,
-                fontWeight: FontWeight.w700,
+          Semantics(
+            container: true,
+            liveRegion: true,
+            label: message,
+            child: ExcludeSemantics(
+              child: Row(
+                children: [
+                  const Icon(
+                    LucideIcons.alertCircle,
+                    color: AppColors.error,
+                    size: 18,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: AppColors.t2,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+          if (onRetry != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: WorkloopTextButton(label: retryLabel, onPressed: onRetry),
+            ),
+          ],
         ],
       ),
     );
@@ -2455,64 +3706,73 @@ class SlateDisclosure extends StatelessWidget {
       radius: AppRadius.lg,
       child: Column(
         children: [
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
+          Semantics(
+            button: true,
+            label: title,
+            value: expanded ? 'Expanded' : 'Collapsed',
+            hint: expanded ? 'Collapse section' : 'Expand section',
             onTap: handleToggle,
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: AppColors.t1.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                    child: Icon(icon, size: 17, color: AppColors.t2),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.t1,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                          ),
+            child: ExcludeSemantics(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: handleToggle,
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: AppColors.t1.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
                         ),
-                        if (subtitle != null) ...[
-                          const SizedBox(height: AppSpacing.xxs),
-                          Text(
-                            subtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.t3,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                        child: Icon(icon, size: 17, color: AppColors.t2),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.t1,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                        ],
-                      ],
-                    ),
+                            if (subtitle != null) ...[
+                              const SizedBox(height: AppSpacing.xxs),
+                              Text(
+                                subtitle!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.t3,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      AnimatedRotation(
+                        turns: expanded ? 0.5 : 0,
+                        duration: AppMotion.responsive(context, AppMotion.fast),
+                        curve: AppMotion.curve,
+                        child: const Icon(
+                          LucideIcons.chevronDown,
+                          color: AppColors.t3,
+                          size: 18,
+                        ),
+                      ),
+                    ],
                   ),
-                  AnimatedRotation(
-                    turns: expanded ? 0.5 : 0,
-                    duration: AppMotion.fast,
-                    curve: AppMotion.curve,
-                    child: const Icon(
-                      LucideIcons.chevronDown,
-                      color: AppColors.t3,
-                      size: 18,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -2522,7 +3782,7 @@ class SlateDisclosure extends StatelessWidget {
             crossFadeState: expanded
                 ? CrossFadeState.showSecond
                 : CrossFadeState.showFirst,
-            duration: AppMotion.standard,
+            duration: AppMotion.responsive(context, AppMotion.standard),
             firstCurve: AppMotion.curve,
             secondCurve: AppMotion.curve,
             sizeCurve: AppMotion.curve,
@@ -2575,59 +3835,67 @@ class _SlateButtonState extends State<SlateButton> {
     final bg = widget.destructive
         ? AppColors.error
         : widget.secondary
-        ? AppColors.t1.withValues(alpha: 0.06)
+        ? AppColors.bgCard
         : AppColors.accentPrimaryStrong;
     final fg = widget.destructive
-        ? Colors.white
+        ? AppColors.bg
         : widget.secondary
         ? AppColors.t2
-        : AppColors.t1;
+        : AppColors.onBrandAccent;
 
-    return GestureDetector(
-      onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
-      onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
-      onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: widget.label,
       onTap: enabled ? _handleTap : null,
-      child: AnimatedScale(
-        scale: _pressed ? 0.985 : 1,
-        duration: AppMotion.fast,
-        curve: AppMotion.curve,
-        child: AnimatedOpacity(
-          opacity: enabled ? 1 : 0.48,
-          duration: AppMotion.fast,
-          child: Container(
-            width: double.infinity,
-            height: 52,
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(
-                color: widget.secondary
-                    ? AppColors.t1.withValues(alpha: 0.06)
-                    : Colors.transparent,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.icon != null) ...[
-                  Icon(widget.icon, color: fg, size: 18),
-                  const SizedBox(width: AppSpacing.xs),
-                ],
-                Flexible(
-                  child: Text(
-                    widget.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: fg,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
+          onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+          onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
+          onTap: enabled ? _handleTap : null,
+          child: AnimatedScale(
+            scale: _pressed ? 0.985 : 1,
+            duration: AppMotion.responsive(context, AppMotion.fast),
+            curve: AppMotion.curve,
+            child: AnimatedOpacity(
+              opacity: enabled ? 1 : 0.48,
+              duration: AppMotion.responsive(context, AppMotion.fast),
+              child: Container(
+                width: double.infinity,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(
+                    color: widget.secondary
+                        ? AppColors.border
+                        : Colors.transparent,
                   ),
                 ),
-              ],
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.icon != null) ...[
+                      Icon(widget.icon, color: fg, size: 18),
+                      const SizedBox(width: AppSpacing.xs),
+                    ],
+                    Flexible(
+                      child: Text(
+                        widget.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: fg,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -2658,7 +3926,7 @@ class SlateSheetFrame extends StatelessWidget {
         padding: padding,
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.96, end: 1),
-          duration: AppMotion.standard,
+          duration: AppMotion.responsive(context, AppMotion.standard),
           curve: AppMotion.curve,
           builder: (context, value, sheet) {
             return Opacity(
@@ -2671,8 +3939,8 @@ class SlateSheetFrame extends StatelessWidget {
             );
           },
           child: SlateSurface(
-            color: AppColors.bgCard.withValues(alpha: 0.96),
-            borderColor: AppColors.t1.withValues(alpha: 0.08),
+            color: AppColors.bgCard,
+            borderColor: AppColors.border,
             radius: AppRadius.xl,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,

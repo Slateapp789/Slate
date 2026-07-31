@@ -21,19 +21,19 @@ class _MoneySectionHero extends StatelessWidget {
           style: const TextStyle(
             color: AppColors.t3,
             fontSize: 13,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: AppSpacing.xxs),
         Text(
-          '£${value.toStringAsFixed(0)}',
+          formatPounds(value),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: AppColors.t1,
             fontSize: 40,
             height: 1,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
             letterSpacing: 0,
           ),
         ),
@@ -84,7 +84,7 @@ class _IncomeTargetProgress extends StatelessWidget {
           style: const TextStyle(
             color: AppColors.t1,
             fontSize: 17,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -103,8 +103,8 @@ class _IncomeTargetProgress extends StatelessWidget {
         Text(
           hasTarget
               ? left > 0
-                    ? '£${made.toStringAsFixed(0)} of £${target.toStringAsFixed(0)} · £${left.toStringAsFixed(0)} left'
-                    : '£${made.toStringAsFixed(0)} of £${target.toStringAsFixed(0)} · Target reached'
+                    ? '${formatPounds(made)} of ${formatPounds(target)} · ${formatPounds(left)} left'
+                    : '${formatPounds(made)} of ${formatPounds(target)} · Target reached'
               : 'Set an income target to track your progress here.',
           style: const TextStyle(
             color: AppColors.t3,
@@ -134,7 +134,7 @@ class _QuietMoneyState extends StatelessWidget {
               style: TextStyle(
                 color: AppColors.t3,
                 fontSize: 13,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -183,7 +183,7 @@ class _ExpenseRow extends StatelessWidget {
                     expense.category,
                     style: const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.t1,
                     ),
                   ),
@@ -201,10 +201,10 @@ class _ExpenseRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Text(
-              '-£${expense.amount.toStringAsFixed(0)}',
+              '-${formatPounds(expense.amount)}',
               style: const TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
                 color: AppColors.t1,
               ),
             ),

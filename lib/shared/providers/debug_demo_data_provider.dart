@@ -15,7 +15,7 @@ final debugDemoSeedProvider = FutureProvider<void>((ref) async {
   try {
     await ref.watch(debugDemoDataRepositoryProvider).seed(workspaceId);
   } catch (error, stackTrace) {
-    debugPrint('Slate demo seed failed: $error');
+    debugPrint('Workloop demo seed failed: $error');
     debugPrintStack(stackTrace: stackTrace);
     rethrow;
   }

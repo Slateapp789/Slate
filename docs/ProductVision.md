@@ -1,6 +1,6 @@
 # Workloop Product Vision
 
-Last updated: 2026-07-15
+Last updated: 2026-07-26
 
 ## What Workloop Is
 
@@ -70,7 +70,9 @@ Current code scope includes:
 
 - Email/password authentication through Supabase.
 - Workspace onboarding with services, working hours, profile handle, revenue target, and first booking.
-- Main shell with four-item bottom pill navigation: Home, Clients, Bookings, More. More contains Money, Tasks, Notes, Profile, and Settings.
+- Main shell with four-item bottom pill navigation: Home, Clients, Bookings,
+  Tools. Tools contains Money, Tasks, and Notes; Profile and Settings are
+  available from compact account controls in the Home header.
 - Dashboard with revenue, pulse, schedule, tasks, notification access, and booking requests.
 - CRM with client records, contact actions, notes, follow-ups, timeline, booking history, payment history, and tasks.
 - Bookings with today/upcoming/past views, calendar view, next booking, date selection, location type, custom services, inline client creation, edit flow, status control, linked tasks, and calendar export.
@@ -78,10 +80,13 @@ Current code scope includes:
 - Money tracking with paid/unpaid payments, booking-linked payments, expenses, target progress, comparisons, add/edit payments, mark received, delete payments, add/edit/delete expenses, category summaries, and week/month/custom period views.
 - Public profile at `/p/:handle`, services, working hours, gallery/reviews toggles/content, notice, and booking request form.
 - Booking request triage and manual confirmation.
-- Notification centre, read/unread filtering, settings toggles, notification rows created by app events.
-- Calendar sync placeholder/account state and ICS export.
-- Privacy export and account deletion request/completion foundation.
-- Demo data seeding through `SEED_DEMO_DATA`.
+- Notification centre, read/unread filtering, settings toggles, notification
+  rows created by app events, and on-device task/booking reminders.
+- Point-in-time ICS calendar export and explicit calendar-event import. Workloop
+  does not claim live two-way calendar sync.
+- Privacy export and trusted Edge Function account deletion workflow.
+- Explicit debug-only demo data seeding through `SEED_DEMO_DATA`; release
+  builds cannot seed demo records.
 
 ## Future Vision
 
@@ -89,10 +94,12 @@ Future Workloop should deepen the V1 operating loop before expanding sideways.
 
 Likely future directions:
 
-- Production-grade reminders and push notifications through Edge Functions/APNs/FCM.
+- Optional cross-device push delivery through Edge Functions/APNs/FCM, while
+  preserving the launch-ready local reminder path.
 - QA and polish booking-to-payment workflows.
 - Deeper money reporting once the daily tracking loop is stable.
-- Calendar integration beyond ICS export.
+- Calendar integration beyond explicit import/export only when it can be
+  reliable, reversible, and clearly communicated.
 - Public profile improvements: QR code, closure dates, richer profile controls.
 - Data export/delete operational hardening around the trusted server-side deletion path.
 - Stripe/pay-now and deposits only when the simple payment workflow is stable.
@@ -130,4 +137,6 @@ Primary product truth comes from Notion pages:
 - Business Profile Page
 - Notifications & Comms
 
-Implementation reality comes from the current Flutter codebase, live Supabase schema, and Git history as of commit `44c596f`.
+Implementation reality comes from the current Flutter codebase, live Supabase
+schema/function inventory, and the release evidence recorded in
+`docs/CurrentState.md` and `docs/LaunchReadiness.md`.

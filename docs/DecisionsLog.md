@@ -1,8 +1,29 @@
-# Slate Decisions Log
+# Workloop Decisions Log
 
-Last updated: 2026-07-19
+Last updated: 2026-07-29
 
 This log consolidates Notion decisions, Git history, and codebase reality.
+
+## July 2026 - Brand Lime Is A Highlight, Not Light-Theme Ink
+
+Status: Superseded by the 2026-07-26 exact-neon decision below. The contrast
+principle remains, but the brand accent itself is now `#C1FF72` in both
+appearances.
+
+Decision:
+
+Keep `#C1FF72` as Workloop's recognisable brand highlight, but use deep green `#3F6513` for accent text, thin icons, outlines, focus rings, and progress indicators on light surfaces.
+
+Reasoning:
+
+The bright lime did not maintain readable contrast against white or its own pale selected-state washes, especially in compact navigation labels and thin operational icons.
+
+Consequences:
+
+- Solid lime controls use dark `#17200D` foreground content.
+- Light-theme selected controls pair a soft lime wash with deep-green content.
+- Dark/OLED mode retains lime foreground accents where the background provides sufficient contrast.
+- Theme tests enforce the core contrast pairs at WCAG AA normal-text level.
 
 ## May 2026 - Slate Is Focused On Solo Appointment Businesses
 
@@ -630,3 +651,436 @@ Consequences:
 - Calendar import and ICS export do not imply continuous two-way sync.
 - No new Supabase schema or unverified optional feature was introduced during this pass.
 - `docs/FinalPolishAudit.md` is the release truth table for supported, unavailable, and externally dependent capability states.
+
+## 2026-07-22 - Appearance Is A First-Class App Setting
+
+Decision:
+
+Expose System, Light, and Dark selection through a dedicated App appearance destination, and apply appearance changes atomically instead of animating theme and compatibility colours on different frames.
+
+Reasoning:
+
+Appearance is a device-level choice rather than a general app preference. Keeping it beside maps and calendar obscured that distinction, while the previous compatibility-palette update could leave parts of a screen briefly using the outgoing theme.
+
+Consequences:
+
+- Settings shows App appearance as its own destination with the current choice described in the row.
+- App preferences now contains only maps, calendar, and product information under Apps and connections.
+- Manual and system appearance changes resolve one effective brightness before the app tree builds.
+- Theme animation is disabled and colour-animating controls are keyed by brightness so semantic tokens, textured surfaces, system chrome, and legacy adaptive colours switch together.
+- Light and Dark palettes use opaque, contrast-tested semantic text roles and more distinct surface/divider roles; disabled colours are not used for essential information.
+- No persistence contract, navigation route, or Supabase schema changes.
+
+## 2026-07-22 - Contrast Comes From Surface Hierarchy And A Confident Brand Accent
+
+Status: Superseded in part by the 2026-07-26 exact-neon decision below. The
+neutral surface hierarchy remains; forest/mint are no longer the brand accent.
+
+Decision:
+
+Replace the pale lime-on-white visual system with an appearance-aware forest/mint accent, a neutral page canvas, crisp elevated surfaces, opaque selected controls, tighter display type, and denser page spacing.
+
+Reasoning:
+
+Repeated local contrast fixes left the application washed out because the root causes were shared: white pages and cards blended together, translucent lime selections lost legibility, oversized offsets weakened hierarchy, and module-specific pastels made the product feel inconsistent. A premium calm interface needs fewer colours, but the colours it keeps must be decisive and accessible.
+
+Consequences:
+
+- Light mode uses a `#F3F5F2` canvas, white surfaces, dark green-black text, and a deep forest `#246B4E` brand accent.
+- Dark mode uses layered charcoal surfaces and a mint `#75C99A` brand accent.
+- Active bottom navigation, workspace rails, segmented controls, filter chips, primary buttons, and picker checks use opaque accent fills with contrast-safe foregrounds.
+- Shared headers, fields, cards, rows, empty states, sheets, and navigation use stronger surface separation, smaller display type, and reduced page padding.
+- Clients, Bookings, booking requests, and More remove one-off pale treatments and inherit the same visual system.
+- No schema, RLS, repository, or navigation contract changes are introduced.
+
+## 2026-07-26 - The Icon Neon Is The Product Accent
+
+Decision:
+
+Use the exact icon and launch-artwork neon `#C1FF72` as Workloop's brand accent
+in System, Light, and Dark appearances. Keep neutral surfaces and use
+contrast-safe foreground roles instead of replacing the neon with a different
+brand colour.
+
+Reasoning:
+
+The icon and launch artwork already establish the strongest recognisable part
+of Workloop's identity. A separate forest accent inside the product weakened
+that continuity. The accessibility issue is not the neon itself; it is using
+neon as small text on light surfaces or placing light content on a neon fill.
+
+Consequences:
+
+- Primary fills, selected controls, navigation emphasis, switches, progress,
+  icon/launch surfaces, and restrained highlights use `#C1FF72`.
+- Content on a neon fill uses dark `#17200D`.
+- Small accent text, focus outlines, and thin icons on light surfaces use the
+  deeper `#4D7317` accent-ink role; Dark mode can use the neon directly.
+- Inter is bundled with its licence so typography is deterministic offline.
+- Theme tests lock the exact neon and contrast-critical foreground pairs.
+
+## 2026-07-26 - Launch Integrations Must Be Useful And Honest
+
+Decision:
+
+Ship real on-device task and booking reminders and one-time calendar import/
+`.ics` export. Do not describe either capability as remote push or live
+calendar sync.
+
+Reasoning:
+
+The useful launch promise is a reminder that works on the owner's phone and a
+portable calendar file the owner deliberately saves. APNs/FCM delivery and
+continuous provider sync introduce operational and failure modes that are not
+ready to promise.
+
+Consequences:
+
+- iOS and Android request notification permission only when the workflow needs
+  it, schedule future task/booking reminders locally, reconcile changes, and
+  route notification taps into Workloop.
+- Remote cross-device push remains future work.
+- Calendar access supports explicit reviewed import only.
+- Calendar export is a point-in-time `.ics` file that can be saved or copied;
+  no provider account or two-way connection is created.
+- Store copy and reviewer notes must preserve these distinctions.
+
+## 2026-07-26 - Multi-Record Workflows Are Atomic And Retry-Safe
+
+Decision:
+
+Create tasks with their initial checklist, create/convert bookings with their
+related records, and complete bookings with payment handling through bounded
+transactional RPCs. Reuse stable idempotency keys across retries. For
+record-by-record imports, remove successful records from the retry set.
+
+Reasoning:
+
+Sequential mobile writes can be interrupted after only part of a business
+workflow succeeds. Blindly retrying can then create duplicate clients,
+bookings, payments, tasks, or checklist items. Both outcomes damage trust.
+
+Consequences:
+
+- Private workflow implementations authenticate the caller and validate
+  workspace ownership and linked-record tenancy before writing.
+- Booking conflict checks are serialised per workspace.
+- Completed workflow retries return the stored result instead of writing again.
+- Booking-request conversion updates the request in the same transaction as the
+  booking and selected related records.
+- Contacts, calendar, CSV, task-text, and note-text imports retain only failed
+  records for retry after a partial attempt.
+- The launch migrations and current Edge Function versions are recorded
+  explicitly. Their structural/grant checks passed; production-like workflow,
+  abuse, and destructive deletion tests remain release gates.
+
+## 2026-07-26 - Workloop 1.0 Is A Portrait-First Mobile Release
+
+Decision:
+
+Launch Workloop 1.0 simultaneously on iOS and Android with an iPhone-only
+portrait target on iOS and portrait orientation on Android. Standardise the
+build baseline on Flutter 3.44.8, Android target/compile API 36, minimum
+Android API 24, Gradle 8.14.3, Android Gradle Plugin 8.11.1, Kotlin 2.2.20,
+and Java 17.
+
+Reasoning:
+
+The current information architecture and interaction design are intentionally
+phone-first. Constraining the first release avoids presenting unverified
+tablet/landscape layouts while still supporting both mobile ecosystems.
+
+Consequences:
+
+- iOS targets device family 1 and portrait orientation with iOS 13 as the
+  deployment floor.
+- Android locks the main activity to portrait and uses API 36 for target and
+  compile.
+- CI has a Linux quality/Android/web lane with Deno checks and a separate
+  macOS unsigned iOS profile-build lane.
+- Physical iPhone and Android device matrices, signing, store accounts, legal
+  hosting, production Auth/email, Edge Function deployment, accessibility, and
+  store declarations remain launch gates.
+
+## 2026-07-26 - Launch Evidence Must Be Environment-Safe And Honest
+
+Decision:
+
+Treat the comprehensive audit branch as a strong closed-beta candidate only
+after its backend/Auth gates close. Do not call the app bug-free or publicly
+launch-ready from source-only evidence. Keep destructive, multi-account,
+booking-abuse, deletion, and load tests on disposable local/staging systems;
+do not point them at production.
+
+Reasoning:
+
+The final local candidate passes 244 Flutter tests, 19 Deno tests, reviewed
+goldens, an iOS simulator smoke, and every supported unsigned/source build.
+Those results materially improve confidence, but they cannot prove a clean
+database replay, tenant isolation under real Auth, deployed booking conversion,
+destructive deletion, production email recovery, sustained load, store
+signatures, or physical accessibility behaviour.
+
+Consequences:
+
+- Production received no migration, Function, destructive, or load mutation
+  during the audit.
+- Candidate database and booking-request changes must pass a clean replay and
+  isolated staging before promotion.
+- The 50,000-account profile remains a deterministic local representation, not
+  a seeded-user or concurrency claim.
+- Android and iOS store artifacts must fail closed while production signing
+  credentials are absent.
+- [`docs/testing/TEST_RESULTS.md`](testing/TEST_RESULTS.md) is the evidence
+  ledger; [`docs/testing/KNOWN_GAPS.md`](testing/KNOWN_GAPS.md) is the release
+  risk register. A missing environment or unexecuted suite remains a blocker,
+  not a pass.
+
+## 2026-07-26 - Shell Geometry And Typography Are One Product System
+
+Decision:
+
+Use one shared, iconless root-page header across Clients, Bookings, Money,
+Tasks, Notes, and More. Place it at the platform safe area plus a 20-point top
+inset, follow it with a 24-point content gap, and reserve one canonical
+bottom-navigation clearance. Bundle Instrument Sans under the OFL and cap
+interface weights at semibold.
+
+Reasoning:
+
+Mixing absolute and safe-area positioning made Clients sit visibly higher than
+Bookings. Separate header constructions, decorative feature icons, inconsistent
+content gaps, and 800-900 typography weights made connected modules feel like
+different products. A quieter typeface and one measured shell grid improve
+clarity without adding visual furniture.
+
+Consequences:
+
+- Home keeps a personalised greeting but consumes the same semantic display and
+  supporting-text styles.
+- Feature-local create actions use the same 48-point neon `+` treatment.
+- Money's single create action discloses income and expense choices in a sheet.
+- More gives Money, Tasks, and Notes primary workspace hierarchy while Profile
+  and Settings remain secondary controls.
+- Geometry, responsive, interaction, and safe-area-aware golden tests protect
+  the system across iOS and Android.
+
+## 2026-07-28 - Workflow Failures Preserve Context And Recovery
+
+Decision:
+
+Keep failure, saving, and retry state inside the workflow or section that owns
+it. Do not dismiss an editor after a failed write, replace an entire screen
+when one independent provider fails, or make users reconstruct valid input.
+Creation and import paths that can write multiple related records must continue
+through the existing validated, idempotent workflow boundary.
+
+Reasoning:
+
+Solo operators often use Workloop while interrupted or between jobs. Losing a
+booking draft, hiding valid Money information because one source failed, or
+offering only a transient snackbar creates uncertainty and duplicate work.
+Local, specific recovery protects both user context and data trust without
+adding another module or redesigning the product.
+
+Consequences:
+
+- Booking-request conversion stays open on validation or network failure and
+  identifies conflicts, outside-hours decisions, and the next recovery action.
+- Public booking requests use persistent labels and inline validation/error
+  feedback in addition to any transient confirmation.
+- Money, notifications, tasks, feed, onboarding, deletion, and import failures
+  retry only their owning operation.
+- Calendar import uses the same atomic booking workflow and stable idempotency
+  contract as direct booking creation.
+- Loading, success, and error semantics remain part of the shared interaction
+  system and are covered at small-phone and large-text sizes.
+
+## 2026-07-28 - Workloop Ships With One Dark Appearance
+
+Decision:
+
+Ship Workloop with one fixed, slightly lifted graphite Dark appearance. Remove
+the System/Light/Dark preference and its Settings destination. Keep the exact
+`#C1FF72` brand neon and use `#151A16` as the native and Flutter page canvas.
+
+Reasoning:
+
+One intentional appearance reduces preference and rendering state, prevents
+platform-theme drift, and lets launch QA concentrate on the experience users
+will actually receive. The previous OLED-black palette felt heavier than the
+calm premium direction, so the graphite layers are lighter while retaining
+contrast and restrained neon hierarchy.
+
+Consequences:
+
+- `MaterialApp`, semantic tokens, compatibility aliases, iOS launch
+  storyboard, and Android launch theme resolve to the same dark system.
+- Existing stored appearance values are ignored safely; no data contract or
+  migration is required.
+- Settings no longer exposes an obsolete appearance choice.
+- Light/System entries earlier in this log remain historical and are
+  superseded by this decision.
+- Accessibility, responsive, golden, simulator, and physical-device checks
+  target the shipped appearance; manual VoiceOver and TalkBack remain required.
+
+## 2026-07-28 - Navigation Shortcuts Preserve Context
+
+Decision:
+
+Provide one app-level top-edge scroll shortcut and preserve platform-native
+back navigation. Retained shell destinations own independent primary scroll
+controllers. Clean pushed routes use native platform gestures; a protected iOS
+route receives a thresholded edge-swipe fallback that invokes, rather than
+bypasses, its existing pop guard.
+
+Reasoning:
+
+Solo operators move repeatedly between long client, booking, and money lists.
+Returning to the beginning should be immediate, but it must target the visible
+workspace rather than disturb an offstage tab. Back swipes reduce reach and
+friction, but allowing an interactive pop to skip unsaved-draft confirmation
+would weaken trust.
+
+Consequences:
+
+- A native iOS status-bar tap or short app top-edge tap animates the visible
+  vertical scroll position to its minimum extent and respects reduced-motion
+  preferences.
+- Home, Clients, Bookings, Money, Tasks, Notes, and More retain independent
+  scroll targets inside the shell.
+- Existing explicit Clients, Money, and business-settings controllers register
+  with the same shared assist system.
+- Ordinary iOS and Android routes retain Flutter's native gesture behaviour.
+- Protected editors keep their Save/Discard/Keep editing contract when reached
+  by a left-edge swipe.
+
+## 2026-07-29 - Navigation Shortcuts Follow the Real Visible Screen
+
+Decision:
+
+Replace per-screen scroll assumptions with app-level discovery of every
+vertical scroll controller. Keep Flutter's native Cupertino back gesture, then
+apply one route-aware left-edge fallback only when the native gesture has not
+completed. Preserve reminder navigation history by pushing destinations rather
+than replacing the active route.
+
+Reasoning:
+
+Physical-device use showed that the earlier contract tests were too narrow:
+screens with implicit or nested controllers were not guaranteed to return to
+the beginning, and ordinary routes had no fallback when the expected native
+gesture did not complete. Navigation shortcuts must follow the actual visible
+scrollable and the screen's existing back decision, not a shortlist of
+screens.
+
+Consequences:
+
+- `ListView`, `SingleChildScrollView`, `CustomScrollView`, nested routes, and
+  retained tabs participate without feature-specific wiring.
+- Every visible vertical scroll layer returns to its beginning together;
+  offstage routes and retained tabs remain untouched.
+- Native iOS back navigation gets first refusal, preventing a double pop.
+- Clean routes, direct routed headers, and protected editors share a forgiving
+  edge-start zone and thresholded fallback recognized during the drag. A
+  pointer cancellation after that deliberate threshold no longer loses the
+  user's back action.
+- Existing back callbacks and `PopScope` guards remain authoritative.
+- Retained subordinate shell workspaces can register their own return target;
+  Money, Tasks, and Notes return to the workspace that launched them.
+- Clients no longer applies a hidden horizontal filter gesture across its full
+  list because it competed with the top shortcut. Its visible filter rail is
+  the canonical filter control, and top-zone client-row taps return to the
+  header when the list is scrolled.
+
+## 2026-07-30 - Hierarchy Follows the User's Next Decision
+
+Decision:
+
+Use three deliberate attention levels across Workloop: one labelled primary
+screen action, one contextual focus area where the workflow has a meaningful
+next decision, and quieter navigation/filter/content layers. Home's contextual
+focus is the booking happening now, the next booking today, or the clear-day
+path into Bookings.
+
+Reasoning:
+
+The shared component system had made the app consistent but too visually flat.
+An unlabeled create icon, selected filters, record rows, and operational
+attention frequently carried similar weight. Solo operators need to recognise
+what is happening and what to do next before reading the rest of the screen.
+
+Consequences:
+
+- Create-capable root screens use a labelled neon action; secondary selected
+  filters use raised graphite and accent text.
+- Standard section headings use sentence-case title hierarchy; quiet variants
+  remain available for dense date/count groups.
+- Home uses a single daily-focus surface and keeps in-progress bookings visible
+  until their end time.
+- Existing provider/repository data sources, routes, four-tab navigation, and
+  data contracts remain unchanged; only attention ordering changes.
+- Booking detail places its operational action near the booking context, and a
+  public profile exposes its booking-request action near the business hero.
+- Golden, responsive, accessibility, provider, and workflow tests remain the
+  verification boundary for future hierarchy changes.
+
+## 2026-07-30 - Back Navigation Must Follow the Finger
+
+Decision:
+
+Keep Flutter's native Cupertino transition authoritative for clean pushed
+routes. Replace binary retained-workspace back callbacks with a progress-driven
+shell transition, and reserve the route fallback for direct routes or
+draft-protected screens after pointer-up. Scroll-to-top targets only scrollables
+that are actually painted and hit-testable on the visible page.
+
+Reasoning:
+
+A callback fired after an arbitrary distance is navigation, but it is not an
+interactive back gesture. It cannot reveal the previous page, cannot be
+reversed naturally, and made a cancelled swipe navigate away. Likewise,
+mounted hidden tabs are not the screen the user intends to reset by tapping the
+status bar.
+
+Consequences:
+
+- Clean pushed pages reveal the real previous route and can cancel using
+  Flutter's native iOS gesture.
+- Money, Tasks, and Notes preserve their retained state and bottom navigation
+  while the remembered workspace appears beneath a finger-tracked transition.
+- Draft-protected editors keep their Save/Discard/Keep editing contract and act
+  only after the user releases a deliberate edge swipe.
+- Hidden `PageView` and `TabBarView` scroll positions remain untouched by a
+  status-bar tap.
+- Scroll-to-top duration scales with distance, capped at 600 milliseconds, and
+  reduced-motion users still jump immediately.
+
+## 2026-07-30 - Tools Stay Grouped And Account Access Lives On Home
+
+Decision:
+
+Keep four stable bottom-navigation destinations: Home, Clients, Bookings, and
+Tools. Rename the generic More destination to Tools, keep Money, Tasks, and
+Notes there as equal full-width workspace rows, and expose Profile and Settings
+as compact direct controls in the Home header.
+
+Reasoning:
+
+Adding Money, Tasks, and Notes individually would create a six-item bottom bar,
+reducing label clarity, recognition, and comfortable thumb targets. The
+previous More layout also mixed a Money hero, two smaller tiles, Profile, and
+Settings, making the page feel like an uneven overflow drawer. Tools gives the
+destination a clearer promise, while the Home header is the familiar place for
+owner and app controls without turning them into daily dashboard content.
+
+Consequences:
+
+- The shell remains four destinations and retains existing workspace state,
+  routes, providers, and back-swipe behaviour.
+- Money, Tasks, and Notes receive equal row treatment; their order still
+  follows the core business loop.
+- Profile and Settings remain pushed screens and do not become dashboard
+  sections that compete with Today.
+- The old `MoreScreen` implementation name can be migrated separately; no
+  architecture or data contract depends on that private presentation name.

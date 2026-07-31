@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
@@ -10,6 +10,7 @@ import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/currency_format.dart';
 import '../../shared/widgets/slate_ui.dart';
 import 'widgets/money_editor_widgets.dart';
 
@@ -18,6 +19,7 @@ typedef _PaymentDraft = ({
   String description,
   String? clientId,
   String status,
+  bool paymentStateChanged,
   String date,
   String dueDate,
 });
@@ -43,6 +45,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
   final _descriptionController = TextEditingController();
   String? _selectedClientId;
   String _status = 'paid';
+  bool _paymentStateChanged = false;
   DateTime _date = DateTime.now();
   DateTime _dueDate = DateTime.now().add(const Duration(days: 7));
   bool _saving = false;
@@ -66,7 +69,9 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
       _descriptionController.text = payment.notes ?? '';
       _selectedClientId = payment.contactId ?? widget.initialClientId;
       _status = payment.status == 'paid' ? 'paid' : 'sent';
-      _date = payment.issueDate;
+      _date = payment.status == 'paid'
+          ? payment.receivedDate
+          : payment.issueDate;
       _dueDate = payment.dueDate ?? payment.issueDate;
     }
     _amountController.addListener(_handleDraftChanged);
@@ -94,6 +99,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
     description: _descriptionController.text.trim(),
     clientId: _selectedClientId,
     status: _status,
+    paymentStateChanged: _paymentStateChanged,
     date: _dateKey(_date),
     dueDate: _dateKey(_dueDate),
   );
@@ -154,10 +160,11 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
         await ref
             .read(paymentsRepositoryProvider)
             .update(
-              paymentId: widget.payment!.id,
+              existingPayment: widget.payment!,
               amount: amount,
               status: _status,
               date: _date,
+              paymentStateChanged: _paymentStateChanged,
               dueDate: _status == 'paid' ? _date : _dueDate,
               contactId: _selectedClientId,
               appointmentId: widget.payment!.appointmentId,
@@ -176,18 +183,25 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
               appointmentId: widget.appointmentId,
               notes: description,
             );
-        await ref
-            .read(notificationsRepositoryProvider)
-            .create(
-              workspaceId: workspaceId,
-              type: _status == 'paid' ? 'payment_received' : 'invoice_overdue',
-              title: _status == 'paid'
-                  ? 'Payment recorded'
-                  : 'Payment to collect',
-              body:
-                  '£${amount.toStringAsFixed(0)} ${_status == 'paid' ? 'was recorded' : 'is waiting to be collected'}.',
-              deepLink: '/payments',
-            );
+        try {
+          await ref
+              .read(notificationsRepositoryProvider)
+              .create(
+                workspaceId: workspaceId,
+                type: _status == 'paid'
+                    ? 'payment_received'
+                    : 'invoice_overdue',
+                title: _status == 'paid'
+                    ? 'Payment recorded'
+                    : 'Payment to collect',
+                body:
+                    '${formatPounds(amount)} ${_status == 'paid' ? 'was recorded' : 'is waiting to be collected'}.',
+                deepLink: '/payments',
+              );
+        } catch (_) {
+          // Recording Money is the primary workflow. A best-effort in-app
+          // notification must not make a committed entry look unsaved.
+        }
       }
 
       ref.invalidate(invoicesProvider);
@@ -277,32 +291,16 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                       AppSpacing.pageX,
                       0,
                     ),
-                    child: Row(
-                      children: [
-                        WorkloopIconButton(
-                          icon: LucideIcons.chevronLeft,
-                          semanticLabel: 'Back to Money',
-                          onTap: _handleBack,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            _editing ? 'Edit income' : 'Record income',
-                            style: const TextStyle(
-                              color: AppColors.t1,
-                              fontSize: 26,
-                              height: 1.05,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        MoneySaveAction(
-                          label: _editing ? 'Save' : 'Add',
-                          loading: _saving,
-                          enabled: _canSave,
-                          onTap: _save,
-                        ),
-                      ],
+                    child: WorkloopRouteHeader(
+                      title: _editing ? 'Edit income' : 'Record income',
+                      backSemanticLabel: 'Back to Money',
+                      onBack: _handleBack,
+                      trailing: MoneySaveAction(
+                        label: _editing ? 'Save' : 'Add',
+                        loading: _saving,
+                        enabled: _canSave,
+                        onTap: _save,
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
@@ -342,10 +340,26 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                                   label: 'To collect',
                                 ),
                               ],
-                              onChanged: (value) =>
-                                  setState(() => _status = value),
+                              onChanged: (value) => setState(() {
+                                _status = value;
+                                _paymentStateChanged = true;
+                              }),
                             ),
                           ),
+                          if (_editing &&
+                              widget.payment!.collectedAmount > 0 &&
+                              widget.payment!.status != 'paid' &&
+                              !_paymentStateChanged) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              '£${widget.payment!.collectedAmount.toStringAsFixed(2)} already received will be preserved.',
+                              style: const TextStyle(
+                                color: AppColors.t3,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: AppSpacing.xl),
                           MoneyFormSection(
                             title: 'Details',
@@ -383,7 +397,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                                     height: 54,
                                     radius: AppRadius.md,
                                   ),
-                                  error: (_, __) => const SlateErrorState(
+                                  error: (_, _) => const SlateErrorState(
                                     message: 'Could not load clients',
                                   ),
                                 ),
@@ -414,7 +428,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                             child: MoneyTextField(
                               controller: _descriptionController,
                               label: 'Note',
-                              hint: 'Job, service or useful reference',
+                              hint: 'Booking, service or useful reference',
                               icon: LucideIcons.fileText,
                               maxLines: 3,
                             ),

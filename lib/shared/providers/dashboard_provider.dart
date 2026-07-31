@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/slate_models.dart';
 import '../repositories/slate_repositories.dart';
+import '../utils/currency_format.dart';
 import 'clients_provider.dart';
 import 'finance_provider.dart';
 import 'tasks_provider.dart';
@@ -33,120 +34,59 @@ class DashboardFocus {
   final int pendingBookingRequests;
   final int overduePayments;
   final double overdueTotal;
-  final bool calendarSyncEnabled;
 
   const DashboardFocus({
     required this.nextAppointment,
     required this.pendingBookingRequests,
     required this.overduePayments,
     required this.overdueTotal,
-    required this.calendarSyncEnabled,
   });
 
   bool get hasAttention =>
       pendingBookingRequests > 0 ||
       overduePayments > 0 ||
-      nextAppointment != null ||
-      !calendarSyncEnabled;
+      nextAppointment != null;
 }
 
-double _sumTotals(List<Map<String, dynamic>> rows) {
-  return rows.fold<double>(0, (sum, row) {
-    final v = row['total'];
-    if (v is num) return sum + v.toDouble();
-    return sum + (double.tryParse(v?.toString() ?? '') ?? 0);
-  });
+DashboardRevenue dashboardRevenueFromFinance(FinanceSummary summary) {
+  return DashboardRevenue(
+    weekTotal: summary.thisWeekPaid,
+    monthTotal: summary.thisMonthPaid,
+    weekExpenses: summary.thisWeekExpenses,
+    monthExpenses: summary.thisMonthExpenses,
+    outstanding: summary.unpaid + summary.overdue,
+    revenueTarget: summary.monthlyTarget,
+  );
 }
 
-double _sumOutstanding(List<Map<String, dynamic>> rows) {
-  return rows.fold<double>(0, (sum, row) {
-    final totalValue = row['total'];
-    final paidValue = row['amount_paid'];
-    final total = totalValue is num
-        ? totalValue.toDouble()
-        : double.tryParse(totalValue?.toString() ?? '') ?? 0;
-    final paid = paidValue is num
-        ? paidValue.toDouble()
-        : double.tryParse(paidValue?.toString() ?? '') ?? 0;
-    return sum + (total - paid).clamp(0, double.infinity);
-  });
+DashboardFocus dashboardFocusFrom({
+  required Map<String, dynamic>? nextAppointment,
+  required int pendingBookingRequests,
+  required List<Payment> payments,
+  DateTime? now,
+}) {
+  final current = now ?? DateTime.now();
+  final overdue = payments
+      .where(
+        (payment) =>
+            moneyStatusFor(payment, now: current) == MoneyStatus.overdue &&
+            outstandingAmountFor(payment) > 0,
+      )
+      .toList();
+  return DashboardFocus(
+    nextAppointment: nextAppointment,
+    pendingBookingRequests: pendingBookingRequests,
+    overduePayments: overdue.length,
+    overdueTotal: overdue.fold<double>(
+      0,
+      (sum, payment) => sum + outstandingAmountFor(payment),
+    ),
+  );
 }
-
-double _sumAmounts(List<Map<String, dynamic>> rows) {
-  return rows.fold<double>(0, (sum, row) {
-    final v = row['amount'];
-    if (v is num) return sum + v.toDouble();
-    return sum + (double.tryParse(v?.toString() ?? '') ?? 0);
-  });
-}
-
-String _dateOnly(DateTime dt) =>
-    '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-
-DateTime _startOfWeek(DateTime now) {
-  final monday = now.subtract(Duration(days: now.weekday - 1));
-  return DateTime(monday.year, monday.month, monday.day);
-}
-
-DateTime _startOfMonth(DateTime now) => DateTime(now.year, now.month, 1);
 
 final dashboardRevenueProvider = FutureProvider<DashboardRevenue>((ref) async {
-  final workspaceId = await ref.watch(workspaceIdProvider.future);
-  if (workspaceId == null) {
-    return const DashboardRevenue(
-      weekTotal: 0,
-      monthTotal: 0,
-      weekExpenses: 0,
-      monthExpenses: 0,
-      outstanding: 0,
-      revenueTarget: 0,
-    );
-  }
-
-  final now = DateTime.now();
-  final weekStart = _dateOnly(_startOfWeek(now));
-  final monthStart = _dateOnly(_startOfMonth(now));
-  final repository = ref.watch(dashboardRepositoryProvider);
-
-  final weekPaid = await repository.invoiceTotals(
-    workspaceId: workspaceId,
-    status: 'paid',
-    issueDateFrom: weekStart,
-  );
-  final monthPaid = await repository.invoiceTotals(
-    workspaceId: workspaceId,
-    status: 'paid',
-    issueDateFrom: monthStart,
-  );
-  final outstandingRows = await repository.invoiceTotals(
-    workspaceId: workspaceId,
-    status: 'sent',
-    statuses: ['sent', 'overdue'],
-  );
-  final weekExpenses = await repository.expenseTotals(
-    workspaceId: workspaceId,
-    expenseDateFrom: weekStart,
-  );
-  final monthExpenses = await repository.expenseTotals(
-    workspaceId: workspaceId,
-    expenseDateFrom: monthStart,
-  );
-
-  double revenueTarget = 0;
-  try {
-    revenueTarget = await repository.revenueTarget(workspaceId);
-  } catch (_) {}
-
-  return DashboardRevenue(
-    weekTotal: _sumTotals(List<Map<String, dynamic>>.from(weekPaid)),
-    monthTotal: _sumTotals(List<Map<String, dynamic>>.from(monthPaid)),
-    weekExpenses: _sumAmounts(List<Map<String, dynamic>>.from(weekExpenses)),
-    monthExpenses: _sumAmounts(List<Map<String, dynamic>>.from(monthExpenses)),
-    outstanding: _sumOutstanding(
-      List<Map<String, dynamic>>.from(outstandingRows),
-    ),
-    revenueTarget: revenueTarget,
-  );
+  final summary = await ref.watch(financeSummaryProvider.future);
+  return dashboardRevenueFromFinance(summary);
 });
 
 final todayAppointmentsProvider = FutureProvider<List<Map<String, dynamic>>>((
@@ -156,8 +96,8 @@ final todayAppointmentsProvider = FutureProvider<List<Map<String, dynamic>>>((
   if (workspaceId == null) return [];
 
   final now = DateTime.now();
-  final startOfToday = DateTime(now.year, now.month, now.day);
-  final startOfTomorrow = startOfToday.add(const Duration(days: 1));
+  final startOfToday = startOfDay(now);
+  final startOfTomorrow = addBusinessCalendarDays(startOfToday, 1);
 
   return ref
       .watch(dashboardRepositoryProvider)
@@ -176,43 +116,24 @@ final dashboardFocusProvider = FutureProvider<DashboardFocus>((ref) async {
       pendingBookingRequests: 0,
       overduePayments: 0,
       overdueTotal: 0,
-      calendarSyncEnabled: false,
     );
   }
 
   final repository = ref.watch(dashboardRepositoryProvider);
   final now = DateTime.now();
 
-  Map<String, dynamic>? nextAppointment;
-  var pendingRequests = 0;
-  var overdueRows = <Map<String, dynamic>>[];
-  var calendarSyncEnabled = false;
+  final nextAppointmentFuture = repository.nextAppointment(
+    workspaceId: workspaceId,
+    from: now,
+  );
+  final pendingRequestsFuture = repository.pendingBookingRequests(workspaceId);
+  final paymentsFuture = ref.watch(invoicesProvider.future);
 
-  try {
-    nextAppointment = await repository.nextAppointment(
-      workspaceId: workspaceId,
-      from: now,
-    );
-  } catch (_) {}
-
-  try {
-    pendingRequests = await repository.pendingBookingRequests(workspaceId);
-  } catch (_) {}
-
-  try {
-    overdueRows = await repository.overduePayments(workspaceId);
-  } catch (_) {}
-
-  try {
-    calendarSyncEnabled = await repository.calendarSyncEnabled(workspaceId);
-  } catch (_) {}
-
-  return DashboardFocus(
-    nextAppointment: nextAppointment,
-    pendingBookingRequests: pendingRequests,
-    overduePayments: overdueRows.length,
-    overdueTotal: _sumOutstanding(overdueRows),
-    calendarSyncEnabled: calendarSyncEnabled,
+  return dashboardFocusFrom(
+    nextAppointment: await nextAppointmentFuture,
+    pendingBookingRequests: await pendingRequestsFuture,
+    payments: await paymentsFuture,
+    now: now,
   );
 });
 
@@ -246,16 +167,10 @@ final dashboardAttentionProvider = FutureProvider<List<DashboardAttentionItem>>(
     final appointmentsFuture = ref.watch(todayAppointmentsProvider.future);
     final clientsFuture = ref.watch(clientsProvider.future);
 
-    final payments = await safeDashboardSource(
-      paymentsFuture,
-      const <Payment>[],
-    );
-    final tasks = await safeDashboardSource(tasksFuture, const <SlateTask>[]);
-    final appointments = await safeDashboardSource(
-      appointmentsFuture,
-      const <Map<String, dynamic>>[],
-    );
-    final clients = await safeDashboardSource(clientsFuture, const <Client>[]);
+    final payments = await paymentsFuture;
+    final tasks = await tasksFuture;
+    final appointments = await appointmentsFuture;
+    final clients = await clientsFuture;
 
     return buildDashboardAttentionItems(
       payments: payments,
@@ -265,14 +180,6 @@ final dashboardAttentionProvider = FutureProvider<List<DashboardAttentionItem>>(
     );
   },
 );
-
-Future<T> safeDashboardSource<T>(Future<T> future, T fallback) async {
-  try {
-    return await future;
-  } catch (_) {
-    return fallback;
-  }
-}
 
 List<DashboardAttentionItem> buildDashboardAttentionItems({
   required List<Payment> payments,
@@ -287,13 +194,15 @@ List<DashboardAttentionItem> buildDashboardAttentionItems({
 
   for (final payment in payments) {
     if (payment.status == 'paid') continue;
+    final outstanding = outstandingAmountFor(payment);
+    if (outstanding <= 0) continue;
     final dueDate = payment.dueDate ?? payment.issueDate;
     final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
     if (today.difference(dueDay) <= dashboardUnpaidThreshold) continue;
     items.add(
       DashboardAttentionItem(
         type: DashboardAttentionType.unpaid,
-        title: 'Collect £${payment.total.toStringAsFixed(0)}',
+        title: 'Collect ${formatPounds(outstanding)}',
         detail: payment.clientName ?? payment.number,
         source: payment,
         sortTime: dueDate,
@@ -353,6 +262,21 @@ List<DashboardAttentionItem> buildDashboardAttentionItems({
     );
   }
 
-  items.sort((a, b) => a.sortTime.compareTo(b.sortTime));
+  items.sort((a, b) {
+    final priority = _dashboardAttentionPriority(
+      a.type,
+    ).compareTo(_dashboardAttentionPriority(b.type));
+    if (priority != 0) return priority;
+    return a.sortTime.compareTo(b.sortTime);
+  });
   return items;
+}
+
+int _dashboardAttentionPriority(DashboardAttentionType type) {
+  return switch (type) {
+    DashboardAttentionType.unconfirmedAppointment => 0,
+    DashboardAttentionType.overdueTask => 1,
+    DashboardAttentionType.unpaid => 2,
+    DashboardAttentionType.uncontactedLead => 3,
+  };
 }

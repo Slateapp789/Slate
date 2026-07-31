@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../settings/widgets/settings_business_tab.dart';
@@ -36,26 +34,9 @@ class ProfileEditorScreen extends StatelessWidget {
                     AppSpacing.pageX,
                     AppSpacing.xl,
                   ),
-                  child: Row(
-                    children: [
-                      WorkloopIconButton(
-                        icon: LucideIcons.chevronLeft,
-                        semanticLabel: 'Back to profile',
-                        onTap: () => Navigator.pop(context),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Text(
-                          _title,
-                          style: const TextStyle(
-                            color: AppColors.t1,
-                            fontSize: 26,
-                            height: 1.05,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: WorkloopRouteHeader(
+                    title: _title,
+                    backSemanticLabel: 'Back to profile',
                   ),
                 ),
                 Expanded(

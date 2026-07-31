@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workloop/shared/models/business_feed_item.dart';
 import 'package:workloop/shared/models/slate_models.dart';
+import 'package:workloop/shared/providers/appointments_provider.dart';
 import 'package:workloop/shared/providers/business_feed_provider.dart';
+import 'package:workloop/shared/providers/clients_provider.dart';
 import 'package:workloop/shared/providers/finance_provider.dart';
+import 'package:workloop/shared/providers/notes_provider.dart';
+import 'package:workloop/shared/providers/tasks_provider.dart';
+import 'package:workloop/shared/providers/workspace_provider.dart';
 import 'package:workloop/shared/widgets/business_feed_list.dart';
 
 void main() {
@@ -324,17 +330,36 @@ void main() {
       expect(expenseItem.subtitle, contains('Business date yesterday'));
     });
 
-    test(
-      'feed source fallback returns safe defaults when a source fails',
-      () async {
-        final notes = await safeBusinessFeedSource<List<SlateNote>>(
-          Future<List<SlateNote>>.error(Exception('notes unavailable')),
-          const <SlateNote>[],
-        );
+    test('provider surfaces a source failure instead of an all-clear feed', () {
+      final sourceError = StateError('payments unavailable');
+      final container = ProviderContainer(
+        overrides: [
+          workspaceIdProvider.overrideWith((ref) async => null),
+          appointmentsProvider.overrideWith(
+            (ref) async => const <Map<String, dynamic>>[],
+          ),
+          invoicesProvider.overrideWith((ref) async => throw sourceError),
+          expensesProvider.overrideWith((ref) async => const <Expense>[]),
+          allTasksProvider.overrideWith((ref) async => const <SlateTask>[]),
+          allNotesProvider.overrideWith((ref) async => const <SlateNote>[]),
+          clientsProvider.overrideWith((ref) async => const <Client>[]),
+          financeSummaryProvider.overrideWith(
+            (ref) async => FinanceSummary.from(
+              payments: const <Payment>[],
+              expenses: const <Expense>[],
+              monthlyTarget: 0,
+              now: DateTime(2026, 7, 6),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
 
-        expect(notes, isEmpty);
-      },
-    );
+      expect(
+        container.read(businessFeedProvider.future),
+        throwsA(same(sourceError)),
+      );
+    });
   });
 
   testWidgets('BusinessFeedList supports source-specific empty copy', (

@@ -1,15 +1,13 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/appointments_provider.dart';
-import '../../shared/providers/calendar_sync_provider.dart';
-import '../../shared/providers/dashboard_provider.dart';
-import '../../shared/providers/workspace_provider.dart';
-import '../../shared/providers/workspace_settings_provider.dart';
-import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/calendar_export.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../imports/calendar_import_screen.dart';
@@ -19,8 +17,6 @@ class CalendarSyncScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sync = ref.watch(calendarSyncProvider);
-
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: Stack(
@@ -30,109 +26,51 @@ class CalendarSyncScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
               children: [
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: const Icon(
-                          LucideIcons.chevronLeft,
-                          color: AppColors.t2,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    const Text(
-                      'Calendar tools',
-                      style: TextStyle(
-                        color: AppColors.t1,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                  ],
+                const WorkloopRouteHeader(
+                  title: 'Calendar tools',
+                  backSemanticLabel: 'Back to settings',
                 ),
-                const SizedBox(height: 26),
-                WorkloopSurface(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Bring events into Workloop',
-                        style: TextStyle(
-                          color: AppColors.t1,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      const Text(
-                        'Choose calendar events, review them, then import them once as bookings.',
-                        style: TextStyle(
-                          color: AppColors.t3,
-                          fontSize: 13,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      WorkloopPrimaryButton(
-                        label: 'Import calendar events',
-                        icon: LucideIcons.download,
-                        secondary: true,
-                        onPressed: () => Navigator.push<void>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const CalendarImportScreen(),
-                          ),
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: AppSpacing.xxl),
+                const WorkloopSectionHeader(label: 'Import events'),
+                const SizedBox(height: AppSpacing.xs),
+                const Text(
+                  'Choose calendar events, review them, then create them once as Workloop bookings.',
+                  style: TextStyle(
+                    color: AppColors.t2,
+                    fontSize: 14,
+                    height: 1.45,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                sync.when(
-                  loading: () => const _SyncLoadingCard(),
-                  error: (_, __) => const _SyncInfoCard(
-                    enabled: false,
-                    provider: null,
-                    lastSyncedAt: null,
-                  ),
-                  data: (state) => _SyncInfoCard(
-                    enabled: state.enabled,
-                    provider: state.account?['provider'] as String?,
-                    lastSyncedAt: DateTime.tryParse(
-                      state.account?['last_synced_at']?.toString() ?? '',
-                    )?.toLocal(),
+                WorkloopPrimaryButton(
+                  label: 'Import calendar events',
+                  icon: LucideIcons.download,
+                  onPressed: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const CalendarImportScreen(),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                sync.when(
-                  data: (state) => state.enabled
-                      ? _ConnectedActions(
-                          onExport: () => _copyIcsFeed(context, ref),
-                          onDisconnect: () => _disconnect(ref),
-                        )
-                      : _ExportActions(
-                          onEnable: () => _connect(ref),
-                          onCopy: () => _copyIcsFeed(context, ref),
-                        ),
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, __) => _ExportActions(
-                    onEnable: () => _connect(ref),
-                    onCopy: () => _copyIcsFeed(context, ref),
+                const SizedBox(height: AppSpacing.xxl),
+                const WorkloopSectionHeader(label: 'Export bookings'),
+                const SizedBox(height: AppSpacing.xs),
+                const Text(
+                  'Save a point-in-time .ics file of your current bookings. This is not a live two-way connection.',
+                  style: TextStyle(
+                    color: AppColors.t2,
+                    fontSize: 14,
+                    height: 1.45,
                   ),
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: AppSpacing.md),
+                _ExportActions(
+                  onSave: () => _saveIcsFile(context, ref),
+                  onCopy: () => _copyIcsData(context, ref),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                const WorkloopSectionHeader(label: 'What to expect'),
+                const SizedBox(height: AppSpacing.xs),
                 const _SyncRow(
                   icon: LucideIcons.download,
                   label: 'One-time import',
@@ -143,11 +81,6 @@ class CalendarSyncScreen extends ConsumerWidget {
                   label: 'Conflict detection',
                   value: 'Active in booking form',
                 ),
-                const _SyncRow(
-                  icon: LucideIcons.repeat,
-                  label: 'Two-way provider sync',
-                  value: 'Not connected',
-                ),
               ],
             ),
           ),
@@ -156,29 +89,38 @@ class CalendarSyncScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _connect(WidgetRef ref) async {
-    final workspaceId = await ref.read(workspaceIdProvider.future);
-    if (workspaceId == null) return;
-    await ref
-        .read(calendarSyncRepositoryProvider)
-        .connect(workspaceId: workspaceId, provider: 'ics_export');
-    ref.invalidate(calendarSyncProvider);
-    ref.invalidate(workspaceSettingsProvider);
-    ref.invalidate(dashboardFocusProvider);
-  }
-
-  Future<void> _disconnect(WidgetRef ref) async {
-    final workspaceId = await ref.read(workspaceIdProvider.future);
-    if (workspaceId == null) return;
-    await ref.read(calendarSyncRepositoryProvider).disconnect(workspaceId);
-    ref.invalidate(calendarSyncProvider);
-    ref.invalidate(workspaceSettingsProvider);
-    ref.invalidate(dashboardFocusProvider);
-  }
-
-  Future<void> _copyIcsFeed(BuildContext context, WidgetRef ref) async {
+  Future<String> _icsData(WidgetRef ref) async {
     final rows = await ref.read(appointmentsProvider.future);
-    final ics = buildSlateIcs(rows);
+    return buildWorkloopIcs(rows);
+  }
+
+  Future<void> _saveIcsFile(BuildContext context, WidgetRef ref) async {
+    try {
+      final ics = await _icsData(ref);
+      final result = await FilePicker.saveFile(
+        dialogTitle: 'Save Workloop calendar',
+        fileName: 'workloop-bookings.ics',
+        type: FileType.custom,
+        allowedExtensions: const ['ics'],
+        bytes: Uint8List.fromList(utf8.encode(ics)),
+      );
+      if (!context.mounted || result == null) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Calendar file saved')));
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Calendar file could not be saved'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _copyIcsData(BuildContext context, WidgetRef ref) async {
+    final ics = await _icsData(ref);
     await Clipboard.setData(ClipboardData(text: ics));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -191,182 +133,28 @@ class CalendarSyncScreen extends ConsumerWidget {
   }
 }
 
-class _SyncInfoCard extends StatelessWidget {
-  final bool enabled;
-  final String? provider;
-  final DateTime? lastSyncedAt;
-
-  const _SyncInfoCard({
-    required this.enabled,
-    required this.provider,
-    required this.lastSyncedAt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: enabled
-              ? AppColors.green.withValues(alpha: 0.32)
-              : AppColors.border,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            enabled ? LucideIcons.calendarCheck : LucideIcons.calendarClock,
-            color: enabled ? AppColors.green : AppColors.t3,
-            size: 28,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            enabled ? 'Calendar export is on' : 'Calendar export',
-            style: const TextStyle(
-              color: AppColors.t1,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            enabled
-                ? '${_providerLabel(provider)} export is enabled. Copy the calendar data when you want to move Workloop bookings elsewhere.'
-                : 'Copy your current Workloop bookings as standard calendar data. This is an export, not a live two-way connection.',
-            style: const TextStyle(
-              color: AppColors.t3,
-              fontSize: 14,
-              height: 1.4,
-            ),
-          ),
-          if (lastSyncedAt != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              'Export preference updated ${_formatDateTime(lastSyncedAt!)}',
-              style: const TextStyle(
-                color: AppColors.green,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _SyncLoadingCard extends StatelessWidget {
-  const _SyncLoadingCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 178,
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: const Center(
-        child: CircularProgressIndicator(color: AppColors.green),
-      ),
-    );
-  }
-}
-
 class _ExportActions extends StatelessWidget {
-  final VoidCallback onEnable;
+  final VoidCallback onSave;
   final VoidCallback onCopy;
-  const _ExportActions({required this.onEnable, required this.onCopy});
+  const _ExportActions({required this.onSave, required this.onCopy});
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton.icon(
-            onPressed: onEnable,
-            icon: const Icon(LucideIcons.calendarCheck, size: 17),
-            label: const Text('Turn on calendar export'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.slateLight.withValues(alpha: 0.82),
-              foregroundColor: AppColors.panelInk,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              elevation: 0,
-            ),
-          ),
+        WorkloopPrimaryButton(
+          label: 'Save calendar file',
+          icon: LucideIcons.download,
+          secondary: true,
+          onPressed: onSave,
         ),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: OutlinedButton.icon(
+        const SizedBox(height: AppSpacing.xs),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: WorkloopTextButton(
+            label: 'Copy raw calendar data',
             onPressed: onCopy,
-            icon: const Icon(LucideIcons.copy, size: 17),
-            label: const Text('Copy calendar data'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.t2,
-              side: const BorderSide(color: AppColors.border),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ConnectedActions extends StatelessWidget {
-  final VoidCallback onExport;
-  final VoidCallback onDisconnect;
-  const _ConnectedActions({required this.onExport, required this.onDisconnect});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton.icon(
-            onPressed: onExport,
-            icon: const Icon(LucideIcons.download, size: 17),
-            label: const Text('Copy calendar data'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.slateLight.withValues(alpha: 0.82),
-              foregroundColor: AppColors.panelInk,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              elevation: 0,
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: OutlinedButton.icon(
-            onPressed: onDisconnect,
-            icon: const Icon(LucideIcons.unlink, size: 17),
-            label: const Text('Turn off calendar export'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.error,
-              side: BorderSide(color: AppColors.error.withValues(alpha: 0.35)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
           ),
         ),
       ],
@@ -386,50 +174,82 @@ class _SyncRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.t3, size: 17),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.t1,
-                fontWeight: FontWeight.w700,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textScaler = MediaQuery.textScalerOf(context);
+        final useStackedLayout =
+            constraints.maxWidth < 340 || textScaler.scale(12) > 15;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            crossAxisAlignment: useStackedLayout
+                ? CrossAxisAlignment.start
+                : CrossAxisAlignment.center,
+            children: [
+              Icon(icon, color: AppColors.t3, size: 17),
+              const SizedBox(width: 12),
+              Expanded(
+                child: useStackedLayout
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SyncRowLabel(label),
+                          const SizedBox(height: AppSpacing.xxs),
+                          _SyncRowValue(value),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(child: _SyncRowLabel(label)),
+                          const SizedBox(width: AppSpacing.sm),
+                          Flexible(child: _SyncRowValue(value, alignEnd: true)),
+                        ],
+                      ),
               ),
-            ),
+            ],
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.t3,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
-String _formatDateTime(DateTime dt) {
-  return '${dt.day}/${dt.month}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+class _SyncRowLabel extends StatelessWidget {
+  final String label;
+
+  const _SyncRowLabel(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: const TextStyle(color: AppColors.t1, fontWeight: FontWeight.w600),
+    );
+  }
 }
 
-String _providerLabel(String? provider) {
-  return switch (provider) {
-    'ics_export' || null => 'Calendar',
-    'google' => 'Google Calendar',
-    'apple' => 'Apple Calendar',
-    _ => provider,
-  };
+class _SyncRowValue extends StatelessWidget {
+  final String value;
+  final bool alignEnd;
+
+  const _SyncRowValue(this.value, {this.alignEnd = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      value,
+      textAlign: alignEnd ? TextAlign.end : TextAlign.start,
+      style: const TextStyle(
+        color: AppColors.t3,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
 }

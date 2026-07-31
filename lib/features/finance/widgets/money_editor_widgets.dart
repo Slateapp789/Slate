@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
 
@@ -25,7 +25,7 @@ class MoneyFormSection extends StatelessWidget {
           style: const TextStyle(
             color: AppColors.t1,
             fontSize: 17,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
           ),
         ),
         if (subtitle != null) ...[
@@ -54,6 +54,9 @@ class MoneyAmountField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens =
+        Theme.of(context).extension<WorkloopThemeTokens>() ??
+        WorkloopThemeTokens.dark;
     return TextField(
       controller: controller,
       autofocus: true,
@@ -62,7 +65,7 @@ class MoneyAmountField extends StatelessWidget {
       style: const TextStyle(
         color: AppColors.t1,
         fontSize: 32,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w600,
         height: 1.1,
       ),
       decoration: InputDecoration(
@@ -70,13 +73,13 @@ class MoneyAmountField extends StatelessWidget {
         prefixStyle: const TextStyle(
           color: AppColors.t3,
           fontSize: 28,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
         ),
         hintText: '0.00',
         hintStyle: TextStyle(
-          color: AppColors.t3.withValues(alpha: 0.55),
+          color: AppColors.t3,
           fontSize: 32,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
         ),
         filled: true,
         fillColor: AppColors.t1.withValues(alpha: 0.035),
@@ -86,7 +89,7 @@ class MoneyAmountField extends StatelessWidget {
         ),
         border: _border(AppColors.border),
         enabledBorder: _border(AppColors.border),
-        focusedBorder: _border(AppColors.accentPrimaryStrong, width: 1.5),
+        focusedBorder: _border(tokens.accentInk, width: 1.5),
       ),
     );
   }
@@ -172,7 +175,7 @@ class MoneyDateField extends StatelessWidget {
                     style: const TextStyle(
                       color: AppColors.t3,
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -181,7 +184,7 @@ class MoneyDateField extends StatelessWidget {
                     style: const TextStyle(
                       color: AppColors.t1,
                       fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -227,7 +230,7 @@ class MoneySaveAction extends StatelessWidget {
             )
           : Text(
               label,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
     );
   }

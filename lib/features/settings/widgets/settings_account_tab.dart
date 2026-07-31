@@ -1,8 +1,11 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/workspace_provider.dart';
 import '../../../shared/repositories/slate_repositories.dart';
@@ -20,7 +23,6 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
   bool _changingPassword = false;
   bool _savingPassword = false;
   bool _exporting = false;
-  bool _requestingDeletion = false;
   final _newPasswordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   final _firstNameCtrl = TextEditingController();
@@ -49,8 +51,8 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
   }
 
   Future<void> _changePassword() async {
-    final newPass = _newPasswordCtrl.text.trim();
-    final confirm = _confirmPasswordCtrl.text.trim();
+    final newPass = _newPasswordCtrl.text;
+    final confirm = _confirmPasswordCtrl.text;
     if (newPass.isEmpty) return;
     if (newPass != confirm) {
       _snack("Passwords don't match", AppColors.error);
@@ -111,7 +113,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
                 style: TextStyle(
                   color: AppColors.t1,
                   fontSize: 20,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 6),
@@ -165,6 +167,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
   void _showSignOutSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -181,7 +184,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
                 'Sign out?',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.t1,
                 ),
               ),
@@ -214,22 +217,46 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
     setState(() => _exporting = true);
     try {
       final workspaceId = await ref.read(workspaceIdProvider.future);
-      if (workspaceId == null) return;
+      if (workspaceId == null) {
+        throw StateError('No active workspace');
+      }
       final json = await ref
           .read(privacyRepositoryProvider)
           .exportWorkspaceData(workspaceId);
-      if (!mounted) return;
-      setState(() => _exporting = false);
-      _showExportSheet(json);
+      final now = DateTime.now();
+      final date =
+          '${now.year.toString().padLeft(4, '0')}-'
+          '${now.month.toString().padLeft(2, '0')}-'
+          '${now.day.toString().padLeft(2, '0')}';
+      final savedPath = await FilePicker.saveFile(
+        dialogTitle: 'Save Workloop data export',
+        fileName: 'workloop-data-export-$date.json',
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        bytes: Uint8List.fromList(utf8.encode(json)),
+      );
+      if (mounted && savedPath != null) {
+        _snack('Data export saved', AppColors.green);
+      }
+    } on PrivacyExportIncompleteException {
+      if (mounted) {
+        _snack(
+          'The export was incomplete, so no file was saved. Please try again.',
+          AppColors.error,
+        );
+      }
     } catch (_) {
-      setState(() => _exporting = false);
       if (mounted) {
         _snack('Your data export could not be prepared.', AppColors.error);
       }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
     }
   }
 
-  void _showExportSheet(String json) {
+  void _showDeleteAccountSheet() {
+    _deleteConfirmCtrl.clear();
+    var requestingDeletion = false;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -237,81 +264,15 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              settingsHandle(),
-              const SizedBox(height: 20),
-              const Text(
-                'Workspace export',
-                style: TextStyle(
-                  color: AppColors.t1,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'This includes the workspace data Workloop currently stores for your account.',
-                style: TextStyle(color: AppColors.t3, height: 1.4),
-              ),
-              const SizedBox(height: 14),
-              Container(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(ctx).size.height * 0.42,
-                ),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.bgInteract,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: SingleChildScrollView(
-                  child: SelectableText(
-                    json,
-                    style: const TextStyle(
-                      color: AppColors.t2,
-                      fontSize: 11,
-                      height: 1.35,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              saveBtn(
-                label: 'Copy export',
-                onTap: () async {
-                  await Clipboard.setData(ClipboardData(text: json));
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) _snack('Export copied', AppColors.green);
-                },
-              ),
-              const SizedBox(height: 10),
-              cancelBtn(ctx),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showDeleteAccountSheet() {
-    _deleteConfirmCtrl.clear();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              24,
+              12,
+              24,
+              24 + MediaQuery.viewInsetsOf(ctx).bottom,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -329,7 +290,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
                   style: TextStyle(
                     color: AppColors.t1,
                     fontSize: 18,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -367,7 +328,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
                 saveBtn(
                   label: 'Request deletion',
                   color: AppColors.warning,
-                  loading: _requestingDeletion,
+                  loading: requestingDeletion,
                   disabled:
                       _deleteConfirmCtrl.text.trim().toUpperCase() != 'DELETE',
                   onTap: () async {
@@ -375,13 +336,20 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
                         'DELETE') {
                       return;
                     }
-                    setSheetState(() => _requestingDeletion = true);
-                    setState(() => _requestingDeletion = true);
+                    setSheetState(() => requestingDeletion = true);
                     try {
                       final workspaceId = await ref.read(
                         workspaceIdProvider.future,
                       );
-                      if (workspaceId == null) return;
+                      if (workspaceId == null) {
+                        if (mounted) {
+                          _snack(
+                            'We couldn’t find your workspace. Reload Workloop and try again.',
+                            AppColors.error,
+                          );
+                        }
+                        return;
+                      }
                       await ref
                           .read(privacyRepositoryProvider)
                           .requestAccountDeletion(workspaceId: workspaceId);
@@ -397,8 +365,8 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
                         );
                       }
                     } finally {
-                      if (mounted) {
-                        setState(() => _requestingDeletion = false);
+                      if (ctx.mounted) {
+                        setSheetState(() => requestingDeletion = false);
                       }
                     }
                   },
@@ -517,7 +485,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
             style: TextStyle(
               color: AppColors.error,
               fontSize: 15,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
             ),
           ),
           subtitle: const Text(
@@ -547,7 +515,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
           label,
           style: const TextStyle(
             fontSize: 10,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
             letterSpacing: 0,
             color: AppColors.t3,
           ),
@@ -578,9 +546,10 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
               horizontal: 14,
               vertical: 12,
             ),
-            suffixIcon: GestureDetector(
-              onTap: onToggle,
-              child: Icon(
+            suffixIcon: IconButton(
+              tooltip: obscure ? 'Show password' : 'Hide password',
+              onPressed: onToggle,
+              icon: Icon(
                 obscure ? LucideIcons.eye : LucideIcons.eyeOff,
                 color: AppColors.t3,
                 size: 16,
@@ -628,7 +597,7 @@ class _AccountActionRow extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t1,
           fontSize: 14,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
         ),
       ),
       trailing: Row(
@@ -639,7 +608,7 @@ class _AccountActionRow extends StatelessWidget {
             style: TextStyle(
               color: valueColor,
               fontSize: 13,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(width: AppSpacing.xs),

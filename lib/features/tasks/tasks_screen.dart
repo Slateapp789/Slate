@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
+import '../../shared/notifications/local_reminder_plan.dart';
+import '../../shared/notifications/local_reminder_service.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/workflow_idempotency.dart';
 import '../../shared/widgets/slate_ui.dart';
+import 'task_filters.dart';
 import '../imports/text_import_screen.dart';
 
 part 'task_logic.dart';
@@ -51,41 +55,40 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
           SafeArea(
+            bottom: false,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.pageX,
-                    AppSpacing.lg,
+                    AppSpacing.screenTop,
                     AppSpacing.pageX,
                     0,
                   ),
                   child: WorkloopPageHeader(
-                    icon: LucideIcons.listChecks,
                     title: 'Tasks',
-                    subtitle: 'Keep follow-ups and admin from slipping.',
+                    subtitle: 'Know what needs doing next.',
                     color: AppColors.modTasks,
-                    trailing: WorkloopIconButton(
-                      icon: LucideIcons.plus,
+                    trailing: WorkloopTopAction(
+                      label: 'New task',
                       semanticLabel: 'New task',
-                      color: AppColors.modTasks,
-                      backgroundColor: AppColors.modTasks.withValues(
-                        alpha: 0.10,
-                      ),
                       onTap: () => _showTaskEditor(context),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.xl),
                 Expanded(
                   child: tasks.when(
                     loading: () => _skeletonList(),
-                    error: (_, __) => Padding(
+                    error: (_, _) => Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.pageX,
                       ),
-                      child: SlateErrorState(message: 'Could not load tasks'),
+                      child: SlateErrorState(
+                        message: 'Could not load tasks',
+                        onRetry: () => ref.invalidate(allTasksProvider),
+                      ),
                     ),
                     data: (data) {
                       final sorted = [...data]..sort(_taskSort);
@@ -100,7 +103,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                             AppSpacing.pageX,
                             0,
                             AppSpacing.pageX,
-                            112,
+                            AppSpacing.bottomNavClearance,
                           ),
                           children: [
                             _TaskViewSwitcher(
@@ -148,8 +151,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         40,
       ),
       itemCount: 5,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (_, __) =>
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (_, _) =>
           const SlateLoadingBlock(height: 80, radius: AppRadius.md),
     );
   }
@@ -175,12 +178,6 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             subtitle: subtitle,
           ),
           if (_view != _TaskView.done) ...[
-            const SizedBox(height: AppSpacing.md),
-            WorkloopPrimaryButton(
-              label: 'Add task',
-              icon: LucideIcons.plus,
-              onPressed: () => _showTaskEditor(context),
-            ),
             const SizedBox(height: AppSpacing.xs),
             WorkloopTextButton(
               label: 'Import a task list',
@@ -223,44 +220,27 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                             AppSpacing.pageX,
                             0,
                           ),
-                          child: Row(
-                            children: [
-                              WorkloopIconButton(
-                                icon: LucideIcons.chevronLeft,
-                                semanticLabel: 'Back to tasks',
-                                onTap: () => Navigator.pop(ctx),
+                          child: WorkloopRouteHeader(
+                            title: 'Task',
+                            backSemanticLabel: 'Back to tasks',
+                            trailing: WorkloopIconButton(
+                              icon: LucideIcons.pencil,
+                              semanticLabel: 'Edit task',
+                              color: AppColors.modTasks,
+                              backgroundColor: AppColors.modTasks.withValues(
+                                alpha: 0.10,
                               ),
-                              const SizedBox(width: AppSpacing.sm),
-                              const Expanded(
-                                child: Text(
-                                  'Task',
-                                  style: TextStyle(
-                                    color: AppColors.t1,
-                                    fontSize: 26,
-                                    height: 1.05,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                              WorkloopIconButton(
-                                icon: LucideIcons.pencil,
-                                semanticLabel: 'Edit task',
-                                color: AppColors.modTasks,
-                                backgroundColor: AppColors.modTasks.withValues(
-                                  alpha: 0.10,
-                                ),
-                                onTap: () async {
-                                  Navigator.pop(ctx);
-                                  await Future<void>.delayed(Duration.zero);
-                                  if (mounted) {
-                                    await _showTaskEditor(
-                                      this.context,
-                                      task: task,
-                                    );
-                                  }
-                                },
-                              ),
-                            ],
+                              onTap: () async {
+                                Navigator.pop(ctx);
+                                await Future<void>.delayed(Duration.zero);
+                                if (mounted) {
+                                  await _showTaskEditor(
+                                    this.context,
+                                    task: task,
+                                  );
+                                }
+                              },
+                            ),
                           ),
                         ),
                         const SizedBox(height: AppSpacing.xl),
@@ -279,7 +259,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                   task.title,
                                   style: TextStyle(
                                     fontSize: 20,
-                                    fontWeight: FontWeight.w900,
+                                    fontWeight: FontWeight.w600,
                                     color: task.status == 'done'
                                         ? AppColors.t3
                                         : AppColors.t1,
@@ -293,7 +273,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                   '${task.status == 'done' ? 'Completed' : _priorityLabel(task.priority)} task',
                                   style: const TextStyle(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w500,
                                     color: AppColors.t3,
                                   ),
                                 ),
@@ -303,6 +283,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                 _TaskChecklistPanel(
                                   items: checklist,
                                   onAdd: () => _showChecklistEditor(task),
+                                  onRetry: () => ref.invalidate(
+                                    taskChecklistProvider(task.id),
+                                  ),
                                   onToggle: (item) =>
                                       _toggleChecklistItem(task, item),
                                   onEdit: (item) =>
@@ -318,15 +301,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                   icon: task.status == 'done'
                                       ? LucideIcons.rotateCcw
                                       : LucideIcons.checkCircle,
-                                  onPressed: () {
-                                    Navigator.pop(ctx);
-                                    if (task.status == 'done') {
-                                      _reopenTask(task);
-                                    } else {
-                                      WidgetsBinding.instance
-                                          .addPostFrameCallback((_) {
-                                            if (mounted) _confirmComplete(task);
-                                          });
+                                  onPressed: () async {
+                                    final changed = task.status == 'done'
+                                        ? await _reopenTask(task)
+                                        : await _confirmComplete(task);
+                                    if (changed && ctx.mounted) {
+                                      Navigator.pop(ctx);
                                     }
                                   },
                                 ),
@@ -334,12 +314,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                 SlateButton(
                                   label: 'Delete Task',
                                   destructive: true,
-                                  onPressed: () {
-                                    Navigator.pop(ctx);
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                          if (mounted) _confirmDelete(task);
-                                        });
+                                  onPressed: () async {
+                                    final deleted = await _confirmDelete(task);
+                                    if (deleted && ctx.mounted) {
+                                      Navigator.pop(ctx);
+                                    }
                                   },
                                 ),
                               ],
@@ -367,6 +346,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     String? selectedClientId = task?.contactId;
     String reminderTiming = task?.reminderTiming ?? 'none';
     final draftChecklist = <String>[];
+    final createIdempotencyKey = task == null
+        ? createWorkflowIdempotencyKey()
+        : null;
     var saving = false;
     var allowPop = false;
     var showOptions =
@@ -382,6 +364,21 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           draftChecklist.isNotEmpty;
     }
 
+    bool canScheduleReminder(String timing) {
+      if (timing == 'none') return true;
+      return planTaskReminder(
+            SlateTask(
+              id: task?.id ?? 'draft',
+              workspaceId: task?.workspaceId ?? '',
+              title: titleController.text.trim(),
+              dueDate: dueDate,
+              reminderTiming: timing,
+            ),
+            now: DateTime.now(),
+          ) !=
+          null;
+    }
+
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (ctx) => StatefulBuilder(
@@ -389,19 +386,77 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             final clients = ref.watch(clientsProvider);
             Future<void> save() async {
               if (saving || titleController.text.trim().isEmpty) return;
+              final reminderChanged =
+                  task == null ||
+                  reminderTiming != task.reminderTiming ||
+                  dueDate != task.dueDate;
+              if (reminderTiming != 'none' && reminderChanged) {
+                if (!canScheduleReminder(reminderTiming)) {
+                  setModal(() => showOptions = true);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'That 09:00 reminder time has passed. Choose a later due date or No reminder.',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                final permission = await ref
+                    .read(localReminderServiceProvider)
+                    .requestPermission();
+                if (!ctx.mounted) return;
+                if (permission != LocalReminderPermission.granted) {
+                  setModal(() => showOptions = true);
+                  final message =
+                      permission == LocalReminderPermission.unsupported
+                      ? 'Choose No reminder to save this task outside the iOS or Android app.'
+                      : 'Allow notifications, or choose No reminder before saving this task.';
+                  ScaffoldMessenger.of(
+                    ctx,
+                  ).showSnackBar(SnackBar(content: Text(message)));
+                  return;
+                }
+              }
               setModal(() => saving = true);
-              final saved = await _saveTask(
-                task: task,
-                title: titleController.text,
-                priority: priority,
-                dueDate: dueDate,
-                clientId: selectedClientId,
-                reminderTiming: reminderTiming,
-                checklistTitles: draftChecklist,
-              );
-              if (!ctx.mounted) return;
-              if (!saved) {
+              try {
+                final saved = await _saveTask(
+                  task: task,
+                  title: titleController.text,
+                  priority: priority,
+                  dueDate: dueDate,
+                  clientId: selectedClientId,
+                  reminderTiming: reminderTiming,
+                  checklistTitles: draftChecklist,
+                  createIdempotencyKey: createIdempotencyKey,
+                );
+                if (!ctx.mounted) return;
+                if (!saved) {
+                  setModal(() => saving = false);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Could not access this workspace. Your task was not saved.',
+                      ),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+              } catch (_) {
+                if (!ctx.mounted) return;
                 setModal(() => saving = false);
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      task == null
+                          ? 'Could not create this task. Nothing was added. Please try again.'
+                          : 'Could not save these task changes. Please try again.',
+                    ),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
                 return;
               }
               allowPop = true;
@@ -451,35 +506,16 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                               AppSpacing.pageX,
                               0,
                             ),
-                            child: Row(
-                              children: [
-                                WorkloopIconButton(
-                                  icon: LucideIcons.chevronLeft,
-                                  semanticLabel: 'Back to tasks',
-                                  onTap: handleBack,
-                                ),
-                                const SizedBox(width: AppSpacing.sm),
-                                Expanded(
-                                  child: Text(
-                                    task == null ? 'New task' : 'Edit task',
-                                    style: const TextStyle(
-                                      color: AppColors.t1,
-                                      fontSize: 26,
-                                      height: 1.05,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.sm),
-                                _TaskSaveAction(
-                                  label: task == null ? 'Add' : 'Save',
-                                  loading: saving,
-                                  enabled: titleController.text
-                                      .trim()
-                                      .isNotEmpty,
-                                  onTap: save,
-                                ),
-                              ],
+                            child: WorkloopRouteHeader(
+                              title: task == null ? 'New task' : 'Edit task',
+                              backSemanticLabel: 'Back to tasks',
+                              onBack: handleBack,
+                              trailing: _TaskSaveAction(
+                                label: task == null ? 'Add' : 'Save',
+                                loading: saving,
+                                enabled: titleController.text.trim().isNotEmpty,
+                                onTap: save,
+                              ),
                             ),
                           ),
                           const SizedBox(height: AppSpacing.xl),
@@ -539,6 +575,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                                 template.dueInDays == 0
                                                 ? 'today'
                                                 : 'day_before';
+                                            showOptions = true;
                                           }
                                         });
                                       },
@@ -552,8 +589,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                   ),
                                   const SizedBox(height: AppSpacing.md),
                                   clients.when(
-                                    loading: () => const SizedBox.shrink(),
-                                    error: (_, __) => const SizedBox.shrink(),
+                                    loading: () => const SlateLoadingBlock(
+                                      height: 58,
+                                      radius: AppRadius.md,
+                                    ),
+                                    error: (_, _) => SlateErrorState(
+                                      message: 'Could not load clients.',
+                                      onRetry: () =>
+                                          ref.invalidate(clientsProvider),
+                                    ),
                                     data: (data) => _ClientPicker(
                                       clients: data,
                                       selectedClientId: selectedClientId,
@@ -581,7 +625,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                       'Priority',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        fontWeight: FontWeight.w800,
+                                        fontWeight: FontWeight.w600,
                                         color: AppColors.t3,
                                       ),
                                     ),
@@ -620,9 +664,44 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                     _ReminderPicker(
                                       value: reminderTiming,
                                       enabled: dueDate != null,
-                                      onChanged: (value) => setModal(
-                                        () => reminderTiming = value,
-                                      ),
+                                      onChanged: (value) async {
+                                        if (value != 'none') {
+                                          if (!canScheduleReminder(value)) {
+                                            ScaffoldMessenger.of(
+                                              ctx,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'That 09:00 reminder time has passed. Choose a later due date.',
+                                                ),
+                                              ),
+                                            );
+                                            return;
+                                          }
+                                          final permission = await ref
+                                              .read(
+                                                localReminderServiceProvider,
+                                              )
+                                              .requestPermission();
+                                          if (!ctx.mounted) return;
+                                          if (permission !=
+                                              LocalReminderPermission.granted) {
+                                            final message =
+                                                permission ==
+                                                    LocalReminderPermission
+                                                        .unsupported
+                                                ? 'Scheduled reminders are available in the iOS and Android apps.'
+                                                : 'Enable notifications in your device settings to use task reminders.';
+                                            ScaffoldMessenger.of(
+                                              ctx,
+                                            ).showSnackBar(
+                                              SnackBar(content: Text(message)),
+                                            );
+                                            return;
+                                          }
+                                        }
+                                        setModal(() => reminderTiming = value);
+                                      },
                                     ),
                                     if (task == null) ...[
                                       const SizedBox(height: AppSpacing.xl),
@@ -701,28 +780,29 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     required String? clientId,
     required String reminderTiming,
     required List<String> checklistTitles,
+    required String? createIdempotencyKey,
   }) async {
     if (title.trim().isEmpty) return false;
     final workspaceId = await ref.read(workspaceIdProvider.future);
     if (workspaceId == null) return false;
     FocusManager.instance.primaryFocus?.unfocus();
+    final savedReminderTiming = dueDate == null ? 'none' : reminderTiming;
+    final reminderChanged =
+        task == null ||
+        task.reminderTiming != savedReminderTiming ||
+        task.dueDate != dueDate;
     if (task == null) {
-      final taskId = await ref
+      await ref
           .read(tasksRepositoryProvider)
-          .create(
+          .createWithChecklist(
             workspaceId: workspaceId,
             title: title,
             priority: priority,
             dueDate: dueDate,
             contactId: clientId,
-            reminderTiming: dueDate == null ? 'none' : reminderTiming,
-          );
-      await ref
-          .read(tasksRepositoryProvider)
-          .addChecklistItems(
-            workspaceId: workspaceId,
-            taskId: taskId,
-            titles: checklistTitles,
+            reminderTiming: savedReminderTiming,
+            checklistTitles: checklistTitles,
+            idempotencyKey: createIdempotencyKey!,
           );
     } else {
       await ref
@@ -733,15 +813,17 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             priority: priority,
             dueDate: dueDate,
             contactId: clientId,
-            reminderTiming: dueDate == null ? 'none' : reminderTiming,
+            reminderTiming: savedReminderTiming,
           );
     }
-    await _maybeCreateDueNotification(
-      workspaceId,
-      title,
-      dueDate,
-      dueDate == null ? 'none' : reminderTiming,
-    );
+    if (reminderChanged) {
+      await _maybeCreateDueNotification(
+        workspaceId,
+        title,
+        dueDate,
+        savedReminderTiming,
+      );
+    }
     return true;
   }
 
@@ -766,21 +848,27 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       _ => false,
     };
     if (shouldCreateNow) {
-      await ref
-          .read(notificationsRepositoryProvider)
-          .create(
-            workspaceId: workspaceId,
-            type: 'task_due',
-            title: 'Task due soon',
-            body: title.trim(),
-            deepLink: '/tasks',
-          );
+      try {
+        await ref
+            .read(notificationsRepositoryProvider)
+            .create(
+              workspaceId: workspaceId,
+              type: 'task_due',
+              title: 'Task due soon',
+              body: title.trim(),
+              deepLink: '/tasks',
+            );
+      } catch (_) {
+        // The saved task is the source of truth. Notification support is
+        // additive and must never turn a committed task into a failed save.
+      }
     }
   }
 
   void _showChecklistEditor(SlateTask task, {TaskChecklistItem? item}) {
     final controller = TextEditingController(text: item?.title ?? '');
     var saving = false;
+    String? errorMessage;
 
     showModalBottomSheet(
       context: context,
@@ -804,7 +892,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   item == null ? 'Add checklist item' : 'Edit checklist item',
                   style: const TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.t1,
                   ),
                 ),
@@ -819,6 +907,20 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   ),
                 ),
                 const SizedBox(height: 18),
+                if (errorMessage != null) ...[
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      errorMessage!,
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
                 SlateButton(
                   label: saving
                       ? 'Saving...'
@@ -831,29 +933,42 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       : () async {
                           final title = controller.text.trim();
                           if (title.isEmpty) return;
-                          setModal(() => saving = true);
-                          if (item == null) {
-                            final existing = await ref.read(
-                              taskChecklistProvider(task.id).future,
-                            );
-                            await ref
-                                .read(tasksRepositoryProvider)
-                                .addChecklistItem(
-                                  workspaceId: task.workspaceId,
-                                  taskId: task.id,
-                                  title: title,
-                                  position: existing.length,
-                                );
-                          } else {
-                            await ref
-                                .read(tasksRepositoryProvider)
-                                .updateChecklistItem(
-                                  itemId: item.id,
-                                  title: title,
-                                );
+                          setModal(() {
+                            saving = true;
+                            errorMessage = null;
+                          });
+                          try {
+                            if (item == null) {
+                              final existing = await ref.read(
+                                taskChecklistProvider(task.id).future,
+                              );
+                              await ref
+                                  .read(tasksRepositoryProvider)
+                                  .addChecklistItem(
+                                    workspaceId: task.workspaceId,
+                                    taskId: task.id,
+                                    title: title,
+                                    position: existing.length,
+                                  );
+                            } else {
+                              await ref
+                                  .read(tasksRepositoryProvider)
+                                  .updateChecklistItem(
+                                    itemId: item.id,
+                                    title: title,
+                                  );
+                            }
+                            ref.invalidate(taskChecklistProvider(task.id));
+                            if (ctx.mounted) Navigator.pop(ctx);
+                          } catch (_) {
+                            if (!ctx.mounted) return;
+                            setModal(() {
+                              saving = false;
+                              errorMessage = item == null
+                                  ? 'Could not add this checklist item. Please try again.'
+                                  : 'Could not save this checklist item. Please try again.';
+                            });
                           }
-                          ref.invalidate(taskChecklistProvider(task.id));
-                          if (ctx.mounted) Navigator.pop(ctx);
                         },
                 ),
               ],
@@ -872,115 +987,220 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     SlateTask task,
     TaskChecklistItem item,
   ) async {
-    await ref
-        .read(tasksRepositoryProvider)
-        .updateChecklistItemStatus(itemId: item.id, completed: !item.completed);
-    ref.invalidate(taskChecklistProvider(task.id));
+    try {
+      await ref
+          .read(tasksRepositoryProvider)
+          .updateChecklistItemStatus(
+            itemId: item.id,
+            completed: !item.completed,
+          );
+      ref.invalidate(taskChecklistProvider(task.id));
+    } catch (_) {
+      _showTaskFailure(
+        'Could not update this checklist item. Nothing was changed.',
+      );
+    }
   }
 
   Future<void> _deleteChecklistItem(
     SlateTask task,
     TaskChecklistItem item,
   ) async {
-    await ref.read(tasksRepositoryProvider).deleteChecklistItem(item.id);
-    ref.invalidate(taskChecklistProvider(task.id));
+    try {
+      await ref.read(tasksRepositoryProvider).deleteChecklistItem(item.id);
+      ref.invalidate(taskChecklistProvider(task.id));
+    } catch (_) {
+      _showTaskFailure(
+        'Could not delete this checklist item. Nothing was removed.',
+      );
+    }
   }
 
-  void _confirmComplete(SlateTask task) {
-    showModalBottomSheet(
+  Future<bool> _confirmComplete(SlateTask task) async {
+    var saving = false;
+    String? errorMessage;
+    final completed = await showModalBottomSheet<bool>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => SlateSheetFrame(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Complete this task?',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: AppColors.t1,
-              ),
+      isDismissible: false,
+      enableDrag: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => PopScope(
+          canPop: !saving,
+          child: SlateSheetFrame(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Complete this task?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.t1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  task.title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: AppColors.t3),
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 22),
+                SlateButton(
+                  label: saving ? 'Completing...' : 'Mark Complete',
+                  icon: LucideIcons.checkCircle,
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          setSheetState(() {
+                            saving = true;
+                            errorMessage = null;
+                          });
+                          try {
+                            await ref
+                                .read(tasksRepositoryProvider)
+                                .updateStatus(task.id, 'done');
+                            _refreshTasks();
+                            if (ctx.mounted) Navigator.pop(ctx, true);
+                          } catch (_) {
+                            if (!ctx.mounted) return;
+                            setSheetState(() {
+                              saving = false;
+                              errorMessage =
+                                  'Could not complete this task. Nothing was changed. Please try again.';
+                            });
+                          }
+                        },
+                ),
+                const SizedBox(height: 10),
+                SlateButton(
+                  label: 'Cancel',
+                  secondary: true,
+                  onPressed: saving ? null : () => Navigator.pop(ctx, false),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              task.title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: AppColors.t3),
-            ),
-            const SizedBox(height: 22),
-            SlateButton(
-              label: 'Mark Complete',
-              icon: LucideIcons.checkCircle,
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await ref
-                    .read(tasksRepositoryProvider)
-                    .updateStatus(task.id, 'done');
-                _refreshTasks();
-              },
-            ),
-            const SizedBox(height: 10),
-            SlateButton(
-              label: 'Cancel',
-              secondary: true,
-              onPressed: () => Navigator.pop(ctx),
-            ),
-          ],
+          ),
         ),
       ),
     );
+    return completed ?? false;
   }
 
-  Future<void> _reopenTask(SlateTask task) async {
-    await ref.read(tasksRepositoryProvider).updateStatus(task.id, 'open');
-    _refreshTasks();
+  Future<bool> _reopenTask(SlateTask task) async {
+    try {
+      await ref.read(tasksRepositoryProvider).updateStatus(task.id, 'open');
+      _refreshTasks();
+      return true;
+    } catch (_) {
+      _showTaskFailure('Could not reopen this task. Nothing was changed.');
+      return false;
+    }
   }
 
-  void _confirmDelete(SlateTask task) {
-    showModalBottomSheet(
+  Future<bool> _confirmDelete(SlateTask task) async {
+    var deleting = false;
+    String? errorMessage;
+    final deleted = await showModalBottomSheet<bool>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => SlateSheetFrame(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Delete task?',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: AppColors.t1,
-              ),
+      isDismissible: false,
+      enableDrag: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => PopScope(
+          canPop: !deleting,
+          child: SlateSheetFrame(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Delete task?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.t1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  task.title,
+                  style: const TextStyle(fontSize: 14, color: AppColors.t3),
+                  textAlign: TextAlign.center,
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                SlateButton(
+                  label: deleting ? 'Deleting...' : 'Delete Task',
+                  destructive: true,
+                  onPressed: deleting
+                      ? null
+                      : () async {
+                          setSheetState(() {
+                            deleting = true;
+                            errorMessage = null;
+                          });
+                          try {
+                            await ref
+                                .read(tasksRepositoryProvider)
+                                .delete(task.id);
+                            _refreshTasks();
+                            if (ctx.mounted) Navigator.pop(ctx, true);
+                          } catch (_) {
+                            if (!ctx.mounted) return;
+                            setSheetState(() {
+                              deleting = false;
+                              errorMessage =
+                                  'Could not delete this task. Nothing was removed. Please try again.';
+                            });
+                          }
+                        },
+                ),
+                const SizedBox(height: 10),
+                SlateButton(
+                  label: 'Cancel',
+                  secondary: true,
+                  onPressed: deleting ? null : () => Navigator.pop(ctx, false),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              task.title,
-              style: const TextStyle(fontSize: 14, color: AppColors.t3),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            SlateButton(
-              label: 'Delete Task',
-              destructive: true,
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await ref.read(tasksRepositoryProvider).delete(task.id);
-                _refreshTasks();
-              },
-            ),
-            const SizedBox(height: 10),
-            SlateButton(
-              label: 'Cancel',
-              secondary: true,
-              onPressed: () => Navigator.pop(ctx),
-            ),
-          ],
+          ),
         ),
       ),
     );
+    return deleted ?? false;
   }
 
   void _refreshTasks() {
@@ -991,6 +1211,17 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   void _refreshTaskNotifications() {
     ref.invalidate(notificationsProvider);
     ref.invalidate(unreadNotificationsProvider);
+  }
+
+  void _showTaskFailure(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 }
 
@@ -1010,6 +1241,7 @@ class _TaskViewSwitcher extends StatelessWidget {
     return WorkloopNavigationControl<_TaskView>(
       selected: value,
       color: AppColors.modTasks,
+      emphasized: false,
       onChanged: onChanged,
       segments: _TaskView.values
           .map(
@@ -1048,6 +1280,7 @@ class _TaskSectionView extends StatelessWidget {
         children: [
           WorkloopSectionHeader(
             label: '${section.title}  ${section.tasks.length}',
+            quiet: true,
           ),
           const SizedBox(height: 6),
           ...section.tasks.map(

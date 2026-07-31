@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { isSoleWorkspaceOwner } from "../_shared/sole_workspace_owner.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,7 +41,9 @@ Deno.serve(async (req: Request) => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-    return response(500, { error: "Deletion request service is not configured" });
+    return response(500, {
+      error: "Deletion request service is not configured",
+    });
   }
 
   let payload: RequestPayload;
@@ -64,24 +67,26 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data: userResult, error: userError } = await userClient.auth.getUser();
+  const { data: userResult, error: userError } = await userClient.auth
+    .getUser();
   const user = userResult.user;
   if (userError || !user) {
     return response(401, { error: "Unauthorized" });
   }
 
-  const { data: membership, error: membershipError } = await serviceClient
+  const { data: memberships, error: membershipError } = await serviceClient
     .from("workspace_members")
-    .select("id")
+    .select("user_id")
     .eq("workspace_id", workspaceId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+    .limit(2);
 
   if (membershipError) {
-    return response(500, { error: "Could not verify workspace access" });
+    return response(500, { error: "Could not verify workspace ownership" });
   }
-  if (!membership) {
-    return response(403, { error: "Workspace access denied" });
+  if (!isSoleWorkspaceOwner(memberships, user.id)) {
+    return response(403, {
+      error: "Only the sole workspace owner can delete this account",
+    });
   }
 
   const { data: existing, error: existingError } = await serviceClient
@@ -111,7 +116,11 @@ Deno.serve(async (req: Request) => {
     if (updateError) {
       return response(500, { error: "Could not refresh deletion request" });
     }
-    return response(200, { ok: true, requestId: existing.id, status: existing.status });
+    return response(200, {
+      ok: true,
+      requestId: existing.id,
+      status: existing.status,
+    });
   }
 
   const { data: inserted, error: insertError } = await serviceClient

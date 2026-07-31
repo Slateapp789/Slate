@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -18,14 +18,15 @@ final bookingRequestsProvider = FutureProvider<List<BookingRequest>>((
 ) async {
   final workspaceId = await ref.watch(workspaceIdProvider.future);
   if (workspaceId == null) return [];
-  try {
-    return ref.watch(profileRepositoryProvider).bookingRequests(workspaceId);
-  } catch (_) {
-    return [];
-  }
+  return ref.watch(profileRepositoryProvider).bookingRequests(workspaceId);
 });
 
-enum _RequestView { active, pending, contacted, booked, declined }
+enum _RequestView { active, pending, closed }
+
+String bookingRequestEditablePrice(num price) {
+  if (!price.isFinite || price < 0) return '0';
+  return price.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+}
 
 class BookingRequestsScreen extends ConsumerStatefulWidget {
   const BookingRequestsScreen({super.key});
@@ -57,26 +58,9 @@ class _BookingRequestsScreenState extends ConsumerState<BookingRequestsScreen> {
                     AppSpacing.pageX,
                     AppSpacing.md,
                   ),
-                  child: Row(
-                    children: [
-                      WorkloopIconButton(
-                        icon: LucideIcons.chevronLeft,
-                        semanticLabel: 'Back to bookings',
-                        onTap: () => Navigator.pop(context),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      const Expanded(
-                        child: Text(
-                          'Booking requests',
-                          style: TextStyle(
-                            color: AppColors.t1,
-                            fontSize: 26,
-                            height: 1.05,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: WorkloopRouteHeader(
+                    title: 'Booking requests',
+                    backSemanticLabel: 'Back to bookings',
                   ),
                 ),
                 requests.maybeWhen(
@@ -85,53 +69,46 @@ class _BookingRequestsScreenState extends ConsumerState<BookingRequestsScreen> {
                     final pending = items
                         .where((item) => item.status == 'pending')
                         .length;
-                    final contacted = items
-                        .where((item) => item.status == 'contacted')
+                    final active = items
+                        .where(
+                          (item) =>
+                              item.status == 'pending' ||
+                              item.status == 'contacted',
+                        )
                         .length;
-                    final booked = items
-                        .where((item) => item.status == 'confirmed')
+                    final closed = items
+                        .where(
+                          (item) =>
+                              item.status == 'confirmed' ||
+                              item.status == 'declined',
+                        )
                         .length;
-                    final declined = items
-                        .where((item) => item.status == 'declined')
-                        .length;
-                    return SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                      child: Row(
-                        children: [
-                          WorkloopFilterChip(
-                            label: 'Active ${pending + contacted}',
-                            selected: _view == _RequestView.active,
-                            onTap: () =>
-                                setState(() => _view = _RequestView.active),
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.pageX,
+                        0,
+                        AppSpacing.pageX,
+                        AppSpacing.md,
+                      ),
+                      child: WorkloopNavigationControl<_RequestView>(
+                        selected: _view,
+                        emphasized: false,
+                        onChanged: (view) => setState(() => _view = view),
+                        segments: [
+                          WorkloopSegment(
+                            value: _RequestView.active,
+                            label: 'Active',
+                            badge: active > 0 ? '$active' : null,
                           ),
-                          const SizedBox(width: 8),
-                          WorkloopFilterChip(
-                            label: 'New $pending',
-                            selected: _view == _RequestView.pending,
-                            onTap: () =>
-                                setState(() => _view = _RequestView.pending),
+                          WorkloopSegment(
+                            value: _RequestView.pending,
+                            label: 'New',
+                            badge: pending > 0 ? '$pending' : null,
                           ),
-                          const SizedBox(width: 8),
-                          WorkloopFilterChip(
-                            label: 'Contacted $contacted',
-                            selected: _view == _RequestView.contacted,
-                            onTap: () =>
-                                setState(() => _view = _RequestView.contacted),
-                          ),
-                          const SizedBox(width: 8),
-                          WorkloopFilterChip(
-                            label: 'Booked $booked',
-                            selected: _view == _RequestView.booked,
-                            onTap: () =>
-                                setState(() => _view = _RequestView.booked),
-                          ),
-                          const SizedBox(width: 8),
-                          WorkloopFilterChip(
-                            label: 'Declined $declined',
-                            selected: _view == _RequestView.declined,
-                            onTap: () =>
-                                setState(() => _view = _RequestView.declined),
+                          WorkloopSegment(
+                            value: _RequestView.closed,
+                            label: 'Closed',
+                            badge: closed > 0 ? '$closed' : null,
                           ),
                         ],
                       ),
@@ -144,9 +121,10 @@ class _BookingRequestsScreenState extends ConsumerState<BookingRequestsScreen> {
                     loading: () => const Center(
                       child: CircularProgressIndicator(color: AppColors.green),
                     ),
-                    error: (_, __) => const _EmptyRequests(
+                    error: (_, _) => _EmptyRequests(
                       title: 'Could not load requests',
-                      subtitle: 'Try again in a moment.',
+                      subtitle: 'Check your connection, then try again.',
+                      onRetry: () => ref.invalidate(bookingRequestsProvider),
                     ),
                     data: (items) {
                       if (items.isEmpty) {
@@ -161,10 +139,8 @@ class _BookingRequestsScreenState extends ConsumerState<BookingRequestsScreen> {
                         return _EmptyRequests(
                           title: switch (_view) {
                             _RequestView.pending => 'No new requests',
-                            _RequestView.contacted => 'No contacted requests',
-                            _RequestView.booked => 'No booked requests',
-                            _RequestView.declined => 'No declined requests',
-                            _ => 'No active requests',
+                            _RequestView.closed => 'No closed requests',
+                            _RequestView.active => 'No active requests',
                           },
                           subtitle: 'Switch filters to review other requests.',
                         );
@@ -186,7 +162,7 @@ class _BookingRequestsScreenState extends ConsumerState<BookingRequestsScreen> {
                               ),
                             ),
                           ),
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const WorkloopDivider(margin: EdgeInsets.zero),
                           itemCount: filtered.length,
                         ),
@@ -208,9 +184,8 @@ class _BookingRequestsScreenState extends ConsumerState<BookingRequestsScreen> {
         _RequestView.active =>
           item.status == 'pending' || item.status == 'contacted',
         _RequestView.pending => item.status == 'pending',
-        _RequestView.contacted => item.status == 'contacted',
-        _RequestView.booked => item.status == 'confirmed',
-        _RequestView.declined => item.status == 'declined',
+        _RequestView.closed =>
+          item.status == 'confirmed' || item.status == 'declined',
       };
     }).toList();
 
@@ -267,7 +242,7 @@ class _RequestRow extends StatelessWidget {
           style: const TextStyle(
             color: AppColors.t1,
             fontSize: 16,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -278,7 +253,7 @@ class _RequestRow extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t1,
           fontSize: 15,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(
@@ -288,7 +263,7 @@ class _RequestRow extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t3,
           fontSize: 13,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w400,
         ),
       ),
       trailing: Row(
@@ -325,26 +300,9 @@ class BookingRequestDetailScreen extends StatelessWidget {
                     AppSpacing.pageX,
                     AppSpacing.xl,
                   ),
-                  child: Row(
-                    children: [
-                      WorkloopIconButton(
-                        icon: LucideIcons.chevronLeft,
-                        semanticLabel: 'Back to booking requests',
-                        onTap: () => Navigator.pop(context),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      const Expanded(
-                        child: Text(
-                          'Booking request',
-                          style: TextStyle(
-                            color: AppColors.t1,
-                            fontSize: 26,
-                            height: 1.05,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: const WorkloopRouteHeader(
+                    title: 'Booking request',
+                    backSemanticLabel: 'Back to booking requests',
                   ),
                 ),
                 Expanded(
@@ -394,9 +352,36 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
     try {
       await ref
           .read(profileRepositoryProvider)
-          .updateBookingRequestStatus(widget.request.id, status);
+          .updateBookingRequestStatus(
+            requestId: widget.request.id,
+            workspaceId: widget.request.workspaceId,
+            status: status,
+          );
       ref.invalidate(bookingRequestsProvider);
       if (widget.closeAfterAction && mounted) Navigator.pop(context);
+    } on BookingRequestStateException catch (error) {
+      ref.invalidate(bookingRequestsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.message),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'The request could not be updated. Check your connection and try again.',
+            ),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -417,7 +402,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
               style: TextStyle(
                 color: AppColors.t1,
                 fontSize: 20,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w600,
                 letterSpacing: 0,
               ),
             ),
@@ -466,13 +451,15 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
       text: (widget.request.serviceDurationMins ?? 60).toString(),
     );
     final priceController = TextEditingController(
-      text: (widget.request.servicePrice ?? 0).toStringAsFixed(0),
+      text: bookingRequestEditablePrice(widget.request.servicePrice ?? 0),
     );
     final locationController = TextEditingController();
     final notesController = TextEditingController();
     var createPaymentDue = (widget.request.servicePrice ?? 0) > 0;
+    var submitting = false;
+    String? submissionError;
 
-    final confirmed = await showModalBottomSheet<bool>(
+    final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -516,6 +503,88 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
               }
             }
 
+            Future<void> submit() async {
+              if (submitting || !canSubmit()) return;
+              setSheetState(() {
+                submitting = true;
+                submissionError = null;
+              });
+              final duration =
+                  int.tryParse(durationController.text.trim()) ?? 60;
+              final price = double.tryParse(priceController.text.trim()) ?? 0;
+              final startTime = DateTime(
+                selectedDate.year,
+                selectedDate.month,
+                selectedDate.day,
+                selectedTime.hour,
+                selectedTime.minute,
+              );
+
+              Future<void> confirm({bool enforceWorkingHours = true}) {
+                return ref
+                    .read(profileRepositoryProvider)
+                    .confirmBookingRequest(
+                      request: widget.request,
+                      startTime: startTime,
+                      durationMins: duration.clamp(15, 720),
+                      price: price,
+                      clientName: clientNameController.text.trim(),
+                      clientPhone: phoneController.text.trim(),
+                      serviceTitle: serviceController.text.trim(),
+                      location: locationController.text.trim(),
+                      extraNotes: notesController.text.trim(),
+                      createPaymentDue: createPaymentDue,
+                      enforceWorkingHours: enforceWorkingHours,
+                    );
+              }
+
+              try {
+                try {
+                  await confirm();
+                } on AppointmentScheduleException catch (error) {
+                  if (error.issue != AppointmentScheduleIssue.workingHours) {
+                    rethrow;
+                  }
+                  if (!context.mounted) return;
+                  final proceed = await showWorkloopOutsideHoursConfirmation(
+                    context,
+                    detail: error.message,
+                  );
+                  if (!proceed) {
+                    if (context.mounted) {
+                      setSheetState(() => submitting = false);
+                    }
+                    return;
+                  }
+                  await confirm(enforceWorkingHours: false);
+                }
+                if (context.mounted) Navigator.pop(context, true);
+              } on AppointmentScheduleException catch (error) {
+                if (context.mounted) {
+                  setSheetState(() {
+                    submitting = false;
+                    submissionError = error.message;
+                  });
+                }
+              } on BookingRequestStateException catch (error) {
+                ref.invalidate(bookingRequestsProvider);
+                if (context.mounted) {
+                  setSheetState(() {
+                    submitting = false;
+                    submissionError = error.message;
+                  });
+                }
+              } catch (_) {
+                if (context.mounted) {
+                  setSheetState(() {
+                    submitting = false;
+                    submissionError =
+                        'The booking was not created. Check your connection and try again.';
+                  });
+                }
+              }
+            }
+
             final price = double.tryParse(priceController.text.trim()) ?? 0;
             final valid = canSubmit();
             final formNote = !valid
@@ -524,187 +593,190 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                 ? 'This will create the booking and an unpaid Money item.'
                 : 'This will create the booking and close the request.';
 
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-              ),
-              child: SlateSheetFrame(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.sizeOf(context).height * 0.82,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Confirm booking',
-                          style: TextStyle(
-                            color: AppColors.t1,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0,
+            return PopScope(
+              canPop: !submitting,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                ),
+                child: SlateSheetFrame(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight:
+                          (MediaQuery.sizeOf(context).height -
+                              MediaQuery.viewInsetsOf(context).bottom) *
+                          0.68,
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Confirm booking',
+                            style: TextStyle(
+                              color: AppColors.t1,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Check the details, then add it to your calendar.',
-                          style: TextStyle(color: AppColors.t3),
-                        ),
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.bgInteract,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.border),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Check the details, then add it to your calendar.',
+                            style: TextStyle(color: AppColors.t3),
                           ),
-                          child: Column(
-                            children: [
-                              if (widget
-                                      .request
-                                      .preferredTimeText
-                                      ?.isNotEmpty ==
-                                  true)
-                                _SheetSummaryRow(
-                                  icon: LucideIcons.messageSquare,
-                                  label: 'Asked for',
-                                  value: widget.request.preferredTimeText!,
-                                ),
-                              if (widget.request.message?.isNotEmpty ==
-                                  true) ...[
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgInteract,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Column(
+                              children: [
                                 if (widget
                                         .request
                                         .preferredTimeText
                                         ?.isNotEmpty ==
                                     true)
-                                  const SizedBox(height: 10),
-                                _SheetSummaryRow(
-                                  icon: LucideIcons.messageCircle,
-                                  label: 'Message',
-                                  value: widget.request.message!,
-                                ),
+                                  _SheetSummaryRow(
+                                    icon: LucideIcons.messageSquare,
+                                    label: 'Asked for',
+                                    value: widget.request.preferredTimeText!,
+                                  ),
+                                if (widget.request.message?.isNotEmpty ==
+                                    true) ...[
+                                  if (widget
+                                          .request
+                                          .preferredTimeText
+                                          ?.isNotEmpty ==
+                                      true)
+                                    const SizedBox(height: 10),
+                                  _SheetSummaryRow(
+                                    icon: LucideIcons.messageCircle,
+                                    label: 'Message',
+                                    value: widget.request.message!,
+                                  ),
+                                ],
+                                if (widget.request.preferredTimeText?.isEmpty !=
+                                        false &&
+                                    widget.request.message?.isEmpty != false)
+                                  const _SheetEmptyHint(
+                                    text:
+                                        'No extra message was included with this request.',
+                                  ),
                               ],
-                              if (widget.request.preferredTimeText?.isEmpty !=
-                                      false &&
-                                  widget.request.message?.isEmpty != false)
-                                const _SheetEmptyHint(
-                                  text:
-                                      'No extra message was included with this request.',
-                                ),
-                            ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        _SheetField(
-                          controller: clientNameController,
-                          label: 'Client name',
-                          icon: LucideIcons.user,
-                          keyboardType: TextInputType.name,
-                          onChanged: (_) => refreshForm(),
-                        ),
-                        const SizedBox(height: 10),
-                        _SheetField(
-                          controller: phoneController,
-                          label: 'Phone',
-                          icon: LucideIcons.phone,
-                          keyboardType: TextInputType.phone,
-                          onChanged: (_) => refreshForm(),
-                        ),
-                        const SizedBox(height: 10),
-                        _SheetField(
-                          controller: serviceController,
-                          label: 'Service',
-                          icon: LucideIcons.scissors,
-                          keyboardType: TextInputType.text,
-                          onChanged: (_) => refreshForm(),
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _SheetPickerButton(
-                                icon: LucideIcons.calendar,
-                                label: _formatSheetDate(selectedDate),
-                                onTap: pickDate,
-                              ),
+                          const SizedBox(height: 16),
+                          _SheetField(
+                            controller: clientNameController,
+                            label: 'Client name',
+                            icon: LucideIcons.user,
+                            keyboardType: TextInputType.name,
+                            onChanged: (_) => refreshForm(),
+                          ),
+                          const SizedBox(height: 10),
+                          _SheetField(
+                            controller: phoneController,
+                            label: 'Phone',
+                            icon: LucideIcons.phone,
+                            keyboardType: TextInputType.phone,
+                            onChanged: (_) => refreshForm(),
+                          ),
+                          const SizedBox(height: 10),
+                          _SheetField(
+                            controller: serviceController,
+                            label: 'Service',
+                            icon: LucideIcons.scissors,
+                            keyboardType: TextInputType.text,
+                            onChanged: (_) => refreshForm(),
+                          ),
+                          const SizedBox(height: 14),
+                          _ResponsiveSheetPair(
+                            first: _SheetPickerButton(
+                              icon: LucideIcons.calendar,
+                              label: _formatSheetDate(selectedDate),
+                              onTap: pickDate,
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _SheetPickerButton(
-                                icon: LucideIcons.clock3,
-                                label: selectedTime.format(context),
-                                onTap: pickTime,
-                              ),
+                            second: _SheetPickerButton(
+                              icon: LucideIcons.clock3,
+                              label: selectedTime.format(context),
+                              onTap: pickTime,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _SheetField(
-                                controller: durationController,
-                                label: 'Duration mins',
-                                icon: LucideIcons.timer,
-                                keyboardType: TextInputType.number,
-                                onChanged: (_) => refreshForm(),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _SheetField(
-                                controller: priceController,
-                                label: 'Price',
-                                icon: LucideIcons.banknote,
-                                keyboardType: TextInputType.number,
-                                onChanged: (_) => refreshForm(),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        _SheetField(
-                          controller: locationController,
-                          label: 'Location',
-                          icon: LucideIcons.mapPin,
-                          keyboardType: TextInputType.text,
-                          onChanged: (_) => refreshForm(),
-                        ),
-                        const SizedBox(height: 10),
-                        _SheetField(
-                          controller: notesController,
-                          label: 'Private booking note',
-                          icon: LucideIcons.fileText,
-                          keyboardType: TextInputType.multiline,
-                          maxLines: 2,
-                          onChanged: (_) => refreshForm(),
-                        ),
-                        if (price > 0) ...[
+                          ),
                           const SizedBox(height: 12),
-                          _SheetSwitchRow(
-                            title: 'Add a payment to collect',
-                            subtitle:
-                                'Links an unpaid Money item to the booking.',
-                            value: createPaymentDue,
-                            onChanged: (value) =>
-                                setSheetState(() => createPaymentDue = value),
+                          _ResponsiveSheetPair(
+                            first: _SheetField(
+                              controller: durationController,
+                              label: 'Duration mins',
+                              icon: LucideIcons.timer,
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => refreshForm(),
+                            ),
+                            second: _SheetField(
+                              controller: priceController,
+                              label: 'Price',
+                              icon: LucideIcons.banknote,
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => refreshForm(),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _SheetField(
+                            controller: locationController,
+                            label: 'Location',
+                            icon: LucideIcons.mapPin,
+                            keyboardType: TextInputType.text,
+                            onChanged: (_) => refreshForm(),
+                          ),
+                          const SizedBox(height: 10),
+                          _SheetField(
+                            controller: notesController,
+                            label: 'Private booking note',
+                            icon: LucideIcons.fileText,
+                            keyboardType: TextInputType.multiline,
+                            maxLines: 2,
+                            onChanged: (_) => refreshForm(),
+                          ),
+                          if (price > 0) ...[
+                            const SizedBox(height: 12),
+                            _SheetSwitchRow(
+                              title: 'Add a payment to collect',
+                              subtitle:
+                                  'Links an unpaid Money item to the booking.',
+                              value: createPaymentDue,
+                              onChanged: (value) =>
+                                  setSheetState(() => createPaymentDue = value),
+                            ),
+                          ],
+                          const SizedBox(height: 10),
+                          _SheetEmptyHint(text: formNote),
+                          if (submissionError != null) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            Semantics(
+                              liveRegion: true,
+                              container: true,
+                              label: submissionError,
+                              child: _SheetSubmissionError(
+                                message: submissionError!,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 18),
+                          SlateButton(
+                            label: submitting
+                                ? 'Creating booking…'
+                                : 'Create booking',
+                            icon: submitting ? null : LucideIcons.calendarCheck,
+                            onPressed: valid && !submitting ? submit : null,
                           ),
                         ],
-                        const SizedBox(height: 10),
-                        _SheetEmptyHint(text: formNote),
-                        const SizedBox(height: 18),
-                        SlateButton(
-                          label: 'Create booking',
-                          icon: LucideIcons.calendarCheck,
-                          onPressed: valid
-                              ? () => Navigator.pop(context, true)
-                              : null,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -715,7 +787,9 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
       },
     );
 
-    if (confirmed != true) {
+    // The modal future completes when pop begins; keep controllers alive for
+    // the closing transition so its text fields cannot rebuild after disposal.
+    Future<void>.delayed(AppMotion.deliberate, () {
       clientNameController.dispose();
       phoneController.dispose();
       serviceController.dispose();
@@ -723,79 +797,27 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
       priceController.dispose();
       locationController.dispose();
       notesController.dispose();
-      return;
-    }
+    });
+    if (created != true) return;
 
-    final duration = int.tryParse(durationController.text.trim()) ?? 60;
-    final price = double.tryParse(priceController.text.trim()) ?? 0;
-    final clientName = clientNameController.text.trim();
-    final clientPhone = phoneController.text.trim();
-    final serviceTitle = serviceController.text.trim();
-    final location = locationController.text.trim();
-    final extraNotes = notesController.text.trim();
-    clientNameController.dispose();
-    phoneController.dispose();
-    serviceController.dispose();
-    durationController.dispose();
-    priceController.dispose();
-    locationController.dispose();
-    notesController.dispose();
-
-    setState(() => _saving = true);
-    try {
-      await ref
-          .read(profileRepositoryProvider)
-          .confirmBookingRequest(
-            request: widget.request,
-            startTime: DateTime(
-              selectedDate.year,
-              selectedDate.month,
-              selectedDate.day,
-              selectedTime.hour,
-              selectedTime.minute,
-            ),
-            durationMins: duration.clamp(15, 720),
-            price: price,
-            clientName: clientName,
-            clientPhone: clientPhone,
-            serviceTitle: serviceTitle,
-            location: location,
-            extraNotes: extraNotes,
-            createPaymentDue: createPaymentDue,
-          );
-      ref.invalidate(bookingRequestsProvider);
-      ref.invalidate(appointmentsProvider);
-      ref.invalidate(invoicesProvider);
-      ref.invalidate(financeSummaryProvider);
-      ref.invalidate(dashboardRevenueProvider);
-      ref.invalidate(dashboardFocusProvider);
-      ref.invalidate(todayAppointmentsProvider);
-      ref.invalidate(notificationsProvider);
-      ref.invalidate(unreadNotificationsProvider);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Booking added to your calendar'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        if (widget.closeAfterAction) Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'The booking could not be created. Please try again.',
-            ),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
+    ref.invalidate(bookingRequestsProvider);
+    ref.invalidate(appointmentsProvider);
+    ref.invalidate(invoicesProvider);
+    ref.invalidate(financeSummaryProvider);
+    ref.invalidate(dashboardRevenueProvider);
+    ref.invalidate(dashboardFocusProvider);
+    ref.invalidate(todayAppointmentsProvider);
+    ref.invalidate(notificationsProvider);
+    ref.invalidate(unreadNotificationsProvider);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Booking added to your calendar'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      if (widget.closeAfterAction) Navigator.pop(context);
     }
   }
 
@@ -831,7 +853,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                   style: const TextStyle(
                     color: AppColors.t1,
                     fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -847,31 +869,28 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                   style: const TextStyle(color: AppColors.t2),
                 ),
               ),
-              GestureDetector(
+              Semantics(
+                button: true,
+                label: 'Call ${request.name}',
                 onTap: _call,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgInteract,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(LucideIcons.phone, size: 13, color: AppColors.t2),
-                      SizedBox(width: 5),
-                      Text(
-                        'Call',
-                        style: TextStyle(
-                          color: AppColors.t2,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
+                child: ExcludeSemantics(
+                  child: OutlinedButton.icon(
+                    onPressed: _call,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.t2,
+                      minimumSize: const Size(0, AppSpacing.minTouch),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      side: const BorderSide(color: AppColors.border),
+                      shape: const StadiumBorder(),
+                    ),
+                    icon: const Icon(LucideIcons.phone, size: 14),
+                    label: const Text(
+                      'Call',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -966,33 +985,71 @@ class _SheetPickerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      label: label,
       onTap: onTap,
-      child: Container(
-        height: 50,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: AppColors.bgInteract,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.t3, size: 17),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.t1,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            height: 50,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.bgInteract,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
             ),
-          ],
+            child: Row(
+              children: [
+                Icon(icon, color: AppColors.t3, size: 17),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.t1,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _ResponsiveSheetPair extends StatelessWidget {
+  final Widget first;
+  final Widget second;
+
+  const _ResponsiveSheetPair({required this.first, required this.second});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scaledBody = MediaQuery.textScalerOf(context).scale(14);
+        final stacked = constraints.maxWidth < 360 || scaledBody > 18;
+        if (stacked) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [first, const SizedBox(height: 10), second],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: first),
+            const SizedBox(width: 10),
+            Expanded(child: second),
+          ],
+        );
+      },
     );
   }
 }
@@ -1021,11 +1078,47 @@ class _SheetField extends StatelessWidget {
       keyboardType: keyboardType,
       maxLines: maxLines,
       onChanged: onChanged,
-      style: const TextStyle(color: AppColors.t1, fontWeight: FontWeight.w800),
+      style: const TextStyle(color: AppColors.t1, fontWeight: FontWeight.w600),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: AppColors.t3),
         prefixIcon: Icon(icon, color: AppColors.t3, size: 17),
+      ),
+    );
+  }
+}
+
+class _SheetSubmissionError extends StatelessWidget {
+  final String message;
+
+  const _SheetSubmissionError({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(LucideIcons.circleAlert, color: AppColors.error, size: 17),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: AppColors.error,
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1079,7 +1172,7 @@ class _SheetSummaryRow extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.t3,
               fontSize: 12,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -1090,7 +1183,7 @@ class _SheetSummaryRow extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.t1,
               fontSize: 13,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
               height: 1.25,
             ),
           ),
@@ -1133,7 +1226,7 @@ class _SheetSwitchRow extends StatelessWidget {
                   style: const TextStyle(
                     color: AppColors.t1,
                     fontSize: 14,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -1148,12 +1241,7 @@ class _SheetSwitchRow extends StatelessWidget {
               ],
             ),
           ),
-          Switch.adaptive(
-            value: value,
-            activeThumbColor: AppColors.green,
-            activeTrackColor: AppColors.green.withValues(alpha: 0.28),
-            onChanged: onChanged,
-          ),
+          Switch.adaptive(value: value, onChanged: onChanged),
         ],
       ),
     );
@@ -1169,6 +1257,9 @@ class _InfoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width - (AppSpacing.pageX * 2),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: AppColors.bgInteract,
@@ -1180,12 +1271,16 @@ class _InfoChip extends StatelessWidget {
         children: [
           Icon(icon, size: 13, color: AppColors.t3),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.t2,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.t2,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -1223,25 +1318,38 @@ class _ActionButton extends StatelessWidget {
         : isDestructive
         ? Colors.transparent
         : AppColors.t1.withValues(alpha: 0.06);
-    final foreground = isPrimary ? AppColors.bg : color;
+    final foreground = isPrimary ? AppColors.onBrandAccent : color;
     final border = isPrimary
         ? Colors.transparent
         : isDestructive
         ? Colors.transparent
         : AppColors.border;
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      enabled: !loading,
+      label: label,
       onTap: loading ? null : onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: border),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(color: foreground, fontWeight: FontWeight.w800),
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: loading ? null : onTap,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: AppSpacing.minTouch),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: border),
+            ),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: foreground,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -1278,7 +1386,7 @@ class _StatusBadge extends StatelessWidget {
         style: TextStyle(
           color: color,
           fontSize: 11,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -1288,33 +1396,51 @@ class _StatusBadge extends StatelessWidget {
 class _EmptyRequests extends StatelessWidget {
   final String title;
   final String subtitle;
-  const _EmptyRequests({required this.title, required this.subtitle});
+  final VoidCallback? onRetry;
+
+  const _EmptyRequests({
+    required this.title,
+    required this.subtitle,
+    this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(LucideIcons.inbox, color: AppColors.t3, size: 38),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                color: AppColors.t1,
-                fontWeight: FontWeight.w800,
-                fontSize: 17,
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xxl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(LucideIcons.inbox, color: AppColors.t3, size: 38),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.t1,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 17,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    subtitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.t3),
+                  ),
+                  if (onRetry != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    WorkloopTextButton(label: 'Try again', onPressed: onRetry),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.t3),
-            ),
-          ],
+          ),
         ),
       ),
     );

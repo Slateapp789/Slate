@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 
 Widget settingsHandle() => Center(
@@ -17,7 +17,7 @@ Widget sectionLabel(String text) => Text(
   text.toUpperCase(),
   style: const TextStyle(
     fontSize: 10,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w600,
     letterSpacing: 0,
     color: AppColors.t3,
   ),
@@ -34,7 +34,7 @@ Widget infoRow(String label, String value) => Padding(
           value,
           style: const TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
             color: AppColors.t1,
           ),
           textAlign: TextAlign.end,
@@ -68,7 +68,7 @@ Widget tappableRow({
             value,
             style: TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
               color: valueColor ?? AppColors.t1,
             ),
           ),
@@ -111,22 +111,26 @@ Widget saveBtn({
     onPressed: loading || disabled ? null : onTap,
     style: ElevatedButton.styleFrom(
       backgroundColor: color,
-      foregroundColor: AppColors.t1,
+      foregroundColor: color == AppColors.accentPrimaryStrong
+          ? AppColors.onBrandAccent
+          : AppColors.bg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 0,
     ),
     child: loading
-        ? const SizedBox(
+        ? SizedBox(
             width: 18,
             height: 18,
             child: CircularProgressIndicator(
-              color: AppColors.t1,
+              color: color == AppColors.accentPrimaryStrong
+                  ? AppColors.onBrandAccent
+                  : AppColors.bg,
               strokeWidth: 2,
             ),
           )
         : Text(
             label,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
   ),
 );
@@ -140,7 +144,7 @@ Widget cancelBtn(BuildContext ctx) => SizedBox(
       'Cancel',
       style: TextStyle(
         fontSize: 15,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w500,
         color: AppColors.t3,
       ),
     ),
@@ -154,6 +158,7 @@ Widget settingsField({
   TextInputType? keyboardType,
   bool autofocus = false,
   int maxLines = 1,
+  int? maxLength,
 }) => Column(
   crossAxisAlignment: CrossAxisAlignment.start,
   children: [
@@ -161,7 +166,7 @@ Widget settingsField({
       label,
       style: const TextStyle(
         fontSize: 10,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w600,
         letterSpacing: 0,
         color: AppColors.t3,
       ),
@@ -172,9 +177,11 @@ Widget settingsField({
       keyboardType: keyboardType,
       autofocus: autofocus,
       maxLines: maxLines,
+      maxLength: maxLength,
       style: const TextStyle(color: AppColors.t1, fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
+        counterText: maxLength == null ? null : '',
         hintStyle: const TextStyle(color: AppColors.t3),
         filled: true,
         fillColor: AppColors.t1.withValues(alpha: 0.028),

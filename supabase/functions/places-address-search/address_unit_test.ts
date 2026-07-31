@@ -1,7 +1,4 @@
-import {
-  unitSearchFrom,
-  withUnitLabel,
-} from "./address_unit.ts";
+import { unitSearchFrom, withUnitLabel } from "./address_unit.ts";
 
 function assertEquals(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/slate_models.dart';
+import 'repository_pagination.dart';
 import 'supabase_client_provider.dart';
 
 final clientsRepositoryProvider = Provider<ClientsRepository>((ref) {
@@ -13,14 +14,19 @@ class ClientsRepository {
   const ClientsRepository(this._client);
 
   Future<List<Client>> list(String workspaceId) async {
-    final rows = await _client
-        .from('contacts')
-        .select()
-        .eq('workspace_id', workspaceId)
-        .order('name', ascending: true);
-    return rows
-        .map<Client>((row) => Client.fromMap(Map<String, dynamic>.from(row)))
-        .toList();
+    final rows = await fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('contacts')
+            .select()
+            .eq('workspace_id', workspaceId)
+            .order('name', ascending: true)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
+    return rows.map<Client>(Client.fromMap).toList();
   }
 
   Future<Client?> getById(String id) async {

@@ -16,25 +16,53 @@ final clientCrmRecordsProvider = FutureProvider<List<ClientCrmRecord>>((
   final workspaceId = await ref.watch(workspaceIdProvider.future);
   if (workspaceId == null) return [];
 
-  final clients = await ref.watch(clientsRepositoryProvider).list(workspaceId);
-  final appointments = await ref
+  final clientsFuture = ref.watch(clientsRepositoryProvider).list(workspaceId);
+  final appointmentsFuture = ref
       .watch(appointmentsRepositoryProvider)
       .list(workspaceId);
-  final payments = await ref
+  final paymentsFuture = ref
       .watch(paymentsRepositoryProvider)
       .list(workspaceId);
-  final tasks = await ref.watch(tasksRepositoryProvider).list(workspaceId);
+  final tasksFuture = ref.watch(tasksRepositoryProvider).list(workspaceId);
+
+  final (clients, appointments, payments, tasks) = await (
+    clientsFuture,
+    appointmentsFuture,
+    paymentsFuture,
+    tasksFuture,
+  ).wait;
+
+  return buildClientCrmRecords(
+    clients: clients,
+    appointments: appointments,
+    payments: payments,
+    tasks: tasks,
+  );
+});
+
+List<ClientCrmRecord> buildClientCrmRecords({
+  required Iterable<Client> clients,
+  required Iterable<Appointment> appointments,
+  required Iterable<Payment> payments,
+  required Iterable<SlateTask> tasks,
+  DateTime? now,
+}) {
+  final current = now ?? DateTime.now();
+  final appointmentsByContact = _groupByContactId(
+    appointments,
+    (item) => item.contactId,
+  );
+  final paymentsByContact = _groupByContactId(
+    payments,
+    (item) => item.contactId,
+  );
+  final tasksByContact = _groupByContactId(tasks, (item) => item.contactId);
 
   return clients.map((client) {
-    final clientAppointments = appointments
-        .where((item) => item.contactId == client.id)
-        .toList();
-    final clientPayments = payments
-        .where((item) => item.contactId == client.id)
-        .toList();
-    final clientTasks = tasks
-        .where((item) => item.contactId == client.id)
-        .toList();
+    final clientAppointments =
+        appointmentsByContact[client.id] ?? const <Appointment>[];
+    final clientPayments = paymentsByContact[client.id] ?? const <Payment>[];
+    final clientTasks = tasksByContact[client.id] ?? const <SlateTask>[];
 
     return ClientCrmRecord(
       client: client,
@@ -42,21 +70,39 @@ final clientCrmRecordsProvider = FutureProvider<List<ClientCrmRecord>>((
       completedBookingCount: clientAppointments
           .where((item) => item.status == 'completed')
           .length,
-      nextBooking: _nextBooking(clientAppointments),
-      lastBooking: _lastBooking(clientAppointments),
-      lifetimeValue: clientPayments
-          .where((item) => item.status == 'paid')
-          .fold<double>(0, (sum, item) => sum + item.amountPaid),
-      outstandingBalance: clientPayments
-          .where((item) => item.status != 'paid')
-          .fold<double>(0, (sum, item) => sum + item.total),
+      nextBooking: _nextBooking(clientAppointments, current),
+      lastBooking: _lastBooking(clientAppointments, current),
+      lifetimeValue: clientPayments.fold<double>(
+        0,
+        (sum, item) => sum + item.collectedAmount,
+      ),
+      outstandingBalance: clientPayments.fold<double>(
+        0,
+        (sum, item) => sum + item.outstandingAmount,
+      ),
       openTaskCount: clientTasks.where((item) => item.status != 'done').length,
       overdueTaskCount: clientTasks
-          .where((item) => item.status != 'done' && _isOverdue(item.dueDate))
+          .where(
+            (item) =>
+                item.status != 'done' && _isOverdue(item.dueDate, current),
+          )
           .length,
     );
   }).toList();
-});
+}
+
+Map<String, List<T>> _groupByContactId<T>(
+  Iterable<T> items,
+  String? Function(T item) contactIdOf,
+) {
+  final grouped = <String, List<T>>{};
+  for (final item in items) {
+    final contactId = contactIdOf(item);
+    if (contactId == null) continue;
+    (grouped[contactId] ??= <T>[]).add(item);
+  }
+  return grouped;
+}
 
 class ClientCrmRecord {
   final Client client;
@@ -115,30 +161,31 @@ class ClientCrmRecord {
   }
 }
 
-Appointment? _nextBooking(List<Appointment> appointments) {
-  final now = DateTime.now();
+Appointment? _nextBooking(List<Appointment> appointments, DateTime now) {
   final future =
       appointments
           .where(
-            (item) => item.startTime.isAfter(now) && item.status != 'cancelled',
+            (item) =>
+                !item.startTime.isBefore(now) &&
+                !_terminalBookingStatuses.contains(item.status.toLowerCase()),
           )
           .toList()
         ..sort((a, b) => a.startTime.compareTo(b.startTime));
   return future.isEmpty ? null : future.first;
 }
 
-Appointment? _lastBooking(List<Appointment> appointments) {
-  final now = DateTime.now();
+Appointment? _lastBooking(List<Appointment> appointments, DateTime now) {
   final past =
       appointments.where((item) => item.startTime.isBefore(now)).toList()
         ..sort((a, b) => b.startTime.compareTo(a.startTime));
   return past.isEmpty ? null : past.first;
 }
 
-bool _isOverdue(DateTime? date) {
+bool _isOverdue(DateTime? date, DateTime now) {
   if (date == null) return false;
-  final today = DateTime.now();
-  final todayOnly = DateTime(today.year, today.month, today.day);
+  final todayOnly = DateTime(now.year, now.month, now.day);
   final dueOnly = DateTime(date.year, date.month, date.day);
   return dueOnly.isBefore(todayOnly);
 }
+
+const _terminalBookingStatuses = {'cancelled', 'no_show', 'completed'};

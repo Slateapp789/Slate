@@ -36,6 +36,7 @@ migrate_working_dir/
 .pub/
 /build
 /build/
+/coverage/
 ui_screenshots/
 supabase/.temp/
 

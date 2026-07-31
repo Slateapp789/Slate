@@ -1,18 +1,20 @@
--- Slate V1 schema contract
+-- Workloop V1 schema contract
 -- This file documents the database shape the Flutter app expects.
 -- Treat it as the source for future Supabase migrations before adding V1 features.
 
 -- Existing core tables used by the current app:
 -- workspaces(id, name, industry, created_at)
--- workspace_members(id, workspace_id, user_id, role, created_at)
--- workspace_settings(id, workspace_id, working_hours jsonb, revenue_target numeric, created_at, updated_at)
+-- workspace_members(id, workspace_id, user_id, created_at)
+-- V1 owner invariant: destructive account deletion requires exactly one
+-- workspace_members row and it must belong to the requesting user.
+-- workspace_settings(workspace_id, working_hours jsonb, revenue_target numeric)
 -- contacts(id, workspace_id, name, phone, email, address, notes, important_notes, status, preferred_contact_method, source, birthday, tags, last_activity_at, created_at)
 -- services(id, workspace_id, name, duration_mins, price, description, show_on_profile, active, created_at)
 -- appointments(id, workspace_id, contact_id, service_id, title, start_time, end_time, price, status, notes, created_at)
 -- invoices(id, workspace_id, contact_id, invoice_number, type, status, issue_date, due_date, subtotal, tax_rate, tax_amount, discount_value, total, amount_paid, notes, created_at)
 -- expenses(id, workspace_id, amount, category, expense_date, notes, created_at, updated_at)
--- tasks(id, workspace_id, contact_id, appointment_id, title, priority, due_date, status, reminder_timing, created_at, updated_at)
--- notes(id, workspace_id, contact_id, appointment_id, title, body, pinned, created_at, updated_at)
+-- tasks(id, workspace_id, contact_id, appointment_id, title, priority, due_date, status, reminder_timing, completed_at, created_at, updated_at)
+-- notes(id, workspace_id, contact_id, appointment_id, task_id, title, body, category, tags, pinned, archived, created_at, updated_at)
 -- business_profiles(id, workspace_id, handle, created_at)
 
 -- V1 extension fields.
@@ -73,6 +75,7 @@ alter table if exists workspace_settings
 alter table if exists tasks
   add column if not exists reminder_timing text not null default 'none',
   add column if not exists appointment_id uuid references appointments(id) on delete set null,
+  add column if not exists completed_at timestamptz,
   add column if not exists updated_at timestamptz not null default now();
 
 create index if not exists tasks_workspace_id_idx
@@ -128,38 +131,61 @@ create table if not exists notes (
   workspace_id uuid not null references workspaces(id) on delete cascade,
   contact_id uuid references contacts(id) on delete set null,
   appointment_id uuid references appointments(id) on delete set null,
+  task_id uuid references tasks(id) on delete set null,
   title text not null default 'Untitled note',
   body text not null default '',
+  category text not null default 'general'
+    check (category in ('general', 'client', 'booking', 'money', 'idea')),
+  tags text[] not null default '{}',
   pinned boolean not null default false,
+  archived boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index if not exists notes_workspace_updated_idx
-  on notes(workspace_id, pinned desc, updated_at desc);
+  on notes(workspace_id, archived, pinned desc, updated_at desc);
+create index if not exists notes_workspace_category_idx
+  on notes(workspace_id, category, updated_at desc);
 create index if not exists notes_contact_id_idx
   on notes(contact_id);
 create index if not exists notes_appointment_id_idx
   on notes(appointment_id);
+create index if not exists notes_task_id_idx
+  on notes(task_id);
+create index if not exists notes_tags_idx
+  on notes using gin(tags);
 
 create table if not exists booking_requests (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references workspaces(id) on delete cascade,
   name text not null,
   phone text not null,
+  phone_normalized text
+    generated always as (regexp_replace(phone, '[^0-9]', '', 'g')) stored,
   service_id uuid references services(id) on delete set null,
   preferred_time_text text,
   message text,
   status text not null default 'pending',
+  source_hash text,
+  request_token uuid,
   created_at timestamptz not null default now()
 );
 
 alter table if exists booking_requests
-  add column if not exists preferred_time_text text;
+  add column if not exists preferred_time_text text,
+  add column if not exists phone_normalized text
+    generated always as (regexp_replace(phone, '[^0-9]', '', 'g')) stored,
+  add column if not exists source_hash text,
+  add column if not exists request_token uuid;
 create index if not exists booking_requests_workspace_id_idx
   on booking_requests(workspace_id);
 create index if not exists booking_requests_service_id_idx
   on booking_requests(service_id);
+create unique index if not exists
+  booking_requests_workspace_request_token_idx
+  on booking_requests(workspace_id, request_token)
+  where request_token is not null;
 
 create table if not exists notifications (
   id uuid primary key default gen_random_uuid(),
@@ -168,11 +194,16 @@ create table if not exists notifications (
   title text not null,
   body text not null,
   deep_link text,
+  dedupe_key text,
   read boolean not null default false,
   created_at timestamptz not null default now()
 );
+alter table if exists notifications
+  add column if not exists dedupe_key text;
 create index if not exists notifications_workspace_id_idx
   on notifications(workspace_id);
+create unique index if not exists notifications_workspace_dedupe_uidx
+  on notifications(workspace_id, dedupe_key);
 
 create table if not exists notification_preferences (
   id uuid primary key default gen_random_uuid(),
@@ -220,7 +251,7 @@ create index if not exists calendar_sync_accounts_workspace_id_idx
 
 create table if not exists account_deletion_requests (
   id uuid primary key default gen_random_uuid(),
-  workspace_id uuid not null references workspaces(id) on delete cascade,
+  workspace_id uuid references workspaces(id) on delete set null,
   user_id uuid,
   email text not null,
   status text not null default 'requested',
@@ -286,14 +317,23 @@ begin
   end if;
 end $$;
 
-alter table if exists booking_requests
-  add column if not exists source_hash text;
-
 create index if not exists booking_requests_source_hash_created_idx
   on booking_requests(workspace_id, source_hash, created_at desc);
 
 do $$
 begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'booking_requests_normalized_phone_check'
+      and conrelid = 'public.booking_requests'::regclass
+  ) then
+    alter table public.booking_requests
+      add constraint booking_requests_normalized_phone_check
+      check (char_length(phone_normalized) between 7 and 32)
+      not valid;
+  end if;
+
   if not exists (
     select 1
     from pg_constraint
@@ -358,10 +398,92 @@ create unique index if not exists business_profiles_handle_unique_idx
 
 create schema if not exists app_private;
 
+create table if not exists app_private.edge_rate_limit_events (
+  id bigint generated always as identity primary key,
+  scope text not null check (
+    scope in (
+      'booking_source',
+      'booking_phone',
+      'places_autocomplete',
+      'places_details'
+    )
+  ),
+  resource_key text not null default '',
+  subject_key text not null,
+  created_at timestamptz not null default clock_timestamp()
+);
+
+create index if not exists edge_rate_limit_subject_window_idx
+  on app_private.edge_rate_limit_events(
+    scope,
+    resource_key,
+    subject_key,
+    created_at desc
+  );
+create index if not exists edge_rate_limit_created_at_idx
+  on app_private.edge_rate_limit_events(created_at);
+
+alter table app_private.edge_rate_limit_events enable row level security;
+revoke all on table app_private.edge_rate_limit_events
+  from public, anon, authenticated;
+grant select, insert, delete on table app_private.edge_rate_limit_events
+  to service_role;
+drop policy if exists edge_rate_limit_events_deny_clients
+  on app_private.edge_rate_limit_events;
+create policy edge_rate_limit_events_deny_clients
+  on app_private.edge_rate_limit_events
+  for all
+  to anon, authenticated
+  using (false)
+  with check (false);
+revoke all on sequence app_private.edge_rate_limit_events_id_seq
+  from public, anon, authenticated;
+grant usage, select on sequence app_private.edge_rate_limit_events_id_seq
+  to service_role;
+
 create table if not exists app_private.payment_counters (
   workspace_id uuid primary key references public.workspaces(id) on delete cascade,
   next_number bigint not null default 1 check (next_number > 0)
 );
+
+create table if not exists app_private.workflow_idempotency (
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  user_id uuid not null,
+  operation text not null,
+  idempotency_key text not null,
+  result jsonb,
+  created_at timestamptz not null default now(),
+  primary key (workspace_id, user_id, operation, idempotency_key)
+);
+
+revoke all on table app_private.workflow_idempotency
+  from public, anon, authenticated;
+create index if not exists workflow_idempotency_created_at_idx
+  on app_private.workflow_idempotency(created_at);
+
+-- RPC contracts expected by the launch clients:
+--
+-- Edge-only public booking intake:
+-- public.create_public_booking_request(
+--   uuid, text, text, uuid, text, text, text, uuid
+-- ) returns table (booking_request_id uuid, outcome text)
+-- SECURITY DEFINER with an explicit search_path. EXECUTE is revoked from
+-- PUBLIC, anon, and authenticated, then granted only to service_role. It
+-- validates the workspace/service, serializes rate checks, preserves request
+-- token idempotency, and inserts the request/counters atomically. The
+-- allow_booking_request_notification trigger suppresses its notification when
+-- all_notifications or booking_request preferences are disabled.
+--
+-- Authenticated transactional workflows:
+-- public.create_task_workflow(jsonb) returns jsonb
+-- public.create_booking_workflow(jsonb) returns jsonb
+-- public.complete_booking_workflow(jsonb) returns jsonb
+-- These public wrappers are SECURITY INVOKER, revoked from PUBLIC/anon, and
+-- granted to authenticated. Private implementations validate auth.uid(),
+-- workspace membership, linked-record ownership, conflicts, payload bounds,
+-- and stable idempotency keys. Booking creation reuses an existing contact
+-- when workspace-scoped digit-normalized phone values match; no country-code
+-- inference is performed.
 
 create unique index if not exists invoices_workspace_invoice_number_unique_idx
   on public.invoices(workspace_id, invoice_number)

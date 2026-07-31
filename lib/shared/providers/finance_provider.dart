@@ -52,11 +52,19 @@ class MoneyPeriodRange {
 }
 
 DateTime startOfWeek(DateTime now) {
-  final monday = now.subtract(Duration(days: now.weekday - 1));
-  return DateTime(monday.year, monday.month, monday.day);
+  final day = startOfDay(now);
+  return addBusinessCalendarDays(day, -(day.weekday - 1));
 }
 
-DateTime startOfDay(DateTime date) => DateTime(date.year, date.month, date.day);
+DateTime startOfDay(DateTime date) {
+  final local = date.toLocal();
+  return DateTime(local.year, local.month, local.day);
+}
+
+DateTime addBusinessCalendarDays(DateTime date, int days) {
+  final local = date.toLocal();
+  return DateTime(local.year, local.month, local.day + days);
+}
 
 MoneyStatus moneyStatusFor(Payment payment, {DateTime? now}) {
   if (payment.status == 'paid') return MoneyStatus.paid;
@@ -67,21 +75,17 @@ MoneyStatus moneyStatusFor(Payment payment, {DateTime? now}) {
 }
 
 double receivedAmountFor(Payment payment) {
-  if (payment.amountPaid > 0) {
-    return payment.amountPaid.clamp(0, payment.total);
-  }
-  return payment.status == 'paid' ? payment.total : 0;
+  return payment.collectedAmount;
 }
 
 double outstandingAmountFor(Payment payment) {
-  if (payment.status == 'paid') return 0;
-  return (payment.total - receivedAmountFor(payment)).clamp(0, double.infinity);
+  return payment.outstandingAmount;
 }
 
 DateTime displayReceivedDate(Payment payment, {DateTime? now}) {
   final today = startOfDay(now ?? DateTime.now());
-  final received = startOfDay(payment.issueDate);
-  return received.isAfter(today) ? today : payment.issueDate;
+  final received = startOfDay(payment.receivedDate);
+  return received.isAfter(today) ? today : payment.receivedDate;
 }
 
 class PeriodMoneySummary {
@@ -113,12 +117,9 @@ class PeriodMoneySummary {
     bool inRange(DateTime date) =>
         !date.isBefore(range.start) && date.isBefore(range.end);
 
-    final today = now ?? DateTime.now();
+    final today = (now ?? DateTime.now()).toLocal();
     final paid = payments
-        .where(
-          (payment) => moneyStatusFor(payment, now: today) == MoneyStatus.paid,
-        )
-        .where((payment) => inRange(payment.issueDate))
+        .where((payment) => inRange(payment.receivedDate))
         .fold<double>(0, (sum, payment) => sum + receivedAmountFor(payment));
     final unpaid = payments
         .where(
@@ -210,10 +211,10 @@ class FinanceSummary {
     required double monthlyTarget,
     DateTime? now,
   }) {
-    final current = now ?? DateTime.now();
+    final current = (now ?? DateTime.now()).toLocal();
     final thisWeekStart = startOfWeek(current);
-    final nextWeekStart = thisWeekStart.add(const Duration(days: 7));
-    final lastWeekStart = thisWeekStart.subtract(const Duration(days: 7));
+    final nextWeekStart = addBusinessCalendarDays(thisWeekStart, 7);
+    final lastWeekStart = addBusinessCalendarDays(thisWeekStart, -7);
     final thisMonthStart = DateTime(current.year, current.month, 1);
     final nextMonthStart = DateTime(current.year, current.month + 1, 1);
     final lastMonthStart = DateTime(current.year, current.month - 1, 1);
@@ -228,24 +229,23 @@ class FinanceSummary {
       label: 'This month',
     );
 
-    final paidPayments = payments.where((item) => item.status == 'paid');
     final thisWeekPaid = _sumPaymentsInRange(
-      paidPayments,
+      payments,
       thisWeekStart,
       nextWeekStart,
     );
     final lastWeekPaid = _sumPaymentsInRange(
-      paidPayments,
+      payments,
       lastWeekStart,
       thisWeekStart,
     );
     final thisMonthPaid = _sumPaymentsInRange(
-      paidPayments,
+      payments,
       thisMonthStart,
       nextMonthStart,
     );
     final lastMonthPaid = _sumPaymentsInRange(
-      paidPayments,
+      payments,
       lastMonthStart,
       thisMonthStart,
     );
@@ -307,7 +307,8 @@ double _sumPaymentsInRange(
   return payments
       .where(
         (item) =>
-            !item.issueDate.isBefore(start) && item.issueDate.isBefore(end),
+            !item.receivedDate.isBefore(start) &&
+            item.receivedDate.isBefore(end),
       )
       .fold<double>(0, (sum, item) => sum + receivedAmountFor(item));
 }

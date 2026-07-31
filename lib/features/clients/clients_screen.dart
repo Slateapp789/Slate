@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
@@ -24,7 +24,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
   String _query = '';
   ClientView _view = ClientView.all;
   ClientSortOrder _sortOrder = ClientSortOrder.nextBooking;
-  double _horizontalDragDistance = 0;
+  Offset? _lastPointerPosition;
 
   @override
   void dispose() {
@@ -42,132 +42,141 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
-          records.when(
-            loading: () => const _ClientsLoading(),
-            error: (_, __) => Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.pageX,
-                AppSpacing.pageTop + AppSpacing.xxl,
-                AppSpacing.pageX,
-                AppSpacing.pageX,
-              ),
-              child: SlateErrorState(message: 'Error loading clients'),
-            ),
-            data: (data) {
-              final filtered = _filterAndSort(data);
-              return GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onHorizontalDragStart: (_) => _horizontalDragDistance = 0,
-                onHorizontalDragUpdate: (details) {
-                  _horizontalDragDistance += details.primaryDelta ?? 0;
-                },
-                onHorizontalDragEnd: _handleHorizontalSwipe,
-                child: RefreshIndicator(
-                  color: AppColors.accentPrimary,
-                  onRefresh: () async {
+          SafeArea(
+            bottom: false,
+            child: records.when(
+              loading: () => const _ClientsLoading(),
+              error: (_, _) => Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.pageX,
+                  AppSpacing.screenTop,
+                  AppSpacing.pageX,
+                  AppSpacing.pageX,
+                ),
+                child: SlateErrorState(
+                  message: 'Could not load clients. Check your connection.',
+                  onRetry: () {
                     ref.invalidate(clientsProvider);
                     ref.invalidate(clientCrmRecordsProvider);
                   },
-                  child: CustomScrollView(
-                    controller: _scrollController,
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.pageX,
-                            AppSpacing.pageTop + AppSpacing.xxl,
-                            AppSpacing.pageX,
-                            0,
-                          ),
-                          child: _Header(onAdd: _openAddClient),
-                        ),
-                      ),
-                      if (data.isNotEmpty) ...[
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.pageX,
-                              AppSpacing.xxl,
-                              AppSpacing.pageX,
-                              0,
-                            ),
-                            child: _SearchAndSort(
-                              controller: _searchController,
-                              onQueryChanged: (value) =>
-                                  setState(() => _query = value.trim()),
-                            ),
-                          ),
-                        ),
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: AppSpacing.sm),
-                            child: _ViewRail(
-                              selected: _view,
-                              records: data,
-                              onChanged: _changeView,
-                            ),
-                          ),
-                        ),
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.pageX,
-                              AppSpacing.md,
-                              AppSpacing.pageX,
-                              0,
-                            ),
-                            child: _SortToolbar(
-                              resultCount: filtered.length,
-                              sortOrder: _sortOrder,
-                              onSort: _showSortPicker,
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (data.isEmpty)
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: _EmptyState(
-                            onAdd: _openAddClient,
-                            onImport: _openContactsImport,
-                          ),
-                        )
-                      else if (filtered.isEmpty)
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: _NoMatches(
-                            view: _view,
-                            hasQuery: _query.isNotEmpty,
-                          ),
-                        )
-                      else
-                        SliverList.separated(
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const SizedBox.shrink(),
-                          itemBuilder: (context, index) {
-                            final record = filtered[index];
-                            return Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                AppSpacing.pageX,
-                                index == 0 ? AppSpacing.xs : 0,
-                                AppSpacing.pageX,
-                                index == filtered.length - 1 ? 132 : 0,
-                              ),
-                              child: _ClientRow(
-                                record: record,
-                                showInactive:
-                                    _view == ClientView.all &&
-                                    record.isInactive,
-                                onTap: () => _openClient(record),
-                              ),
-                            );
-                          },
-                        ),
-                    ],
-                  ),
                 ),
-              );
-            },
+              ),
+              data: (data) {
+                final filtered = _filterAndSort(data);
+                return Listener(
+                  onPointerDown: (event) =>
+                      _lastPointerPosition = event.position,
+                  child: RefreshIndicator(
+                    color: AppColors.accentPrimary,
+                    onRefresh: () async {
+                      ref.invalidate(clientsProvider);
+                      ref.invalidate(clientCrmRecordsProvider);
+                    },
+                    child: CustomScrollView(
+                      controller: _scrollController,
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.pageX,
+                              AppSpacing.screenTop,
+                              AppSpacing.pageX,
+                              0,
+                            ),
+                            child: _Header(onAdd: _openAddClient),
+                          ),
+                        ),
+                        if (data.isNotEmpty) ...[
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.pageX,
+                                AppSpacing.xl,
+                                AppSpacing.pageX,
+                                0,
+                              ),
+                              child: _SearchAndSort(
+                                controller: _searchController,
+                                onQueryChanged: (value) =>
+                                    setState(() => _query = value.trim()),
+                              ),
+                            ),
+                          ),
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.only(
+                                top: AppSpacing.sm,
+                              ),
+                              child: _ViewRail(
+                                selected: _view,
+                                records: data,
+                                onChanged: _changeView,
+                              ),
+                            ),
+                          ),
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.pageX,
+                                AppSpacing.md,
+                                AppSpacing.pageX,
+                                0,
+                              ),
+                              child: _SortToolbar(
+                                resultCount: filtered.length,
+                                sortOrder: _sortOrder,
+                                onSort: _showSortPicker,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (data.isEmpty)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: _EmptyState(onImport: _openContactsImport),
+                          )
+                        else if (filtered.isEmpty)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: _NoMatches(
+                              view: _view,
+                              hasQuery: _query.isNotEmpty,
+                            ),
+                          )
+                        else
+                          SliverList.separated(
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, _) => const SizedBox.shrink(),
+                            itemBuilder: (context, index) {
+                              final record = filtered[index];
+                              return Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  AppSpacing.pageX,
+                                  index == 0 ? AppSpacing.xs : 0,
+                                  AppSpacing.pageX,
+                                  index == filtered.length - 1
+                                      ? AppSpacing.bottomNavClearance
+                                      : 0,
+                                ),
+                                child: _ClientRow(
+                                  record: record,
+                                  showInactive:
+                                      _view == ClientView.all &&
+                                      record.isInactive,
+                                  onTap: () {
+                                    if (_returnToTopFromClientRow()) return;
+                                    _openClient(record);
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -195,19 +204,6 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
     return sortClientRecords(filtered, _sortOrder);
   }
 
-  void _handleHorizontalSwipe(DragEndDetails details) {
-    final nextView = clientViewAfterSwipe(
-      current: _view,
-      dragDistance: _horizontalDragDistance,
-      velocity: details.primaryVelocity ?? 0,
-    );
-    _horizontalDragDistance = 0;
-    if (nextView == _view) return;
-
-    SlateHaptics.tap();
-    _changeView(nextView);
-  }
-
   void _changeView(ClientView view) {
     if (view == _view) return;
     FocusManager.instance.primaryFocus?.unfocus();
@@ -221,6 +217,24 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
         curve: AppMotion.curve,
       );
     });
+  }
+
+  bool _returnToTopFromClientRow() {
+    final position = _lastPointerPosition;
+    if (position == null ||
+        !_scrollController.hasClients ||
+        _scrollController.offset <=
+            _scrollController.position.minScrollExtent + 0.5) {
+      return false;
+    }
+    final topExtent = MediaQuery.paddingOf(context).top + 72;
+    if (position.dy > topExtent) return false;
+    _scrollController.animateTo(
+      _scrollController.position.minScrollExtent,
+      duration: AppMotion.standard,
+      curve: AppMotion.curve,
+    );
+    return true;
   }
 
   Future<void> _showSortPicker() async {
@@ -272,45 +286,15 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Clients',
-                style: TextStyle(
-                  color: AppColors.t1,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                  height: 1.04,
-                ),
-              ),
-              SizedBox(height: AppSpacing.sm),
-              Text(
-                'People you work with.',
-                style: TextStyle(
-                  color: AppColors.t2,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  height: 1.32,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        WorkloopIconButton(
-          icon: LucideIcons.plus,
-          semanticLabel: 'New client',
-          color: AppColors.modClients,
-          backgroundColor: AppColors.modClients.withValues(alpha: 0.10),
-          size: 48,
-          onTap: onAdd,
-        ),
-      ],
+    return WorkloopPageHeader(
+      title: 'Clients',
+      subtitle: 'Build relationships and know who needs attention.',
+      color: AppColors.modClients,
+      trailing: WorkloopTopAction(
+        label: 'New client',
+        semanticLabel: 'New client',
+        onTap: onAdd,
+      ),
     );
   }
 }
@@ -348,16 +332,17 @@ class _SortToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     final countLabel = resultCount == 1 ? '1 client' : '$resultCount clients';
     return Row(
       children: [
         Expanded(
           child: Text(
             countLabel,
-            style: const TextStyle(
-              color: AppColors.t2,
+            style: TextStyle(
+              color: tokens.textSecondary,
               fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
@@ -375,27 +360,27 @@ class _SortToolbar extends StatelessWidget {
                 vertical: AppSpacing.xs,
               ),
               decoration: BoxDecoration(
-                color: AppColors.bgCard.withValues(alpha: 0.72),
+                color: tokens.surfaceRaised.withValues(alpha: 0.96),
                 borderRadius: BorderRadius.circular(AppRadius.pill),
                 border: Border.all(
-                  color: AppColors.border.withValues(alpha: 0.72),
+                  color: tokens.dividerStrong.withValues(alpha: 0.82),
                 ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     LucideIcons.arrowUpDown,
                     size: 14,
-                    color: AppColors.t2,
+                    color: tokens.textSecondary,
                   ),
                   const SizedBox(width: AppSpacing.xs),
                   Text(
                     sortOrder.label,
-                    style: const TextStyle(
-                      color: AppColors.t1,
+                    style: TextStyle(
+                      color: tokens.textPrimary,
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -431,7 +416,7 @@ class _ClientSortSheet extends StatelessWidget {
             style: TextStyle(
               color: AppColors.t1,
               fontSize: 20,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -440,7 +425,7 @@ class _ClientSortSheet extends StatelessWidget {
             style: TextStyle(
               color: AppColors.t2,
               fontSize: 13,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w400,
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -502,8 +487,8 @@ class _ClientSortOption extends StatelessWidget {
                             color: AppColors.t1,
                             fontSize: 14,
                             fontWeight: selected
-                                ? FontWeight.w800
-                                : FontWeight.w600,
+                                ? FontWeight.w600
+                                : FontWeight.w500,
                           ),
                         ),
                       ),
@@ -549,6 +534,7 @@ class _ViewRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     final items = <({ClientView value, String label, int count})>[
       (value: ClientView.all, label: 'All', count: records.length),
       (
@@ -573,7 +559,7 @@ class _ViewRail extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
       child: SlateGlassSurface(
         blur: 22,
-        color: AppColors.bgCard.withValues(alpha: 0.90),
+        color: tokens.surface,
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
         child: SizedBox(
           height: 54,
@@ -607,7 +593,10 @@ class _ViewRail extends StatelessWidget {
                   alignment: Alignment.center,
                   children: [
                     AnimatedPositioned(
-                      duration: AppMotion.deliberate,
+                      duration: AppMotion.responsive(
+                        context,
+                        AppMotion.deliberate,
+                      ),
                       curve: AppMotion.emphasized,
                       left: selectedIndex * itemWidth,
                       top: 6,
@@ -617,15 +606,9 @@ class _ViewRail extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 2),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            color: AppColors.accentPrimary.withValues(
-                              alpha: 0.14,
-                            ),
+                            color: tokens.surfaceRaised,
                             borderRadius: BorderRadius.circular(AppRadius.pill),
-                            border: Border.all(
-                              color: AppColors.accentPrimary.withValues(
-                                alpha: 0.22,
-                              ),
-                            ),
+                            border: Border.all(color: tokens.dividerStrong),
                           ),
                         ),
                       ),
@@ -669,23 +652,29 @@ class _ClientViewButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return Semantics(
       button: true,
       selected: selected,
       label: '$label, $count clients',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Center(
-          child: AnimatedDefaultTextStyle(
-            duration: AppMotion.standard,
-            curve: AppMotion.curve,
-            style: TextStyle(
-              color: selected ? AppColors.accentPrimary : AppColors.t3,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Center(
+            child: AnimatedDefaultTextStyle(
+              key: ValueKey(Theme.of(context).brightness),
+              duration: AppMotion.standard,
+              curve: AppMotion.curve,
+              style: TextStyle(
+                fontFamily: 'Instrument Sans',
+                color: selected ? tokens.accentInk : tokens.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+              child: Text('$label $count'),
             ),
-            child: Text('$label $count'),
           ),
         ),
       ),
@@ -731,7 +720,7 @@ class _ClientRow extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.t1,
               fontSize: 14,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -743,7 +732,7 @@ class _ClientRow extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t1,
           fontSize: 16,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(
@@ -753,7 +742,7 @@ class _ClientRow extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t2,
           fontSize: 13,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
         ),
       ),
       trailing: Row(
@@ -765,7 +754,7 @@ class _ClientRow extends StatelessWidget {
               style: TextStyle(
                 color: AppColors.t3,
                 fontSize: 10,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(width: AppSpacing.xs),
@@ -782,9 +771,9 @@ class _ClientRow extends StatelessWidget {
     final last = record.lastBooking;
     if (last != null) {
       final days = DateTime.now().difference(last.startTime).inDays;
-      if (days <= 0) return 'Last job today';
-      if (days == 1) return 'Last job yesterday';
-      return 'Last job $days days ago';
+      if (days <= 0) return 'Last booking today';
+      if (days == 1) return 'Last booking yesterday';
+      return 'Last booking $days days ago';
     }
     if (record.client.tags.isNotEmpty) return record.client.tags.first;
     if (record.client.status == 'lead') return 'Lead';
@@ -800,12 +789,12 @@ class _ClientsLoading extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.pageX,
-        AppSpacing.pageTop + AppSpacing.xxl,
+        AppSpacing.screenTop,
         AppSpacing.pageX,
-        132,
+        AppSpacing.bottomNavClearance,
       ),
       itemCount: 7,
-      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
       itemBuilder: (_, index) => SlateLoadingBlock(
         height: index == 0 ? 116 : 98,
         radius: AppRadius.xl,
@@ -815,10 +804,9 @@ class _ClientsLoading extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  final VoidCallback onAdd;
   final VoidCallback onImport;
 
-  const _EmptyState({required this.onAdd, required this.onImport});
+  const _EmptyState({required this.onImport});
 
   @override
   Widget build(BuildContext context) {
@@ -832,13 +820,7 @@ class _EmptyState extends StatelessWidget {
               icon: LucideIcons.users,
               title: 'No clients yet',
               subtitle:
-                  'Add a client, capture their preferences, then build bookings, payments, and tasks around them.',
-            ),
-            const SizedBox(height: 24),
-            WorkloopPrimaryButton(
-              label: 'Add client',
-              icon: LucideIcons.userPlus,
-              onPressed: onAdd,
+                  'Add the people you work with and keep their details in one place.',
             ),
             const SizedBox(height: AppSpacing.xs),
             WorkloopTextButton(
@@ -889,27 +871,16 @@ class _NoMatches extends StatelessWidget {
             ),
           };
 
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: AppColors.t3, size: 32),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.t2,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.t3, fontSize: 12),
-          ),
-        ],
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.pageX,
+          AppSpacing.xl,
+          AppSpacing.pageX,
+          AppSpacing.bottomNavClearance,
+        ),
+        child: WorkloopEmptyState(icon: icon, title: title, subtitle: subtitle),
       ),
     );
   }

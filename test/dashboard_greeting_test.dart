@@ -45,6 +45,23 @@ void main() {
     expect(comingUp.map((row) => row['id']), ['tomorrow']);
   });
 
+  test('dashboard keeps an in-progress booking in today focus', () {
+    final now = DateTime(2026, 7, 15, 10, 30);
+    final rows = [
+      {
+        'id': 'in-progress',
+        'start_time': DateTime(2026, 7, 15, 10).toUtc().toIso8601String(),
+        'end_time': DateTime(2026, 7, 15, 11).toUtc().toIso8601String(),
+        'status': 'scheduled',
+      },
+    ];
+
+    expect(
+      selectDashboardTodayBookings(rows, now: now).single['id'],
+      'in-progress',
+    );
+  });
+
   test('dashboard coming up stays intentionally short', () {
     final now = DateTime(2026, 7, 15, 10);
     final rows = List.generate(5, (index) {

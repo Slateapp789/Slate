@@ -4,6 +4,14 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../repositories/supabase_client_provider.dart';
+
+const legacyOnboardingDraftKey = 'workloop.onboarding.draft.v1';
+
+String onboardingDraftKeyForUser(String userId) {
+  return '$legacyOnboardingDraftKey.user.$userId';
+}
+
 class OnboardingState {
   final String firstName;
   final String businessName;
@@ -118,30 +126,54 @@ class OnboardingState {
 }
 
 class OnboardingNotifier extends Notifier<OnboardingState> {
-  static const _draftKey = 'workloop.onboarding.draft.v1';
   final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
-  bool _restored = false;
+  Future<void> _pendingDraftWrite = Future<void>.value();
+  String? _restoredForUserId;
 
   @override
   OnboardingState build() => const OnboardingState();
 
+  String? get _currentUserId =>
+      ref.read(supabaseClientProvider).auth.currentUser?.id;
+
   Future<void> restore() async {
-    if (_restored) return;
-    _restored = true;
-    final value = await _preferences.getString(_draftKey);
+    final userId = _currentUserId;
+    if (userId == null || _restoredForUserId == userId) return;
+    await _pendingDraftWrite;
+    _restoredForUserId = userId;
+    state = const OnboardingState();
+
+    // The legacy key was shared by every account on the device and may contain
+    // private client/business details. Never migrate it between users.
+    await _preferences.remove(legacyOnboardingDraftKey);
+
+    final draftKey = onboardingDraftKeyForUser(userId);
+    final value = await _preferences.getString(draftKey);
     if (value == null || value.isEmpty) return;
     try {
       state = OnboardingState.fromJson(
         Map<String, dynamic>.from(jsonDecode(value) as Map),
       );
     } catch (_) {
-      await _preferences.remove(_draftKey);
+      await _preferences.remove(draftKey);
     }
   }
 
   void _set(OnboardingState next) {
     state = next;
-    unawaited(_preferences.setString(_draftKey, jsonEncode(next.toJson())));
+    final userId = _currentUserId;
+    if (userId == null) return;
+    final draftKey = onboardingDraftKeyForUser(userId);
+    final encodedDraft = jsonEncode(next.toJson());
+    _pendingDraftWrite = _pendingDraftWrite.then((_) async {
+      try {
+        await _preferences.setString(draftKey, encodedDraft);
+      } catch (_) {
+        // A later state change may retry persistence. The in-memory onboarding
+        // flow remains usable when device storage is temporarily unavailable.
+      }
+    });
+    unawaited(_pendingDraftWrite);
   }
 
   void setName(String firstName, String businessName) {
@@ -191,7 +223,11 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
 
   Future<void> clearDraft() async {
     state = const OnboardingState();
-    await _preferences.remove(_draftKey);
+    final userId = _currentUserId;
+    if (userId != null) {
+      await _pendingDraftWrite;
+      await _preferences.remove(onboardingDraftKeyForUser(userId));
+    }
   }
 }
 

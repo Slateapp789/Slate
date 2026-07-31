@@ -268,6 +268,7 @@ class Payment {
   final String number;
   final String status;
   final DateTime issueDate;
+  final DateTime? incomeRecordedAt;
   final DateTime? dueDate;
   final double total;
   final double amountPaid;
@@ -282,12 +283,29 @@ class Payment {
     required this.number,
     required this.status,
     required this.issueDate,
+    this.incomeRecordedAt,
     this.dueDate,
     required this.total,
     this.amountPaid = 0,
     this.notes,
     this.clientName,
   });
+
+  double get collectedAmount {
+    if (total < 0) {
+      if (status == 'paid' && amountPaid == 0) return total;
+      return amountPaid.clamp(total, 0).toDouble();
+    }
+    if (status == 'paid' && amountPaid <= 0) return total;
+    return amountPaid.clamp(0, total).toDouble();
+  }
+
+  double get outstandingAmount {
+    if (total <= 0) return 0;
+    return (total - collectedAmount).clamp(0, total).toDouble();
+  }
+
+  DateTime get receivedDate => incomeRecordedAt?.toLocal() ?? issueDate;
 
   factory Payment.fromMap(Map<String, dynamic> map) {
     final contact = _nestedMap(map['contacts']);
@@ -304,6 +322,7 @@ class Payment {
       issueDate:
           _dateTimeFrom(map['issue_date']) ??
           DateTime.fromMillisecondsSinceEpoch(0),
+      incomeRecordedAt: _dateTimeFrom(map['income_recorded_at']),
       dueDate: _dateTimeFrom(map['due_date']),
       total: _doubleFrom(map['total']),
       amountPaid: _doubleFrom(map['amount_paid']),
@@ -320,6 +339,8 @@ class Payment {
     'invoice_number': number,
     'status': status,
     'issue_date': issueDate.toIso8601String().split('T').first,
+    if (incomeRecordedAt != null)
+      'income_recorded_at': incomeRecordedAt!.toIso8601String(),
     if (dueDate != null)
       'due_date': dueDate!.toIso8601String().split('T').first,
     'total': total,
@@ -545,7 +566,14 @@ class BusinessProfile {
   final List<String> reviewQuotes;
   final bool reviewsEnabled;
   final bool galleryEnabled;
-  final bool payNowEnabled;
+
+  final bool _legacyPayNowEnabled;
+
+  /// Always false until Workloop has a connected online-payment processor.
+  ///
+  /// The database value is retained privately for round-trip compatibility,
+  /// but cannot accidentally advertise an unavailable feature.
+  bool get payNowEnabled => false;
   final String bookingMode;
   final String? noticeText;
   final DateTime? noticeStart;
@@ -561,12 +589,20 @@ class BusinessProfile {
     this.reviewQuotes = const [],
     this.reviewsEnabled = false,
     this.galleryEnabled = false,
-    this.payNowEnabled = false,
+    bool payNowEnabled = false,
     this.bookingMode = 'manual',
     this.noticeText,
     this.noticeStart,
     this.noticeEnd,
-  });
+  }) : _legacyPayNowEnabled = payNowEnabled;
+
+  bool isNoticeActive({DateTime? now}) {
+    if (noticeText?.trim().isNotEmpty != true) return false;
+    final current = now ?? DateTime.now();
+    if (noticeStart != null && current.isBefore(noticeStart!)) return false;
+    if (noticeEnd != null && current.isAfter(noticeEnd!)) return false;
+    return true;
+  }
 
   factory BusinessProfile.fromMap(Map<String, dynamic> map) {
     return BusinessProfile(
@@ -597,7 +633,7 @@ class BusinessProfile {
     'review_quotes': reviewQuotes,
     'reviews_enabled': reviewsEnabled,
     'gallery_enabled': galleryEnabled,
-    'pay_now_enabled': payNowEnabled,
+    'pay_now_enabled': _legacyPayNowEnabled,
     'booking_mode': bookingMode,
     'notice_text': noticeText,
     if (noticeStart != null) 'notice_start': noticeStart!.toIso8601String(),

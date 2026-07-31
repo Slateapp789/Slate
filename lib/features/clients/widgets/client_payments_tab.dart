@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/slate_models.dart';
 import '../../../shared/providers/clients_provider.dart';
 import '../../../shared/providers/dashboard_provider.dart';
 import '../../../shared/providers/finance_provider.dart';
+import '../../../shared/utils/currency_format.dart';
 import '../../../shared/widgets/slate_ui.dart';
 import '../../finance/add_payment_screen.dart';
 import '../providers/client_detail_providers.dart';
@@ -28,10 +29,11 @@ class ClientPaymentsTab extends ConsumerWidget {
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppColors.green),
       ),
-      error: (e, _) => Center(
-        child: Text(
-          'Money activity could not be loaded.',
-          style: const TextStyle(color: AppColors.error),
+      error: (_, _) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: SlateErrorState(
+          message: 'Money activity could not be loaded.',
+          onRetry: () => ref.invalidate(clientPaymentsProvider(clientId)),
         ),
       ),
       data: (items) {
@@ -76,7 +78,7 @@ class ClientPaymentsTab extends ConsumerWidget {
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox.shrink(),
+                  separatorBuilder: (_, _) => const SizedBox.shrink(),
                   itemBuilder: (context, index) {
                     final payment = items[index];
                     return _PaymentRow(
@@ -134,7 +136,7 @@ class _PaymentRow extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
           color: AppColors.t1,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(
@@ -145,10 +147,10 @@ class _PaymentRow extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            '£${amount.toStringAsFixed(0)}',
+            formatPounds(amount),
             style: const TextStyle(
               color: AppColors.t1,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(width: 10),
@@ -157,7 +159,7 @@ class _PaymentRow extends StatelessWidget {
             style: TextStyle(
               color: color,
               fontSize: 11,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(width: 8),
@@ -191,17 +193,17 @@ class _PaymentsToolbar extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            '£${received.toStringAsFixed(0)} received',
+            '${formatPounds(received)} received',
             style: const TextStyle(
               color: AppColors.t1,
               fontSize: 13,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           if (remaining > 0) ...[
             const SizedBox(width: 8),
             Text(
-              '· £${remaining.toStringAsFixed(0)} left',
+              '· ${formatPounds(remaining)} left',
               style: const TextStyle(color: AppColors.t3, fontSize: 13),
             ),
           ],
@@ -249,7 +251,7 @@ class _EmptyPayments extends StatelessWidget {
             icon: LucideIcons.banknote,
             title: 'No payments yet.',
             subtitle:
-                'Paid jobs and invoices for this client will appear here.',
+                'Income and outstanding payments for this client will appear here.',
           ),
           const SizedBox(height: 16),
           WorkloopPrimaryButton(label: 'Record payment', onPressed: onAction),

@@ -1,0 +1,6 @@
+-- Intentionally empty.
+--
+-- Supabase CLI applies this file only to the local database. Deterministic
+-- application-scale fixtures are produced by tool/quality/generate_test_data.dart
+-- and should be loaded by an explicit isolated-test command, never by a default
+-- database reset.

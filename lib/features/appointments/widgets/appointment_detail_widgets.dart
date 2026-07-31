@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/utils/currency_format.dart';
 import '../../../shared/widgets/slate_ui.dart';
-import '../../clients/client_detail_screen.dart';
 
 // ── Hero card (client + service) ──────────────────────────────────────────────
 class AppointmentHeroCard extends StatelessWidget {
@@ -15,7 +15,8 @@ class AppointmentHeroCard extends StatelessWidget {
   final num? price;
   final String initials;
   final String? contactId;
-  final Map<String, dynamic> appt;
+  final bool openingClient;
+  final VoidCallback onOpenClient;
   // Edit mode
   final AsyncValue<List<Map<String, dynamic>>> clients;
   final List<Map<String, dynamic>> services;
@@ -25,6 +26,7 @@ class AppointmentHeroCard extends StatelessWidget {
   final TextEditingController serviceTitleController;
   final ValueChanged<String?> onClientChanged;
   final ValueChanged<String?> onServiceChanged;
+  final VoidCallback onRetryClients;
 
   const AppointmentHeroCard({
     super.key,
@@ -34,7 +36,8 @@ class AppointmentHeroCard extends StatelessWidget {
     this.price,
     required this.initials,
     this.contactId,
-    required this.appt,
+    this.openingClient = false,
+    required this.onOpenClient,
     required this.clients,
     required this.services,
     this.selectedClientId,
@@ -43,6 +46,7 @@ class AppointmentHeroCard extends StatelessWidget {
     required this.serviceTitleController,
     required this.onClientChanged,
     required this.onServiceChanged,
+    required this.onRetryClients,
   });
 
   @override
@@ -60,6 +64,61 @@ class AppointmentHeroCard extends StatelessWidget {
   }
 
   Widget _buildViewMode(BuildContext context) {
+    final clientDetails = ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: AppSpacing.minTouch),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            clientName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.t1,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Flexible(
+                child: Text(
+                  serviceName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.t3,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (contactId != null) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  openingClient ? 'Opening…' : 'View client',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.modClients,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xxs),
+                const Icon(
+                  LucideIcons.chevronRight,
+                  size: 12,
+                  color: AppColors.modClients,
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+
     return Row(
       children: [
         Container(
@@ -74,7 +133,7 @@ class AppointmentHeroCard extends StatelessWidget {
               initials,
               style: const TextStyle(
                 fontSize: 18,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
                 color: AppColors.green,
               ),
             ),
@@ -82,93 +141,33 @@ class AppointmentHeroCard extends StatelessWidget {
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              GestureDetector(
-                onTap: () => _openClient(context),
-                child: Text(
-                  clientName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.t1,
-                    letterSpacing: 0,
+          child: contactId == null
+              ? clientDetails
+              : Semantics(
+                  button: true,
+                  enabled: !openingClient,
+                  label: 'View client $clientName',
+                  value: openingClient ? 'Opening' : serviceName,
+                  onTap: openingClient ? null : onOpenClient,
+                  child: ExcludeSemantics(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: openingClient ? null : onOpenClient,
+                      child: clientDetails,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              GestureDetector(
-                onTap: contactId == null ? null : () => _openClient(context),
-                behavior: HitTestBehavior.opaque,
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        serviceName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.t3,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    if (contactId != null) ...[
-                      const SizedBox(width: AppSpacing.sm),
-                      const Text(
-                        'View client',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.modClients,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xxs),
-                      const Icon(
-                        LucideIcons.chevronRight,
-                        size: 12,
-                        color: AppColors.modClients,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
         ),
         if (price != null)
           Text(
-            '£${price!.toStringAsFixed(0)}',
+            formatPounds(price!),
             style: const TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
               color: AppColors.t1,
             ),
           ),
       ],
-    );
-  }
-
-  void _openClient(BuildContext context) {
-    if (contactId == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ClientDetailScreen(
-          client: {
-            'id': contactId,
-            'name': clientName,
-            'phone': appt['contacts']?['phone'] ?? '',
-            'email': appt['contacts']?['email'] ?? '',
-            'notes': appt['contacts']?['notes'] ?? '',
-            'status': appt['contacts']?['status'] ?? 'active',
-          },
-        ),
-      ),
     );
   }
 
@@ -209,10 +208,10 @@ class AppointmentHeroCard extends StatelessWidget {
             onChanged: onClientChanged,
           ),
           loading: () =>
-              const CircularProgressIndicator(color: AppColors.green),
-          error: (_, __) => const Text(
-            'Error loading clients',
-            style: TextStyle(color: AppColors.error),
+              const SlateLoadingBlock(height: 58, radius: AppRadius.md),
+          error: (_, _) => SlateErrorState(
+            message: 'Could not load clients.',
+            onRetry: onRetryClients,
           ),
         ),
         const SizedBox(height: 12),
@@ -255,7 +254,7 @@ class AppointmentHeroCard extends StatelessWidget {
         const SizedBox(height: 8),
         TextField(
           controller: priceController,
-          keyboardType: TextInputType.number,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           style: const TextStyle(color: AppColors.t1),
           decoration: _inputDecoration('0'),
         ),
@@ -267,7 +266,7 @@ class AppointmentHeroCard extends StatelessWidget {
     text,
     style: const TextStyle(
       fontSize: 13,
-      fontWeight: FontWeight.w700,
+      fontWeight: FontWeight.w600,
       color: AppColors.t2,
     ),
   );
@@ -354,7 +353,7 @@ class AppointmentDateTimeCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
-      child: editing ? _buildEditMode() : _buildViewMode(),
+      child: editing ? _buildEditMode(context) : _buildViewMode(),
     );
   }
 
@@ -390,10 +389,12 @@ class AppointmentDateTimeCard extends StatelessWidget {
     );
   }
 
-  Widget _buildEditMode() {
+  Widget _buildEditMode(BuildContext context) {
     return Column(
       children: [
-        GestureDetector(
+        _editAction(
+          label: 'Booking date',
+          value: _formatDate(selectedDate),
           onTap: onPickDate,
           child: _editRow(
             LucideIcons.calendar,
@@ -404,7 +405,10 @@ class AppointmentDateTimeCard extends StatelessWidget {
         const SizedBox(height: 16),
         Divider(height: 1, color: AppColors.border),
         const SizedBox(height: 16),
-        GestureDetector(
+        _editAction(
+          label: 'Booking time',
+          value:
+              '${selectedHour.toString().padLeft(2, '0')}:${selectedMinute.toString().padLeft(2, '0')}',
           onTap: onPickTime,
           child: _editRow(
             LucideIcons.clock,
@@ -415,12 +419,12 @@ class AppointmentDateTimeCard extends StatelessWidget {
         const SizedBox(height: 16),
         Divider(height: 1, color: AppColors.border),
         const SizedBox(height: 16),
-        _durationEditor(),
+        _durationEditor(context),
       ],
     );
   }
 
-  Widget _durationEditor() {
+  Widget _durationEditor(BuildContext context) {
     final selectedDuration = int.tryParse(durationController.text.trim()) ?? 60;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -441,30 +445,10 @@ class AppointmentDateTimeCard extends StatelessWidget {
           runSpacing: 8,
           children: [30, 45, 60, 90, 120].map((minutes) {
             final selected = selectedDuration == minutes;
-            return GestureDetector(
+            return WorkloopFilterChip(
+              label: '${minutes}m',
+              selected: selected,
               onTap: () => onDurationSelected(minutes),
-              child: AnimatedContainer(
-                duration: AppMotion.fast,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: selected ? AppColors.slateLight : AppColors.bgInteract,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: selected ? AppColors.borderStrong : AppColors.border,
-                  ),
-                ),
-                child: Text(
-                  '${minutes}m',
-                  style: TextStyle(
-                    color: selected ? AppColors.panelInk : AppColors.t2,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
             );
           }).toList(),
         ),
@@ -494,7 +478,7 @@ class AppointmentDateTimeCard extends StatelessWidget {
           value,
           style: const TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
             color: AppColors.t1,
           ),
         ),
@@ -503,23 +487,54 @@ class AppointmentDateTimeCard extends StatelessWidget {
   }
 
   Widget _editRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.t3, size: 16),
-        const SizedBox(width: 12),
-        Text(label, style: const TextStyle(fontSize: 13, color: AppColors.t3)),
-        const Spacer(),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppColors.green,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: AppSpacing.minTouch),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.t3, size: 16),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: AppColors.t3),
           ),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.green,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 14),
+        ],
+      ),
+    );
+  }
+
+  Widget _editAction({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+    required Widget child,
+  }) {
+    return Semantics(
+      button: true,
+      label: label,
+      value: value,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: child,
         ),
-        const SizedBox(width: 6),
-        const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 14),
-      ],
+      ),
     );
   }
 
@@ -572,7 +587,7 @@ class AppointmentActionSection extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: loading ? null : onComplete,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.green,
+                backgroundColor: AppColors.brandAccent,
                 foregroundColor: AppColors.onBrandAccent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -584,14 +599,14 @@ class AppointmentActionSection extends StatelessWidget {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                        color: Colors.white,
+                        color: AppColors.onBrandAccent,
                         strokeWidth: 2,
                       ),
                     )
                   : const Icon(LucideIcons.checkCircle, size: 18),
               label: const Text(
                 'Mark as Complete',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -611,7 +626,7 @@ class AppointmentActionSection extends StatelessWidget {
               icon: const Icon(LucideIcons.x, size: 18),
               label: const Text(
                 'Cancel Booking',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -636,7 +651,7 @@ class AppointmentActionSection extends StatelessWidget {
               'This booking is complete',
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
                 color: AppColors.success,
               ),
             ),
@@ -667,7 +682,7 @@ class AppointmentActionSection extends StatelessWidget {
                     'Booking cancelled',
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                       color: AppColors.error,
                     ),
                   ),

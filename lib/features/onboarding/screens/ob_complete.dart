@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/onboarding_provider.dart';
 import '../../../shared/providers/workspace_provider.dart';
 import '../../../shared/repositories/slate_repositories.dart';
+import '../../../shared/utils/currency_format.dart';
 
 class ObComplete extends ConsumerStatefulWidget {
   const ObComplete({super.key});
@@ -20,6 +22,7 @@ class _ObCompleteState extends ConsumerState<ObComplete>
   late Animation<double> _slideUp;
   bool _saving = false;
   bool _saved = false;
+  bool _animationStarted = false;
   String? _saveError;
 
   @override
@@ -34,8 +37,19 @@ class _ObCompleteState extends ConsumerState<ObComplete>
       begin: 30,
       end: 0,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-    _controller.forward();
     _saveWorkspace();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_animationStarted) return;
+    _animationStarted = true;
+    if (MediaQuery.maybeOf(context)?.disableAnimations == true) {
+      _controller.value = 1;
+    } else {
+      _controller.forward();
+    }
   }
 
   @override
@@ -74,8 +88,10 @@ class _ObCompleteState extends ConsumerState<ObComplete>
       if (!mounted) return;
       setState(() => _saved = true);
     } catch (e, stack) {
-      debugPrint('Error saving workspace: $e');
-      debugPrint('Stack: $stack');
+      if (kDebugMode) {
+        debugPrint('Error saving workspace: $e');
+        debugPrint('Stack: $stack');
+      }
       if (!mounted) return;
       setState(() {
         _saved = false;
@@ -98,129 +114,151 @@ class _ObCompleteState extends ConsumerState<ObComplete>
   @override
   Widget build(BuildContext context) {
     final onboarding = ref.watch(onboardingProvider);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          return Opacity(
-            opacity: _fadeIn.value,
-            child: Transform.translate(
-              offset: Offset(0, _slideUp.value),
-              child: child,
-            ),
-          );
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Spacer(),
-            Icon(
-              _saveError == null
-                  ? Icons.celebration_rounded
-                  : Icons.error_outline_rounded,
-              size: 64,
-              color: _saveError == null ? AppColors.green : AppColors.error,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              _saveError == null
-                  ? 'Your workspace\nis ready.'
-                  : 'Setup needs\none more try.',
-              style: TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.w900,
-                color: _saveError == null ? AppColors.t1 : AppColors.error,
-                letterSpacing: 0,
-                height: 1.1,
-              ),
-            ),
-            const SizedBox(height: 20),
-            _SummaryRow(
-              icon: Icons.business_rounded,
-              label: onboarding.businessName,
-            ),
-            const SizedBox(height: 10),
-            _SummaryRow(
-              icon: Icons.link_rounded,
-              label: 'workloop.app/${onboarding.handle}',
-              color: AppColors.green,
-            ),
-            const SizedBox(height: 10),
-            _SummaryRow(
-              icon: Icons.design_services_rounded,
-              label: '${onboarding.services.length} services configured',
-            ),
-            if (onboarding.revenueTarget > 0) ...[
-              const SizedBox(height: 10),
-              _SummaryRow(
-                icon: Icons.track_changes_rounded,
-                label:
-                    '£${onboarding.revenueTarget.toStringAsFixed(0)} monthly target set',
-                color: AppColors.green,
-              ),
-            ],
-            if (_saveError != null) ...[
-              const SizedBox(height: 16),
-              Text(
-                _saveError!,
-                style: const TextStyle(
-                  color: AppColors.t2,
-                  fontSize: 15,
-                  height: 1.4,
-                ),
-              ),
-            ],
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton(
-                onPressed: _saving
-                    ? null
-                    : _saveError != null
-                    ? _saveWorkspace
-                    : _saved
-                    ? _goToDashboard
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.green,
-                  disabledBackgroundColor: AppColors.bgInteract,
-                  foregroundColor: AppColors.onBrandAccent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final minHeight =
+            constraints.hasBoundedHeight && constraints.maxHeight > 48
+            ? constraints.maxHeight - 48
+            : 0.0;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: minHeight),
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: reduceMotion ? 1 : _fadeIn.value,
+                  child: Transform.translate(
+                    offset: Offset(0, reduceMotion ? 0 : _slideUp.value),
+                    child: child,
                   ),
-                  elevation: 0,
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : Text(
-                        _saveError != null
-                            ? 'Try again'
-                            : _saved
-                            ? onboarding.importAfterSetup
-                                  ? 'Import existing data'
-                                  : 'Go to my dashboard'
-                            : 'Setting up workspace...',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                );
+              },
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Spacer(),
+                    Icon(
+                      _saveError == null
+                          ? Icons.celebration_rounded
+                          : Icons.error_outline_rounded,
+                      size: 64,
+                      color: _saveError == null
+                          ? AppColors.green
+                          : AppColors.error,
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      _saveError == null
+                          ? 'Your workspace\nis ready.'
+                          : 'Setup needs\none more try.',
+                      style: TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.w600,
+                        color: _saveError == null
+                            ? AppColors.t1
+                            : AppColors.error,
+                        letterSpacing: 0,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _SummaryRow(
+                      icon: Icons.business_rounded,
+                      label: onboarding.businessName,
+                    ),
+                    const SizedBox(height: 10),
+                    _SummaryRow(
+                      icon: Icons.link_rounded,
+                      label: 'workloop.app/${onboarding.handle}',
+                      color: AppColors.green,
+                    ),
+                    const SizedBox(height: 10),
+                    _SummaryRow(
+                      icon: Icons.design_services_rounded,
+                      label:
+                          '${onboarding.services.length} services configured',
+                    ),
+                    if (onboarding.revenueTarget > 0) ...[
+                      const SizedBox(height: 10),
+                      _SummaryRow(
+                        icon: Icons.track_changes_rounded,
+                        label:
+                            '${formatPounds(onboarding.revenueTarget)} monthly target set',
+                        color: AppColors.green,
+                      ),
+                    ],
+                    if (_saveError != null) ...[
+                      const SizedBox(height: 16),
+                      Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          _saveError!,
+                          style: const TextStyle(
+                            color: AppColors.t2,
+                            fontSize: 15,
+                            height: 1.4,
+                          ),
                         ),
                       ),
+                    ],
+                    const Spacer(),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: _saving
+                            ? null
+                            : _saveError != null
+                            ? _saveWorkspace
+                            : _saved
+                            ? _goToDashboard
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.brandAccent,
+                          disabledBackgroundColor: AppColors.bgInteract,
+                          foregroundColor: AppColors.onBrandAccent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: _saving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: AppColors.onBrandAccent,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                _saveError != null
+                                    ? 'Try again'
+                                    : _saved
+                                    ? onboarding.importAfterSetup
+                                          ? 'Import existing data'
+                                          : 'Go to my dashboard'
+                                    : 'Setting up workspace…',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -250,7 +288,7 @@ class _SummaryRow extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
                 color: color ?? AppColors.t1,
               ),
             ),

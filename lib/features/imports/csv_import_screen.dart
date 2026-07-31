@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
@@ -25,18 +25,21 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
   CsvTable? _table;
   String? _fileName;
   final Map<int, _ClientField> _mapping = {};
+  final Set<int> _completedRows = {};
   bool _loading = false;
   bool _importing = false;
+  bool _reviewing = false;
   bool _skipDuplicates = true;
   String? _error;
 
   Future<void> _chooseFile() async {
+    if (_loading || _importing || _reviewing) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: const ['csv', 'txt'],
         withData: true,
@@ -66,6 +69,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
         _mapping
           ..clear()
           ..addAll(mapping);
+        _completedRows.clear();
       });
     } catch (_) {
       if (mounted) {
@@ -115,7 +119,8 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
 
     return [
       for (var index = 0; index < table.rows.length; index++)
-        if (table.rows[index][nameIndex].trim().isNotEmpty)
+        if (!_completedRows.contains(index) &&
+            table.rows[index][nameIndex].trim().isNotEmpty)
           ImportCandidate(
             sourceId: 'csv-$index',
             name: table.rows[index][nameIndex].trim(),
@@ -136,6 +141,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
   }
 
   Future<void> _import() async {
+    if (_importing || _reviewing) return;
     final table = _table;
     if (table == null) return;
     final candidates = _candidates();
@@ -147,44 +153,50 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
       setState(() => _error = 'No rows contain a client name.');
       return;
     }
-    final confirmed = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: SlateTheme.of(context).scrim,
-      builder: (context) => SlateSheetFrame(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Review CSV import',
-              style: TextStyle(
-                color: AppColors.t1,
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
+    setState(() => _reviewing = true);
+    bool? confirmed;
+    try {
+      confirmed = await showModalBottomSheet<bool>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        barrierColor: SlateTheme.of(context).scrim,
+        builder: (context) => SlateSheetFrame(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Review CSV import',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              '${candidates.length} valid rows are ready. Invalid rows will be reported, never silently ignored.',
-              style: const TextStyle(color: AppColors.t3, height: 1.45),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            WorkloopPrimaryButton(
-              label: 'Import clients',
-              icon: LucideIcons.download,
-              onPressed: () => Navigator.pop(context, true),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            WorkloopPrimaryButton(
-              label: 'Keep reviewing',
-              secondary: true,
-              onPressed: () => Navigator.pop(context, false),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                '${candidates.length} valid rows are ready. Invalid rows will be reported, never silently ignored.',
+                style: const TextStyle(color: AppColors.t3, height: 1.45),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              WorkloopPrimaryButton(
+                label: 'Import clients',
+                icon: LucideIcons.download,
+                onPressed: () => Navigator.pop(context, true),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              WorkloopPrimaryButton(
+                label: 'Keep reviewing',
+                secondary: true,
+                onPressed: () => Navigator.pop(context, false),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) setState(() => _reviewing = false);
+    }
     if (confirmed != true) return;
     setState(() {
       _importing = true;
@@ -192,6 +204,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
     });
     var imported = 0;
     var skipped = 0;
+    final completedThisAttempt = <int>{};
     final failures = <String>[];
     try {
       final workspaceId = await ref.read(workspaceIdProvider.future);
@@ -205,6 +218,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
           .toList();
       final repository = ref.read(clientsRepositoryProvider);
       for (var index = 0; index < table.rows.length; index++) {
+        if (_completedRows.contains(index)) continue;
         final row = table.rows[index];
         final name = _field(row, _ClientField.name);
         if (name == null) {
@@ -221,6 +235,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
         if (_skipDuplicates &&
             isLikelyDuplicate(candidate: candidate, existing: existing)) {
           skipped++;
+          completedThisAttempt.add(index);
           continue;
         }
         try {
@@ -244,6 +259,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
             tags: {...tags, 'imported'}.toList(),
           );
           imported++;
+          completedThisAttempt.add(index);
           existing.add((
             name: candidate.name,
             phone: candidate.phone,
@@ -253,17 +269,41 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
           failures.add('Row ${index + 2}: $name');
         }
       }
+      final attemptedRows = List.generate(
+        table.rows.length,
+        (index) => index,
+      ).where((index) => !_completedRows.contains(index));
+      final result = reconcileImportAttempt(
+        attempted: attemptedRows,
+        completed: completedThisAttempt,
+      );
+      final summary =
+          '$imported ${imported == 1 ? 'client was' : 'clients were'} imported'
+          '${skipped > 0 ? '; $skipped likely ${skipped == 1 ? 'duplicate was' : 'duplicates were'} skipped' : ''}.'
+          '${result.retryable.isNotEmpty ? ' ${result.retryable.length} ${result.retryable.length == 1 ? 'row remains' : 'rows remain'} to retry.' : ''}';
+      if (mounted) {
+        setState(() {
+          _completedRows.addAll(result.completed);
+          _error = failures.isEmpty ? null : summary;
+        });
+      }
       ref.invalidate(clientsProvider);
       ref.invalidate(clientCrmRecordsProvider);
       if (!mounted) return;
-      SlateHaptics.success();
+      if (imported > 0 || skipped > 0) {
+        SlateHaptics.success();
+      } else {
+        SlateHaptics.warning();
+      }
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Import complete'),
           content: SingleChildScrollView(
             child: Text(
-              '$imported imported${skipped > 0 ? ', $skipped likely duplicates skipped' : ''}${failures.isNotEmpty ? '. ${failures.length} rows need attention:\n${failures.take(8).join('\n')}' : '.'}',
+              failures.isEmpty
+                  ? summary
+                  : '$summary\n\nRows needing attention:\n${failures.take(8).join('\n')}',
             ),
           ),
           actions: [
@@ -294,55 +334,35 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              WorkloopIconButton(
-                icon: LucideIcons.chevronLeft,
-                semanticLabel: 'Back',
-                onTap: () => Navigator.pop(context),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              const Expanded(
-                child: Text(
-                  'Import CSV',
-                  style: TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 26,
-                    height: 1.05,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          const Text(
-            'Bring client data with you',
-            style: TextStyle(
-              color: AppColors.t1,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          const WorkloopRouteHeader(title: 'Import CSV'),
           const SizedBox(height: AppSpacing.xs),
           const Text(
             'Choose a CSV, map its columns, preview the result and confirm before anything is created.',
-            style: TextStyle(color: AppColors.t3, height: 1.45),
+            style: TextStyle(color: AppColors.t2, fontSize: 15, height: 1.45),
           ),
           const SizedBox(height: AppSpacing.lg),
           WorkloopPrimaryButton(
             label: _loading ? 'Reading file…' : 'Choose CSV file',
             icon: LucideIcons.fileUp,
-            onPressed: _loading ? null : _chooseFile,
+            onPressed: _loading || _importing || _reviewing
+                ? null
+                : _chooseFile,
           ),
           if (_error != null) ...[
             const SizedBox(height: AppSpacing.sm),
-            Text(
-              _error!,
-              style: const TextStyle(
-                color: AppColors.error,
-                fontSize: 13,
-                height: 1.4,
+            Semantics(
+              container: true,
+              liveRegion: true,
+              label: _error!,
+              child: ExcludeSemantics(
+                child: Text(
+                  _error!,
+                  style: const TextStyle(
+                    color: AppColors.error,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
               ),
             ),
           ],
@@ -361,11 +381,13 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
                           _fileName ?? 'CSV file',
                           style: const TextStyle(
                             color: AppColors.t1,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         Text(
-                          '${table.rows.length} rows · ${table.headers.length} columns',
+                          '${table.rows.length - _completedRows.length} rows remaining'
+                          '${_completedRows.isNotEmpty ? ' · ${_completedRows.length} completed' : ''}'
+                          ' · ${table.headers.length} columns',
                           style: const TextStyle(
                             color: AppColors.t3,
                             fontSize: 12,
@@ -388,7 +410,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
                 style: const TextStyle(
                   color: AppColors.t2,
                   fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
@@ -423,6 +445,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
                   ),
                   WorkloopPickerOption(value: _ClientField.tags, label: 'Tags'),
                 ],
+                enabled: !_importing && !_reviewing,
                 onChanged: (value) => setState(() {
                   if (value != _ClientField.ignore) {
                     for (final entry in _mapping.entries.toList()) {
@@ -459,7 +482,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
                         _candidates()[index].name,
                         style: const TextStyle(
                           color: AppColors.t1,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       subtitle: Text(
@@ -477,7 +500,9 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
               value: _skipDuplicates,
-              onChanged: (value) => setState(() => _skipDuplicates = value),
+              onChanged: _importing || _reviewing
+                  ? null
+                  : (value) => setState(() => _skipDuplicates = value),
               title: const Text('Skip likely duplicates'),
               subtitle: const Text(
                 'Matches are checked by name, phone and email.',
@@ -485,9 +510,13 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
             ),
             const SizedBox(height: AppSpacing.lg),
             WorkloopPrimaryButton(
-              label: _importing ? 'Importing…' : 'Review import',
+              label: _importing
+                  ? 'Importing…'
+                  : _reviewing
+                  ? 'Reviewing…'
+                  : 'Review import',
               icon: LucideIcons.arrowRight,
-              onPressed: _importing ? null : _import,
+              onPressed: _importing || _reviewing ? null : _import,
             ),
           ],
         ],

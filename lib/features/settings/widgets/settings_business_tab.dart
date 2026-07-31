@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/workspace_provider.dart';
 import '../../../shared/repositories/slate_repositories.dart';
+import '../../../shared/utils/currency_format.dart';
+import '../../../shared/utils/public_profile_routes.dart';
 import '../../../shared/utils/working_hours.dart';
+import '../../../shared/widgets/slate_ui.dart';
 import '../providers/settings_providers.dart';
 import 'settings_helpers.dart';
 import 'settings_services_section.dart';
 
-final _profileHandlePattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$');
+final _profileHandlePattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$');
 
 enum SettingsBusinessSection { business, workingHours, publicProfile, services }
 
@@ -46,6 +49,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   bool _businessInfoHydrated = false;
   bool _saving = false;
   bool _profileHydrated = false;
+  String _savedHandle = '';
 
   Future<void> _scrollToSection() async {
     if (widget.showOnlySelected) return;
@@ -76,7 +80,6 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   String _bookingMode = 'manual';
   bool _reviewsEnabled = false;
   bool _galleryEnabled = false;
-  bool _payNowEnabled = false;
   late TextEditingController _ownerNameController;
   late TextEditingController _nameController;
   late TextEditingController _industryController;
@@ -135,6 +138,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   }
 
   Future<void> _saveInfo(String workspaceId) async {
+    if (_saving) return;
     final ownerName = _ownerNameController.text.trim();
     if (ownerName.isEmpty) {
       _snack('Add your name', AppColors.warning);
@@ -155,6 +159,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
               : _industryController.text.trim(),
         }),
       ]);
+      if (!mounted) return;
       ref.invalidate(workspaceProvider);
       setState(() {
         _editingInfo = false;
@@ -162,17 +167,22 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
       });
       if (mounted) _snack('Business details updated', AppColors.green);
     } catch (_) {
+      if (!mounted) return;
       setState(() => _saving = false);
-      if (mounted) {
-        _snack('Business details could not be saved.', AppColors.error);
-      }
+      _snack('Business details could not be saved.', AppColors.error);
     }
   }
 
   Future<void> _saveProfile(String workspaceId) async {
+    if (_saving) return;
     final handle = _handleController.text.trim().toLowerCase();
+    final handleChanged = handle != _savedHandle;
     if (handle.length < 3) {
       _snack('Handle must be at least 3 characters', AppColors.warning);
+      return;
+    }
+    if (handle.length > 40) {
+      _snack('Handle must be 40 characters or fewer', AppColors.warning);
       return;
     }
     if (!_profileHandlePattern.hasMatch(handle)) {
@@ -182,7 +192,47 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
       );
       return;
     }
+    if (handleChanged && isReservedPublicHandle(handle)) {
+      _snack(
+        'That booking link is reserved by Workloop. Choose another handle.',
+        AppColors.warning,
+      );
+      return;
+    }
     setState(() => _saving = true);
+    if (handleChanged) {
+      try {
+        final available = await ref
+            .read(profileRepositoryProvider)
+            .isHandleAvailable(handle);
+        if (!mounted) return;
+        if (_handleController.text.trim().toLowerCase() != handle) {
+          setState(() => _saving = false);
+          _snack(
+            'The handle changed while it was being checked. Tap save again.',
+            AppColors.warning,
+          );
+          return;
+        }
+        if (!available) {
+          setState(() => _saving = false);
+          _snack(
+            'That booking link is already taken. Choose another handle.',
+            AppColors.warning,
+          );
+          return;
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() => _saving = false);
+          _snack(
+            'Couldn’t check that booking link. Check your connection and try again.',
+            AppColors.error,
+          );
+        }
+        return;
+      }
+    }
     try {
       await ref
           .read(profileRepositoryProvider)
@@ -204,20 +254,20 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
               'booking_mode': _bookingMode,
               'reviews_enabled': _reviewsEnabled,
               'gallery_enabled': _galleryEnabled,
-              'pay_now_enabled': _payNowEnabled,
             },
           );
+      if (!mounted) return;
       ref.invalidate(settingsBusinessProfileProvider);
       setState(() {
+        _savedHandle = handle;
         _profileHydrated = false;
         _saving = false;
       });
       if (mounted) _snack('Profile updated', AppColors.green);
     } catch (_) {
+      if (!mounted) return;
       setState(() => _saving = false);
-      if (mounted) {
-        _snack('The public profile could not be saved.', AppColors.error);
-      }
+      _snack('The public profile could not be saved.', AppColors.error);
     }
   }
 
@@ -227,6 +277,8 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     );
     final enabled = <String, bool>{};
     final blockControllers = <String, List<_HoursBlockControllers>>{};
+    var saving = false;
+    String? error;
 
     for (final day in workingHourDays) {
       final shortDay = shortToLongDay.entries
@@ -276,7 +328,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                 'Working Hours',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.t1,
                 ),
               ),
@@ -305,15 +357,18 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                               day,
                               style: const TextStyle(
                                 color: AppColors.t1,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
-                          Switch(
-                            value: enabled[day]!,
-                            activeThumbColor: AppColors.green,
-                            onChanged: (value) =>
-                                setModal(() => enabled[day] = value),
+                          Semantics(
+                            label: '$day working hours',
+                            value: enabled[day]! ? 'Working' : 'Off',
+                            child: Switch.adaptive(
+                              value: enabled[day]!,
+                              onChanged: (value) =>
+                                  setModal(() => enabled[day] = value),
+                            ),
                           ),
                         ],
                       ),
@@ -344,7 +399,12 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                                 if (blocks.length > 1) ...[
                                   const SizedBox(width: 8),
                                   IconButton(
-                                    visualDensity: VisualDensity.compact,
+                                    tooltip:
+                                        'Remove $day time block ${index + 1}',
+                                    constraints: const BoxConstraints(
+                                      minWidth: AppSpacing.minTouch,
+                                      minHeight: AppSpacing.minTouch,
+                                    ),
                                     onPressed: () =>
                                         setModal(() => blocks.removeAt(index)),
                                     icon: const Icon(
@@ -359,8 +419,8 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                           );
                         }),
                         const SizedBox(height: 10),
-                        GestureDetector(
-                          onTap: () => setModal(
+                        TextButton.icon(
+                          onPressed: () => setModal(
                             () => blocks.add(
                               _HoursBlockControllers(
                                 start: '16:00',
@@ -368,23 +428,21 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                               ),
                             ),
                           ),
-                          child: Row(
-                            children: const [
-                              Icon(
-                                Icons.add_rounded,
-                                color: AppColors.green,
-                                size: 16,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                'Add another block',
-                                style: TextStyle(
-                                  color: AppColors.green,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.green,
+                            minimumSize: const Size(
+                              AppSpacing.minTouch,
+                              AppSpacing.minTouch,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          icon: const Icon(Icons.add_rounded, size: 16),
+                          label: const Text(
+                            'Add another block',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                         if (blocks.length > 1) ...[
@@ -400,37 +458,78 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                 );
               }),
               const SizedBox(height: 10),
+              if (error != null) ...[
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    error!,
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               saveBtn(
                 label: 'Save Hours',
+                loading: saving,
                 onTap: () async {
-                  final workspaceId = await ref.read(
-                    workspaceIdProvider.future,
-                  );
-                  if (workspaceId == null) return;
-                  final nextHours = <String, dynamic>{};
-                  for (final day in workingHourDays) {
-                    final blocks = blockControllers[day]!
-                        .map(
-                          (block) => {
-                            'start': block.startController.text.trim(),
-                            'end': block.endController.text.trim(),
-                          },
-                        )
-                        .toList();
-                    nextHours[day] = {
-                      'enabled': enabled[day],
-                      'blocks': blocks,
-                      if (blocks.isNotEmpty) 'start': blocks.first['start'],
-                      if (blocks.isNotEmpty) 'end': blocks.last['end'],
-                    };
+                  if (saving) return;
+                  setModal(() {
+                    saving = true;
+                    error = null;
+                  });
+                  try {
+                    final workspaceId = await ref.read(
+                      workspaceIdProvider.future,
+                    );
+                    if (workspaceId == null) {
+                      throw StateError('Workspace unavailable');
+                    }
+                    final nextHours = <String, dynamic>{};
+                    for (final day in workingHourDays) {
+                      final blocks = blockControllers[day]!
+                          .map(
+                            (block) => {
+                              'start': block.startController.text.trim(),
+                              'end': block.endController.text.trim(),
+                            },
+                          )
+                          .toList();
+                      nextHours[day] = {
+                        'enabled': enabled[day],
+                        'blocks': blocks,
+                        if (blocks.isNotEmpty) 'start': blocks.first['start'],
+                        if (blocks.isNotEmpty) 'end': blocks.last['end'],
+                      };
+                    }
+                    await ref.read(workspaceSettingsRepositoryProvider).update(
+                      workspaceId,
+                      {'working_hours': nextHours},
+                    );
+                    ref.invalidate(settingsWorkspaceSettingsProvider);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (mounted) {
+                      _snack('Working hours updated', AppColors.green);
+                    }
+                  } catch (_) {
+                    if (!ctx.mounted) {
+                      if (mounted) {
+                        _snack(
+                          'Working hours could not be saved.',
+                          AppColors.error,
+                        );
+                      }
+                      return;
+                    }
+                    setModal(() {
+                      saving = false;
+                      error =
+                          'Couldn’t save working hours. Your previous hours are unchanged.';
+                    });
                   }
-                  await ref.read(workspaceSettingsRepositoryProvider).update(
-                    workspaceId,
-                    {'working_hours': nextHours},
-                  );
-                  ref.invalidate(settingsWorkspaceSettingsProvider);
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) _snack('Working hours updated', AppColors.green);
                 },
               ),
             ],
@@ -476,6 +575,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     final descCtrl = TextEditingController();
     bool showOnProfile = true;
     bool saving = false;
+    String? error;
 
     showModalBottomSheet(
       context: context,
@@ -502,7 +602,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                 'New Service',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.t1,
                 ),
               ),
@@ -528,7 +628,9 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                       label: 'PRICE (£)',
                       controller: priceCtrl,
                       hint: '65',
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -546,12 +648,11 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: showOnProfile,
-                activeThumbColor: AppColors.green,
                 title: const Text(
                   'Show on public profile',
                   style: TextStyle(
                     color: AppColors.t1,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 subtitle: const Text(
@@ -561,15 +662,38 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                 onChanged: (value) => setModal(() => showOnProfile = value),
               ),
               const SizedBox(height: 20),
+              if (error != null) ...[
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    error!,
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               saveBtn(
                 label: 'Add Service',
                 loading: saving,
                 onTap: () async {
-                  if (nameCtrl.text.trim().isEmpty) return;
-                  setModal(() => saving = true);
+                  if (saving) return;
+                  if (nameCtrl.text.trim().isEmpty) {
+                    setModal(() => error = 'Add a service name to continue.');
+                    return;
+                  }
+                  setModal(() {
+                    saving = true;
+                    error = null;
+                  });
                   try {
                     final wsId = await ref.read(workspaceIdProvider.future);
-                    if (wsId == null) return;
+                    if (wsId == null) {
+                      throw StateError('Workspace unavailable');
+                    }
                     await ref
                         .read(servicesRepositoryProvider)
                         .create(
@@ -582,8 +706,22 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                         );
                     ref.invalidate(settingsServicesProvider);
                     if (ctx.mounted) Navigator.pop(ctx);
-                  } catch (e) {
-                    setModal(() => saving = false);
+                    if (mounted) _snack('Service added', AppColors.green);
+                  } catch (_) {
+                    if (!ctx.mounted) {
+                      if (mounted) {
+                        _snack(
+                          'The service could not be added.',
+                          AppColors.error,
+                        );
+                      }
+                      return;
+                    }
+                    setModal(() {
+                      saving = false;
+                      error =
+                          'Couldn’t add this service. Nothing was saved. Please try again.';
+                    });
                   }
                 },
               ),
@@ -597,7 +735,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   void _showEditServiceSheet(Map<String, dynamic> svc) {
     final nameCtrl = TextEditingController(text: svc['name'] as String? ?? '');
     final priceCtrl = TextEditingController(
-      text: (svc['price'] as num?)?.toStringAsFixed(0) ?? '',
+      text: currencyInputValue(svc['price'] as num?),
     );
     final durCtrl = TextEditingController(
       text: svc['duration_mins']?.toString() ?? '60',
@@ -607,6 +745,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     );
     bool showOnProfile = svc['show_on_profile'] as bool? ?? true;
     bool saving = false;
+    String? error;
 
     showModalBottomSheet(
       context: context,
@@ -636,33 +775,19 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                     'Edit Service',
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.t1,
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _confirmDelete(svc);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.errorDim,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'Delete',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.error,
-                        ),
-                      ),
-                    ),
+                  WorkloopTextButton(
+                    label: 'Delete',
+                    destructive: true,
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            final deleted = await _confirmDelete(svc);
+                            if (deleted && ctx.mounted) Navigator.pop(ctx);
+                          },
                   ),
                 ],
               ),
@@ -687,7 +812,9 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                       label: 'PRICE (£)',
                       controller: priceCtrl,
                       hint: '65',
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -705,12 +832,11 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: showOnProfile,
-                activeThumbColor: AppColors.green,
                 title: const Text(
                   'Show on public profile',
                   style: TextStyle(
                     color: AppColors.t1,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 subtitle: const Text(
@@ -720,12 +846,33 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                 onChanged: (value) => setModal(() => showOnProfile = value),
               ),
               const SizedBox(height: 20),
+              if (error != null) ...[
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    error!,
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               saveBtn(
                 label: 'Save Changes',
                 loading: saving,
                 onTap: () async {
-                  if (nameCtrl.text.trim().isEmpty) return;
-                  setModal(() => saving = true);
+                  if (saving) return;
+                  if (nameCtrl.text.trim().isEmpty) {
+                    setModal(() => error = 'Add a service name to continue.');
+                    return;
+                  }
+                  setModal(() {
+                    saving = true;
+                    error = null;
+                  });
                   try {
                     await ref.read(servicesRepositoryProvider).update(
                       svc['id'] as String,
@@ -744,8 +891,21 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                     ref.invalidate(settingsServicesProvider);
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (mounted) _snack('Service updated', AppColors.green);
-                  } catch (e) {
-                    setModal(() => saving = false);
+                  } catch (_) {
+                    if (!ctx.mounted) {
+                      if (mounted) {
+                        _snack(
+                          'The service could not be updated.',
+                          AppColors.error,
+                        );
+                      }
+                      return;
+                    }
+                    setModal(() {
+                      saving = false;
+                      error =
+                          'Couldn’t save this service. Your previous details are unchanged.';
+                    });
                   }
                 },
               ),
@@ -756,56 +916,116 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     );
   }
 
-  void _confirmDelete(Map<String, dynamic> svc) {
-    showModalBottomSheet(
+  Future<bool> _confirmDelete(Map<String, dynamic> svc) async {
+    var deleting = false;
+    String? deleteError;
+
+    final deleted = await showModalBottomSheet<bool>(
       context: context,
+      isDismissible: false,
+      enableDrag: false,
       backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              settingsHandle(),
-              const SizedBox(height: 24),
-              Text(
-                'Delete "${svc['name']}"?',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t1,
-                ),
-                textAlign: TextAlign.center,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => PopScope(
+          canPop: !deleting,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  settingsHandle(),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Delete "${svc['name']}"?',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.t1,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "This won't affect existing bookings.",
+                    style: TextStyle(fontSize: 14, color: AppColors.t3),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (deleteError != null) ...[
+                    const SizedBox(height: 16),
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        deleteError!,
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  saveBtn(
+                    label: 'Delete Service',
+                    color: AppColors.error,
+                    loading: deleting,
+                    onTap: () async {
+                      if (deleting) return;
+                      setModal(() {
+                        deleting = true;
+                        deleteError = null;
+                      });
+                      try {
+                        await ref
+                            .read(servicesRepositoryProvider)
+                            .delete(svc['id'] as String);
+                      } catch (_) {
+                        if (!ctx.mounted) return;
+                        setModal(() {
+                          deleting = false;
+                          deleteError =
+                              'Couldn’t delete this service. Nothing was removed. Please try again.';
+                        });
+                        return;
+                      }
+                      ref.invalidate(settingsServicesProvider);
+                      if (ctx.mounted) Navigator.pop(ctx, true);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: TextButton(
+                      onPressed: deleting
+                          ? null
+                          : () => Navigator.pop(ctx, false),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.t3,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              const Text(
-                "This won't affect existing appointments.",
-                style: TextStyle(fontSize: 14, color: AppColors.t3),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              saveBtn(
-                label: 'Delete Service',
-                color: AppColors.error,
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  await ref
-                      .read(servicesRepositoryProvider)
-                      .delete(svc['id'] as String);
-                  ref.invalidate(settingsServicesProvider);
-                  if (mounted) _snack('Service deleted', AppColors.error);
-                },
-              ),
-              const SizedBox(height: 10),
-              cancelBtn(ctx),
-            ],
+            ),
           ),
         ),
       ),
     );
+    if (deleted == true && mounted) {
+      _snack('Service deleted', AppColors.error);
+    }
+    return deleted ?? false;
   }
 
   @override
@@ -836,14 +1056,14 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                 style: TextStyle(
                   color: AppColors.t1,
                   fontSize: widget.showOnlySelected ? 22 : 18,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
             workspace.when(
               loading: () => skeletonBox(80),
-              error: (_, __) => errorBox('Could not load workspace'),
+              error: (_, _) => errorBox('Could not load workspace'),
               data: (ws) {
                 if (!_businessInfoHydrated) {
                   _ownerNameController.text =
@@ -898,76 +1118,68 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                                 Row(
                                   children: [
                                     Expanded(
-                                      child: GestureDetector(
-                                        onTap: () => setState(
+                                      child: OutlinedButton(
+                                        onPressed: () => setState(
                                           () => _editingInfo = false,
                                         ),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: AppColors.t2,
+                                          minimumSize: const Size.fromHeight(
+                                            48,
                                           ),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.bgInteract,
+                                          side: const BorderSide(
+                                            color: AppColors.border,
+                                          ),
+                                          shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(
                                               12,
                                             ),
-                                            border: Border.all(
-                                              color: AppColors.border,
-                                            ),
-                                          ),
-                                          child: const Center(
-                                            child: Text(
-                                              'Cancel',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.t3,
-                                              ),
-                                            ),
                                           ),
                                         ),
+                                        child: const Text('Cancel'),
                                       ),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
-                                      child: GestureDetector(
-                                        onTap: _saving
+                                      child: ElevatedButton(
+                                        onPressed: _saving
                                             ? null
                                             : () => _saveInfo(
                                                 ws?['id'] as String,
                                               ),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              AppColors.brandAccent,
+                                          foregroundColor:
+                                              AppColors.onBrandAccent,
+                                          minimumSize: const Size.fromHeight(
+                                            48,
                                           ),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.green,
+                                          shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(
                                               12,
                                             ),
                                           ),
-                                          child: Center(
-                                            child: _saving
-                                                ? const SizedBox(
-                                                    width: 16,
-                                                    height: 16,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                          color: Colors.white,
-                                                          strokeWidth: 2,
-                                                        ),
-                                                  )
-                                                : const Text(
-                                                    'Save',
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color: Colors.white,
-                                                    ),
-                                                  ),
-                                          ),
+                                          elevation: 0,
                                         ),
+                                        child: _saving
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      color: AppColors
+                                                          .onBrandAccent,
+                                                      strokeWidth: 2,
+                                                    ),
+                                              )
+                                            : const Text(
+                                                'Save',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
                                       ),
                                     ),
                                   ],
@@ -1016,7 +1228,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
             const SizedBox(height: 10),
             workspaceSettings.when(
               loading: () => skeletonBox(80),
-              error: (_, __) => errorBox('Could not load working hours'),
+              error: (_, _) => errorBox('Could not load working hours'),
               data: (settings) {
                 final hours = Map<String, dynamic>.from(
                   settings?['working_hours'] as Map? ?? {},
@@ -1055,13 +1267,14 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
             const SizedBox(height: 10),
             workspace.when(
               loading: () => skeletonBox(140),
-              error: (_, __) => errorBox('Could not load profile controls'),
+              error: (_, _) => errorBox('Could not load profile controls'),
               data: (ws) => profile.when(
                 loading: () => skeletonBox(140),
-                error: (_, __) => errorBox('Could not load public profile'),
+                error: (_, _) => errorBox('Could not load public profile'),
                 data: (bp) {
                   if (!_profileHydrated) {
                     _handleController.text = bp?.handle ?? '';
+                    _savedHandle = bp?.handle.trim().toLowerCase() ?? '';
                     _bioController.text = bp?.bio ?? '';
                     _coverPhotoController.text = bp?.coverPhotoUrl ?? '';
                     _galleryController.text =
@@ -1071,7 +1284,6 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                     _bookingMode = bp?.bookingMode ?? 'manual';
                     _reviewsEnabled = bp?.reviewsEnabled ?? false;
                     _galleryEnabled = bp?.galleryEnabled ?? false;
-                    _payNowEnabled = bp?.payNowEnabled ?? false;
                     _profileHydrated = true;
                   }
                   return Container(
@@ -1092,6 +1304,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                           label: 'HANDLE',
                           controller: _handleController,
                           hint: 'your-handle',
+                          maxLength: 40,
                         ),
                         const SizedBox(height: 12),
                         settingsField(
@@ -1119,7 +1332,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                           style: const TextStyle(
                             color: AppColors.t3,
                             fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -1144,6 +1357,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                 services: services,
                 onAdd: _showAddServiceSheet,
                 onEdit: _showEditServiceSheet,
+                onRetry: () => ref.invalidate(settingsServicesProvider),
               ),
             ),
         ],
@@ -1168,7 +1382,7 @@ class _BookingModeControl extends StatelessWidget {
           style: TextStyle(
             color: AppColors.t3,
             fontSize: 11,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
             letterSpacing: 0,
           ),
         ),
@@ -1176,7 +1390,7 @@ class _BookingModeControl extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: _BookingModeChip(
+              child: WorkloopFilterChip(
                 label: 'Accept requests',
                 selected: value == 'manual',
                 onTap: () => onChanged('manual'),
@@ -1184,7 +1398,7 @@ class _BookingModeControl extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: _BookingModeChip(
+              child: WorkloopFilterChip(
                 label: 'Closed',
                 selected: value == 'closed',
                 onTap: () => onChanged('closed'),
@@ -1193,48 +1407,6 @@ class _BookingModeControl extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-class _BookingModeChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _BookingModeChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        height: 42,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.green.withValues(alpha: 0.16)
-              : AppColors.bgInteract,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected ? AppColors.green : AppColors.border,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? AppColors.green : AppColors.t2,
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
     );
   }
 }

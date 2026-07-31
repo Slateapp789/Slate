@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/slate_models.dart';
 import '../../../shared/providers/finance_provider.dart';
+import '../../../shared/utils/currency_format.dart';
 import '../../../shared/utils/date_format.dart';
 
 class PaymentCard extends StatelessWidget {
@@ -84,7 +85,7 @@ class PaymentCard extends StatelessWidget {
                     clientName,
                     style: const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.t1,
                     ),
                     maxLines: 1,
@@ -114,10 +115,14 @@ class PaymentCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '£${(isPaid ? receivedAmountFor(payment) : outstandingAmountFor(payment)).toStringAsFixed(0)}',
+                  formatPounds(
+                    isPaid
+                        ? receivedAmountFor(payment)
+                        : outstandingAmountFor(payment),
+                  ),
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.t1,
                   ),
                 ),
@@ -126,7 +131,7 @@ class PaymentCard extends StatelessWidget {
                   statusLabel,
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: statusColor,
                   ),
                 ),

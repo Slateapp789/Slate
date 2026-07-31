@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/onboarding_provider.dart';
@@ -30,7 +30,7 @@ class ObPreferences extends ConsumerWidget {
             color: AppColors.t1,
             fontSize: 30,
             height: 1.05,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -67,7 +67,7 @@ class ObPreferences extends ConsumerWidget {
         _PreferenceSwitch(
           icon: LucideIcons.banknote,
           title: 'Money',
-          subtitle: 'Payments received and overdue invoices.',
+          subtitle: 'Payments received and balances that need attention.',
           value: state.notificationPreferences['payment_received'] ?? true,
           onChanged: (value) {
             notifier.setNotificationPreference('payment_received', value);
@@ -132,7 +132,7 @@ class _PreferenceSwitch extends StatelessWidget {
         style: TextStyle(
           color: tokens.textPrimary,
           fontSize: 15,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(

@@ -1,35 +1,57 @@
-# Slate UI Design System
+# Workloop UI Design System
 
-Last updated: 2026-07-15
+Last updated: 2026-07-30
 
 ## Design Intent
 
-Slate should feel premium, calm, modern, mobile-first, and high-trust. It is a working tool for people running real businesses from their phone.
+Workloop should feel premium, calm, modern, mobile-first, and high-trust. It is a working tool for people running real businesses from their phone.
 
-Current design direction is dark graphite with a restrained lime accent. Slate should feel operational and premium: quiet surfaces, clear hierarchy, and colour used sparingly so important actions and statuses are obvious.
+Current design direction is one slightly lifted graphite Dark appearance, with
+the exact icon/launch neon as the brand accent. Workloop should feel operational
+and premium: calm layered surfaces, clear hierarchy, and `#C1FF72` used
+sparingly so important actions and selected states are obvious. Workloop does
+not ship a user-selectable Light or System appearance.
 
 ## Current Colour System
 
 Source: `lib/core/theme/app_theme.dart`
 
-Current palette:
+Canonical semantic roles:
 
-- Background: `AppColors.bg` `#141713`
-- Card: `AppColors.bgCard` `#1D211C`
-- Raised: `AppColors.bgRaised` `#282D25`
-- Interactive: `AppColors.bgInteract` `#30372D`
-- Border: `AppColors.border` `#3E463A`
-- Strong border: `AppColors.borderStrong` `#68735F`
-- Primary text: `AppColors.t1` `#F3F5EE`
-- Secondary text: `AppColors.t2`
-- Tertiary text: `AppColors.t3`
-- Disabled/faint text: `AppColors.t4`
+| Role | Value |
+|---|---:|
+| Background | `#151A16` |
+| Surface | `#1C231D` |
+| Raised surface | `#252E26` |
+| Interactive surface | `#2C372D` |
+| Divider | `#3E4B3F` |
+| Strong divider | `#5E705F` |
+| Primary text | `#F4F7F3` |
+| Secondary text | `#CDD5CC` |
+| Tertiary text | `#A6B1A5` |
+| Disabled text | `#899588` |
 
 Accent:
 
-- Primary accent is lime: `AppColors.accentPrimary` / `AppColors.slate` / `AppColors.green` `#B8F24B`.
-- Reserve the bright accent for the main CTA on a screen or sheet and active navigation/selection.
-- Green/violet aliases remain in code for compatibility and should be gradually renamed only when safe.
+- Brand accent: `#C1FF72`, sampled from the icon and launch artwork.
+- `AppColors.brandAccent`, `AppColors.accentPrimaryStrong`, and
+  `AppColors.accentInk` resolve to the exact neon.
+  `AppColors.onBrandAccent` is dark `#17200D`.
+- Reserve the brand accent for the main CTA, active navigation, selection, focus, and restrained status emphasis.
+- Legacy green/violet aliases remain in code for compatibility and should be gradually renamed only when safe.
+
+Accessibility refinement (2026-07-26):
+
+- Primary navigation and primary controls use an opaque accent fill. Secondary
+  display and time filters use raised graphite with an accent label so they do
+  not compete with the screen action.
+- Content on a neon fill uses dark `#17200D`.
+- Neon is not used as body text; it remains an action, selection, focus, and
+  restrained status signal.
+- Essential text never uses the disabled role, and tertiary copy remains readable against the page canvas.
+- Primary, secondary, tertiary, and accent text roles meet WCAG AA normal-text
+  contrast against the shipped dark canvas. Disabled text is reserved for
+  unavailable controls, never essential information.
 
 Semantic:
 
@@ -39,30 +61,33 @@ Semantic:
 
 Rule:
 
-Avoid strong colour noise. Lime means "primary action or active place"; success, warning, and error colours communicate state and should not compete with primary actions.
+Avoid strong colour noise. Neon means "primary action or active place"; success, warning, and error colours communicate state and should not compete with primary actions.
 
 ## Typography
 
 Font:
 
-- Inter through `GoogleFonts.interTextTheme`.
+- Bundled Instrument Sans variable font with the OFL licence included in
+  `assets/fonts`.
 
 Current text scale:
 
-- Display large: 52, w900.
-- Display medium: 36, w900.
-- Headline large: 26, w900.
-- Headline medium: 22, w700.
-- Title large: 17, w700.
+- Display large: 40, w600.
+- Display medium: 32, w600.
+- Headline large: 26, w600.
+- Headline medium: 21, w600.
+- Title large: 18, w600.
 - Title medium: 15, w600.
-- Body large: 15, w400.
-- Body medium: 13, w400.
-- Label large: 13, w600.
-- Label small: 10, w700.
+- Body large: 16, w400.
+- Body medium: 14, w400.
+- Label large: 13, w500.
+- Label small: 10, w600.
 
 Rules:
 
-- No negative letter spacing.
+- Use only restrained negative tracking on display type; body and control copy remain neutral.
+- Cap interface typography at w600. Use size, spacing, and colour before adding
+  weight.
 - Do not use hero-scale type inside compact cards or controls.
 - Prioritise scannable hierarchy.
 - Keep labels short and practical.
@@ -78,12 +103,17 @@ Source: `AppSpacing`.
 - `lg`: 20
 - `xl`: 24
 - `xxl`: 32
-- `pageX`: 24
-- `pageTop`: 60
+- `pageX`: 20
+- `screenTop`: 20 inside the platform `SafeArea`
 - `minTouch`: 44
+- `bottomNavClearance`: 104
 
 Rules:
 
+- Shell page headers begin at `safeArea.top + screenTop`.
+- Leave `xl` (24) between a root page header and its first control or section.
+- Shell scrolling content uses `bottomNavClearance` rather than local magic
+  numbers.
 - Mobile screens should breathe without becoming sparse.
 - Use fewer stacked boxes where typography and spacing can carry hierarchy.
 - Keep primary actions within comfortable thumb reach.
@@ -94,9 +124,9 @@ Source: `AppRadius`.
 
 - `xs`: 8
 - `sm`: 12
-- `md`: 16
-- `lg`: 20
-- `xl`: 24
+- `md`: 14
+- `lg`: 18
+- `xl`: 22
 - `pill`: 999
 
 Rules:
@@ -115,7 +145,7 @@ Rules:
 
 - Use shadow sparingly.
 - Prefer surface contrast and spacing over heavy elevation.
-- Glass surfaces may use blur and transparency, especially navigation/sheets.
+- Navigation and sheets may use restrained blur, but their fill and selected states must remain opaque enough to preserve contrast.
 
 ## Components
 
@@ -130,6 +160,11 @@ Core components:
 - `SlateButton`
 - `SlateSheetFrame`
 - `SlateLoadingBlock`
+- `WorkloopTopAction`
+- `WorkloopSectionHeader`
+- `WorkloopEmptyState`
+- `WorkloopRouteHeader`
+- `WorkloopInteractiveWorkspaceStack`
 
 Rules:
 
@@ -137,6 +172,18 @@ Rules:
 - Do not create random one-off surface styles.
 - If a pattern repeats across two features, promote it into shared widgets.
 - Buttons should use clear labels and appropriate icons.
+- Create-capable root screens use one labelled `WorkloopTopAction`; an
+  unlabeled `+` is not sufficient as the main screen action.
+- Standard section headings use sentence-case title hierarchy. Use the quiet
+  section variant only for dense chronological groups and counts. A restrained
+  strong-divider marker separates standard sections without spending the neon
+  action colour.
+- Pushed screens use `WorkloopRouteHeader`; protected editors pass their
+  existing guarded back callback and save action into that primitive.
+- Empty states are inline by default. Contained empty states are reserved for
+  places where the boundary itself communicates useful context.
+- A root empty state must not duplicate the labelled primary action already
+  present in its feature header.
 - Use `SlateSheetFrame` for bottom sheets.
 
 ## Cards and Layout
@@ -175,15 +222,40 @@ Current main navigation:
 
 - Bottom pill/glass nav.
 - Labels appear under icons.
-- Tabs: Home, Clients, Bookings, More.
-- More contains Money, Tasks, Notes, Profile, and Settings.
-- Create-capable feature screens use a compact top-right `+` action instead of a detached global floating action.
+- Tabs: Home, Clients, Bookings, Tools.
+- Tools contains Money, Tasks, and Notes as equal full-width workspace rows.
+- Profile and Settings use compact, direct controls in the Home header rather
+  than occupying tool rows or permanent bottom-navigation destinations.
+- Create-capable feature screens use one labelled top-right action instead of a
+  detached global floating action.
 - Body extends behind nav for blur/transparency.
 
 Rules:
 
 - Core modules should remain in bottom nav.
 - Detail/create flows can push screens or sheets.
+- A short tap in the status/top-edge area returns the visible vertical screen
+  to its beginning. The calm, non-interactive top/header zone is deliberately
+  forgiving, and all visible vertical layers return together. Interactive
+  header controls keep their own tap. All vertical scroll views register
+  centrally, including implicit and nested controllers. Actual painted and
+  hit-test visibility prevents hidden `PageView` or `TabBarView` children from
+  being reset. Retained shell tabs keep independent scroll positions, and deep
+  returns use a distance-aware animation capped at 600 milliseconds.
+- Clean pushed routes use the native iOS interactive edge swipe and Android
+  system back gesture so the previous screen tracks the user's finger and a
+  cancelled swipe restores the current page.
+- A left-edge swipe uses the route's existing back action. Draft-protected iOS
+  editors therefore invoke their existing Save/Discard/Keep editing decision;
+  the fallback runs only after pointer-up and must never bypass draft
+  protection.
+- Money, Tasks, and Notes use a progress-driven retained-workspace transition:
+  the current page follows the left-edge drag, the preceding workspace is
+  revealed with restrained parallax, and distance or velocity decides whether
+  the gesture completes or cancels. Home, Clients, Bookings, and Tools remain
+  root destinations.
+- On a long list whose rows occupy the top zone after scrolling, the top
+  shortcut takes precedence over opening that row. Clients follows this rule.
 - Important routes should eventually be represented in GoRouter.
 
 ## Interaction Principles
@@ -191,6 +263,8 @@ Rules:
 - Completion should be deliberate.
 - Destructive actions require confirmation.
 - Swipe actions must not accidentally dismiss important business data.
+- Back gestures must follow the same validation, saving, and draft-protection
+  path as the visible back control.
 - Tapping a record should usually open detail/context, not mutate state.
 - Use snackbars for lightweight success/failure feedback.
 
@@ -229,17 +303,21 @@ Design rule:
 - Empty states should be calm inline guidance, not placeholder cards.
 - Lime remains the signature accent and should be reserved for primary actions, active navigation, progress, selected state, and important highlights.
 
-Implementation changes:
+Historical implementation changes:
 
-- `WorkloopThemeTokens` now defines explicit light and OLED-dark token sets.
+- `WorkloopThemeTokens` defined explicit light and OLED-dark token sets during
+  this refoundation.
 - Shared primitives in `lib/shared/widgets/slate_ui.dart` include token-aware surfaces, icon buttons, empty states, list rows, and filter chips.
 - Main navigation active state uses lime rather than module colours.
 - High-traffic screens have started moving from card-heavy rows to divider/list rhythm.
 
-Current dark-mode status:
+Historical appearance status:
 
-- The dark token foundation exists, but the app still runs in light mode while static `AppColors` usages are migrated.
-- Do not enable system dark mode until major screens, forms, sheets, dialogs, and local feature widgets read from theme tokens instead of static light colours.
+- System, Light, and OLED-aware Dark appearances were available from Settings >
+  App appearance.
+- This choice and its compatibility bridge were superseded by the
+  2026-07-28 dark-only launch decision. Production now has one fixed semantic
+  palette and no appearance setting.
 
 ## 2026-07-07 Final UI System Implementation
 
@@ -276,4 +354,6 @@ Current scope:
 
 - Dashboard, Business Feed, Clients, Bookings, Money, Tasks, Notes, Settings, Onboarding, bottom navigation, and global workspace error chrome now reference the canonical primitives where they touch shared system UI.
 - Bookings and Settings use the shared segmented control instead of local pill-tab containers.
-- Full dark mode is still intentionally disabled until local feature widgets stop depending on static light `AppColors`.
+- This section records the 2026-07-07 implementation. As of 2026-07-28, only
+  the canonical dark appearance is supported; new work must continue to use
+  semantic theme tokens rather than local colours.

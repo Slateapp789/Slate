@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/workloop_app_info.dart';
 import '../../../shared/providers/maps_preference_provider.dart';
-import '../../../shared/providers/theme_mode_provider.dart';
 import '../../../shared/utils/maps_launcher.dart';
 import '../../../shared/widgets/slate_ui.dart';
+import '../legal_document_screen.dart';
 
 class SettingsAppTab extends ConsumerWidget {
   const SettingsAppTab({super.key});
@@ -16,9 +17,6 @@ class SettingsAppTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final mapsPreference = ref.watch(preferredMapsAppProvider);
     final preference = mapsPreference.value ?? MapsAppPreference.askEveryTime;
-    final appearance =
-        ref.watch(workloopAppearanceProvider).value ??
-        WorkloopAppearance.system;
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.pageX,
@@ -27,33 +25,8 @@ class SettingsAppTab extends ConsumerWidget {
         AppSpacing.xxl,
       ),
       children: [
-        const WorkloopSectionHeader(label: 'General'),
+        const WorkloopSectionHeader(label: 'Apps and connections'),
         const SizedBox(height: AppSpacing.xs),
-        WorkloopPickerField<WorkloopAppearance>(
-          value: appearance,
-          title: 'Appearance',
-          hint: 'Choose appearance',
-          leadingIcon: LucideIcons.sunMoon,
-          options: [
-            for (final option in WorkloopAppearance.values)
-              WorkloopPickerOption(
-                value: option,
-                label: option.label,
-                subtitle: option.description,
-                leading: Icon(switch (option) {
-                  WorkloopAppearance.system => LucideIcons.monitor,
-                  WorkloopAppearance.light => LucideIcons.sun,
-                  WorkloopAppearance.dark => LucideIcons.moon,
-                }, size: 18),
-              ),
-          ],
-          onChanged: (selected) async {
-            await ref
-                .read(workloopAppearanceProvider.notifier)
-                .setAppearance(selected);
-          },
-        ),
-        const SizedBox(height: AppSpacing.sm),
         _PreferenceRow(
           icon: LucideIcons.navigation,
           title: 'Default maps app',
@@ -73,15 +46,45 @@ class SettingsAppTab extends ConsumerWidget {
         _PreferenceRow(
           icon: LucideIcons.calendarClock,
           title: 'Calendar',
-          subtitle: 'Export and calendar connection options',
+          subtitle: 'Export bookings to a standard calendar file',
           onTap: () => context.push('/calendar-sync'),
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        const WorkloopSectionHeader(label: 'Legal'),
+        const SizedBox(height: AppSpacing.xs),
+        _PreferenceRow(
+          icon: LucideIcons.shieldCheck,
+          title: 'Privacy policy',
+          subtitle: 'How Workloop handles and protects data',
+          onTap: () => Navigator.push<void>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const LegalDocumentScreen(
+                document: WorkloopLegalDocument.privacy,
+              ),
+            ),
+          ),
+        ),
+        const WorkloopDivider(margin: EdgeInsets.zero),
+        _PreferenceRow(
+          icon: LucideIcons.fileText,
+          title: 'Terms of use',
+          subtitle: 'The agreement for using Workloop',
+          onTap: () => Navigator.push<void>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const LegalDocumentScreen(
+                document: WorkloopLegalDocument.terms,
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: AppSpacing.xxl),
         const WorkloopSectionHeader(label: 'About Workloop'),
         const SizedBox(height: AppSpacing.xs),
-        const _InformationRow(label: 'Version', value: '1.0.0'),
+        _InformationRow(label: 'Version', value: WorkloopAppInfo.version),
         const WorkloopDivider(margin: EdgeInsets.zero),
-        const _InformationRow(label: 'Build', value: '1'),
+        _InformationRow(label: 'Build', value: WorkloopAppInfo.buildNumber),
       ],
     );
   }
@@ -121,7 +124,7 @@ class _PreferenceRow extends StatelessWidget {
         style: TextStyle(
           color: tokens.textPrimary,
           fontSize: 15,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(
@@ -161,7 +164,7 @@ class _InformationRow extends StatelessWidget {
             style: TextStyle(
               color: tokens.textPrimary,
               fontSize: 14,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],

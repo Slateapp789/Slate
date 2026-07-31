@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -61,7 +61,7 @@ Future<MapLaunchChoice?> showMapLaunchSheet(
               style: TextStyle(
                 color: AppColors.t1,
                 fontSize: 18,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -118,7 +118,7 @@ Future<MapLaunchChoice?> showMapLaunchSheet(
                       style: TextStyle(
                         color: AppColors.t2,
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
@@ -150,7 +150,7 @@ Future<MapsAppPreference?> showMapsPreferenceSheet(
             style: TextStyle(
               color: AppColors.t1,
               fontSize: 18,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -218,7 +218,7 @@ class _MapOptionRow extends StatelessWidget {
                 style: const TextStyle(
                   color: AppColors.t1,
                   fontSize: 14,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),

@@ -15,7 +15,7 @@ class _TaskFormSectionLabel extends StatelessWidget {
           text,
           style: const TextStyle(
             fontSize: 20,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
             height: 1.12,
             color: AppColors.t1,
           ),
@@ -27,7 +27,7 @@ class _TaskFormSectionLabel extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.t3,
               fontSize: 14,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w400,
               height: 1.35,
             ),
           ),
@@ -61,7 +61,10 @@ class _TaskSaveAction extends StatelessWidget {
         onTap: enabled && !loading ? onTap : null,
         borderRadius: BorderRadius.circular(AppRadius.pill),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 58, minHeight: 42),
+          constraints: const BoxConstraints(
+            minWidth: 58,
+            minHeight: AppSpacing.minTouch,
+          ),
           child: Center(
             child: loading
                 ? const SizedBox(
@@ -77,7 +80,7 @@ class _TaskSaveAction extends StatelessWidget {
                     style: TextStyle(
                       color: enabled ? AppColors.modTasks : AppColors.t3,
                       fontSize: 14,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
           ),
@@ -101,7 +104,7 @@ class _TaskTemplatePicker extends StatelessWidget {
           'Start with',
           style: TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
             color: AppColors.t3,
           ),
         ),
@@ -149,7 +152,7 @@ class _DraftChecklistEditor extends StatelessWidget {
               'Checklist',
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w600,
                 color: AppColors.t1,
               ),
             ),
@@ -158,7 +161,7 @@ class _DraftChecklistEditor extends StatelessWidget {
               'Saved with task',
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
                 color: AppColors.t3,
               ),
             ),
@@ -183,19 +186,27 @@ class _DraftChecklistEditor extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            GestureDetector(
+            Semantics(
+              button: true,
+              label: 'Add checklist step',
               onTap: onAdd,
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.slateLight,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: const Icon(
-                  LucideIcons.plus,
-                  size: 18,
-                  color: AppColors.panelInk,
+              child: ExcludeSemantics(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onAdd,
+                  child: Container(
+                    width: AppSpacing.minTouch,
+                    height: AppSpacing.minTouch,
+                    decoration: BoxDecoration(
+                      color: AppColors.slateLight,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: const Icon(
+                      LucideIcons.plus,
+                      size: 18,
+                      color: AppColors.panelInk,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -218,15 +229,17 @@ class _DraftChecklistEditor extends StatelessWidget {
                       style: const TextStyle(
                         color: AppColors.t2,
                         fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () => onRemove(entry.key),
-                    child: const Padding(
-                      padding: EdgeInsets.all(6),
-                      child: Icon(LucideIcons.x, size: 14, color: AppColors.t3),
+                  Tooltip(
+                    message: 'Remove ${entry.value} from checklist',
+                    child: WorkloopIconButton(
+                      icon: LucideIcons.x,
+                      semanticLabel: 'Remove ${entry.value} from checklist',
+                      size: AppSpacing.minTouch,
+                      onTap: () => onRemove(entry.key),
                     ),
                   ),
                 ],
@@ -307,7 +320,7 @@ class _DueDatePicker extends StatelessWidget {
           'Due date',
           style: TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
             color: AppColors.t3,
           ),
         ),
@@ -347,7 +360,7 @@ class _DueDatePicker extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.t2,
               fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -375,39 +388,47 @@ class _TaskOptionsDisclosure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.md),
+    return Semantics(
+      button: true,
+      expanded: expanded,
+      label: 'More options',
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            const Icon(
-              LucideIcons.slidersHorizontal,
-              size: 16,
-              color: AppColors.t3,
-            ),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Text(
-                'More options',
-                style: TextStyle(
-                  color: AppColors.t2,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+      child: ExcludeSemantics(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: AppSpacing.minTouch),
+            child: Row(
+              children: [
+                const Icon(
+                  LucideIcons.slidersHorizontal,
+                  size: 16,
+                  color: AppColors.t3,
                 ),
-              ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'More options',
+                    style: TextStyle(
+                      color: AppColors.t2,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: expanded ? 0.5 : 0,
+                  duration: AppMotion.standard,
+                  child: const Icon(
+                    LucideIcons.chevronDown,
+                    size: 16,
+                    color: AppColors.t3,
+                  ),
+                ),
+              ],
             ),
-            AnimatedRotation(
-              turns: expanded ? 0.5 : 0,
-              duration: AppMotion.standard,
-              child: const Icon(
-                LucideIcons.chevronDown,
-                size: 16,
-                color: AppColors.t3,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -436,7 +457,7 @@ class _ReminderPicker extends StatelessWidget {
 
     return AnimatedOpacity(
       opacity: enabled ? 1 : 0.45,
-      duration: AppMotion.fast,
+      duration: AppMotion.responsive(context, AppMotion.fast),
       child: IgnorePointer(
         ignoring: !enabled,
         child: Column(
@@ -446,7 +467,7 @@ class _ReminderPicker extends StatelessWidget {
               'Reminder',
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
                 color: AppColors.t3,
               ),
             ),
@@ -456,39 +477,20 @@ class _ReminderPicker extends StatelessWidget {
               runSpacing: 8,
               children: options.map((option) {
                 final active = value == option.$1;
-                return GestureDetector(
+                return WorkloopFilterChip(
+                  label: option.$2,
+                  selected: active,
                   onTap: () => onChanged(option.$1),
-                  child: AnimatedContainer(
-                    duration: AppMotion.standard,
-                    curve: AppMotion.curve,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: active
-                          ? AppColors.slateLight
-                          : AppColors.t1.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                      border: Border.all(
-                        color: active
-                            ? AppColors.borderStrong
-                            : Colors.transparent,
-                      ),
-                    ),
-                    child: Text(
-                      option.$2,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: active ? AppColors.panelInk : AppColors.t2,
-                      ),
-                    ),
-                  ),
                 );
               }).toList(),
             ),
-            if (!enabled) ...[
+            if (enabled) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Reminders normally arrive on this device at 09:00.',
+                style: TextStyle(fontSize: 12, color: AppColors.t3),
+              ),
+            ] else ...[
               const SizedBox(height: 8),
               const Text(
                 'Choose a due date before adding a reminder.',
@@ -515,33 +517,7 @@ class _DateChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppMotion.standard,
-        curve: AppMotion.curve,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.modTasks.withValues(alpha: 0.14)
-              : AppColors.t1.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: selected
-                ? AppColors.modTasks.withValues(alpha: 0.45)
-                : Colors.transparent,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            color: selected ? AppColors.modTasks : AppColors.t2,
-          ),
-        ),
-      ),
-    );
+    return WorkloopFilterChip(label: label, selected: selected, onTap: onTap);
   }
 }
 
@@ -563,21 +539,37 @@ class _PriorityChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = selected == value;
-    return GestureDetector(
-      onTap: () => onTap(value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: active ? color.withValues(alpha: 0.15) : AppColors.bgInteract,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: active ? color : Colors.transparent),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: active ? color : AppColors.t2,
+    void handleTap() => onTap(value);
+    return Semantics(
+      button: true,
+      selected: active,
+      label: '$label priority',
+      onTap: handleTap,
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: handleTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: AppSpacing.minTouch),
+            child: Container(
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: active
+                    ? color.withValues(alpha: 0.15)
+                    : AppColors.bgInteract,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(color: active ? color : Colors.transparent),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: active ? color : AppColors.t2,
+                ),
+              ),
+            ),
           ),
         ),
       ),

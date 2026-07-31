@@ -1,18 +1,21 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import "jsr:@supabase/functions-js@2.110.5/edge-runtime.d.ts";
+import { createClient } from "@supabase/supabase-js";
+import { unitSearchFrom, withUnitLabel } from "./address_unit.ts";
 import {
-  unitSearchFrom,
-  withUnitLabel,
-} from "./address_unit.ts";
+  parsePlacesRateLimitResult,
+  type PlacesRateLimitBucket,
+} from "./rate_limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Expose-Headers": "Retry-After",
 };
 
 const googlePlacesBaseUrl = "https://places.googleapis.com/v1";
+const textEncoder = new TextEncoder();
 
 type RequestPayload = {
   action?: unknown;
@@ -30,10 +33,18 @@ type AddressPrediction = {
   isPostcode: boolean;
 };
 
-function jsonResponse(status: number, body: Record<string, unknown>) {
+function jsonResponse(
+  status: number,
+  body: Record<string, unknown>,
+  extraHeaders: Record<string, string> = {},
+) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: {
+      ...corsHeaders,
+      ...extraHeaders,
+      "Content-Type": "application/json",
+    },
   });
 }
 
@@ -55,6 +66,62 @@ async function authenticatedUser(req: Request) {
   const { data, error } = await client.auth.getUser();
   if (error) return null;
   return data.user;
+}
+
+async function sha256(value: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    textEncoder.encode(value),
+  );
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function consumePlacesBudget(
+  userId: string,
+  bucket: PlacesRateLimitBucket,
+) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const configuredSalt = Deno.env.get("PLACES_RATE_LIMIT_SALT") ?? "";
+  if (!supabaseUrl || serviceRoleKey.length < 32) return null;
+
+  const salt = configuredSalt.length >= 32
+    ? configuredSalt
+    : await sha256(`workloop-places-rate-limit:${serviceRoleKey}`);
+  const subjectHash = await sha256(`${userId}:${salt}`);
+  const serviceClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await serviceClient.rpc(
+    "consume_places_rate_limit",
+    {
+      p_subject_hash: subjectHash,
+      p_bucket: bucket,
+    },
+  );
+  if (error) {
+    console.error("places_rate_limit_rpc_failed", { code: error.code });
+    return null;
+  }
+  return parsePlacesRateLimitResult(data);
+}
+
+async function placesRateLimitRejection(
+  userId: string,
+  bucket: PlacesRateLimitBucket,
+) {
+  const budget = await consumePlacesBudget(userId, bucket);
+  if (!budget) {
+    return jsonResponse(503, { error: "Address search is unavailable" });
+  }
+  if (budget.allowed) return null;
+  return jsonResponse(
+    429,
+    { error: "Too many address searches. Try again shortly." },
+    { "Retry-After": Math.max(1, budget.retryAfterSeconds).toString() },
+  );
 }
 
 async function googleAutocomplete(
@@ -92,12 +159,9 @@ async function googleAutocomplete(
   );
 
   if (!googleResponse.ok) {
-    const responseBody = await googleResponse.text();
-    console.error(
-      "Google Places autocomplete failed",
-      googleResponse.status,
-      responseBody,
-    );
+    console.error("google_places_autocomplete_failed", {
+      status: googleResponse.status,
+    });
     throw new Error(
       `Google Places autocomplete failed: ${googleResponse.status}`,
     );
@@ -152,9 +216,11 @@ async function autocomplete(
 ) {
   const unitSearch = unitSearchFrom(input);
   const searches = [unitSearch?.buildingInput, input];
-  const uniqueSearches = [...new Set(
-    searches.filter((value): value is string => Boolean(value)),
-  )];
+  const uniqueSearches = [
+    ...new Set(
+      searches.filter((value): value is string => Boolean(value)),
+    ),
+  ];
 
   try {
     const resultSets = await Promise.all(
@@ -204,11 +270,9 @@ async function details(
   );
 
   if (!googleResponse.ok) {
-    console.error(
-      "Google Places details failed",
-      googleResponse.status,
-      await googleResponse.text(),
-    );
+    console.error("google_places_details_failed", {
+      status: googleResponse.status,
+    });
     return jsonResponse(502, { error: "Could not load the selected address" });
   }
 
@@ -239,7 +303,8 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(405, { error: "Method not allowed" });
   }
 
-  if (!await authenticatedUser(req)) {
+  const user = await authenticatedUser(req);
+  if (!user) {
     return jsonResponse(401, { error: "Unauthorized" });
   }
 
@@ -264,6 +329,11 @@ Deno.serve(async (req: Request) => {
   if (action === "autocomplete") {
     const input = stringValue(payload.input, 240);
     if (input.length < 3) return jsonResponse(200, { predictions: [] });
+    const rejection = await placesRateLimitRejection(
+      user.id,
+      "autocomplete",
+    );
+    if (rejection) return rejection;
     return autocomplete(input, sessionToken, apiKey);
   }
 
@@ -272,6 +342,8 @@ Deno.serve(async (req: Request) => {
     if (!placeId || !/^[A-Za-z0-9_-]+$/.test(placeId)) {
       return jsonResponse(400, { error: "Invalid place" });
     }
+    const rejection = await placesRateLimitRejection(user.id, "details");
+    if (rejection) return rejection;
     return details(placeId, sessionToken, apiKey);
   }
 

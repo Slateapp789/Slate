@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { isSoleWorkspaceOwner } from "../_shared/sole_workspace_owner.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,7 +50,8 @@ Deno.serve(async (req: Request) => {
     return response(405, { error: "Method not allowed" });
   }
 
-  const configuredAdminToken = Deno.env.get("ACCOUNT_DELETION_ADMIN_TOKEN") ?? "";
+  const configuredAdminToken = Deno.env.get("ACCOUNT_DELETION_ADMIN_TOKEN") ??
+    "";
   const suppliedAdminToken = req.headers.get("x-admin-token") ?? "";
   if (!configuredAdminToken || suppliedAdminToken !== configuredAdminToken) {
     return response(401, { error: "Unauthorized" });
@@ -58,7 +60,9 @@ Deno.serve(async (req: Request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   if (!supabaseUrl || !serviceRoleKey) {
-    return response(500, { error: "Deletion completion service is not configured" });
+    return response(500, {
+      error: "Deletion completion service is not configured",
+    });
   }
 
   let payload: CompletionPayload;
@@ -80,7 +84,9 @@ Deno.serve(async (req: Request) => {
 
   const { data: request, error: requestError } = await supabase
     .from("account_deletion_requests")
-    .select("id, workspace_id, user_id, requested_by_user_id, email, status, requested_at")
+    .select(
+      "id, workspace_id, user_id, requested_by_user_id, email, status, requested_at, processing_started_at",
+    )
     .eq("id", requestId)
     .maybeSingle();
 
@@ -92,74 +98,170 @@ Deno.serve(async (req: Request) => {
     return response(409, { error: "Deletion request is not open" });
   }
 
-  await supabase
+  const userId = request.requested_by_user_id ?? request.user_id;
+  if (!userId) {
+    return response(409, {
+      error: "Deletion blocked because the request has no verified owner",
+    });
+  }
+
+  if (request.workspace_id) {
+    const { data: memberships, error: membershipError } = await supabase
+      .from("workspace_members")
+      .select("user_id")
+      .eq("workspace_id", request.workspace_id)
+      .limit(2);
+
+    if (membershipError) {
+      return response(500, {
+        error: "Could not verify workspace ownership",
+      });
+    }
+    if (!isSoleWorkspaceOwner(memberships, userId)) {
+      return response(409, {
+        error:
+          "Deletion blocked because sole workspace ownership could not be verified",
+      });
+    }
+  }
+
+  const claimTime = new Date();
+  const previousClaimTime = request.processing_started_at
+    ? new Date(request.processing_started_at)
+    : null;
+  const retryLeaseMs = 5 * 60 * 1000;
+  if (
+    request.status === "processing" &&
+    previousClaimTime &&
+    claimTime.getTime() - previousClaimTime.getTime() < retryLeaseMs
+  ) {
+    return response(409, {
+      error: "Deletion is already processing; retry after five minutes",
+    });
+  }
+
+  let claimQuery = supabase
     .from("account_deletion_requests")
     .update({
       status: "processing",
-      processing_started_at: new Date().toISOString(),
+      processing_started_at: claimTime.toISOString(),
       completed_by: "admin-token",
       completion_mode: "workspace_and_auth_user_delete",
       notes: notes || "Deletion completion started.",
     })
-    .eq("id", request.id);
+    .eq("id", request.id)
+    .eq("status", request.status);
+  if (request.status === "processing") {
+    claimQuery = previousClaimTime
+      ? claimQuery.eq("processing_started_at", request.processing_started_at)
+      : claimQuery.is("processing_started_at", null);
+  }
+  const { data: claim, error: completionUpdateError } = await claimQuery
+    .select("id")
+    .maybeSingle();
+  if (completionUpdateError) {
+    return response(500, { error: "Could not start account deletion" });
+  }
+  if (!claim) {
+    return response(409, { error: "Deletion request was claimed elsewhere" });
+  }
 
   let workspaceDeleted = false;
   let authUserDeleted = false;
-  const userId = request.requested_by_user_id ?? request.user_id;
 
-  const { error: workspaceDeleteError } = await supabase
-    .from("workspaces")
-    .delete()
-    .eq("id", request.workspace_id);
-  if (workspaceDeleteError) {
-    await supabase.from("account_deletion_audit").insert({
-      request_id: request.id,
-      workspace_id: request.workspace_id,
-      user_id: userId,
-      email_hash: request.email ? await sha256(request.email.toLowerCase()) : null,
-      requested_at: request.requested_at,
-      completed_by: "admin-token",
-      completion_mode: "workspace_and_auth_user_delete",
-      workspace_deleted: false,
-      auth_user_deleted: false,
-      notes: `Workspace deletion failed: ${workspaceDeleteError.message}`,
-    });
-    return response(500, { error: "Workspace deletion failed" });
-  }
-  workspaceDeleted = true;
-
-  if (userId) {
-    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
-    if (authDeleteError) {
+  // The request survives workspace deletion (FK uses ON DELETE SET NULL), so
+  // a later auth failure can be retried with the same request id.
+  if (request.workspace_id) {
+    const { error: workspaceDeleteError } = await supabase
+      .from("workspaces")
+      .delete()
+      .eq("id", request.workspace_id);
+    if (workspaceDeleteError) {
       await supabase.from("account_deletion_audit").insert({
         request_id: request.id,
         workspace_id: request.workspace_id,
         user_id: userId,
-        email_hash: request.email ? await sha256(request.email.toLowerCase()) : null,
+        email_hash: request.email
+          ? await sha256(request.email.toLowerCase())
+          : null,
+        requested_at: request.requested_at,
+        completed_by: "admin-token",
+        completion_mode: "workspace_and_auth_user_delete",
+        workspace_deleted: false,
+        auth_user_deleted: false,
+        notes: `Workspace deletion failed: ${workspaceDeleteError.message}`,
+      });
+      return response(500, { error: "Workspace deletion failed" });
+    }
+  }
+  workspaceDeleted = true;
+
+  if (userId) {
+    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(
+      userId,
+    );
+    const authUserAlreadyDeleted = authDeleteError &&
+      (authDeleteError.status === 404 ||
+        /not found|does not exist/i.test(authDeleteError.message));
+    if (authDeleteError && !authUserAlreadyDeleted) {
+      await supabase.from("account_deletion_audit").insert({
+        request_id: request.id,
+        workspace_id: request.workspace_id,
+        user_id: userId,
+        email_hash: request.email
+          ? await sha256(request.email.toLowerCase())
+          : null,
         requested_at: request.requested_at,
         completed_by: "admin-token",
         completion_mode: "workspace_and_auth_user_delete",
         workspace_deleted: workspaceDeleted,
         auth_user_deleted: false,
-        notes: `Workspace deleted, auth user deletion failed: ${authDeleteError.message}`,
+        notes:
+          `Workspace deleted, auth user deletion failed: ${authDeleteError.message}`,
       });
-      return response(500, { error: "Auth user deletion failed after workspace deletion" });
+      return response(500, {
+        error: "Auth user deletion failed after workspace deletion",
+      });
     }
     authUserDeleted = true;
   }
 
-  await supabase.from("account_deletion_audit").insert({
-    request_id: request.id,
-    workspace_id: request.workspace_id,
-    user_id: userId,
-    email_hash: request.email ? await sha256(request.email.toLowerCase()) : null,
-    requested_at: request.requested_at,
-    completed_by: "admin-token",
-    completion_mode: "workspace_and_auth_user_delete",
-    workspace_deleted: workspaceDeleted,
-    auth_user_deleted: authUserDeleted,
-    notes: notes || "Workspace and auth user deleted.",
-  });
+  const { error: finalUpdateError } = await supabase
+    .from("account_deletion_requests")
+    .update({
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      notes: notes || "Workspace and auth user deleted.",
+    })
+    .eq("id", request.id);
+  if (finalUpdateError) {
+    return response(500, {
+      error:
+        "Account data was deleted, but completion could not be recorded; retry this request",
+    });
+  }
+
+  const { error: auditError } = await supabase.from("account_deletion_audit")
+    .insert({
+      request_id: request.id,
+      workspace_id: request.workspace_id,
+      user_id: userId,
+      email_hash: request.email
+        ? await sha256(request.email.toLowerCase())
+        : null,
+      requested_at: request.requested_at,
+      completed_by: "admin-token",
+      completion_mode: "workspace_and_auth_user_delete",
+      workspace_deleted: workspaceDeleted,
+      auth_user_deleted: authUserDeleted,
+      notes: notes || "Workspace and auth user deleted.",
+    });
+  if (auditError) {
+    return response(500, {
+      error:
+        "Account data was deleted, but the deletion audit could not be recorded",
+    });
+  }
 
   return response(200, {
     ok: true,

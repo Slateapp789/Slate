@@ -2,7 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/slate_models.dart';
+import '../utils/appointment_recurrence.dart';
 import '../utils/working_hours.dart';
+import 'repository_pagination.dart';
 import 'supabase_client_provider.dart';
 
 final appointmentsRepositoryProvider = Provider<AppointmentsRepository>((ref) {
@@ -25,7 +27,7 @@ class AppointmentsRepository {
   }) async {
     final duration = endTime.difference(startTime);
     for (var index = 0; index < repeatOccurrences.clamp(1, 24); index++) {
-      final occurrenceStart = _occurrenceStart(
+      final occurrenceStart = appointmentOccurrenceStart(
         startTime,
         recurrenceRule,
         index,
@@ -66,25 +68,34 @@ class AppointmentsRepository {
   }
 
   Future<List<Appointment>> list(String workspaceId) async {
-    final rows = await _client
-        .from('appointments')
-        .select('*, contacts(name), services(name)')
-        .eq('workspace_id', workspaceId)
-        .order('start_time', ascending: true);
-    return rows
-        .map<Appointment>(
-          (row) => Appointment.fromMap(Map<String, dynamic>.from(row)),
-        )
-        .toList();
+    final rows = await fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('appointments')
+            .select('*, contacts(name), services(name)')
+            .eq('workspace_id', workspaceId)
+            .order('start_time', ascending: true)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
+    return rows.map<Appointment>(Appointment.fromMap).toList();
   }
 
   Future<List<Map<String, dynamic>>> listRows(String workspaceId) async {
-    final rows = await _client
-        .from('appointments')
-        .select('*, contacts(name), services(name)')
-        .eq('workspace_id', workspaceId)
-        .order('start_time', ascending: true);
-    return List<Map<String, dynamic>>.from(rows);
+    return fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('appointments')
+            .select('*, contacts(name), services(name)')
+            .eq('workspace_id', workspaceId)
+            .order('start_time', ascending: true)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
   }
 
   Future<List<Map<String, dynamic>>> conflicts({
@@ -93,27 +104,40 @@ class AppointmentsRepository {
     required DateTime endTime,
     String? excludeAppointmentId,
   }) async {
-    var query = _client
-        .from('appointments')
-        .select('*, contacts(name), services(name)')
-        .eq('workspace_id', workspaceId)
-        .neq('status', 'cancelled')
-        .lt('start_time', endTime.toUtc().toIso8601String())
-        .gt('end_time', startTime.toUtc().toIso8601String());
-    if (excludeAppointmentId != null) {
-      query = query.neq('id', excludeAppointmentId);
-    }
-    final rows = await query.order('start_time', ascending: true);
-    return List<Map<String, dynamic>>.from(rows);
+    return fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        var query = _client
+            .from('appointments')
+            .select('*, contacts(name), services(name)')
+            .eq('workspace_id', workspaceId)
+            .neq('status', 'cancelled')
+            .lt('start_time', endTime.toUtc().toIso8601String())
+            .gt('end_time', startTime.toUtc().toIso8601String());
+        if (excludeAppointmentId != null) {
+          query = query.neq('id', excludeAppointmentId);
+        }
+        final page = await query
+            .order('start_time', ascending: true)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
   }
 
   Future<List<Map<String, dynamic>>> forClientRows(String clientId) async {
-    final rows = await _client
-        .from('appointments')
-        .select('*, services(name), contacts(name)')
-        .eq('contact_id', clientId)
-        .order('start_time', ascending: false);
-    return List<Map<String, dynamic>>.from(rows);
+    return fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('appointments')
+            .select('*, services(name), contacts(name)')
+            .eq('contact_id', clientId)
+            .order('start_time', ascending: false)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
   }
 
   Future<List<Appointment>> upcoming(
@@ -151,7 +175,7 @@ class AppointmentsRepository {
     final duration = endTime.difference(startTime);
     final safeTitle = title?.trim().isEmpty ?? true ? 'Booking' : title!.trim();
     final rows = List.generate(repeatOccurrences.clamp(1, 24), (index) {
-      final occurrenceStart = _occurrenceStart(
+      final occurrenceStart = appointmentOccurrenceStart(
         startTime,
         recurrenceRule,
         index,
@@ -161,41 +185,128 @@ class AppointmentsRepository {
         'contact_id': contactId,
         'service_id': serviceId,
         'title': safeTitle,
-        'start_time': occurrenceStart.toIso8601String(),
-        'end_time': occurrenceStart.add(duration).toIso8601String(),
+        'start_time': occurrenceStart.toUtc().toIso8601String(),
+        'end_time': occurrenceStart.add(duration).toUtc().toIso8601String(),
         'price': price,
         'status': 'scheduled',
         'notes': notes?.trim().isEmpty ?? true ? null : notes!.trim(),
         'location': location?.trim().isEmpty ?? true ? null : location!.trim(),
-        if (recurrenceRule != null) 'recurrence_rule': recurrenceRule,
+        'recurrence_rule': ?recurrenceRule,
       };
     });
 
+    final inserted = await _client
+        .from('appointments')
+        .insert(rows)
+        .select('id');
+    return List<Map<String, dynamic>>.from(
+      inserted,
+    ).map((row) => row['id'] as String).toList();
+  }
+
+  Future<List<String>> createBookingWorkflow({
+    required String workspaceId,
+    required String idempotencyKey,
+    String? contactId,
+    String? newContactName,
+    String? newContactPhone,
+    String? newContactEmail,
+    String? newContactAddress,
+    String? newContactNotes,
+    bool reuseContactByPhone = false,
+    String? bookingRequestId,
+    String? serviceId,
+    required DateTime startTime,
+    required DateTime endTime,
+    required double price,
+    String? title,
+    String? notes,
+    String? location,
+    String? recurrenceRule,
+    int repeatOccurrences = 1,
+    List<String> taskTitles = const [],
+    DateTime? taskDueDate,
+    bool createPaymentDue = false,
+    String? paymentNote,
+    String notificationTitle = 'New booking created',
+    String notificationBody = 'A booking was added to your schedule.',
+  }) async {
+    final payload = buildBookingWorkflowPayload(
+      workspaceId: workspaceId,
+      idempotencyKey: idempotencyKey,
+      contactId: contactId,
+      newContactName: newContactName,
+      newContactPhone: newContactPhone,
+      newContactEmail: newContactEmail,
+      newContactAddress: newContactAddress,
+      newContactNotes: newContactNotes,
+      reuseContactByPhone: reuseContactByPhone,
+      bookingRequestId: bookingRequestId,
+      serviceId: serviceId,
+      startTime: startTime,
+      endTime: endTime,
+      price: price,
+      title: title,
+      notes: notes,
+      location: location,
+      recurrenceRule: recurrenceRule,
+      repeatOccurrences: repeatOccurrences,
+      taskTitles: taskTitles,
+      taskDueDate: taskDueDate,
+      createPaymentDue: createPaymentDue,
+      paymentNote: paymentNote,
+      notificationTitle: notificationTitle,
+      notificationBody: notificationBody,
+    );
+    late final dynamic response;
     try {
-      final inserted = await _client
-          .from('appointments')
-          .insert(rows)
-          .select('id');
-      return List<Map<String, dynamic>>.from(
-        inserted,
-      ).map((row) => row['id'] as String).toList();
-    } catch (_) {
-      final fallbackRows = rows
-          .map(
-            (row) => Map<String, dynamic>.from(row)
-              ..remove('recurrence_rule')
-              ..remove('recurrence_parent_id')
-              ..remove('location'),
-          )
-          .toList();
-      final inserted = await _client
-          .from('appointments')
-          .insert(fallbackRows)
-          .select('id');
-      return List<Map<String, dynamic>>.from(
-        inserted,
-      ).map((row) => row['id'] as String).toList();
+      response = await _client.rpc(
+        'create_booking_workflow',
+        params: {'p_payload': payload},
+      );
+    } on PostgrestException catch (error) {
+      if (isAppointmentConflictError(
+        code: error.code,
+        message: error.message,
+      )) {
+        throw const AppointmentScheduleException(
+          'This time now overlaps an existing booking. Choose another time.',
+          issue: AppointmentScheduleIssue.conflict,
+        );
+      }
+      rethrow;
     }
+    final result = Map<String, dynamic>.from(response as Map);
+    final ids = result['appointment_ids'];
+    if (ids is! List) {
+      throw const FormatException(
+        'Booking workflow returned an invalid appointment list.',
+      );
+    }
+    return ids.map((id) => id.toString()).toList(growable: false);
+  }
+
+  Future<void> completeBookingWorkflow({
+    required String workspaceId,
+    required String appointmentId,
+    required String idempotencyKey,
+    required String paymentMode,
+    String? linkedPaymentId,
+    DateTime? paymentDate,
+  }) async {
+    await _client.rpc(
+      'complete_booking_workflow',
+      params: {
+        'p_payload': buildCompletionWorkflowPayload(
+          workspaceId: workspaceId,
+          appointmentId: appointmentId,
+          idempotencyKey: idempotencyKey,
+          paymentMode: paymentMode,
+          linkedPaymentId: linkedPaymentId,
+          paymentDate: paymentDate,
+        ),
+      },
+    );
   }
 
   Future<void> update(String appointmentId, Map<String, dynamic> values) async {
@@ -207,29 +318,99 @@ class AppointmentsRepository {
     String status, {
     String? notes,
   }) async {
-    await update(appointmentId, {
-      'status': status,
-      if (notes != null) 'notes': notes,
-    });
+    await update(appointmentId, {'status': status, 'notes': ?notes});
   }
+}
 
-  DateTime _occurrenceStart(DateTime startTime, String? rule, int index) {
-    if (index == 0 || rule == null) return startTime;
-    if (rule.contains('FREQ=MONTHLY')) {
-      return DateTime.utc(
-        startTime.year,
-        startTime.month + index,
-        startTime.day,
-        startTime.hour,
-        startTime.minute,
-        startTime.second,
-        startTime.millisecond,
-        startTime.microsecond,
-      );
-    }
-    final interval = rule.contains('INTERVAL=2') ? 2 : 1;
-    return startTime.add(Duration(days: 7 * interval * index));
-  }
+Map<String, dynamic> buildBookingWorkflowPayload({
+  required String workspaceId,
+  required String idempotencyKey,
+  String? contactId,
+  String? newContactName,
+  String? newContactPhone,
+  String? newContactEmail,
+  String? newContactAddress,
+  String? newContactNotes,
+  bool reuseContactByPhone = false,
+  String? bookingRequestId,
+  String? serviceId,
+  required DateTime startTime,
+  required DateTime endTime,
+  required double price,
+  String? title,
+  String? notes,
+  String? location,
+  String? recurrenceRule,
+  int repeatOccurrences = 1,
+  List<String> taskTitles = const [],
+  DateTime? taskDueDate,
+  bool createPaymentDue = false,
+  String? paymentNote,
+  required String notificationTitle,
+  required String notificationBody,
+}) {
+  final duration = endTime.difference(startTime);
+  final occurrences = List.generate(repeatOccurrences.clamp(1, 24), (index) {
+    final occurrenceStart = appointmentOccurrenceStart(
+      startTime,
+      recurrenceRule,
+      index,
+    );
+    return {
+      'start_time': occurrenceStart.toUtc().toIso8601String(),
+      'end_time': occurrenceStart.add(duration).toUtc().toIso8601String(),
+      'payment_date': _dateOnly(occurrenceStart.toLocal()),
+    };
+  }, growable: false);
+  return {
+    'workspace_id': workspaceId,
+    'idempotency_key': idempotencyKey,
+    'contact_id': ?contactId,
+    if (contactId == null)
+      'new_contact': {
+        'name': newContactName,
+        'phone': newContactPhone,
+        'email': newContactEmail,
+        'address': newContactAddress,
+        'notes': newContactNotes,
+      },
+    'reuse_contact_by_phone': reuseContactByPhone,
+    'booking_request_id': ?bookingRequestId,
+    'service_id': ?serviceId,
+    'title': title,
+    'price': price,
+    'notes': notes,
+    'location': location,
+    'recurrence_rule': ?recurrenceRule,
+    'appointments': occurrences,
+    'task_titles': taskTitles,
+    if (taskDueDate != null) 'task_due_date': _dateOnly(taskDueDate),
+    'create_payment_due': createPaymentDue,
+    'payment_note': paymentNote,
+    'notification_title': notificationTitle,
+    'notification_body': notificationBody,
+  };
+}
+
+String _dateOnly(DateTime value) =>
+    '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+
+Map<String, dynamic> buildCompletionWorkflowPayload({
+  required String workspaceId,
+  required String appointmentId,
+  required String idempotencyKey,
+  required String paymentMode,
+  String? linkedPaymentId,
+  DateTime? paymentDate,
+}) {
+  return {
+    'workspace_id': workspaceId,
+    'appointment_id': appointmentId,
+    'idempotency_key': idempotencyKey,
+    'payment_mode': paymentMode,
+    'linked_payment_id': ?linkedPaymentId,
+    if (paymentDate != null) 'payment_date': _dateOnly(paymentDate),
+  };
 }
 
 enum AppointmentScheduleIssue { workingHours, conflict, other }
@@ -245,4 +426,11 @@ class AppointmentScheduleException implements Exception {
 
   @override
   String toString() => message;
+}
+
+bool isAppointmentConflictError({
+  required String? code,
+  required String message,
+}) {
+  return code == '23P01' || message.toLowerCase().contains('overlap');
 }

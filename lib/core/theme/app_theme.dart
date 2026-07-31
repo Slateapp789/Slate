@@ -1,134 +1,75 @@
-import 'dart:ui' show ColorSpace;
-
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-
-/// Compatibility bridge for legacy widgets that still reference [AppColors].
-/// New and actively edited widgets should use [WorkloopThemeTokens] instead.
-class WorkloopLegacyPalette {
-  const WorkloopLegacyPalette._();
-
-  static Brightness brightness = Brightness.light;
-
-  static void sync(Brightness value) => brightness = value;
-}
-
-class _AdaptiveColor extends Color {
-  final Color light;
-  final Color dark;
-
-  const _AdaptiveColor(this.light, this.dark) : super(0x00000000);
-
-  Color get _resolved =>
-      WorkloopLegacyPalette.brightness == Brightness.dark ? dark : light;
-
-  @override
-  double get a => _resolved.a;
-
-  @override
-  double get r => _resolved.r;
-
-  @override
-  double get g => _resolved.g;
-
-  @override
-  double get b => _resolved.b;
-
-  @override
-  ColorSpace get colorSpace => _resolved.colorSpace;
-
-  @override
-  int toARGB32() => _resolved.toARGB32();
-}
 
 class AppColors {
-  // Backgrounds - pure paper with very quiet operational surfaces.
-  static const bg = _AdaptiveColor(Color(0xFFFFFFFF), Color(0xFF050604));
-  static const bgCard = _AdaptiveColor(Color(0xFFFFFFFF), Color(0xFF090B08));
-  static const bgRaised = _AdaptiveColor(Color(0xFFF8F9F6), Color(0xFF10130E));
-  static const bgInteract = _AdaptiveColor(
-    Color(0xFFF4F6F1),
-    Color(0xFF151A12),
-  );
-  static const border = _AdaptiveColor(Color(0xFFE8EDE3), Color(0xFF20261D));
-  static const borderStrong = _AdaptiveColor(
-    Color(0xFFD6DFCE),
-    Color(0xFF313A2C),
-  );
+  // Workloop is intentionally dark-only. These graphite layers are slightly
+  // lifted from black so surfaces stay calm without collapsing together.
+  static const bg = Color(0xFF151A16);
+  static const bgCard = Color(0xFF1C231D);
+  static const bgRaised = Color(0xFF252E26);
+  static const bgInteract = Color(0xFF2C372D);
+  static const border = Color(0xFF3E4B3F);
+  static const borderStrong = Color(0xFF5E705F);
 
   // Text
-  static const t1 = _AdaptiveColor(Color(0xFF11130F), Color(0xFFF7F8F3));
-  static const t2 = _AdaptiveColor(Color(0xCC11130F), Color(0xCCF7F8F3));
-  static const t3 = _AdaptiveColor(Color(0x8C11130F), Color(0x8CF7F8F3));
-  static const t4 = _AdaptiveColor(Color(0x3D11130F), Color(0x3DF7F8F3));
+  static const t1 = Color(0xFFF4F7F3);
+  static const t2 = Color(0xFFCDD5CC);
+  static const t3 = Color(0xFFA6B1A5);
+  static const t4 = Color(0xFF899588);
 
-  // Brand accent. Keep the root accent exact; use accentInk for thin icons and
-  // text that need stronger contrast on light surfaces.
+  // Workloop's signature neon is sampled directly from the app icon and launch
+  // artwork. It is reserved for primary actions and active states; filled
+  // controls use the dark [onBrandAccent] foreground.
   static const brandAccent = Color(0xFFC1FF72);
   static const onBrandAccent = Color(0xFF17200D);
-  static const accentInk = _AdaptiveColor(Color(0xFF4D7317), Color(0xFFC1FF72));
+  static const accentInk = Color(0xFFC1FF72);
   static const slate = brandAccent;
   static const slateLight = brandAccent;
   static const slateDim = Color(0x33C1FF72);
   static const slateGlow = Color(0x55C1FF72);
-  static const accentPrimary = brandAccent;
+  static const accentPrimary = accentInk;
   static const accentPrimaryStrong = brandAccent;
-  // Compatibility aliases for older brand-colour call sites.
-  static const green = brandAccent;
-  static const greenLight = _AdaptiveColor(
-    Color(0xFFF2FFDF),
-    Color(0xFF1A2410),
-  );
-  static const greenDim = Color(0x33C1FF72);
-  static const greenGlow = Color(0x55C1FF72);
+  // Compatibility alias for older foreground/status call sites. Filled brand
+  // controls must use brandAccent/accentPrimaryStrong explicitly.
+  static const green = accentInk;
+  static const greenLight = Color(0xFF202B17);
+  static const greenDim = slateDim;
+  static const greenGlow = slateGlow;
 
   // Aliases so existing code doesn't break
-  static const violet = Color(0xFFB05884);
+  static const violet = Color(0xFFE58AB5);
   static const violetDim = Color(0x24B05884);
   static const violetGlow = Color(0x33B05884);
 
   // Semantic
-  static const statusSuccess = Color(0xFF5C8F25);
-  static const statusSuccessDim = _AdaptiveColor(
-    Color(0x295C8F25),
-    Color(0x385C8F25),
-  );
-  static const success = Color(0xFF5C8F25);
+  static const statusSuccess = Color(0xFFA8E85B);
+  static const statusSuccessDim = Color(0x385C8F25);
+  static const success = statusSuccess;
   static const successDim = statusSuccessDim;
-  static const warning = Color(0xFFA67300);
-  static const warningDim = _AdaptiveColor(
-    Color(0x24A67300),
-    Color(0x382B220D),
-  );
-  static const error = Color(0xFFC94A42);
-  static const errorDim = _AdaptiveColor(Color(0x24C94A42), Color(0x4D2C1210));
+  static const warning = Color(0xFFF2C56B);
+  static const warningDim = Color(0x38332A13);
+  static const error = Color(0xFFFF7A73);
+  static const errorDim = Color(0x4D351817);
 
   // Module colours.
-  static const modHome = Color(0xFF6F911C);
-  static const modClients = Color(0xFF17845F);
-  static const modCalendar = Color(0xFF0D79A0);
-  static const modFinance = Color(0xFF5D7F00);
-  static const modTasks = Color(0xFFB05884);
-  static const modNotes = Color(0xFF09789A);
+  static const modHome = accentInk;
+  static const modClients = accentInk;
+  static const modCalendar = Color(0xFF75C9B8);
+  static const modFinance = accentInk;
+  static const modTasks = Color(0xFFD19ABA);
+  static const modNotes = Color(0xFF83BDD3);
 
   // Module icon backgrounds.
-  static const modBg = _AdaptiveColor(Color(0xFFF2F5EE), Color(0xFF151A12));
+  static const modBg = Color(0xFF2C372D);
 
   // Hero/summary panels used for financial and high-trust information.
-  static const panelSoft = _AdaptiveColor(Color(0xFFF7FAF1), Color(0xFF10130E));
-  static const panelSoftRaised = _AdaptiveColor(
-    Color(0xFFE4ECD9),
-    Color(0xFF18220F),
-  );
-  static const panelInk = _AdaptiveColor(Color(0xFF11130F), Color(0xFFF7F8F3));
-  static const panelMuted = _AdaptiveColor(
-    Color(0x9911130F),
-    Color(0x99F7F8F3),
-  );
-  static const panelFaint = _AdaptiveColor(
-    Color(0x24D6DFCE),
-    Color(0x38313A2C),
-  );
+  static const panelSoft = Color(0xFF191F15);
+  static const panelSoftRaised = Color(0xFF242F1A);
+  // Foreground used whenever the exact brand neon is the background fill.
+  // This stays dark to preserve contrast on the neon fill.
+  static const panelInk = onBrandAccent;
+  static const panelMuted = Color(0xFFC3CCC2);
+  static const panelFaint = Color(0x38C1FF72);
 }
 
 @immutable
@@ -187,60 +128,32 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
     required this.skeletonHighlight,
   });
 
-  static const light = WorkloopThemeTokens(
-    background: Color(0xFFFFFFFF),
-    surface: Color(0xFFFFFFFF),
-    surfaceRaised: Color(0xFFF8F9F6),
-    surfaceSubtle: Color(0xFFF4F6F1),
-    divider: Color(0xFFE8EDE3),
-    dividerStrong: Color(0xFFD6DFCE),
-    textPrimary: Color(0xFF11130F),
-    textSecondary: Color(0xCC11130F),
-    textTertiary: Color(0x8C11130F),
-    textDisabled: Color(0x3D11130F),
-    accent: Color(0xFFC1FF72),
-    accentStrong: Color(0xFFC1FF72),
-    accentInk: Color(0xFF4D7317),
-    onAccent: Color(0xFF17200D),
-    success: Color(0xFF5C8F25),
-    successContainer: Color(0xFFEAF4DE),
-    warning: Color(0xFFA67300),
-    warningContainer: Color(0xFFFFF3D6),
-    error: Color(0xFFC94A42),
-    errorContainer: Color(0xFFFBEAE8),
-    info: Color(0xFF256C8A),
-    infoContainer: Color(0xFFE5F3F8),
-    scrim: Color(0x52000000),
-    skeletonBase: Color(0xFFE8EDE3),
-    skeletonHighlight: Color(0xFFF7F9F4),
-  );
-
   static const dark = WorkloopThemeTokens(
-    background: Color(0xFF050604),
-    surface: Color(0xFF090B08),
-    surfaceRaised: Color(0xFF10130E),
-    surfaceSubtle: Color(0xFF151A12),
-    divider: Color(0xFF20261D),
-    dividerStrong: Color(0xFF313A2C),
-    textPrimary: Color(0xFFF7F8F3),
-    textSecondary: Color(0xCCF7F8F3),
-    textTertiary: Color(0x8CF7F8F3),
-    textDisabled: Color(0x3DF7F8F3),
+    background: Color(0xFF151A16),
+    surface: Color(0xFF1C231D),
+    surfaceRaised: Color(0xFF252E26),
+    surfaceSubtle: Color(0xFF2C372D),
+    divider: Color(0xFF3E4B3F),
+    dividerStrong: Color(0xFF5E705F),
+    textPrimary: Color(0xFFF4F7F3),
+    textSecondary: Color(0xFFCDD5CC),
+    textTertiary: Color(0xFFA6B1A5),
+    textDisabled: Color(0xFF899588),
     accent: Color(0xFFC1FF72),
     accentStrong: Color(0xFFC1FF72),
     accentInk: Color(0xFFC1FF72),
     onAccent: Color(0xFF17200D),
-    success: Color(0xFF8CBF39),
-    successContainer: Color(0xFF18220F),
-    warning: Color(0xFFE2AC38),
-    warningContainer: Color(0xFF2B220D),
-    error: Color(0xFFFF6961),
-    errorContainer: Color(0xFF2C1210),
+    success: Color(0xFFA8E85B),
+    successContainer: Color(0xFF202B17),
+    warning: Color(0xFFF2C56B),
+    warningContainer: Color(0xFF332A13),
+    error: Color(0xFFFF7A73),
+    errorContainer: Color(0xFF351817),
     info: Color(0xFF72C7EA),
-    infoContainer: Color(0xFF10242C),
+    infoContainer: Color(0xFF162D36),
     scrim: Color(0xA6000000),
-    skeletonBase: Color(0xFF20261D),
-    skeletonHighlight: Color(0xFF313A2C),
+    skeletonBase: Color(0xFF3E4B3F),
+    skeletonHighlight: Color(0xFF5B6C5C),
   );
 
   @override
@@ -345,18 +258,20 @@ class AppSpacing {
   static const double lg = 20;
   static const double xl = 24;
   static const double xxl = 32;
-  static const double pageX = 24;
-  static const double pageTop = 60;
+  static const double pageX = 20;
+
+  /// Canonical content inset below the platform safe area.
+  static const double screenTop = lg;
   static const double minTouch = 44;
-  static const double bottomNavClearance = 118;
+  static const double bottomNavClearance = 104;
 }
 
 class AppRadius {
   static const double xs = 8;
   static const double sm = 12;
-  static const double md = 16;
-  static const double lg = 20;
-  static const double xl = 24;
+  static const double md = 14;
+  static const double lg = 18;
+  static const double xl = 22;
   static const double pill = 999;
 }
 
@@ -393,189 +308,21 @@ class AppShadows {
 }
 
 class AppTheme {
-  static ThemeData get dark => oledDark;
+  static const themeMode = ThemeMode.dark;
 
-  static ThemeData get light {
-    return ThemeData(
-      brightness: Brightness.light,
-      extensions: const [WorkloopThemeTokens.light],
-      scaffoldBackgroundColor: AppColors.bg,
-      pageTransitionsTheme: const PageTransitionsTheme(
-        builders: {
-          TargetPlatform.android: _SlatePageTransitionsBuilder(),
-          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-        },
-      ),
-      colorScheme: const ColorScheme.light(
-        primary: AppColors.brandAccent,
-        onPrimary: AppColors.onBrandAccent,
-        surface: AppColors.bgCard,
-        onSurface: AppColors.t1,
-        error: AppColors.error,
-      ),
-      textTheme: GoogleFonts.interTextTheme(
-        const TextTheme(
-          displayLarge: TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
-            height: 1.02,
-            color: AppColors.t1,
-          ),
-          displayMedium: TextStyle(
-            fontSize: 34,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
-            height: 1.04,
-            color: AppColors.t1,
-          ),
-          headlineLarge: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
-            height: 1.08,
-            color: AppColors.t1,
-          ),
-          headlineMedium: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-            height: 1.12,
-            color: AppColors.t1,
-          ),
-          titleLarge: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-            color: AppColors.t1,
-          ),
-          titleMedium: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: AppColors.t1,
-          ),
-          bodyLarge: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w400,
-            height: 1.38,
-            color: AppColors.t1,
-          ),
-          bodyMedium: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w400,
-            height: 1.36,
-            color: AppColors.t2,
-          ),
-          labelLarge: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppColors.t1,
-          ),
-          labelSmall: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-            color: AppColors.t3,
-          ),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.bgInteract,
-        hintStyle: const TextStyle(color: AppColors.t3),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(
-            color: AppColors.accentPrimary,
-            width: 1.5,
-          ),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 16,
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accentPrimaryStrong,
-          foregroundColor: AppColors.t1,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-        ),
-      ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: AppColors.bgCard,
-        modalBackgroundColor: AppColors.bgCard,
-        surfaceTintColor: Colors.transparent,
-        showDragHandle: true,
-        dragHandleColor: AppColors.borderStrong,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppRadius.xl),
-          ),
-        ),
-      ),
-      dialogTheme: DialogThemeData(
-        backgroundColor: AppColors.bgCard,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          side: const BorderSide(color: AppColors.border),
-        ),
-      ),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: AppColors.t1,
-        contentTextStyle: const TextStyle(
-          color: AppColors.bgCard,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-        behavior: SnackBarBehavior.floating,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-      ),
-      switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? AppColors.onBrandAccent
-              : AppColors.bgCard,
-        ),
-        trackColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? AppColors.brandAccent
-              : AppColors.borderStrong,
-        ),
-        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
-      ),
-      dividerColor: AppColors.border,
-      dividerTheme: const DividerThemeData(
-        color: AppColors.border,
-        thickness: 1,
-        space: 1,
-      ),
-    );
-  }
-
-  static ThemeData get oledDark {
+  static ThemeData get dark {
     const tokens = WorkloopThemeTokens.dark;
     return ThemeData(
+      useMaterial3: true,
+      fontFamily: 'Instrument Sans',
       brightness: Brightness.dark,
       extensions: const [tokens],
       scaffoldBackgroundColor: tokens.background,
+      focusColor: tokens.accent.withValues(alpha: 0.24),
+      highlightColor: tokens.accent.withValues(alpha: 0.12),
+      splashColor: tokens.accent.withValues(alpha: 0.14),
+      disabledColor: tokens.textDisabled,
+      iconTheme: IconThemeData(color: tokens.textSecondary, size: 20),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: _SlatePageTransitionsBuilder(),
@@ -586,78 +333,91 @@ class AppTheme {
       colorScheme: ColorScheme.dark(
         primary: tokens.accent,
         onPrimary: tokens.onAccent,
+        secondary: tokens.accent,
+        onSecondary: tokens.onAccent,
         surface: tokens.surface,
         onSurface: tokens.textPrimary,
         error: tokens.error,
       ),
-      textTheme: GoogleFonts.interTextTheme(
-        TextTheme(
-          displayLarge: TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
-            height: 1.02,
-            color: tokens.textPrimary,
-          ),
-          displayMedium: TextStyle(
-            fontSize: 34,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
-            height: 1.04,
-            color: tokens.textPrimary,
-          ),
-          headlineLarge: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
-            height: 1.08,
-            color: tokens.textPrimary,
-          ),
-          headlineMedium: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-            height: 1.12,
-            color: tokens.textPrimary,
-          ),
-          titleLarge: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-            color: tokens.textPrimary,
-          ),
-          titleMedium: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: tokens.textPrimary,
-          ),
-          bodyLarge: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w400,
-            height: 1.38,
-            color: tokens.textPrimary,
-          ),
-          bodyMedium: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w400,
-            height: 1.36,
-            color: tokens.textSecondary,
-          ),
-          labelLarge: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: tokens.textPrimary,
-          ),
-          labelSmall: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-            color: tokens.textTertiary,
-          ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        foregroundColor: tokens.textPrimary,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+      ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: tokens.accentInk,
+        selectionColor: tokens.accent.withValues(alpha: 0.42),
+        selectionHandleColor: tokens.accentInk,
+      ),
+      textTheme: TextTheme(
+        displayLarge: TextStyle(
+          fontSize: 40,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.8,
+          height: 1.05,
+          color: tokens.textPrimary,
+        ),
+        displayMedium: TextStyle(
+          fontSize: 32,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.45,
+          height: 1.06,
+          color: tokens.textPrimary,
+        ),
+        headlineLarge: TextStyle(
+          fontSize: 26,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.25,
+          height: 1.1,
+          color: tokens.textPrimary,
+        ),
+        headlineMedium: TextStyle(
+          fontSize: 21,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+          height: 1.12,
+          color: tokens.textPrimary,
+        ),
+        titleLarge: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: tokens.textPrimary,
+        ),
+        titleMedium: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: tokens.textPrimary,
+        ),
+        bodyLarge: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+          height: 1.38,
+          color: tokens.textPrimary,
+        ),
+        bodyMedium: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          height: 1.36,
+          color: tokens.textSecondary,
+        ),
+        labelLarge: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: tokens.textPrimary,
+        ),
+        labelSmall: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+          color: tokens.textTertiary,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: tokens.surfaceSubtle,
+        fillColor: tokens.surface,
         hintStyle: TextStyle(color: tokens.textTertiary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
@@ -669,7 +429,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: tokens.accent, width: 1.5),
+          borderSide: BorderSide(color: tokens.accentInk, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
@@ -679,13 +439,91 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: tokens.accentStrong,
-          foregroundColor: const Color(0xFF11130F),
+          foregroundColor: tokens.onAccent,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(
+            fontFamily: 'Instrument Sans',
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: tokens.accentStrong,
+          foregroundColor: tokens.onAccent,
+          minimumSize: const Size(44, 44),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          textStyle: const TextStyle(
+            fontFamily: 'Instrument Sans',
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: tokens.accentInk,
+          minimumSize: const Size(44, 44),
+          textStyle: const TextStyle(
+            fontFamily: 'Instrument Sans',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: tokens.textPrimary,
+          minimumSize: const Size(44, 44),
+          side: BorderSide(color: tokens.dividerStrong),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          textStyle: const TextStyle(
+            fontFamily: 'Instrument Sans',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: tokens.accentStrong,
+        foregroundColor: tokens.onAccent,
+        elevation: 0,
+        focusElevation: 0,
+        hoverElevation: 0,
+        highlightElevation: 0,
+        shape: const CircleBorder(),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? tokens.accentStrong
+              : Colors.transparent,
+        ),
+        checkColor: WidgetStatePropertyAll(tokens.onAccent),
+        side: BorderSide(color: tokens.dividerStrong, width: 1.5),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.xs / 2),
+        ),
+      ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? tokens.accentInk
+              : tokens.textTertiary,
+        ),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: tokens.accentInk,
+        linearTrackColor: tokens.surfaceSubtle,
+        circularTrackColor: tokens.surfaceSubtle,
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: tokens.surfaceRaised,
@@ -713,7 +551,7 @@ class AppTheme {
         contentTextStyle: TextStyle(
           color: tokens.background,
           fontSize: 14,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
         ),
         behavior: SnackBarBehavior.floating,
         elevation: 0,
@@ -755,6 +593,9 @@ class _SlatePageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
+    if (MediaQuery.maybeOf(context)?.disableAnimations == true) {
+      return child;
+    }
     final curved = CurvedAnimation(
       parent: animation,
       curve: AppMotion.curve,

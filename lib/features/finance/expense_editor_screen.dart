@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
@@ -223,32 +223,16 @@ class _ExpenseEditorScreenState extends ConsumerState<ExpenseEditorScreen> {
                       AppSpacing.pageX,
                       0,
                     ),
-                    child: Row(
-                      children: [
-                        WorkloopIconButton(
-                          icon: LucideIcons.chevronLeft,
-                          semanticLabel: 'Back to Money',
-                          onTap: _handleBack,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            _editing ? 'Edit expense' : 'Add expense',
-                            style: const TextStyle(
-                              color: AppColors.t1,
-                              fontSize: 26,
-                              height: 1.05,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        MoneySaveAction(
-                          label: _editing ? 'Save' : 'Add',
-                          loading: _saving,
-                          enabled: _canSave,
-                          onTap: _save,
-                        ),
-                      ],
+                    child: WorkloopRouteHeader(
+                      title: _editing ? 'Edit expense' : 'Add expense',
+                      backSemanticLabel: 'Back to Money',
+                      onBack: _handleBack,
+                      trailing: MoneySaveAction(
+                        label: _editing ? 'Save' : 'Add',
+                        loading: _saving,
+                        enabled: _canSave,
+                        onTap: _save,
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xl),

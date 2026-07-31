@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'repository_pagination.dart';
 import 'supabase_client_provider.dart';
 
 final servicesRepositoryProvider = Provider<ServicesRepository>((ref) {
@@ -12,12 +13,18 @@ class ServicesRepository {
   const ServicesRepository(this._client);
 
   Future<List<Map<String, dynamic>>> listRows(String workspaceId) async {
-    final rows = await _client
-        .from('services')
-        .select()
-        .eq('workspace_id', workspaceId)
-        .order('name', ascending: true);
-    return List<Map<String, dynamic>>.from(rows);
+    return fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('services')
+            .select()
+            .eq('workspace_id', workspaceId)
+            .order('name', ascending: true)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
   }
 
   Future<void> create({

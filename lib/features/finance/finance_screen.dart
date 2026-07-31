@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/providers/clients_provider.dart';
@@ -10,6 +10,7 @@ import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/currency_format.dart';
 import '../../shared/widgets/slate_ui.dart';
 import 'add_payment_screen.dart';
 import 'expense_editor_screen.dart';
@@ -80,7 +81,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     _didApplyInitialFocus = true;
     Scrollable.ensureVisible(
       targetContext,
-      duration: AppMotion.standard,
+      duration: AppMotion.responsive(context, AppMotion.standard),
       curve: AppMotion.curve,
       alignment: 0.08,
     );
@@ -90,7 +91,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   Widget build(BuildContext context) {
     final invoices = ref.watch(invoicesProvider);
     final expenses = ref.watch(expensesProvider);
-    final summary = ref.watch(financeSummaryProvider);
+    final settings = ref.watch(workspaceSettingsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -98,6 +99,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
           SafeArea(
+            bottom: false,
             child: RefreshIndicator(
               onRefresh: () async {
                 SlateHaptics.action();
@@ -108,38 +110,23 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 controller: _scrollController,
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.pageX,
-                  AppSpacing.lg,
+                  AppSpacing.screenTop,
                   AppSpacing.pageX,
-                  110,
+                  AppSpacing.bottomNavClearance,
                 ),
                 children: [
                   WorkloopPageHeader(
-                    icon: LucideIcons.banknote,
                     title: 'Money',
-                    subtitle: 'What you have made, spent, and are owed.',
+                    subtitle:
+                        'Know what came in, went out, and needs following up.',
                     color: AppColors.modFinance,
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        WorkloopIconButton(
-                          icon: LucideIcons.plus,
-                          semanticLabel: 'Record income',
-                          color: AppColors.t2,
-                          backgroundColor: AppColors.t1.withValues(alpha: 0.04),
-                          onTap: () => _recordPayment(context),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        WorkloopIconButton(
-                          icon: LucideIcons.minus,
-                          semanticLabel: 'Add outgoing',
-                          color: AppColors.t2,
-                          backgroundColor: AppColors.t1.withValues(alpha: 0.04),
-                          onTap: () => _showExpenseSheet(context),
-                        ),
-                      ],
+                    trailing: WorkloopTopAction(
+                      label: 'Record',
+                      semanticLabel: 'Add money',
+                      onTap: () => _showMoneyCreateSheet(context),
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.xl),
                   WorkloopNavigationControl<MoneySection>(
                     selected: _section,
                     segments: const [
@@ -154,36 +141,16 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     onChanged: (section) => setState(() => _section = section),
                   ),
                   const SizedBox(height: AppSpacing.xl),
-                  invoices.when(
-                    loading: () =>
-                        const SlateLoadingBlock(height: 360, radius: 18),
-                    error: (_, __) =>
-                        const SlateErrorState(message: 'Could not load income'),
-                    data: (payments) => expenses.when(
-                      loading: () =>
-                          const SlateLoadingBlock(height: 360, radius: 18),
-                      error: (_, __) => const SlateErrorState(
-                        message: 'Could not load outgoing',
-                      ),
-                      data: (expenseRows) => summary.when(
-                        loading: () =>
-                            const SlateLoadingBlock(height: 360, radius: 18),
-                        error: (_, __) => const SlateErrorState(
-                          message: 'Could not load Money',
-                        ),
-                        data: (financeSummary) => AnimatedSwitcher(
-                          duration: AppMotion.standard,
-                          switchInCurve: AppMotion.curve,
-                          switchOutCurve: AppMotion.curve,
-                          child: KeyedSubtree(
-                            key: ValueKey(_section),
-                            child: _buildMoneySection(
-                              payments: payments,
-                              expenses: expenseRows,
-                              summary: financeSummary,
-                            ),
-                          ),
-                        ),
+                  AnimatedSwitcher(
+                    duration: AppMotion.responsive(context, AppMotion.standard),
+                    switchInCurve: AppMotion.curve,
+                    switchOutCurve: AppMotion.curve,
+                    child: KeyedSubtree(
+                      key: ValueKey(_section),
+                      child: _buildMoneySection(
+                        invoices: invoices,
+                        expenses: expenses,
+                        settings: settings,
                       ),
                     ),
                   ),
@@ -197,29 +164,53 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   }
 
   Widget _buildMoneySection({
-    required List<Payment> payments,
-    required List<Expense> expenses,
-    required FinanceSummary summary,
+    required AsyncValue<List<Payment>> invoices,
+    required AsyncValue<List<Expense>> expenses,
+    required AsyncValue<Map<String, dynamic>?> settings,
   }) {
     final range = _selectedRange();
-    final periodSummary = PeriodMoneySummary.from(
-      payments: payments,
-      expenses: expenses,
-      range: range,
-    );
     return switch (_section) {
-      MoneySection.made => _incomeSection(
-        payments: payments,
-        summary: summary,
-        range: range,
-        periodSummary: periodSummary,
+      MoneySection.made => invoices.when(
+        loading: () => const SlateLoadingBlock(height: 360, radius: 18),
+        error: (_, _) => SlateErrorState(
+          message: 'Could not load income',
+          onRetry: () => ref.invalidate(invoicesProvider),
+        ),
+        data: (payments) => _incomeSection(
+          payments: payments,
+          settings: settings,
+          range: range,
+          periodSummary: PeriodMoneySummary.from(
+            payments: payments,
+            expenses: const [],
+            range: range,
+          ),
+        ),
       ),
-      MoneySection.spent => _outgoingSection(
-        expenses: expenses,
-        range: range,
-        periodSummary: periodSummary,
+      MoneySection.spent => expenses.when(
+        loading: () => const SlateLoadingBlock(height: 360, radius: 18),
+        error: (_, _) => SlateErrorState(
+          message: 'Could not load expenses',
+          onRetry: () => ref.invalidate(expensesProvider),
+        ),
+        data: (expenseRows) => _outgoingSection(
+          expenses: expenseRows,
+          range: range,
+          periodSummary: PeriodMoneySummary.from(
+            payments: const [],
+            expenses: expenseRows,
+            range: range,
+          ),
+        ),
       ),
-      MoneySection.owed => _owedSection(payments),
+      MoneySection.owed => invoices.when(
+        loading: () => const SlateLoadingBlock(height: 360, radius: 18),
+        error: (_, _) => SlateErrorState(
+          message: 'Could not load payments owed',
+          onRetry: () => ref.invalidate(invoicesProvider),
+        ),
+        data: _owedSection,
+      ),
     };
   }
 
@@ -239,7 +230,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 
   Widget _incomeSection({
     required List<Payment> payments,
-    required FinanceSummary summary,
+    required AsyncValue<Map<String, dynamic>?> settings,
     required MoneyPeriodRange range,
     required PeriodMoneySummary periodSummary,
   }) {
@@ -262,15 +253,27 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         ),
         if (_period != FinancePeriod.custom) ...[
           const SizedBox(height: AppSpacing.xxl),
-          _IncomeTargetProgress(
-            label: _period == FinancePeriod.month
-                ? 'Monthly target'
-                : 'Weekly target',
-            made: periodSummary.paid,
-            target: _period == FinancePeriod.month
-                ? summary.monthlyTarget
-                : summary.weeklyTarget,
-            onEditTarget: () => _showTargetSheet(context, summary),
+          settings.when(
+            loading: () =>
+                const SlateLoadingBlock(height: 112, radius: AppRadius.md),
+            error: (_, _) => SlateErrorState(
+              message: 'Could not load your Money target',
+              onRetry: () => ref.invalidate(workspaceSettingsProvider),
+            ),
+            data: (values) {
+              final monthlyTarget =
+                  (values?['revenue_target'] as num?)?.toDouble() ?? 0;
+              return _IncomeTargetProgress(
+                label: _period == FinancePeriod.month
+                    ? 'Monthly target'
+                    : 'Weekly target',
+                made: periodSummary.paid,
+                target: _period == FinancePeriod.month
+                    ? monthlyTarget
+                    : monthlyTarget / 4.345,
+                onEditTarget: () => _showTargetSheet(context, monthlyTarget),
+              );
+            },
           ),
         ],
         const SizedBox(height: AppSpacing.xxl),
@@ -402,6 +405,60 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     _refreshMoney();
   }
 
+  Future<void> _showMoneyCreateSheet(BuildContext context) async {
+    final action = await showModalBottomSheet<_MoneyCreateAction>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: SlateTheme.of(context).scrim,
+      builder: (sheetContext) => SlateSheetFrame(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Add to Money',
+              style: TextStyle(
+                color: AppColors.t1,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                height: 1.1,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            const Text(
+              'Choose what you want to record.',
+              style: TextStyle(color: AppColors.t3, fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _MoneyCreateChoice(
+              icon: LucideIcons.banknote,
+              label: 'Record income',
+              description: 'Money received or waiting to be paid.',
+              onTap: () =>
+                  Navigator.pop(sheetContext, _MoneyCreateAction.income),
+            ),
+            _MoneyCreateChoice(
+              icon: LucideIcons.receipt,
+              label: 'Add expense',
+              description: 'Money spent by the business.',
+              showDivider: false,
+              onTap: () =>
+                  Navigator.pop(sheetContext, _MoneyCreateAction.expense),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!context.mounted || action == null) return;
+    switch (action) {
+      case _MoneyCreateAction.income:
+        await _recordPayment(context);
+      case _MoneyCreateAction.expense:
+        await _showExpenseSheet(context);
+    }
+  }
+
   void _refreshMoney() {
     ref.invalidate(invoicesProvider);
     ref.invalidate(expensesProvider);
@@ -489,7 +546,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                   'Custom period',
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.t1,
                   ),
                 ),
@@ -534,16 +591,13 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     );
   }
 
-  void _showTargetSheet(BuildContext context, FinanceSummary summary) {
+  void _showTargetSheet(BuildContext context, double monthlyTarget) {
     final monthlyController = TextEditingController(
-      text: summary.monthlyTarget > 0
-          ? summary.monthlyTarget.toStringAsFixed(0)
-          : '',
+      text: monthlyTarget > 0 ? currencyInputValue(monthlyTarget) : '',
     );
+    final weeklyTarget = monthlyTarget / 4.345;
     final weeklyController = TextEditingController(
-      text: summary.weeklyTarget > 0
-          ? summary.weeklyTarget.toStringAsFixed(0)
-          : '',
+      text: weeklyTarget > 0 ? currencyInputValue(weeklyTarget) : '',
     );
     var mode = 'monthly';
     var saving = false;
@@ -602,7 +656,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     'Money target',
                     style: TextStyle(
                       fontSize: 20,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.t1,
                     ),
                   ),
@@ -623,7 +677,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     style: const TextStyle(
                       color: AppColors.t1,
                       fontSize: 28,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w600,
                     ),
                     decoration: InputDecoration(
                       prefixText: '£ ',
@@ -669,49 +723,95 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     _refreshMoney();
   }
 
-  void _confirmDeleteExpense(BuildContext context, Expense expense) {
-    showModalBottomSheet(
+  Future<bool> _confirmDeleteExpense(
+    BuildContext context,
+    Expense expense,
+  ) async {
+    var deleting = false;
+    String? errorMessage;
+    final deleted = await showModalBottomSheet<bool>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => SlateSheetFrame(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Delete expense?',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.t1,
-              ),
+      isDismissible: false,
+      enableDrag: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => PopScope(
+          canPop: !deleting,
+          child: SlateSheetFrame(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Delete expense?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.t1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${expense.category} · ${formatPounds(expense.amount)}',
+                  style: const TextStyle(fontSize: 14, color: AppColors.t3),
+                  textAlign: TextAlign.center,
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                SlateButton(
+                  label: deleting ? 'Deleting...' : 'Delete Expense',
+                  destructive: true,
+                  onPressed: deleting
+                      ? null
+                      : () async {
+                          setSheetState(() {
+                            deleting = true;
+                            errorMessage = null;
+                          });
+                          try {
+                            await ref
+                                .read(expensesRepositoryProvider)
+                                .delete(expense.id);
+                            _refreshMoney();
+                            if (ctx.mounted) Navigator.pop(ctx, true);
+                          } catch (_) {
+                            if (!ctx.mounted) return;
+                            setSheetState(() {
+                              deleting = false;
+                              errorMessage =
+                                  'Could not confirm this deletion. The expense remains visible; check your connection and try again.';
+                            });
+                          }
+                        },
+                ),
+                const SizedBox(height: 10),
+                SlateButton(
+                  label: 'Cancel',
+                  secondary: true,
+                  onPressed: deleting ? null : () => Navigator.pop(ctx, false),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              '${expense.category} · £${expense.amount.toStringAsFixed(0)}',
-              style: const TextStyle(fontSize: 14, color: AppColors.t3),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            SlateButton(
-              label: 'Delete Expense',
-              destructive: true,
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await ref.read(expensesRepositoryProvider).delete(expense.id);
-                _refreshMoney();
-              },
-            ),
-            const SizedBox(height: 10),
-            SlateButton(
-              label: 'Cancel',
-              secondary: true,
-              onPressed: () => Navigator.pop(ctx),
-            ),
-          ],
+          ),
         ),
       ),
     );
+    return deleted ?? false;
   }
 
   void _showPaymentActionsSheet(BuildContext context, Payment payment) {
@@ -722,139 +822,188 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         payment.status == 'sent' ||
         payment.status == 'pending' ||
         payment.status == 'overdue';
+    var updating = false;
+    String? errorMessage;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => SlateSheetFrame(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(ctx).height * 0.76,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => PopScope(
+          canPop: !updating,
+          child: SlateSheetFrame(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(ctx).height * 0.76,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      payment.status == 'paid'
-                          ? 'Income received'
-                          : 'To collect',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.t3,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      '£${amount.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.t1,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      clientName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.t1,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      _paymentTiming(payment),
-                      style: const TextStyle(fontSize: 13, color: AppColors.t3),
-                    ),
-                    if (description.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        description,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.t3,
-                        ),
-                      ),
-                    ],
-                    if (payment.appointmentId != null) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      const Row(
-                        children: [
-                          Icon(
-                            LucideIcons.calendarCheck,
-                            size: 14,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          payment.status == 'paid'
+                              ? 'Income received'
+                              : 'To collect',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                             color: AppColors.t3,
                           ),
-                          SizedBox(width: 6),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          formatPounds(amount),
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.t1,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          clientName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.t1,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          _paymentTiming(payment),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.t3,
+                          ),
+                        ),
+                        if (description.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.xs),
                           Text(
-                            'Linked to booking',
-                            style: TextStyle(
+                            description,
+                            style: const TextStyle(
+                              fontSize: 13,
                               color: AppColors.t3,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
+                        if (payment.appointmentId != null) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          const Row(
+                            children: [
+                              Icon(
+                                LucideIcons.calendarCheck,
+                                size: 14,
+                                color: AppColors.t3,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Linked to booking',
+                                style: TextStyle(
+                                  color: AppColors.t3,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    if (errorMessage != null) ...[
+                      Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.error,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
+                      const SizedBox(height: AppSpacing.md),
                     ],
+                    if (canMarkPaid) ...[
+                      SlateButton(
+                        label: updating ? 'Updating...' : 'Mark as Received',
+                        icon: LucideIcons.checkCircle,
+                        onPressed: updating
+                            ? null
+                            : () async {
+                                setSheetState(() {
+                                  updating = true;
+                                  errorMessage = null;
+                                });
+                                try {
+                                  await _markPaymentPaid(context, payment);
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                } catch (_) {
+                                  if (!ctx.mounted) return;
+                                  setSheetState(() {
+                                    updating = false;
+                                    errorMessage =
+                                        'Could not mark this payment as received. Nothing visible has changed; check your connection and try again.';
+                                  });
+                                }
+                              },
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    SlateButton(
+                      label: 'Edit income',
+                      icon: LucideIcons.pencil,
+                      secondary: true,
+                      onPressed: updating
+                          ? null
+                          : () {
+                              Navigator.pop(ctx);
+                              WidgetsBinding.instance.addPostFrameCallback((
+                                _,
+                              ) async {
+                                if (!context.mounted) return;
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        AddPaymentScreen(payment: payment),
+                                  ),
+                                );
+                                _refreshPayment(payment);
+                              });
+                            },
+                    ),
+                    const SizedBox(height: 10),
+                    SlateButton(
+                      label: 'Delete income',
+                      icon: LucideIcons.trash2,
+                      destructive: true,
+                      onPressed: updating
+                          ? null
+                          : () {
+                              Navigator.pop(ctx);
+                              _confirmDeletePayment(context, payment);
+                            },
+                    ),
+                    const SizedBox(height: 10),
+                    SlateButton(
+                      label: 'Close',
+                      secondary: true,
+                      onPressed: updating ? null : () => Navigator.pop(ctx),
+                    ),
+                    const SizedBox(height: 2),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.xl),
-                if (canMarkPaid) ...[
-                  SlateButton(
-                    label: 'Mark as Received',
-                    icon: LucideIcons.checkCircle,
-                    onPressed: () async {
-                      Navigator.pop(ctx);
-                      await _markPaymentPaid(context, payment);
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                SlateButton(
-                  label: 'Edit income',
-                  icon: LucideIcons.pencil,
-                  secondary: true,
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    WidgetsBinding.instance.addPostFrameCallback((_) async {
-                      if (!context.mounted) return;
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => AddPaymentScreen(payment: payment),
-                        ),
-                      );
-                      _refreshPayment(payment);
-                    });
-                  },
-                ),
-                const SizedBox(height: 10),
-                SlateButton(
-                  label: 'Delete income',
-                  icon: LucideIcons.trash2,
-                  destructive: true,
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _confirmDeletePayment(context, payment);
-                  },
-                ),
-                const SizedBox(height: 10),
-                SlateButton(
-                  label: 'Close',
-                  secondary: true,
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-                const SizedBox(height: 2),
-              ],
+              ),
             ),
           ),
         ),
@@ -865,16 +1014,21 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   Future<void> _markPaymentPaid(BuildContext context, Payment payment) async {
     final amount = payment.total;
     await ref.read(paymentsRepositoryProvider).markPaid(payment);
-    await ref
-        .read(notificationsRepositoryProvider)
-        .create(
-          workspaceId: payment.workspaceId,
-          type: 'payment_received',
-          title: 'Payment received',
-          body:
-              '£${amount.toStringAsFixed(0)} from ${payment.clientName ?? 'a client'} is now paid.',
-          deepLink: '/payments',
-        );
+    try {
+      await ref
+          .read(notificationsRepositoryProvider)
+          .create(
+            workspaceId: payment.workspaceId,
+            type: 'payment_received',
+            title: 'Payment received',
+            body:
+                '${formatPounds(amount)} from ${payment.clientName ?? 'a client'} is now paid.',
+            deepLink: '/payments',
+          );
+    } catch (_) {
+      // The confirmed payment update remains successful even if the optional
+      // notification feed is temporarily unavailable.
+    }
     _refreshPayment(payment);
     ref.invalidate(notificationsProvider);
     ref.invalidate(unreadNotificationsProvider);
@@ -882,10 +1036,10 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '£${amount.toStringAsFixed(0)} marked as received',
+            '${formatPounds(amount)} marked as received',
             style: const TextStyle(color: AppColors.onBrandAccent),
           ),
-          backgroundColor: AppColors.green,
+          backgroundColor: AppColors.brandAccent,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -895,52 +1049,98 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     }
   }
 
-  void _confirmDeletePayment(BuildContext context, Payment payment) {
+  Future<bool> _confirmDeletePayment(
+    BuildContext context,
+    Payment payment,
+  ) async {
     final clientName = payment.clientName ?? 'Unknown';
     final amount = payment.total;
+    var deleting = false;
+    String? errorMessage;
 
-    showModalBottomSheet(
+    final deleted = await showModalBottomSheet<bool>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => SlateSheetFrame(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Delete income entry?',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.t1,
-              ),
+      isDismissible: false,
+      enableDrag: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => PopScope(
+          canPop: !deleting,
+          child: SlateSheetFrame(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Delete income entry?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.t1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$clientName · ${formatPounds(amount)}',
+                  style: const TextStyle(fontSize: 14, color: AppColors.t3),
+                  textAlign: TextAlign.center,
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                SlateButton(
+                  label: deleting ? 'Deleting...' : 'Delete income',
+                  destructive: true,
+                  onPressed: deleting
+                      ? null
+                      : () async {
+                          setSheetState(() {
+                            deleting = true;
+                            errorMessage = null;
+                          });
+                          try {
+                            await ref
+                                .read(paymentsRepositoryProvider)
+                                .delete(payment.id);
+                            _refreshPayment(payment);
+                            if (ctx.mounted) Navigator.pop(ctx, true);
+                          } catch (_) {
+                            if (!ctx.mounted) return;
+                            setSheetState(() {
+                              deleting = false;
+                              errorMessage =
+                                  'Could not confirm this deletion. The income entry remains visible; check your connection and try again.';
+                            });
+                          }
+                        },
+                ),
+                const SizedBox(height: 10),
+                SlateButton(
+                  label: 'Cancel',
+                  secondary: true,
+                  onPressed: deleting ? null : () => Navigator.pop(ctx, false),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              '$clientName · £${amount.toStringAsFixed(0)}',
-              style: const TextStyle(fontSize: 14, color: AppColors.t3),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            SlateButton(
-              label: 'Delete income',
-              destructive: true,
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await ref.read(paymentsRepositoryProvider).delete(payment.id);
-                _refreshPayment(payment);
-              },
-            ),
-            const SizedBox(height: 10),
-            SlateButton(
-              label: 'Cancel',
-              secondary: true,
-              onPressed: () => Navigator.pop(ctx),
-            ),
-          ],
+          ),
         ),
       ),
     );
+    return deleted ?? false;
   }
 
   String _paymentTiming(Payment payment) {
@@ -977,5 +1177,62 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       'Dec',
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+}
+
+enum _MoneyCreateAction { income, expense }
+
+class _MoneyCreateChoice extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String description;
+  final VoidCallback onTap;
+  final bool showDivider;
+
+  const _MoneyCreateChoice({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.onTap,
+    this.showDivider = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    return WorkloopListRow(
+      leading: Container(
+        width: AppSpacing.minTouch,
+        height: AppSpacing.minTouch,
+        decoration: BoxDecoration(
+          color: tokens.surfaceSubtle,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Icon(icon, color: tokens.accentInk, size: 19),
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: tokens.textPrimary,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      subtitle: Text(
+        description,
+        style: TextStyle(
+          color: tokens.textSecondary,
+          fontSize: 13,
+          height: 1.35,
+        ),
+      ),
+      trailing: Icon(
+        LucideIcons.chevronRight,
+        color: tokens.textTertiary,
+        size: 18,
+      ),
+      showDivider: showDivider,
+      onTap: onTap,
+    );
   }
 }

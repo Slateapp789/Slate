@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/appointments_provider.dart';
 import '../../shared/providers/clients_provider.dart';
@@ -13,8 +13,11 @@ import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/currency_format.dart';
 import '../../shared/utils/maps_launcher.dart';
+import '../../shared/utils/workflow_idempotency.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../clients/client_detail_screen.dart';
 import '../clients/widgets/client_form.dart';
 import '../finance/add_payment_screen.dart';
 import 'widgets/appointment_detail_widgets.dart';
@@ -77,7 +80,10 @@ class _BookingDetailAction extends StatelessWidget {
         onTap: loading ? null : onTap,
         borderRadius: BorderRadius.circular(AppRadius.pill),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 58, minHeight: 42),
+          constraints: const BoxConstraints(
+            minWidth: 58,
+            minHeight: AppSpacing.minTouch,
+          ),
           child: Center(
             child: loading
                 ? const SizedBox(
@@ -93,7 +99,7 @@ class _BookingDetailAction extends StatelessWidget {
                     style: TextStyle(
                       color: primary ? AppColors.accentPrimary : AppColors.t2,
                       fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
           ),
@@ -124,7 +130,9 @@ class _AppointmentDetailScreenState
   bool _notesExpanded = false;
   bool _paymentExpanded = false;
   bool _tasksExpanded = false;
+  bool _openingClient = false;
   bool _allowPop = false;
+  final String _completionIdempotencyKey = createWorkflowIdempotencyKey();
   late _BookingEditDraft _savedEditDraft;
 
   @override
@@ -259,6 +267,40 @@ class _AppointmentDetailScreenState
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
+  Future<void> _openLinkedClient() async {
+    final clientId = _appt['contact_id'] as String?;
+    if (clientId == null || _openingClient) return;
+    setState(() => _openingClient = true);
+    try {
+      final repository = ref.read(clientsRepositoryProvider);
+      final client = await repository.getById(clientId);
+      if (!mounted) return;
+      if (client == null) {
+        _snack('This client is no longer available.');
+        return;
+      }
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ClientDetailScreen(client: client.toMap()),
+        ),
+      );
+      if (!mounted) return;
+      ref.invalidate(clientsProvider);
+      final refreshedClient = await repository.getById(clientId);
+      if (!mounted || refreshedClient == null) return;
+      setState(() => _appt['contacts'] = refreshedClient.toMap());
+    } catch (_) {
+      if (mounted) {
+        _snack(
+          'Could not open this client. Check your connection and try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _openingClient = false);
+    }
+  }
+
   Future<bool> _updateStatus(String status, {String? cancelReason}) async {
     setState(() => _loading = true);
     try {
@@ -303,49 +345,7 @@ class _AppointmentDetailScreenState
 
   Future<void> _completeWithPayment(String paymentMode) async {
     Navigator.pop(context);
-    final completed = await _updateStatus('completed');
-    if (!completed) return;
-    if (paymentMode == 'skip') return;
-
-    final workspaceId = await ref.read(workspaceIdProvider.future);
-    if (workspaceId == null) return;
-    final amount = (_appt['price'] as num?)?.toDouble() ?? 0;
-    if (amount <= 0) return;
-
-    final serviceName =
-        _appt['services']?['name'] as String? ??
-        _appt['title'] as String? ??
-        'Booking';
-    final startTime =
-        DateTime.tryParse(_appt['start_time'] as String? ?? '') ??
-        DateTime.now().toUtc();
-    final status = paymentMode == 'paid' ? 'paid' : 'sent';
-
-    await ref
-        .read(paymentsRepositoryProvider)
-        .create(
-          workspaceId: workspaceId,
-          amount: amount,
-          status: status,
-          date: startTime,
-          dueDate: startTime,
-          contactId: _appt['contact_id'] as String?,
-          appointmentId: _appt['id'] as String,
-          notes: paymentMode == 'paid'
-              ? 'Payment received for $serviceName'
-              : 'Payment due for $serviceName',
-        );
-    await ref
-        .read(notificationsRepositoryProvider)
-        .create(
-          workspaceId: workspaceId,
-          type: status == 'paid' ? 'payment_received' : 'invoice_overdue',
-          title: status == 'paid' ? 'Payment recorded' : 'Payment pending',
-          body:
-              '£${amount.toStringAsFixed(0)} ${status == 'paid' ? 'was recorded' : 'is outstanding'} for $serviceName.',
-          deepLink: '/payments',
-        );
-    _refreshPaymentState();
+    await _runCompletionWorkflow(paymentMode: paymentMode);
   }
 
   Future<void> _completeWithLinkedPayment({
@@ -353,34 +353,88 @@ class _AppointmentDetailScreenState
     bool markPaid = false,
   }) async {
     Navigator.pop(context);
-    final completed = await _updateStatus('completed');
-    if (!completed) return;
-    if (payment != null && markPaid) {
-      await _markLinkedPaymentPaid(payment);
+    await _runCompletionWorkflow(
+      paymentMode: markPaid ? 'linked_paid' : 'linked_unpaid',
+      linkedPayment: payment,
+    );
+  }
+
+  Future<bool> _runCompletionWorkflow({
+    required String paymentMode,
+    Payment? linkedPayment,
+  }) async {
+    setState(() => _loading = true);
+    try {
+      final workspaceId = await ref.read(workspaceIdProvider.future);
+      if (workspaceId == null) {
+        throw StateError('No active workspace.');
+      }
+      final startTime =
+          DateTime.tryParse(_appt['start_time'] as String? ?? '') ??
+          DateTime.now();
+      await ref
+          .read(appointmentsRepositoryProvider)
+          .completeBookingWorkflow(
+            workspaceId: workspaceId,
+            appointmentId: _appt['id'] as String,
+            idempotencyKey: _completionIdempotencyKey,
+            paymentMode: paymentMode,
+            linkedPaymentId: linkedPayment?.id,
+            paymentDate: startTime.toLocal(),
+          );
+      if (!mounted) return true;
+      setState(() {
+        _appt['status'] = 'completed';
+        _loading = false;
+      });
+      ref.invalidate(appointmentsProvider);
+      _refreshPaymentState();
+      if (paymentMode == 'linked_paid' && linkedPayment != null) {
+        _snack('${formatPounds(linkedPayment.total)} marked as received');
+      }
+      return true;
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loading = false);
+        _snack('The booking could not be completed. Please try again.');
+      }
+      return false;
     }
   }
 
   Future<void> _markLinkedPaymentPaid(Payment payment) async {
-    await ref.read(paymentsRepositoryProvider).markPaid(payment);
-    await ref
-        .read(notificationsRepositoryProvider)
-        .create(
-          workspaceId: payment.workspaceId,
-          type: 'payment_received',
-          title: 'Payment received',
-          body:
-              '£${payment.total.toStringAsFixed(0)} from ${payment.clientName ?? 'a client'} is now paid.',
-          deepLink: '/payments',
-        );
+    try {
+      await ref.read(paymentsRepositoryProvider).markPaid(payment);
+    } catch (_) {
+      if (mounted) {
+        _snack('The payment could not be updated. Please try again.');
+      }
+      return;
+    }
+    try {
+      await ref
+          .read(notificationsRepositoryProvider)
+          .create(
+            workspaceId: payment.workspaceId,
+            type: 'payment_received',
+            title: 'Payment received',
+            body:
+                '${formatPounds(payment.total)} from ${payment.clientName ?? 'a client'} is now paid.',
+            deepLink: '/payments',
+          );
+    } catch (_) {
+      // The confirmed payment remains the source of truth. Notification
+      // delivery is best-effort and must not leave the booking visibly stale.
+    }
     _refreshPaymentState();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '£${payment.total.toStringAsFixed(0)} marked as received',
+            '${formatPounds(payment.total)} marked as received',
             style: const TextStyle(color: AppColors.onBrandAccent),
           ),
-          backgroundColor: AppColors.green,
+          backgroundColor: AppColors.brandAccent,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -422,7 +476,7 @@ class _AppointmentDetailScreenState
               'Complete booking',
               style: TextStyle(
                 fontSize: 20,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w600,
                 color: AppColors.t1,
               ),
             ),
@@ -433,7 +487,7 @@ class _AppointmentDetailScreenState
                   : hasPaidLinkedPayment
                   ? 'This booking already has a paid Money item linked.'
                   : amount > 0
-                  ? 'How should Workloop handle the £${amount.toStringAsFixed(0)} payment?'
+                  ? 'How should Workloop handle the ${formatPounds(amount)} payment?'
                   : 'No booking price is set, so you can complete it without recording money.',
               style: const TextStyle(fontSize: 13, color: AppColors.t3),
             ),
@@ -452,7 +506,8 @@ class _AppointmentDetailScreenState
                 label: 'Complete, Leave Unpaid',
                 icon: LucideIcons.clock3,
                 secondary: true,
-                onPressed: () => _completeWithLinkedPayment(),
+                onPressed: () =>
+                    _completeWithLinkedPayment(payment: unpaidLinkedPayment),
               ),
               const SizedBox(height: 10),
             ] else if (!hasLinkedPayment && amount > 0) ...[
@@ -708,7 +763,7 @@ class _AppointmentDetailScreenState
               style: TextStyle(
                 color: AppColors.t1,
                 fontSize: 18,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 12),
@@ -826,7 +881,7 @@ class _AppointmentDetailScreenState
                 'Cancel Booking',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.t1,
                 ),
               ),
@@ -841,28 +896,40 @@ class _AppointmentDetailScreenState
                 runSpacing: 8,
                 children: _cancelReasons.map((reason) {
                   final active = selectedReason == reason;
-                  return GestureDetector(
+                  return Semantics(
+                    button: true,
+                    selected: active,
+                    label: reason,
                     onTap: () => setModal(() => selectedReason = reason),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: active
-                            ? AppColors.errorDim
-                            : AppColors.bgInteract,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: active ? AppColors.error : AppColors.border,
-                        ),
-                      ),
-                      child: Text(
-                        reason,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: active ? AppColors.error : AppColors.t2,
+                    child: ExcludeSemantics(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => setModal(() => selectedReason = reason),
+                        child: Container(
+                          constraints: const BoxConstraints(
+                            minHeight: AppSpacing.minTouch,
+                          ),
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: active
+                                ? AppColors.errorDim
+                                : AppColors.bgInteract,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: active
+                                  ? AppColors.error
+                                  : AppColors.border,
+                            ),
+                          ),
+                          child: Text(
+                            reason,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: active ? AppColors.error : AppColors.t2,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -924,7 +991,7 @@ class _AppointmentDetailScreenState
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.error,
                     disabledBackgroundColor: AppColors.bgInteract,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.bg,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -932,7 +999,7 @@ class _AppointmentDetailScreenState
                   ),
                   child: const Text(
                     'Cancel Booking',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -1009,57 +1076,40 @@ class _AppointmentDetailScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // ── Header ────────────────────────────────────────────────────
-                    Row(
-                      children: [
-                        WorkloopIconButton(
-                          icon: LucideIcons.chevronLeft,
-                          semanticLabel: 'Back to bookings',
-                          onTap: _handleBack,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        const Expanded(
-                          child: Text(
-                            'Booking',
-                            style: TextStyle(
-                              color: AppColors.t1,
-                              fontSize: 26,
-                              height: 1.05,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        if (status == 'scheduled')
-                          _BookingDetailAction(
-                            label: _editing ? 'Save' : 'Edit',
-                            loading: _loading,
-                            primary: _editing,
-                            onTap: () => _editing
-                                ? _saveEdit()
-                                : setState(() => _editing = true),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: statusColor.withValues(alpha: 0.3),
+                    WorkloopRouteHeader(
+                      title: 'Booking',
+                      backSemanticLabel: 'Back to bookings',
+                      onBack: _handleBack,
+                      trailing: status == 'scheduled'
+                          ? _BookingDetailAction(
+                              label: _editing ? 'Save' : 'Edit',
+                              loading: _loading,
+                              primary: _editing,
+                              onTap: () => _editing
+                                  ? _saveEdit()
+                                  : setState(() => _editing = true),
+                            )
+                          : Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: statusColor.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Text(
+                                status.replaceAll('_', ' ').toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: statusColor,
+                                ),
                               ),
                             ),
-                            child: Text(
-                              status.replaceAll('_', ' ').toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: statusColor,
-                              ),
-                            ),
-                          ),
-                      ],
                     ),
                     const SizedBox(height: 24),
 
@@ -1071,7 +1121,8 @@ class _AppointmentDetailScreenState
                       price: price as num?,
                       initials: initials,
                       contactId: _appt['contact_id'] as String?,
-                      appt: _appt,
+                      openingClient: _openingClient,
+                      onOpenClient: _openLinkedClient,
                       clients: clients.whenData(
                         (data) => data.map((client) => client.toMap()).toList(),
                       ),
@@ -1100,7 +1151,7 @@ class _AppointmentDetailScreenState
                               service['name'] as String? ?? '';
                           final price = (service['price'] as num?)?.toDouble();
                           if (price != null) {
-                            _priceController.text = price.toStringAsFixed(0);
+                            _priceController.text = currencyInputValue(price);
                           }
                           final duration = service['duration_mins'] as int?;
                           if (duration != null) {
@@ -1108,6 +1159,7 @@ class _AppointmentDetailScreenState
                           }
                         });
                       },
+                      onRetryClients: () => ref.invalidate(clientsProvider),
                     ),
                     const SizedBox(height: 12),
 
@@ -1127,7 +1179,25 @@ class _AppointmentDetailScreenState
                       },
                       onDurationChanged: (_) => setState(() {}),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.lg),
+
+                    // The next operational decision stays close to the booking
+                    // context instead of being hidden below notes and history.
+                    AppointmentActionSection(
+                      status: status,
+                      notes: notes,
+                      loading: _loading,
+                      onComplete: () {
+                        final payments = linkedPayments.value;
+                        if (payments == null) {
+                          _snack('Payment status is still loading');
+                          return;
+                        }
+                        _showCompletionSheet(payments);
+                      },
+                      onCancel: _showCancelSheet,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
 
                     Container(
                       width: double.infinity,
@@ -1161,39 +1231,12 @@ class _AppointmentDetailScreenState
                                       ].map((option) {
                                         final selected =
                                             _locationMode == option.value;
-                                        return GestureDetector(
+                                        return WorkloopFilterChip(
+                                          label: option.label,
+                                          selected: selected,
                                           onTap: () => _setEditLocationMode(
                                             option.value,
                                             clients.value ?? const <Client>[],
-                                          ),
-                                          child: AnimatedContainer(
-                                            duration: AppMotion.fast,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 13,
-                                              vertical: 8,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: selected
-                                                  ? AppColors.slateLight
-                                                  : AppColors.bgInteract,
-                                              borderRadius:
-                                                  BorderRadius.circular(999),
-                                              border: Border.all(
-                                                color: selected
-                                                    ? AppColors.borderStrong
-                                                    : AppColors.border,
-                                              ),
-                                            ),
-                                            child: Text(
-                                              option.label,
-                                              style: TextStyle(
-                                                color: selected
-                                                    ? AppColors.panelInk
-                                                    : AppColors.t2,
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                            ),
                                           ),
                                         );
                                       }).toList(),
@@ -1263,7 +1306,7 @@ class _AppointmentDetailScreenState
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: 13,
-                                        fontWeight: FontWeight.w700,
+                                        fontWeight: FontWeight.w600,
                                         color: AppColors.t1,
                                       ),
                                     ),
@@ -1303,7 +1346,7 @@ class _AppointmentDetailScreenState
                               style: const TextStyle(
                                 color: AppColors.t2,
                                 fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
@@ -1376,10 +1419,10 @@ class _AppointmentDetailScreenState
                       title: 'Money',
                       subtitle: linkedPayments.when(
                         loading: () => 'Loading payment state',
-                        error: (_, __) => 'Payment state unavailable',
+                        error: (_, _) => 'Payment state unavailable',
                         data: (rows) => rows.isEmpty
                             ? bookingPrice > 0
-                                  ? 'No payment linked · £${bookingPrice.toStringAsFixed(0)}'
+                                  ? 'No payment linked · ${formatPounds(bookingPrice)}'
                                   : 'No payment linked'
                             : '${rows.length} linked payment${rows.length == 1 ? '' : 's'}',
                       ),
@@ -1411,7 +1454,7 @@ class _AppointmentDetailScreenState
                       title: 'Booking tasks',
                       subtitle: linkedTasks.when(
                         loading: () => 'Loading tasks',
-                        error: (_, __) => 'Tasks unavailable',
+                        error: (_, _) => 'Tasks unavailable',
                         data: (items) => items.isEmpty
                             ? 'Prep and follow-up tasks'
                             : '${items.length} linked task${items.length == 1 ? '' : 's'}',
@@ -1423,6 +1466,9 @@ class _AppointmentDetailScreenState
                       child: _BookingTasksCard(
                         tasks: linkedTasks,
                         onAddTask: _showAddTaskSheet,
+                        onRetry: () => ref.invalidate(
+                          appointmentTasksProvider(_appt['id'] as String),
+                        ),
                         onToggle: (task) async {
                           final done = task.status == 'done';
                           await ref
@@ -1435,23 +1481,6 @@ class _AppointmentDetailScreenState
                           ref.invalidate(allTasksProvider);
                         },
                       ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // ── Actions ───────────────────────────────────────────────────
-                    AppointmentActionSection(
-                      status: status,
-                      notes: notes,
-                      loading: _loading,
-                      onComplete: () {
-                        final payments = linkedPayments.value;
-                        if (payments == null) {
-                          _snack('Payment status is still loading');
-                          return;
-                        }
-                        _showCompletionSheet(payments);
-                      },
-                      onCancel: _showCancelSheet,
                     ),
                     const SizedBox(height: 40),
                   ],

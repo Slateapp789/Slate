@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/slate_models.dart';
+import 'repository_pagination.dart';
 import 'supabase_client_provider.dart';
 
 final notesRepositoryProvider = Provider<NotesRepository>((ref) {
@@ -13,18 +14,21 @@ class NotesRepository {
   const NotesRepository(this._client);
 
   Future<List<SlateNote>> list(String workspaceId) async {
-    final rows = await _client
-        .from('notes')
-        .select('*, contacts(name)')
-        .eq('workspace_id', workspaceId)
-        .order('pinned', ascending: false)
-        .order('updated_at', ascending: false);
+    final rows = await fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('notes')
+            .select('*, contacts(name)')
+            .eq('workspace_id', workspaceId)
+            .order('pinned', ascending: false)
+            .order('updated_at', ascending: false)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
 
-    return rows
-        .map<SlateNote>(
-          (row) => SlateNote.fromMap(Map<String, dynamic>.from(row)),
-        )
-        .toList();
+    return rows.map<SlateNote>(SlateNote.fromMap).toList();
   }
 
   Future<String> create({

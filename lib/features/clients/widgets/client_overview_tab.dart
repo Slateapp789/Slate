@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/slate_models.dart';
+import '../../../shared/utils/currency_format.dart';
 import '../../../shared/widgets/slate_ui.dart';
 import '../../appointments/appointment_detail_screen.dart';
 import '../providers/client_detail_providers.dart';
@@ -33,16 +34,22 @@ class ClientOverviewTab extends ConsumerWidget {
     final appointments = ref.watch(clientAppointmentsProvider(clientId));
     final payments = ref.watch(clientPaymentsProvider(clientId));
     final tasks = ref.watch(clientTasksProvider(clientId));
+    final activityUnavailable =
+        appointments.hasError || payments.hasError || tasks.hasError;
     final appointmentRows = appointments.value ?? const [];
     final paymentRows = payments.value ?? const <Payment>[];
     final taskRows = tasks.value ?? const <SlateTask>[];
 
+    void retryActivity() {
+      ref.invalidate(clientAppointmentsProvider(clientId));
+      ref.invalidate(clientPaymentsProvider(clientId));
+      ref.invalidate(clientTasksProvider(clientId));
+    }
+
     return RefreshIndicator(
       color: AppColors.accentPrimary,
       onRefresh: () async {
-        ref.invalidate(clientAppointmentsProvider(clientId));
-        ref.invalidate(clientPaymentsProvider(clientId));
-        ref.invalidate(clientTasksProvider(clientId));
+        retryActivity();
       },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(
@@ -52,24 +59,34 @@ class ClientOverviewTab extends ConsumerWidget {
           AppSpacing.xxl,
         ),
         children: [
-          _NextBookingSection(
-            appointments: appointmentRows,
-            onOpenBookings: onOpenBookings,
-          ),
-          const WorkloopDivider(margin: EdgeInsets.symmetric(vertical: 22)),
-          _RelationshipSnapshot(
-            appointments: appointmentRows,
-            payments: paymentRows,
-            tasks: taskRows,
-            loading:
-                appointments.isLoading || payments.isLoading || tasks.isLoading,
-          ),
-          _WorthALook(
-            payments: paymentRows,
-            tasks: taskRows,
-            onOpenPayments: onOpenPayments,
-            onOpenTasks: onOpenTasks,
-          ),
+          if (activityUnavailable)
+            SlateErrorState(
+              message:
+                  'Some client activity could not be loaded. Try again before relying on this overview.',
+              onRetry: retryActivity,
+            )
+          else ...[
+            _NextBookingSection(
+              appointments: appointmentRows,
+              onOpenBookings: onOpenBookings,
+            ),
+            const WorkloopDivider(margin: EdgeInsets.symmetric(vertical: 22)),
+            _RelationshipSnapshot(
+              appointments: appointmentRows,
+              payments: paymentRows,
+              tasks: taskRows,
+              loading:
+                  appointments.isLoading ||
+                  payments.isLoading ||
+                  tasks.isLoading,
+            ),
+            _WorthALook(
+              payments: paymentRows,
+              tasks: taskRows,
+              onOpenPayments: onOpenPayments,
+              onOpenTasks: onOpenTasks,
+            ),
+          ],
           const WorkloopDivider(margin: EdgeInsets.symmetric(vertical: 22)),
           _NotesSection(client: client, onEdit: onEdit),
           const WorkloopDivider(margin: EdgeInsets.symmetric(vertical: 22)),
@@ -78,16 +95,20 @@ class ClientOverviewTab extends ConsumerWidget {
             onEdit: onEdit,
             onOpenAddress: onOpenAddress,
           ),
-          const WorkloopDivider(margin: EdgeInsets.symmetric(vertical: 22)),
-          _RecentActivity(
-            appointments: appointmentRows,
-            payments: paymentRows,
-            tasks: taskRows,
-            loading:
-                appointments.isLoading || payments.isLoading || tasks.isLoading,
-            onOpenPayments: onOpenPayments,
-            onOpenTasks: onOpenTasks,
-          ),
+          if (!activityUnavailable) ...[
+            const WorkloopDivider(margin: EdgeInsets.symmetric(vertical: 22)),
+            _RecentActivity(
+              appointments: appointmentRows,
+              payments: paymentRows,
+              tasks: taskRows,
+              loading:
+                  appointments.isLoading ||
+                  payments.isLoading ||
+                  tasks.isLoading,
+              onOpenPayments: onOpenPayments,
+              onOpenTasks: onOpenTasks,
+            ),
+          ],
         ],
       ),
     );
@@ -202,7 +223,7 @@ class _BookingPanel extends StatelessWidget {
                       style: const TextStyle(
                         color: AppColors.t1,
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xxs),
@@ -217,7 +238,7 @@ class _BookingPanel extends StatelessWidget {
                       style: const TextStyle(
                         color: AppColors.t3,
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     if (laterCount > 0) ...[
@@ -284,12 +305,15 @@ class _RelationshipSnapshot extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _Metric(value: '$completed', label: 'Jobs completed'),
+                child: _Metric(
+                  value: '$completed',
+                  label: 'Bookings completed',
+                ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: _Metric(
-                  value: '£${received.toStringAsFixed(0)}',
+                  value: formatPounds(received),
                   label: 'Received',
                 ),
               ),
@@ -322,7 +346,7 @@ class _Metric extends StatelessWidget {
           style: const TextStyle(
             color: AppColors.t1,
             fontSize: 18,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: AppSpacing.xxs),
@@ -331,7 +355,7 @@ class _Metric extends StatelessWidget {
           style: const TextStyle(
             color: AppColors.t3,
             fontSize: 11,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],
@@ -371,7 +395,7 @@ class _WorthALook extends StatelessWidget {
           if (remaining > 0)
             _QuietRow(
               icon: LucideIcons.banknote,
-              title: '£${remaining.toStringAsFixed(0)} remaining',
+              title: '${formatPounds(remaining)} remaining',
               subtitle: 'Across this client’s recorded payments.',
               onTap: onOpenPayments,
             ),
@@ -426,7 +450,7 @@ class _NotesSection extends StatelessWidget {
                     style: const TextStyle(
                       color: AppColors.t1,
                       fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       height: 1.4,
                     ),
                   ),
@@ -530,7 +554,7 @@ class _DetailsSection extends StatelessWidget {
                             style: const TextStyle(
                               color: AppColors.t3,
                               fontSize: 10,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -539,7 +563,7 @@ class _DetailsSection extends StatelessWidget {
                             style: const TextStyle(
                               color: AppColors.t2,
                               fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w500,
                               height: 1.35,
                             ),
                           ),
@@ -584,7 +608,7 @@ class _DetailsSection extends StatelessWidget {
                       style: const TextStyle(
                         color: AppColors.t2,
                         fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -708,7 +732,7 @@ class _ActivityItem {
       icon: LucideIcons.banknote,
       title: payment.status == 'paid' ? 'Payment received' : 'Payment recorded',
       subtitle:
-          '£${payment.total.toStringAsFixed(0)} · ${_formatLongDate(payment.issueDate)}',
+          '${formatPounds(payment.total)} · ${_formatLongDate(payment.issueDate)}',
     );
   }
 
@@ -741,25 +765,12 @@ class _SectionHeader extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.t1,
               fontSize: 18,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
         if (action != null)
-          GestureDetector(
-            onTap: onAction,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-              child: Text(
-                action!,
-                style: const TextStyle(
-                  color: AppColors.t2,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
+          WorkloopTextButton(label: action!, onPressed: onAction),
       ],
     );
   }
@@ -798,7 +809,7 @@ class _QuietRow extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t1,
           fontSize: 14,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(
@@ -808,7 +819,7 @@ class _QuietRow extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t3,
           fontSize: 12,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
         ),
       ),
       trailing: const Icon(

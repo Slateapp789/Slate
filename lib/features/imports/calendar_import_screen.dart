@@ -1,15 +1,47 @@
 import 'package:device_calendar/device_calendar.dart' as device;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/providers/appointments_provider.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
+import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/repositories/appointments_repository.dart';
 import '../../shared/widgets/slate_ui.dart';
+import 'import_models.dart';
+
+typedef CalendarImportStep = Future<void> Function();
+
+Future<void> executeCalendarImportBooking({
+  required CalendarImportStep validateSchedule,
+  required CalendarImportStep createBookingWorkflow,
+}) async {
+  try {
+    await validateSchedule();
+  } on AppointmentScheduleException catch (error) {
+    if (error.issue != AppointmentScheduleIssue.conflict) rethrow;
+    // Let the atomic workflow arbitrate this conflict. A retry can see the
+    // booking committed by its previous response and recover by idempotency.
+  }
+  await createBookingWorkflow();
+}
+
+String calendarImportFailureMessage(Object error) {
+  if (error is AppointmentScheduleException) {
+    return switch (error.issue) {
+      AppointmentScheduleIssue.workingHours =>
+        '${error.message} Create it manually if you want to confirm an exception.',
+      AppointmentScheduleIssue.conflict =>
+        '${error.message} Deselect it or change the source event time, then reload.',
+      AppointmentScheduleIssue.other =>
+        '${error.message} Review the event and try again.',
+    };
+  }
+  return 'Could not create this booking. Check your connection and try again.';
+}
 
 class CalendarImportScreen extends ConsumerStatefulWidget {
   const CalendarImportScreen({super.key});
@@ -24,6 +56,7 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
   List<device.Calendar> _calendars = const [];
   List<device.Event> _events = const [];
   final Set<String> _selected = {};
+  final Map<String, String> _eventFailures = {};
   String? _calendarId;
   String? _clientId;
   DateTime _from = DateTime.now();
@@ -33,6 +66,7 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
   String? _message;
 
   Future<void> _loadCalendars() async {
+    if (_loading || _importing) return;
     setState(() {
       _loading = true;
       _message = null;
@@ -80,7 +114,7 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
   }
 
   Future<void> _loadEvents() async {
-    if (_calendarId == null) return;
+    if (_calendarId == null || _importing) return;
     setState(() {
       _loading = true;
       _message = null;
@@ -100,6 +134,7 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
       setState(() {
         _events = events;
         _selected.clear();
+        _eventFailures.clear();
         _message = events.isEmpty
             ? 'No events were found in this calendar and date range.'
             : null;
@@ -117,6 +152,7 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
   }
 
   Future<void> _pickRange() async {
+    if (_loading || _importing) return;
     final from = await showWorkloopDatePicker(
       context: context,
       initialDate: _from,
@@ -143,57 +179,138 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
   }
 
   Future<void> _import() async {
-    if (_selected.isEmpty || _clientId == null) return;
-    setState(() => _importing = true);
+    if (_importing || _selected.isEmpty || _clientId == null) return;
+    final selectedIds = Set<String>.of(_selected);
+    final chosen = _events
+        .where((event) => selectedIds.contains(_id(event)))
+        .toList();
+    if (chosen.isEmpty) return;
+    setState(() {
+      _importing = true;
+      _message = null;
+      _eventFailures.removeWhere((id, _) => selectedIds.contains(id));
+    });
     var imported = 0;
-    final failures = <String>[];
+    final completedIds = <String>{};
+    final failures = <({String eventId, String title, String reason})>[];
     try {
       final workspaceId = await ref.read(workspaceIdProvider.future);
       if (workspaceId == null) throw StateError('Workspace unavailable');
+      final settings = await ref.read(workspaceSettingsProvider.future);
+      final workingHours = settings?['working_hours'] is Map
+          ? Map<String, dynamic>.from(settings!['working_hours'] as Map)
+          : <String, dynamic>{};
       final repository = ref.read(appointmentsRepositoryProvider);
-      final chosen = _events.where((event) => _selected.contains(_id(event)));
       for (final event in chosen) {
+        final eventId = _id(event);
         final start = event.start!.toLocal();
-        final end = event.end?.toLocal() ?? start.add(const Duration(hours: 1));
+        final candidateEnd =
+            event.end?.toLocal() ?? start.add(const Duration(hours: 1));
+        final end = candidateEnd.isAfter(start)
+            ? candidateEnd
+            : start.add(const Duration(hours: 1));
+        final title = event.title?.trim().isNotEmpty == true
+            ? event.title!.trim()
+            : 'Imported booking';
+        final notes = [
+          event.description?.trim(),
+          'Imported once from device calendar.',
+          if (event.allDay == true) 'Originally an all-day event.',
+        ].whereType<String>().where((value) => value.isNotEmpty).join('\n\n');
+        final idempotencyKey = calendarImportIdempotencyKey(
+          calendarId: event.calendarId ?? _calendarId!,
+          eventId: event.eventId,
+          startTime: start,
+          endTime: end,
+          title: title,
+          location: event.location,
+        );
         try {
-          await repository.create(
-            workspaceId: workspaceId,
-            contactId: _clientId!,
-            startTime: start,
-            endTime: end.isAfter(start)
-                ? end
-                : start.add(const Duration(hours: 1)),
-            price: 0,
-            title: event.title?.trim().isNotEmpty == true
-                ? event.title!.trim()
-                : 'Imported booking',
-            notes:
-                [
-                      event.description?.trim(),
-                      'Imported once from device calendar.',
-                      if (event.allDay == true) 'Originally an all-day event.',
-                    ]
-                    .whereType<String>()
-                    .where((value) => value.isNotEmpty)
-                    .join('\n\n'),
-            location: event.location,
+          await executeCalendarImportBooking(
+            validateSchedule: () => repository.ensureScheduleAvailable(
+              workspaceId: workspaceId,
+              startTime: start,
+              endTime: end,
+              workingHours: workingHours,
+            ),
+            createBookingWorkflow: () async {
+              await repository.createBookingWorkflow(
+                workspaceId: workspaceId,
+                idempotencyKey: idempotencyKey,
+                contactId: _clientId!,
+                startTime: start,
+                endTime: end,
+                price: 0,
+                title: title,
+                notes: notes,
+                location: event.location,
+                notificationTitle: 'Calendar event imported',
+                notificationBody: '$title was added to your schedule.',
+              );
+            },
           );
           imported++;
-        } catch (_) {
-          failures.add(event.title ?? 'Untitled event');
+          completedIds.add(eventId);
+        } catch (error) {
+          failures.add((
+            eventId: eventId,
+            title: event.title?.trim().isNotEmpty == true
+                ? event.title!.trim()
+                : 'Untitled event',
+            reason: calendarImportFailureMessage(error),
+          ));
         }
+      }
+      final result = reconcileImportAttempt(
+        attempted: chosen.map(_id),
+        completed: completedIds,
+      );
+      final summary = failures.isEmpty
+          ? '$imported ${imported == 1 ? 'booking was' : 'bookings were'} created.'
+          : '$imported ${imported == 1 ? 'booking was' : 'bookings were'} created. '
+                '${result.retryable.length} ${result.retryable.length == 1 ? 'event remains' : 'events remain'} selected to retry.';
+      if (mounted) {
+        setState(() {
+          _events = _events
+              .where((event) => !result.completed.contains(_id(event)))
+              .toList();
+          _selected
+            ..removeAll(result.completed)
+            ..addAll(result.retryable);
+          _eventFailures
+            ..removeWhere((id, _) => result.completed.contains(id))
+            ..addEntries(
+              failures.map(
+                (failure) => MapEntry(failure.eventId, failure.reason),
+              ),
+            );
+          _message = summary;
+        });
       }
       ref.invalidate(appointmentsProvider);
       if (!mounted) return;
-      SlateHaptics.success();
+      if (imported > 0) {
+        SlateHaptics.success();
+      } else {
+        SlateHaptics.warning();
+      }
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Calendar import complete'),
           content: Text(
             failures.isEmpty
-                ? '$imported ${imported == 1 ? 'booking was' : 'bookings were'} created.'
-                : '$imported created. ${failures.length} could not be imported: ${failures.take(3).join(', ')}.',
+                ? summary
+                : [
+                    summary,
+                    ...failures
+                        .take(3)
+                        .map(
+                          (failure) => '${failure.title}: ${failure.reason}',
+                        ),
+                    if (failures.length > 3)
+                      '${failures.length - 3} more failed events remain selected.',
+                  ].join('\n\n'),
           ),
           actions: [
             TextButton(
@@ -250,40 +367,11 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              WorkloopIconButton(
-                icon: LucideIcons.chevronLeft,
-                semanticLabel: 'Back',
-                onTap: () => Navigator.pop(context),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              const Expanded(
-                child: Text(
-                  'Import calendar',
-                  style: TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 26,
-                    height: 1.05,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          const Text(
-            'Review events before creating bookings',
-            style: TextStyle(
-              color: AppColors.t1,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          const WorkloopRouteHeader(title: 'Import calendar'),
           const SizedBox(height: AppSpacing.xs),
           const Text(
-            'This is a one-time import, not calendar sync. Your source calendar is never changed.',
-            style: TextStyle(color: AppColors.t3, height: 1.45),
+            'Review a one-time snapshot before creating any bookings. Your source calendar is never changed.',
+            style: TextStyle(color: AppColors.t2, fontSize: 15, height: 1.45),
           ),
           const SizedBox(height: AppSpacing.lg),
           if (_calendars.isEmpty) ...[
@@ -297,7 +385,7 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
               'Calendar',
               style: TextStyle(
                 color: AppColors.t2,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -317,21 +405,23 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
                   )
                   .toList(),
               onChanged: (value) async {
+                if (_importing) return;
                 setState(() => _calendarId = value);
                 await _loadEvents();
               },
+              enabled: !_importing,
             ),
             const SizedBox(height: AppSpacing.md),
             const Text(
               'Date range',
               style: TextStyle(
                 color: AppColors.t2,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
             WorkloopSurface(
-              onTap: _pickRange,
+              onTap: _importing ? null : _pickRange,
               child: Row(
                 children: [
                   const Icon(LucideIcons.calendarRange, color: AppColors.t3),
@@ -341,7 +431,7 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
                       '${_date(_from)} — ${_date(_to)}',
                       style: const TextStyle(
                         color: AppColors.t1,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -352,9 +442,16 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
           ],
           if (_message != null) ...[
             const SizedBox(height: AppSpacing.sm),
-            Text(
-              _message!,
-              style: const TextStyle(color: AppColors.t3, height: 1.4),
+            Semantics(
+              container: true,
+              liveRegion: true,
+              label: _message!,
+              child: ExcludeSemantics(
+                child: Text(
+                  _message!,
+                  style: const TextStyle(color: AppColors.t3, height: 1.4),
+                ),
+              ),
             ),
           ],
           if (_loading) ...[
@@ -369,13 +466,15 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
                   label: _selected.length == _events.length
                       ? 'Clear'
                       : 'Select all',
-                  onPressed: () => setState(() {
-                    if (_selected.length == _events.length) {
-                      _selected.clear();
-                    } else {
-                      _selected.addAll(_events.map(_id));
-                    }
-                  }),
+                  onPressed: _importing
+                      ? null
+                      : () => setState(() {
+                          if (_selected.length == _events.length) {
+                            _selected.clear();
+                          } else {
+                            _selected.addAll(_events.map(_id));
+                          }
+                        }),
                 ),
               ],
             ),
@@ -391,20 +490,25 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
                     final event = _events[index];
                     final id = _id(event);
                     final start = event.start!.toLocal();
+                    final failure = _eventFailures[id];
                     return WorkloopListRow(
-                      onTap: () => setState(() {
-                        if (!_selected.add(id)) _selected.remove(id);
-                      }),
+                      onTap: _importing
+                          ? null
+                          : () => setState(() {
+                              if (!_selected.add(id)) _selected.remove(id);
+                            }),
                       showDivider: index != _events.length - 1,
                       leading: Checkbox.adaptive(
                         value: _selected.contains(id),
-                        onChanged: (value) => setState(() {
-                          if (value == true) {
-                            _selected.add(id);
-                          } else {
-                            _selected.remove(id);
-                          }
-                        }),
+                        onChanged: _importing
+                            ? null
+                            : (value) => setState(() {
+                                if (value == true) {
+                                  _selected.add(id);
+                                } else {
+                                  _selected.remove(id);
+                                }
+                              }),
                       ),
                       title: Text(
                         event.title?.trim().isNotEmpty == true
@@ -412,14 +516,30 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
                             : 'Untitled event',
                         style: const TextStyle(
                           color: AppColors.t1,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      subtitle: Text(
-                        event.allDay == true
-                            ? '${_date(start)} · All day'
-                            : '${_date(start)} · ${_time(start)}${event.end == null ? '' : '–${_time(event.end!.toLocal())}'}',
-                        style: const TextStyle(color: AppColors.t3),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            event.allDay == true
+                                ? '${_date(start)} · All day'
+                                : '${_date(start)} · ${_time(start)}${event.end == null ? '' : '–${_time(event.end!.toLocal())}'}',
+                            style: const TextStyle(color: AppColors.t3),
+                          ),
+                          if (failure != null) ...[
+                            const SizedBox(height: AppSpacing.xxs),
+                            Text(
+                              failure,
+                              style: const TextStyle(
+                                color: AppColors.error,
+                                fontSize: 12,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     );
                   },
@@ -431,7 +551,7 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
               'Client for selected events',
               style: TextStyle(
                 color: AppColors.t2,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -452,6 +572,7 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
                   )
                   .toList(),
               onChanged: (value) => setState(() => _clientId = value),
+              enabled: !_importing,
             ),
             const SizedBox(height: AppSpacing.xs),
             const Text(

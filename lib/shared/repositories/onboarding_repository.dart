@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:math';
 
 import 'supabase_client_provider.dart';
 
@@ -25,112 +24,90 @@ class OnboardingRepository {
     final user = _client.auth.currentUser;
     if (user == null) return null;
 
+    final workspaceId = await _client.rpc(
+      'complete_onboarding',
+      params: buildOnboardingRpcParams(
+        businessName: businessName,
+        industry: industry,
+        handle: handle,
+        services: services,
+        workingHours: workingHours,
+        revenueTarget: revenueTarget,
+        firstBooking: firstBooking,
+      ),
+    );
+
+    if (workspaceId == null || workspaceId.toString().trim().isEmpty) {
+      throw StateError('Workspace was not created');
+    }
+
+    // Profile metadata is outside the workspace transaction. Perform it after
+    // the idempotent RPC so a transient auth failure can safely be retried
+    // without creating another workspace.
     await _client.auth.updateUser(
       UserAttributes(data: {'first_name': firstName.trim()}),
     );
 
-    final workspaceId = _uuidV4();
-    await _client.from('workspaces').insert({
-      'id': workspaceId,
-      'name': businessName,
-      'industry': industry,
-    });
+    return workspaceId.toString();
+  }
+}
 
-    await _client.from('workspace_members').insert({
-      'workspace_id': workspaceId,
-      'user_id': user.id,
-    });
+Map<String, dynamic> buildOnboardingRpcParams({
+  required String businessName,
+  required String industry,
+  required String handle,
+  required List<Map<String, dynamic>> services,
+  required Map<String, dynamic> workingHours,
+  required double revenueTarget,
+  Map<String, dynamic>? firstBooking,
+}) {
+  final serviceRows = services
+      .map(
+        (service) => <String, dynamic>{
+          'name': service['name']?.toString().trim(),
+          'duration_mins': (service['duration'] as num?)?.toInt() ?? 60,
+          'price': (service['price'] as num?)?.toDouble() ?? 0,
+        },
+      )
+      .toList(growable: false);
 
-    await _client.from('workspace_settings').insert({
-      'workspace_id': workspaceId,
-      'working_hours': workingHours,
-      'revenue_target': revenueTarget,
-    });
-
-    await _client.from('business_profiles').insert({
-      'workspace_id': workspaceId,
-      'handle': handle,
-    });
-
-    var insertedServices = <Map<String, dynamic>>[];
-    if (services.isNotEmpty) {
-      final result = await _client
-          .from('services')
-          .insert(
-            services
-                .map(
-                  (service) => {
-                    'workspace_id': workspaceId,
-                    'name': service['name'],
-                    'duration_mins': service['duration'],
-                    'price': service['price'],
-                  },
-                )
-                .toList(),
-          )
-          .select();
-      insertedServices = List<Map<String, dynamic>>.from(result);
-    }
-
-    if (firstBooking == null) return workspaceId;
-
-    final contactResult = await _client
-        .from('contacts')
-        .insert({
-          'workspace_id': workspaceId,
-          'name': firstBooking['clientName'] as String,
-          'status': 'active',
-        })
-        .select()
-        .single();
-    final contactId = contactResult['id'] as String;
-
-    final serviceName = firstBooking['serviceName'] as String?;
-    final matchedService = insertedServices.firstWhere(
-      (service) => service['name'] == serviceName,
-      orElse: () => <String, dynamic>{},
-    );
-    final serviceId = matchedService['id'] as String?;
+  Map<String, dynamic>? firstBookingValue;
+  if (firstBooking != null) {
+    final dateParts = (firstBooking['date'] as String).split('-');
+    final serviceName = firstBooking['serviceName']?.toString().trim();
+    final matchingService = serviceRows
+        .cast<Map<String, dynamic>?>()
+        .firstWhere(
+          (service) => service?['name'] == serviceName,
+          orElse: () => null,
+        );
     final durationMins =
-        (matchedService['duration_mins'] as num?)?.toInt() ?? 60;
-    final price = (matchedService['price'] as num?)?.toDouble() ?? 0;
-
-    final dateStr = firstBooking['date'] as String;
-    final dateParts = dateStr.split('-');
-    final startTime = DateTime(
+        (matchingService?['duration_mins'] as num?)?.toInt() ?? 60;
+    final start = DateTime(
       int.parse(dateParts[0]),
       int.parse(dateParts[1]),
       int.parse(dateParts[2]),
-      firstBooking['hour'] as int,
-      firstBooking['minute'] as int,
+      (firstBooking['hour'] as num).toInt(),
+      (firstBooking['minute'] as num).toInt(),
     );
-    final endTime = startTime.add(Duration(minutes: durationMins));
-
-    await _client.from('appointments').insert({
-      'workspace_id': workspaceId,
-      'contact_id': contactId,
-      if (serviceId != null) 'service_id': serviceId,
-      'title': serviceName ?? 'Booking',
-      'start_time': startTime.toUtc().toIso8601String(),
-      'end_time': endTime.toUtc().toIso8601String(),
-      'price': price,
-      'status': 'scheduled',
-    });
-    return workspaceId;
+    firstBookingValue = {
+      'client_name': firstBooking['clientName']?.toString().trim(),
+      'service_name': serviceName,
+      'start_time': start.toUtc().toIso8601String(),
+      'end_time': start
+          .add(Duration(minutes: durationMins))
+          .toUtc()
+          .toIso8601String(),
+    };
   }
 
-  String _uuidV4() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-    String hex(int value) => value.toRadixString(16).padLeft(2, '0');
-    final chars = bytes.map(hex).join();
-    return '${chars.substring(0, 8)}-'
-        '${chars.substring(8, 12)}-'
-        '${chars.substring(12, 16)}-'
-        '${chars.substring(16, 20)}-'
-        '${chars.substring(20)}';
-  }
+  return {
+    'business_name': businessName.trim(),
+    'industry_name': industry.trim(),
+    'profile_handle': handle.trim().toLowerCase(),
+    'service_rows': serviceRows,
+    'working_hours_value': workingHours,
+    'revenue_target_value': revenueTarget,
+    'first_booking_value': firstBookingValue,
+  };
 }

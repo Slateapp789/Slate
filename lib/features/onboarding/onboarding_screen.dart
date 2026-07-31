@@ -90,6 +90,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       children: [
                         WorkloopIconButton(
                           icon: Icons.arrow_back_ios_new_rounded,
+                          semanticLabel: 'Previous onboarding step',
                           onTap: prevPage,
                           size: 38,
                         ),

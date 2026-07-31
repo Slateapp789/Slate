@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/slate_ui.dart';
@@ -24,40 +24,14 @@ class ImportDataScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              WorkloopIconButton(
-                icon: LucideIcons.chevronLeft,
-                semanticLabel: 'Back to settings',
-                onTap: () => Navigator.pop(context),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              const Expanded(
-                child: Text(
-                  'Import data',
-                  style: TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 26,
-                    height: 1.05,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          const Text(
-            'Bring your work into one place',
-            style: TextStyle(
-              color: AppColors.t1,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
+          const WorkloopRouteHeader(
+            title: 'Import data',
+            backSemanticLabel: 'Back to settings',
           ),
           const SizedBox(height: AppSpacing.xs),
           const Text(
-            'You always review what Workloop will create. Source data stays on your device unless you confirm an import.',
-            style: TextStyle(color: AppColors.t3, height: 1.45),
+            'Bring existing work into one place. You review everything before Workloop creates it.',
+            style: TextStyle(color: AppColors.t2, fontSize: 15, height: 1.45),
           ),
           const SizedBox(height: AppSpacing.xl),
           const WorkloopSectionHeader(label: 'People and bookings'),
@@ -120,7 +94,7 @@ class ImportDataScreen extends StatelessWidget {
                         'Private by design',
                         style: TextStyle(
                           color: AppColors.t1,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       SizedBox(height: AppSpacing.xxs),
@@ -179,7 +153,7 @@ class _ImportRow extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t1,
           fontSize: 15,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(

@@ -1,0 +1,10 @@
+create index if not exists appointments_workspace_id_idx on public.appointments(workspace_id);
+create index if not exists appointments_contact_id_idx on public.appointments(contact_id);
+create index if not exists appointments_service_id_idx on public.appointments(service_id);
+create index if not exists invoices_workspace_id_idx on public.invoices(workspace_id);
+create index if not exists invoices_contact_id_idx on public.invoices(contact_id);
+create index if not exists invoices_appointment_id_idx on public.invoices(appointment_id);
+create index if not exists tasks_workspace_id_idx on public.tasks(workspace_id);
+create index if not exists tasks_contact_id_idx on public.tasks(contact_id);
+create index if not exists tasks_appointment_id_idx on public.tasks(appointment_id);
+create index if not exists services_workspace_id_idx on public.services(workspace_id);

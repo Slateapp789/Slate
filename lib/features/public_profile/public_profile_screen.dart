@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/workloop_app_info.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/currency_format.dart';
+import '../../shared/utils/workflow_idempotency.dart';
 import '../../shared/utils/working_hours.dart';
 import '../../shared/widgets/slate_ui.dart';
 
@@ -35,8 +39,12 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   final _preferredTimeController = TextEditingController();
   final _messageController = TextEditingController();
   String? _selectedServiceId;
+  String? _nameError;
+  String? _phoneError;
+  String? _submitError;
   bool _sending = false;
   bool _sent = false;
+  final String _requestToken = createPublicRequestToken();
 
   @override
   void dispose() {
@@ -49,14 +57,21 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
 
   Future<void> _sendRequest(PublicProfile profile) async {
     if (_sending || _sent) return;
+    final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
     final phoneDigits = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    if (_nameController.text.trim().isEmpty || phone.isEmpty) {
-      _showSnack('Name and phone are required', AppColors.warning);
-      return;
-    }
-    if (phoneDigits.length < 7) {
-      _showSnack('Add a valid phone number', AppColors.warning);
+    final nameError = name.isEmpty ? 'Add your name' : null;
+    final phoneError = phone.isEmpty
+        ? 'Add a phone number'
+        : phoneDigits.length < 7
+        ? 'Add a valid phone number'
+        : null;
+    setState(() {
+      _nameError = nameError;
+      _phoneError = phoneError;
+      _submitError = null;
+    });
+    if (nameError != null || phoneError != null) {
       return;
     }
     setState(() => _sending = true);
@@ -65,8 +80,9 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
           .read(profileRepositoryProvider)
           .createBookingRequest(
             handle: profile.profile.handle,
-            name: _nameController.text.trim(),
-            phone: _phoneController.text.trim(),
+            name: name,
+            phone: phone,
+            requestToken: _requestToken,
             serviceId: _selectedServiceId,
             preferredTimeText: _preferredTimeController.text.trim().isEmpty
                 ? null
@@ -83,20 +99,21 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _sending = false);
-        _showSnack('Could not send request. Try again.', AppColors.error);
+        setState(() {
+          _sending = false;
+          _submitError =
+              'Your request was not sent. Check your connection and try again.';
+        });
       }
     }
   }
 
-  void _showSnack(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  void _clearNameError(String _) {
+    if (_nameError != null) setState(() => _nameError = null);
+  }
+
+  void _clearPhoneError(String _) {
+    if (_phoneError != null) setState(() => _phoneError = null);
   }
 
   @override
@@ -115,9 +132,11 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               loading: () => const Center(
                 child: CircularProgressIndicator(color: AppColors.green),
               ),
-              error: (_, __) => const _ProfileMessage(
+              error: (_, _) => _ProfileMessage(
                 title: 'Could not load profile',
                 body: 'Check the link and try again.',
+                onRetry: () =>
+                    ref.invalidate(publicProfileProvider(widget.handle)),
               ),
               data: (data) {
                 if (data == null) {
@@ -135,7 +154,12 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                   messageController: _messageController,
                   sending: _sending,
                   sent: _sent,
+                  nameError: _nameError,
+                  phoneError: _phoneError,
+                  submitError: _submitError,
                   topInset: canGoBack ? 84 : 28,
+                  onNameChanged: _clearNameError,
+                  onPhoneChanged: _clearPhoneError,
                   onServiceChanged: (id) =>
                       setState(() => _selectedServiceId = id),
                   onPreferredTimePicked: (value) =>
@@ -156,7 +180,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                   icon: LucideIcons.chevronLeft,
                   semanticLabel: 'Back to profile',
                   backgroundColor: AppColors.bgCard.withValues(alpha: 0.94),
-                  onTap: () => Navigator.pop(context),
+                  onTap: () => workloopGoBack(context),
                 ),
               ),
             ),
@@ -175,7 +199,12 @@ class _ProfileContent extends StatelessWidget {
   final TextEditingController messageController;
   final bool sending;
   final bool sent;
+  final String? nameError;
+  final String? phoneError;
+  final String? submitError;
   final double topInset;
+  final ValueChanged<String> onNameChanged;
+  final ValueChanged<String> onPhoneChanged;
   final ValueChanged<String?> onServiceChanged;
   final ValueChanged<String> onPreferredTimePicked;
   final VoidCallback onSubmit;
@@ -189,7 +218,12 @@ class _ProfileContent extends StatelessWidget {
     required this.messageController,
     required this.sending,
     required this.sent,
+    required this.nameError,
+    required this.phoneError,
+    required this.submitError,
     required this.topInset,
+    required this.onNameChanged,
+    required this.onPhoneChanged,
     required this.onServiceChanged,
     required this.onPreferredTimePicked,
     required this.onSubmit,
@@ -198,6 +232,7 @@ class _ProfileContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bookingClosed = profile.profile.bookingMode != 'manual';
+    final bookingSectionKey = GlobalKey();
     final enabledBadges = <_ProfileBadgeData>[
       if (profile.profile.reviewsEnabled)
         const _ProfileBadgeData(LucideIcons.star, 'Reviews enabled'),
@@ -206,8 +241,6 @@ class _ProfileContent extends StatelessWidget {
           LucideIcons.galleryThumbnails,
           'Gallery enabled',
         ),
-      if (profile.profile.payNowEnabled)
-        const _ProfileBadgeData(LucideIcons.creditCard, 'Pay now available'),
     ];
 
     return SafeArea(
@@ -215,12 +248,29 @@ class _ProfileContent extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(20, topInset, 20, 40),
         children: [
           _Hero(profile: profile),
+          if (!bookingClosed && !sent) ...[
+            const SizedBox(height: AppSpacing.lg),
+            WorkloopPrimaryButton(
+              label: 'Request a booking',
+              icon: LucideIcons.calendarPlus,
+              onPressed: () {
+                final target = bookingSectionKey.currentContext;
+                if (target == null) return;
+                Scrollable.ensureVisible(
+                  target,
+                  duration: AppMotion.responsive(context, AppMotion.standard),
+                  curve: AppMotion.curve,
+                  alignment: 0.06,
+                );
+              },
+            ),
+          ],
           const SizedBox(height: 24),
           if (enabledBadges.isNotEmpty) ...[
             _ProfileBadges(items: enabledBadges),
             const SizedBox(height: 16),
           ],
-          if (profile.profile.noticeText?.isNotEmpty == true) ...[
+          if (profile.profile.isNoticeActive()) ...[
             _Notice(text: profile.profile.noticeText!),
             const SizedBox(height: 16),
           ],
@@ -244,7 +294,7 @@ class _ProfileContent extends StatelessWidget {
             title: 'Services',
             child: profile.services.isEmpty
                 ? const Text(
-                    'Services will appear here soon.',
+                    'No services are currently listed.',
                     style: TextStyle(color: AppColors.t3),
                   )
                 : Column(
@@ -269,90 +319,176 @@ class _ProfileContent extends StatelessWidget {
                     style: TextStyle(color: AppColors.t3),
                   )
                 : Column(
-                    children: profile.workingHours.entries
-                        .map(
-                          (entry) =>
-                              _HoursRow(day: entry.key, value: entry.value),
-                        )
-                        .toList(),
+                    children: workingHourDays.map((day) {
+                      final shortDay = shortToLongDay.entries
+                          .firstWhere((entry) => entry.value == day)
+                          .key;
+                      return _HoursRow(
+                        day: day,
+                        value:
+                            profile.workingHours[day] ??
+                            profile.workingHours[shortDay],
+                      );
+                    }).toList(),
                   ),
           ),
           const SizedBox(height: 16),
-          _Section(
-            title: 'Request a booking',
-            child: bookingClosed
-                ? const _ClosedBookingState()
-                : sent
-                ? const _SentState()
-                : Column(
-                    children: [
-                      _ProfileField(
-                        controller: nameController,
-                        hint: 'Your name',
-                        maxLength: 80,
-                      ),
-                      const SizedBox(height: 10),
-                      _ProfileField(
-                        controller: phoneController,
-                        hint: 'Phone number',
-                        keyboardType: TextInputType.phone,
-                        maxLength: 32,
-                      ),
-                      const SizedBox(height: 10),
-                      WorkloopPickerField<String?>(
-                        value: selectedServiceId,
-                        title: 'Choose a service',
-                        hint: 'Service',
-                        searchHint: 'Search services',
-                        options: [
-                          const WorkloopPickerOption<String?>(
-                            value: null,
-                            label: 'Not sure yet',
-                          ),
-                          ...profile.services.map(
-                            (service) => WorkloopPickerOption<String?>(
-                              value: service.id,
-                              label: service.name,
+          Container(
+            key: bookingSectionKey,
+            child: _Section(
+              title: 'Request a booking',
+              child: bookingClosed
+                  ? const _ClosedBookingState()
+                  : sent
+                  ? const _SentState()
+                  : Column(
+                      children: [
+                        _ProfileField(
+                          controller: nameController,
+                          label: 'Name',
+                          hint: 'Your name',
+                          errorText: nameError,
+                          autofillHints: const [AutofillHints.name],
+                          textInputAction: TextInputAction.next,
+                          onChanged: onNameChanged,
+                          maxLength: 80,
+                        ),
+                        const SizedBox(height: 10),
+                        _ProfileField(
+                          controller: phoneController,
+                          label: 'Phone',
+                          hint: 'Phone number',
+                          errorText: phoneError,
+                          autofillHints: const [AutofillHints.telephoneNumber],
+                          textInputAction: TextInputAction.next,
+                          onChanged: onPhoneChanged,
+                          keyboardType: TextInputType.phone,
+                          maxLength: 32,
+                        ),
+                        const SizedBox(height: 10),
+                        WorkloopPickerField<String?>(
+                          value: selectedServiceId,
+                          title: 'Choose a service',
+                          hint: 'Service',
+                          searchHint: 'Search services',
+                          options: [
+                            const WorkloopPickerOption<String?>(
+                              value: null,
+                              label: 'Not sure yet',
+                            ),
+                            ...profile.services.map(
+                              (service) => WorkloopPickerOption<String?>(
+                                value: service.id,
+                                label: service.name,
+                              ),
+                            ),
+                          ],
+                          onChanged: onServiceChanged,
+                        ),
+                        const SizedBox(height: 10),
+                        _ProfileField(
+                          controller: preferredTimeController,
+                          label: 'Preferred time',
+                          hint: 'Preferred day or time',
+                          maxLength: 160,
+                        ),
+                        const SizedBox(height: 8),
+                        _PreferredTimeShortcuts(onPick: onPreferredTimePicked),
+                        const SizedBox(height: 10),
+                        _ProfileField(
+                          controller: messageController,
+                          label: 'Message',
+                          hint: 'Anything we should know?',
+                          maxLines: 3,
+                          maxLength: 1000,
+                        ),
+                        if (submitError != null) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          Semantics(
+                            liveRegion: true,
+                            container: true,
+                            label: submitError,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  LucideIcons.circleAlert,
+                                  color: AppColors.error,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: AppSpacing.xs),
+                                Expanded(
+                                  child: Text(
+                                    submitError!,
+                                    style: const TextStyle(
+                                      color: AppColors.error,
+                                      fontSize: 13,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
-                        onChanged: onServiceChanged,
-                      ),
-                      const SizedBox(height: 10),
-                      _ProfileField(
-                        controller: preferredTimeController,
-                        hint: 'Preferred day or time',
-                        maxLength: 160,
-                      ),
-                      const SizedBox(height: 8),
-                      _PreferredTimeShortcuts(onPick: onPreferredTimePicked),
-                      const SizedBox(height: 10),
-                      _ProfileField(
-                        controller: messageController,
-                        hint: 'Anything we should know?',
-                        maxLines: 3,
-                        maxLength: 1000,
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: ElevatedButton(
-                          onPressed: sending ? null : onSubmit,
-                          child: sending
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text('Send request'),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: sending ? null : onSubmit,
+                            child: sending
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      color: AppColors.onBrandAccent,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('Send request'),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(height: AppSpacing.xs),
+                        const _BookingPrivacyNotice(),
+                      ],
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BookingPrivacyNotice extends StatelessWidget {
+  const _BookingPrivacyNotice();
+
+  Future<void> _openPrivacyPolicy(BuildContext context) async {
+    final opened = await launchUrl(
+      Uri.parse(WorkloopAppInfo.privacyUrl),
+      mode: LaunchMode.externalApplication,
+    );
+    if (opened || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('The privacy policy could not be opened')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      child: Column(
+        children: [
+          const Text(
+            'Workloop sends these details to this business so they can respond to your request.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.t3, fontSize: 12, height: 1.4),
+          ),
+          WorkloopTextButton(
+            label: 'Privacy policy',
+            onPressed: () => _openPrivacyPolicy(context),
           ),
         ],
       ),
@@ -378,7 +514,7 @@ class _Hero extends StatelessWidget {
               child: Image.network(
                 coverUrl!,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, _, _) => Container(
                   color: AppColors.bgCard,
                   alignment: Alignment.center,
                   child: const Icon(
@@ -396,7 +532,7 @@ class _Hero extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: AppColors.green,
+              color: AppColors.accentPrimaryStrong,
               borderRadius: BorderRadius.circular(18),
             ),
             child: Center(
@@ -405,9 +541,9 @@ class _Hero extends StatelessWidget {
                     ? 'S'
                     : profile.businessName[0].toUpperCase(),
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.onBrandAccent,
                   fontSize: 28,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -418,8 +554,8 @@ class _Hero extends StatelessWidget {
           profile.businessName,
           style: const TextStyle(
             color: AppColors.t1,
-            fontSize: 34,
-            fontWeight: FontWeight.w900,
+            fontSize: 32,
+            fontWeight: FontWeight.w600,
             letterSpacing: 0,
           ),
         ),
@@ -439,9 +575,12 @@ class _Hero extends StatelessWidget {
           children: [
             const Icon(LucideIcons.link, color: AppColors.t3, size: 15),
             const SizedBox(width: 6),
-            Text(
-              'workloop.app/${profile.profile.handle}',
-              style: const TextStyle(color: AppColors.t3, fontSize: 13),
+            Expanded(
+              child: Text(
+                'workloop.app/${profile.profile.handle}',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.t3, fontSize: 13),
+              ),
             ),
           ],
         ),
@@ -473,7 +612,7 @@ class _GalleryGrid extends StatelessWidget {
         child: Image.network(
           visibleUrls[index],
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorBuilder: (_, _, _) => Container(
             color: AppColors.bgInteract,
             alignment: Alignment.center,
             child: const Icon(
@@ -593,7 +732,7 @@ class _ProfileBadges extends StatelessWidget {
                     style: const TextStyle(
                       color: AppColors.t2,
                       fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -627,7 +766,7 @@ class _Section extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.t3,
               fontSize: 10,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
               letterSpacing: 0,
             ),
           ),
@@ -665,7 +804,7 @@ class _ServiceRow extends StatelessWidget {
                   name,
                   style: const TextStyle(
                     color: AppColors.t1,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -688,10 +827,10 @@ class _ServiceRow extends StatelessWidget {
             ),
           ),
           Text(
-            '£${price.toStringAsFixed(0)}',
+            formatPounds(price),
             style: const TextStyle(
               color: AppColors.t1,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -719,11 +858,15 @@ class _HoursRow extends StatelessWidget {
           Expanded(
             child: Text(day, style: const TextStyle(color: AppColors.t2)),
           ),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.t1,
-              fontWeight: FontWeight.w600,
+          const SizedBox(width: AppSpacing.sm),
+          Flexible(
+            child: Text(
+              label,
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                color: AppColors.t1,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -734,32 +877,49 @@ class _HoursRow extends StatelessWidget {
 
 class _ProfileField extends StatelessWidget {
   final TextEditingController controller;
+  final String label;
   final String hint;
+  final String? errorText;
   final int maxLines;
   final TextInputType keyboardType;
+  final TextInputAction? textInputAction;
+  final Iterable<String>? autofillHints;
+  final ValueChanged<String>? onChanged;
   final int? maxLength;
 
   const _ProfileField({
     required this.controller,
+    required this.label,
     required this.hint,
+    this.errorText,
     this.maxLines = 1,
     this.keyboardType = TextInputType.text,
+    this.textInputAction,
+    this.autofillHints,
+    this.onChanged,
     this.maxLength,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      maxLength: maxLength,
-      buildCounter: maxLength == null
-          ? null
-          : (_, {required currentLength, required isFocused, maxLength}) =>
-                null,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: AppColors.t1),
-      decoration: _fieldDecoration(hint),
+    return Semantics(
+      textField: true,
+      label: label,
+      child: TextField(
+        controller: controller,
+        maxLines: maxLines,
+        maxLength: maxLength,
+        buildCounter: maxLength == null
+            ? null
+            : (_, {required currentLength, required isFocused, maxLength}) =>
+                  null,
+        keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        autofillHints: autofillHints,
+        onChanged: onChanged,
+        style: const TextStyle(color: AppColors.t1),
+        decoration: _fieldDecoration(hint, label: label, errorText: errorText),
+      ),
     );
   }
 }
@@ -779,27 +939,10 @@ class _PreferredTimeShortcuts extends StatelessWidget {
         runSpacing: 8,
         children: options
             .map(
-              (option) => GestureDetector(
+              (option) => WorkloopFilterChip(
+                label: option,
+                selected: false,
                 onTap: () => onPick(option),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgInteract,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Text(
-                    option,
-                    style: const TextStyle(
-                      color: AppColors.t2,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
               ),
             )
             .toList(),
@@ -808,9 +951,15 @@ class _PreferredTimeShortcuts extends StatelessWidget {
   }
 }
 
-InputDecoration _fieldDecoration(String hint) {
+InputDecoration _fieldDecoration(
+  String hint, {
+  String? label,
+  String? errorText,
+}) {
   return InputDecoration(
+    labelText: label,
     hintText: hint,
+    errorText: errorText,
     hintStyle: const TextStyle(color: AppColors.t3),
     filled: true,
     fillColor: AppColors.bgInteract,
@@ -824,7 +973,7 @@ InputDecoration _fieldDecoration(String hint) {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: AppColors.green, width: 1.4),
+      borderSide: const BorderSide(color: AppColors.accentInk, width: 1.5),
     ),
   );
 }
@@ -834,25 +983,32 @@ class _SentState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        Icon(LucideIcons.checkCircle2, color: AppColors.success, size: 34),
-        SizedBox(height: 10),
-        Text(
-          'Request sent',
-          style: TextStyle(
-            color: AppColors.t1,
-            fontWeight: FontWeight.w800,
-            fontSize: 17,
-          ),
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      label: 'Request sent. The business owner will contact you to confirm.',
+      child: const ExcludeSemantics(
+        child: Column(
+          children: [
+            Icon(LucideIcons.checkCircle2, color: AppColors.success, size: 34),
+            SizedBox(height: 10),
+            Text(
+              'Request sent',
+              style: TextStyle(
+                color: AppColors.t1,
+                fontWeight: FontWeight.w600,
+                fontSize: 17,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'The business owner will contact you to confirm.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.t3, fontSize: 13),
+            ),
+          ],
         ),
-        SizedBox(height: 4),
-        Text(
-          'The business owner will contact you to confirm.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.t3, fontSize: 13),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -879,7 +1035,7 @@ class _ClosedBookingState extends StatelessWidget {
             'Booking requests are closed',
             style: TextStyle(
               color: AppColors.t1,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
               fontSize: 16,
             ),
           ),
@@ -897,7 +1053,13 @@ class _ClosedBookingState extends StatelessWidget {
 class _ProfileMessage extends StatelessWidget {
   final String title;
   final String body;
-  const _ProfileMessage({required this.title, required this.body});
+  final VoidCallback? onRetry;
+
+  const _ProfileMessage({
+    required this.title,
+    required this.body,
+    this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -913,7 +1075,7 @@ class _ProfileMessage extends StatelessWidget {
               style: const TextStyle(
                 color: AppColors.t1,
                 fontSize: 22,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 8),
@@ -922,6 +1084,15 @@ class _ProfileMessage extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.t3),
             ),
+            if (onRetry != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              WorkloopPrimaryButton(
+                label: 'Try again',
+                icon: LucideIcons.refreshCw,
+                secondary: true,
+                onPressed: onRetry,
+              ),
+            ],
           ],
         ),
       ),

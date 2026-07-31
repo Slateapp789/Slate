@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/onboarding_provider.dart';
+import '../../../shared/utils/currency_format.dart';
+import '../../../shared/widgets/slate_ui.dart';
 
 class ObRevenueTarget extends ConsumerStatefulWidget {
   final VoidCallback onNext;
@@ -30,7 +32,7 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
       if (_presets.contains(target)) {
         _selected = target;
       } else {
-        _controller.text = target.toStringAsFixed(0);
+        _controller.text = currencyInputValue(target);
       }
     }
   }
@@ -62,7 +64,7 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
             'Set your\nrevenue target.',
             style: TextStyle(
               fontSize: 32,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
               color: AppColors.t1,
               letterSpacing: 0,
               height: 1.1,
@@ -90,7 +92,7 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
                     '£',
                     style: TextStyle(
                       fontSize: 24,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.t2,
                     ),
                   ),
@@ -101,14 +103,14 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
                     keyboardType: TextInputType.number,
                     style: const TextStyle(
                       fontSize: 24,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.t1,
                     ),
                     decoration: const InputDecoration(
                       hintText: '0',
                       hintStyle: TextStyle(
                         fontSize: 24,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         color: AppColors.t3,
                       ),
                       border: InputBorder.none,
@@ -120,18 +122,16 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
                   ),
                 ),
                 if (_controller.text.isNotEmpty)
-                  GestureDetector(
-                    onTap: () {
+                  IconButton(
+                    tooltip: 'Clear revenue target',
+                    onPressed: () {
                       _controller.clear();
                       setState(() {});
                     },
-                    child: const Padding(
-                      padding: EdgeInsets.only(right: 16),
-                      child: Icon(
-                        Icons.close_rounded,
-                        color: AppColors.t3,
-                        size: 18,
-                      ),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: AppColors.t3,
+                      size: 18,
                     ),
                   ),
               ],
@@ -144,7 +144,7 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
             'OR CHOOSE A TARGET',
             style: TextStyle(
               fontSize: 10,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               letterSpacing: 0,
               color: AppColors.t3,
             ),
@@ -155,32 +155,13 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
             runSpacing: 10,
             children: _presets.map((amount) {
               final active = _selected == amount && _controller.text.isEmpty;
-              return GestureDetector(
+              return WorkloopFilterChip(
+                label: formatPounds(amount),
+                selected: active,
                 onTap: () => setState(() {
                   _selected = amount;
                   _controller.clear();
                 }),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: active ? AppColors.greenDim : AppColors.bgCard,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: active ? AppColors.green : AppColors.border,
-                    ),
-                  ),
-                  child: Text(
-                    '£${amount.toStringAsFixed(0)}',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: active ? AppColors.green : AppColors.t2,
-                    ),
-                  ),
-                ),
               );
             }).toList(),
           ),
@@ -192,7 +173,7 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
             child: ElevatedButton(
               onPressed: _hasValue ? _continue : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.green,
+                backgroundColor: AppColors.brandAccent,
                 disabledBackgroundColor: AppColors.bgInteract,
                 foregroundColor: AppColors.onBrandAccent,
                 disabledForegroundColor: AppColors.t3,
@@ -203,22 +184,15 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
               ),
               child: const Text(
                 'Continue',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),
           const SizedBox(height: 16),
           Center(
-            child: GestureDetector(
-              onTap: widget.onNext,
-              child: const Text(
-                'Skip — set this later in settings',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.t3,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+            child: WorkloopTextButton(
+              label: 'Skip — set this later in settings',
+              onPressed: widget.onNext,
             ),
           ),
           const SizedBox(height: 32),

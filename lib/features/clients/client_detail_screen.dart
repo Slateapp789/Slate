@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
@@ -146,6 +146,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
       : '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
   Future<void> _handleBack() async {
+    if (_saving) return;
     FocusManager.instance.primaryFocus?.unfocus();
     if (!_editing || !_hasEditChanges) {
       await _leaveScreen();
@@ -179,6 +180,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   // ── Save / Delete ─────────────────────────────────────────────────────────
 
   Future<bool> _save() async {
+    if (_saving) return false;
     if (!_canSaveDraft) {
       _snack('Check the client name and email address.', AppColors.error);
       return false;
@@ -191,6 +193,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
         email: _emailController.text,
         excludingClientId: _client['id'] as String,
       );
+      if (!mounted) return false;
       if (duplicate != null) {
         setState(() => _saving = false);
         _snack(
@@ -230,6 +233,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                 .where((tag) => tag.isNotEmpty)
                 .toList(),
           });
+      if (!mounted) return true;
       setState(() {
         _client['name'] = _nameController.text.trim();
         _client['phone'] = _phoneController.text.trim();
@@ -253,60 +257,106 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
       ref.invalidate(clientCrmRecordsProvider);
       return true;
     } catch (_) {
+      if (!mounted) return false;
       setState(() => _saving = false);
-      if (mounted) {
-        _snack('Couldn’t save this client. Please try again.', AppColors.error);
-      }
+      _snack('Couldn’t save this client. Please try again.', AppColors.error);
       return false;
     }
   }
 
-  void _confirmDeleteClient() {
-    showModalBottomSheet(
+  Future<void> _confirmDeleteClient() async {
+    var deleting = false;
+    String? deleteError;
+
+    await showModalBottomSheet<void>(
       context: context,
+      isDismissible: false,
+      enableDrag: false,
       backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _handle(),
-              const SizedBox(height: 24),
-              Text(
-                'Delete ${_client['name']}?',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.t1,
-                ),
-                textAlign: TextAlign.center,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => PopScope(
+          canPop: !deleting,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _handle(),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Delete ${_client['name']}?',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.t1,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'This removes the client. Their bookings, money records, '
+                    'tasks and notes stay in Workloop without a client link.',
+                    style: TextStyle(fontSize: 14, color: AppColors.t3),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (deleteError != null) ...[
+                    const SizedBox(height: 16),
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        deleteError!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.error,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  _actionBtn(
+                    label: 'Delete Client',
+                    color: AppColors.error,
+                    loading: deleting,
+                    onTap: () async {
+                      if (deleting) return;
+                      setModal(() {
+                        deleting = true;
+                        deleteError = null;
+                      });
+                      try {
+                        await ref
+                            .read(clientsRepositoryProvider)
+                            .delete(_client['id'] as String);
+                      } catch (_) {
+                        if (!ctx.mounted) return;
+                        setModal(() {
+                          deleting = false;
+                          deleteError =
+                              'Couldn’t delete this client. Nothing was removed. Please try again.';
+                        });
+                        return;
+                      }
+                      ref.invalidate(clientsProvider);
+                      ref.invalidate(clientCrmRecordsProvider);
+                      if (!ctx.mounted) return;
+                      Navigator.pop(ctx);
+                      if (!mounted) return;
+                      setState(() => _allowPop = true);
+                      await WidgetsBinding.instance.endOfFrame;
+                      if (mounted) Navigator.pop(context);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  _cancelBtn(ctx, disabled: deleting),
+                ],
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'This will permanently remove the client and all linked data.',
-                style: TextStyle(fontSize: 14, color: AppColors.t3),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              _actionBtn(
-                label: 'Delete Client',
-                color: AppColors.error,
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  await ref
-                      .read(clientsRepositoryProvider)
-                      .delete(_client['id'] as String);
-                  ref.invalidate(clientsProvider);
-                  if (mounted) Navigator.pop(context);
-                },
-              ),
-              const SizedBox(height: 10),
-              _cancelBtn(ctx),
-            ],
+            ),
           ),
         ),
       ),
@@ -407,40 +457,20 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                       AppSpacing.pageX,
                       0,
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        WorkloopIconButton(
-                          icon: LucideIcons.chevronLeft,
-                          semanticLabel: 'Back to clients',
-                          onTap: _handleBack,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            _editing ? 'Edit client' : name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 26,
-                              height: 1.05,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.t1,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        _HeaderAction(
-                          label: _editing ? 'Save' : 'Edit',
-                          primary: _editing,
-                          loading: _saving,
-                          onTap: _saving || (_editing && !_canSaveDraft)
-                              ? null
-                              : () => _editing
-                                    ? _save()
-                                    : setState(() => _editing = true),
-                        ),
-                      ],
+                    child: WorkloopRouteHeader(
+                      title: _editing ? 'Edit client' : name,
+                      backSemanticLabel: 'Back to clients',
+                      onBack: _handleBack,
+                      trailing: _HeaderAction(
+                        label: _editing ? 'Save' : 'Edit',
+                        primary: _editing,
+                        loading: _saving,
+                        onTap: _saving || (_editing && !_canSaveDraft)
+                            ? null
+                            : () => _editing
+                                  ? _save()
+                                  : setState(() => _editing = true),
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
@@ -584,7 +614,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
               style: TextStyle(
                 color: AppColors.error,
                 fontSize: 13,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -636,7 +666,7 @@ class _ClientCompactHeader extends StatelessWidget {
                 initials.isEmpty ? '?' : initials,
                 style: const TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.modClients,
                 ),
               ),
@@ -653,7 +683,7 @@ class _ClientCompactHeader extends StatelessWidget {
                   style: TextStyle(
                     color: statusColor,
                     fontSize: 10,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -664,7 +694,7 @@ class _ClientCompactHeader extends StatelessWidget {
                   style: const TextStyle(
                     color: AppColors.t2,
                     fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ],
@@ -751,7 +781,10 @@ class _HeaderAction extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.pill),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 58, minHeight: 42),
+          constraints: const BoxConstraints(
+            minWidth: 58,
+            minHeight: AppSpacing.minTouch,
+          ),
           child: Center(
             child: loading
                 ? const SizedBox(
@@ -771,7 +804,7 @@ class _HeaderAction extends StatelessWidget {
                           ? AppColors.accentPrimary
                           : AppColors.t2,
                       fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
           ),
@@ -794,9 +827,10 @@ class _ClientWorkspaceNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return SlateGlassSurface(
-      blur: 22,
-      color: AppColors.bgCard.withValues(alpha: 0.90),
+      blur: 16,
+      color: tokens.surface,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
       child: SizedBox(
         height: 54,
@@ -836,15 +870,9 @@ class _ClientWorkspaceNavigation extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 2),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: AppColors.accentPrimary.withValues(
-                            alpha: 0.14,
-                          ),
+                          color: tokens.accentStrong,
                           borderRadius: BorderRadius.circular(AppRadius.pill),
-                          border: Border.all(
-                            color: AppColors.accentPrimary.withValues(
-                              alpha: 0.22,
-                            ),
-                          ),
+                          border: Border.all(color: tokens.accentStrong),
                         ),
                       ),
                     ),
@@ -853,20 +881,30 @@ class _ClientWorkspaceNavigation extends StatelessWidget {
                     children: List.generate(
                       _labels.length,
                       (tabIndex) => Expanded(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
+                        child: Semantics(
+                          button: true,
+                          selected: tabIndex == index,
+                          label: '${_labels[tabIndex]} client workspace tab',
                           onTap: () => select(tabIndex),
-                          child: Center(
-                            child: AnimatedDefaultTextStyle(
-                              duration: AppMotion.standard,
-                              style: TextStyle(
-                                color: tabIndex == index
-                                    ? AppColors.accentPrimary
-                                    : AppColors.t3,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
+                          child: ExcludeSemantics(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => select(tabIndex),
+                              child: Center(
+                                child: AnimatedDefaultTextStyle(
+                                  key: ValueKey(Theme.of(context).brightness),
+                                  duration: AppMotion.standard,
+                                  style: TextStyle(
+                                    fontFamily: 'Instrument Sans',
+                                    color: tabIndex == index
+                                        ? tokens.onAccent
+                                        : tokens.textSecondary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  child: Text(_labels[tabIndex]),
+                                ),
                               ),
-                              child: Text(_labels[tabIndex]),
                             ),
                           ),
                         ),
@@ -897,38 +935,48 @@ Widget _handle() => Center(
 
 Widget _actionBtn({
   required String label,
-  required VoidCallback onTap,
-  Color color = AppColors.green,
+  required VoidCallback? onTap,
+  bool loading = false,
+  Color color = AppColors.brandAccent,
 }) => SizedBox(
   width: double.infinity,
   height: 52,
   child: ElevatedButton(
-    onPressed: onTap,
+    onPressed: loading ? null : onTap,
     style: ElevatedButton.styleFrom(
       backgroundColor: color,
       foregroundColor: color == AppColors.error
-          ? Colors.white
+          ? AppColors.bg
           : AppColors.onBrandAccent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 0,
     ),
-    child: Text(
-      label,
-      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-    ),
+    child: loading
+        ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              color: AppColors.bg,
+              strokeWidth: 2,
+            ),
+          )
+        : Text(
+            label,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
   ),
 );
 
-Widget _cancelBtn(BuildContext ctx) => SizedBox(
+Widget _cancelBtn(BuildContext ctx, {bool disabled = false}) => SizedBox(
   width: double.infinity,
   height: 52,
   child: TextButton(
-    onPressed: () => Navigator.pop(ctx),
+    onPressed: disabled ? null : () => Navigator.pop(ctx),
     child: const Text(
       'Cancel',
       style: TextStyle(
         fontSize: 15,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w500,
         color: AppColors.t3,
       ),
     ),

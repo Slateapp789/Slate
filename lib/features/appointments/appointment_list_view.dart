@@ -7,7 +7,6 @@ class _AppointmentListView extends StatelessWidget {
   final String emptySubtitle;
   final Function(Map<String, dynamic>) onTap;
   final VoidCallback onRefresh;
-  final VoidCallback? onEmptyAction;
   final bool groupByDate;
   final bool showStatusBadge;
 
@@ -18,7 +17,6 @@ class _AppointmentListView extends StatelessWidget {
     required this.emptySubtitle,
     required this.onTap,
     required this.onRefresh,
-    this.onEmptyAction,
     this.groupByDate = false,
     this.showStatusBadge = false,
   });
@@ -26,36 +24,36 @@ class _AppointmentListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (appointments.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SlateEmptyState(
-                icon: emptyIcon,
-                title: emptyTitle,
-                subtitle: emptySubtitle,
+      return RefreshIndicator(
+        onRefresh: () async => onRefresh(),
+        color: AppColors.accentPrimary,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                0,
+                AppSpacing.pageX,
+                AppSpacing.bottomNavClearance,
               ),
-              if (onEmptyAction != null) ...[
-                const SizedBox(height: AppSpacing.lg),
-                SizedBox(
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: onEmptyAction,
-                    icon: const Icon(LucideIcons.calendarPlus, size: 17),
-                    label: const Text(
-                      'Add booking',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+              sliver: SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      WorkloopEmptyState(
+                        icon: emptyIcon,
+                        title: emptyTitle,
+                        subtitle: emptySubtitle,
                       ),
-                    ),
+                    ],
                   ),
                 ),
-              ],
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -69,10 +67,10 @@ class _AppointmentListView extends StatelessWidget {
             AppSpacing.pageX,
             0,
             AppSpacing.pageX,
-            100,
+            AppSpacing.bottomNavClearance,
           ),
           itemCount: appointments.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 2),
+          separatorBuilder: (_, _) => const SizedBox(height: 2),
           itemBuilder: (_, i) => _AppointmentCard(
             appt: appointments[i],
             onTap: () => onTap(appointments[i]),
@@ -101,7 +99,7 @@ class _AppointmentListView extends StatelessWidget {
           AppSpacing.pageX,
           0,
           AppSpacing.pageX,
-          100,
+          AppSpacing.bottomNavClearance,
         ),
         itemCount: keys.length,
         itemBuilder: (_, i) {
@@ -116,7 +114,7 @@ class _AppointmentListView extends StatelessWidget {
                   key,
                   style: const TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: 0,
                     color: AppColors.t3,
                   ),
@@ -143,7 +141,7 @@ class _AppointmentListView extends StatelessWidget {
   String _dateKey(DateTime dt) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final tomorrow = today.add(const Duration(days: 1));
+    final tomorrow = nextBookingCalendarDay(today);
     final d = DateTime(dt.year, dt.month, dt.day);
     final diff = d.difference(today).inDays;
 
@@ -200,7 +198,7 @@ class _BookingCalendarView extends StatelessWidget {
           AppSpacing.pageX,
           0,
           AppSpacing.pageX,
-          112,
+          AppSpacing.bottomNavClearance,
         ),
         children: [
           _MonthCalendar(
@@ -216,11 +214,11 @@ class _BookingCalendarView extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (selectedDayAppointments.isEmpty)
-            SlateEmptyState(
+            const WorkloopEmptyState(
               icon: LucideIcons.calendarPlus,
               title: 'No bookings this day',
               subtitle:
-                  'Use the gap for admin, client tasks, or add a booking.',
+                  'Use the gap for admin or choose Add in the day heading.',
             )
           else
             ...selectedDayAppointments.map(
@@ -230,20 +228,6 @@ class _BookingCalendarView extends StatelessWidget {
                 showStatusBadge: true,
               ),
             ),
-          if (selectedDayAppointments.isEmpty) ...[
-            const SizedBox(height: AppSpacing.lg),
-            SizedBox(
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: onEmptyAction,
-                icon: const Icon(LucideIcons.calendarPlus, size: 17),
-                label: const Text(
-                  'Add booking',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -251,7 +235,7 @@ class _BookingCalendarView extends StatelessWidget {
 
   int _countForDay(DateTime day) {
     final start = _dateOnly(day);
-    final end = start.add(const Duration(days: 1));
+    final end = nextBookingCalendarDay(start);
     return appointments.where((appt) {
       final dt = _start(appt);
       return dt != null &&
@@ -291,11 +275,22 @@ class _MonthCalendar extends StatelessWidget {
         children: [
           Row(
             children: [
-              IconButton(
-                onPressed: () => onDateSelected(
-                  DateTime(selectedDate.year, selectedDate.month - 1, 1),
+              Semantics(
+                button: true,
+                label: 'Previous month',
+                child: ExcludeSemantics(
+                  child: IconButton(
+                    tooltip: 'Previous month',
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouch,
+                      minHeight: AppSpacing.minTouch,
+                    ),
+                    onPressed: () => onDateSelected(
+                      DateTime(selectedDate.year, selectedDate.month - 1, 1),
+                    ),
+                    icon: const Icon(LucideIcons.chevronLeft, size: 18),
+                  ),
                 ),
-                icon: const Icon(LucideIcons.chevronLeft, size: 18),
               ),
               Expanded(
                 child: Text(
@@ -304,26 +299,43 @@ class _MonthCalendar extends StatelessWidget {
                   style: const TextStyle(
                     color: AppColors.t1,
                     fontSize: 17,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
               TextButton(
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(
+                    AppSpacing.minTouch,
+                    AppSpacing.minTouch,
+                  ),
+                ),
                 onPressed: () => onDateSelected(_dateOnly(DateTime.now())),
                 child: const Text(
                   'Today',
                   style: TextStyle(
                     color: AppColors.modCalendar,
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-              IconButton(
-                onPressed: () => onDateSelected(
-                  DateTime(selectedDate.year, selectedDate.month + 1, 1),
+              Semantics(
+                button: true,
+                label: 'Next month',
+                child: ExcludeSemantics(
+                  child: IconButton(
+                    tooltip: 'Next month',
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouch,
+                      minHeight: AppSpacing.minTouch,
+                    ),
+                    onPressed: () => onDateSelected(
+                      DateTime(selectedDate.year, selectedDate.month + 1, 1),
+                    ),
+                    icon: const Icon(LucideIcons.chevronRight, size: 18),
+                  ),
                 ),
-                icon: const Icon(LucideIcons.chevronRight, size: 18),
               ),
             ],
           ),
@@ -338,7 +350,7 @@ class _MonthCalendar extends StatelessWidget {
                         style: const TextStyle(
                           color: AppColors.t3,
                           fontSize: 11,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -362,57 +374,74 @@ class _MonthCalendar extends StatelessWidget {
               final selected = _dateOnly(date) == _dateOnly(selectedDate);
               final inMonth = date.month == month.month;
               final count = countForDay(date);
-              return GestureDetector(
-                onTap: () {
-                  SlateHaptics.tap();
-                  onDateSelected(_dateOnly(date));
-                },
-                child: AnimatedContainer(
-                  duration: AppMotion.fast,
-                  curve: AppMotion.curve,
-                  padding: const EdgeInsets.symmetric(vertical: 5),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? AppColors.accentPrimaryStrong.withValues(alpha: 0.72)
-                        : count > 0
-                        ? AppColors.accentPrimaryStrong.withValues(alpha: 0.20)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    border: Border.all(
-                      color: selected
-                          ? AppColors.accentPrimaryStrong.withValues(
-                              alpha: 0.74,
-                            )
-                          : AppColors.t1.withValues(alpha: 0.05),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '${date.day}',
-                        style: TextStyle(
+              void handleTap() {
+                SlateHaptics.tap();
+                onDateSelected(_dateOnly(date));
+              }
+
+              return Semantics(
+                button: true,
+                selected: selected,
+                label: '${date.day}/${date.month}/${date.year}',
+                value: '$count booking${count == 1 ? '' : 's'}',
+                onTap: handleTap,
+                child: ExcludeSemantics(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: handleTap,
+                    child: AnimatedContainer(
+                      key: ValueKey(Theme.of(context).brightness),
+                      duration: AppMotion.fast,
+                      curve: AppMotion.curve,
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? AppColors.accentPrimaryStrong.withValues(
+                                alpha: 0.72,
+                              )
+                            : count > 0
+                            ? AppColors.accentPrimaryStrong.withValues(
+                                alpha: 0.20,
+                              )
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        border: Border.all(
                           color: selected
-                              ? AppColors.panelInk
-                              : inMonth
-                              ? AppColors.t1
-                              : AppColors.t3.withValues(alpha: 0.42),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
+                              ? AppColors.accentPrimaryStrong.withValues(
+                                  alpha: 0.74,
+                                )
+                              : AppColors.t1.withValues(alpha: 0.05),
                         ),
                       ),
-                      const Spacer(),
-                      if (count > 0)
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? AppColors.panelInk
-                                : AppColors.accentPrimary,
-                            shape: BoxShape.circle,
+                      child: Column(
+                        children: [
+                          Text(
+                            '${date.day}',
+                            style: TextStyle(
+                              color: selected
+                                  ? AppColors.panelInk
+                                  : inMonth
+                                  ? AppColors.t1
+                                  : AppColors.t3.withValues(alpha: 0.42),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                    ],
+                          const Spacer(),
+                          if (count > 0)
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: selected
+                                    ? AppColors.panelInk
+                                    : AppColors.accentPrimary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               );
@@ -473,7 +502,7 @@ class _DayPlanHeader extends StatelessWidget {
                 style: const TextStyle(
                   color: AppColors.t1,
                   fontSize: 18,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 3),
@@ -573,7 +602,7 @@ class _AppointmentCard extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
           fontSize: 16,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
           color: AppColors.t1,
         ),
       ),
@@ -591,7 +620,7 @@ class _AppointmentCard extends StatelessWidget {
             style: const TextStyle(
               fontSize: 13,
               color: AppColors.t2,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
           if (showStatusBadge ||
@@ -641,10 +670,10 @@ class _AppointmentCard extends StatelessWidget {
         children: [
           if (price != null) ...[
             Text(
-              '£${(price as num).toStringAsFixed(0)}',
+              formatPounds(price as num),
               style: const TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
                 color: AppColors.t1,
               ),
             ),
@@ -688,7 +717,7 @@ class _AppointmentPill extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
               color: color,
             ),
           ),
@@ -702,7 +731,7 @@ String _friendlyDate(DateTime date) {
   final today = _dateOnly(DateTime.now());
   final day = _dateOnly(date);
   if (day == today) return 'Today';
-  if (day == today.add(const Duration(days: 1))) return 'Tomorrow';
+  if (day == nextBookingCalendarDay(today)) return 'Tomorrow';
   const weekdays = [
     'Monday',
     'Tuesday',

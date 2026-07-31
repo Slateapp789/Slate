@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../models/business_feed_item.dart';
@@ -61,7 +61,7 @@ class BusinessFeedList extends StatelessWidget {
                 foregroundColor: AppColors.modHome,
                 textStyle: const TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -143,7 +143,7 @@ class _BusinessFeedRow extends StatelessWidget {
               style: TextStyle(
                 color: AppColors.t1,
                 fontSize: compact ? 13 : 14,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -163,7 +163,7 @@ class _BusinessFeedRow extends StatelessWidget {
             style: TextStyle(
               color: AppColors.t3,
               fontSize: compact ? 12 : 13,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
           if (!compact) ...[
@@ -175,7 +175,7 @@ class _BusinessFeedRow extends StatelessWidget {
                   style: const TextStyle(
                     color: AppColors.t4,
                     fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 if (item.actionLabel != null) ...[
@@ -185,7 +185,7 @@ class _BusinessFeedRow extends StatelessWidget {
                     style: TextStyle(
                       color: color,
                       fontSize: 11,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -223,7 +223,7 @@ class _FeedPill extends StatelessWidget {
         style: TextStyle(
           color: color,
           fontSize: 10,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -242,7 +242,7 @@ class _FeedSectionLabel extends StatelessWidget {
       style: const TextStyle(
         color: AppColors.t3,
         fontSize: 10,
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w600,
       ),
     );
   }
@@ -275,7 +275,7 @@ class _BusinessFeedEmptyState extends StatelessWidget {
               style: const TextStyle(
                 color: AppColors.t3,
                 fontSize: 13,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
                 height: 1.3,
               ),
             ),

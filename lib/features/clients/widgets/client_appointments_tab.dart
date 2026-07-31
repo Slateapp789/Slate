@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/utils/currency_format.dart';
 import '../../../shared/widgets/slate_ui.dart';
 import '../../appointments/appointment_detail_screen.dart';
 import '../../appointments/add_appointment_screen.dart';
@@ -40,10 +41,11 @@ class ClientAppointmentsTab extends ConsumerWidget {
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppColors.green),
       ),
-      error: (e, _) => Center(
-        child: Text(
-          'Bookings could not be loaded.',
-          style: const TextStyle(color: AppColors.error),
+      error: (_, _) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: SlateErrorState(
+          message: 'Bookings could not be loaded.',
+          onRetry: () => ref.invalidate(clientAppointmentsProvider(clientId)),
         ),
       ),
       data: (appts) => appts.isEmpty
@@ -86,7 +88,7 @@ class ClientAppointmentsTab extends ConsumerWidget {
                     child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
                       itemCount: appts.length,
-                      separatorBuilder: (_, __) => const SizedBox.shrink(),
+                      separatorBuilder: (_, _) => const SizedBox.shrink(),
                       itemBuilder: (context, i) {
                         final appt = appts[i];
                         final dt = DateTime.tryParse(
@@ -124,7 +126,7 @@ class ClientAppointmentsTab extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w600,
                               color: AppColors.t1,
                             ),
                           ),
@@ -146,10 +148,10 @@ class ClientAppointmentsTab extends ConsumerWidget {
                             children: [
                               if (appt['price'] != null)
                                 Text(
-                                  '£${(appt['price'] as num).toStringAsFixed(0)}',
+                                  formatPounds(appt['price'] as num),
                                   style: const TextStyle(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w600,
                                     color: AppColors.t2,
                                   ),
                                 ),
@@ -158,7 +160,7 @@ class ClientAppointmentsTab extends ConsumerWidget {
                                 status.replaceAll('_', ' '),
                                 style: TextStyle(
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w600,
                                   color: statusColor,
                                 ),
                               ),
@@ -203,7 +205,7 @@ class _AppointmentsToolbar extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.t2,
               fontSize: 13,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const Spacer(),

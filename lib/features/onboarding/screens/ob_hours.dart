@@ -5,6 +5,15 @@ import '../../../shared/providers/onboarding_provider.dart';
 import '../../../shared/widgets/slate_ui.dart';
 
 const List<String> _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const Map<String, String> _dayLabels = {
+  'Mon': 'Monday',
+  'Tue': 'Tuesday',
+  'Wed': 'Wednesday',
+  'Thu': 'Thursday',
+  'Fri': 'Friday',
+  'Sat': 'Saturday',
+  'Sun': 'Sunday',
+};
 
 const Map<String, dynamic> _defaultHours = {
   'Mon': {'enabled': true, 'open': '09:00', 'close': '18:00'},
@@ -75,7 +84,7 @@ class _ObHoursState extends ConsumerState<ObHours> {
             'When do you work?',
             style: TextStyle(
               fontSize: 32,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
               color: AppColors.t1,
               letterSpacing: 0,
             ),
@@ -106,98 +115,83 @@ class _ObHoursState extends ConsumerState<ObHours> {
                         horizontal: 18,
                         vertical: 14,
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SizedBox(
-                            width: 36,
-                            child: Text(
-                              day,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: enabled ? AppColors.t1 : AppColors.t3,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _dayLabels[day]!,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: enabled
+                                        ? AppColors.t1
+                                        : AppColors.t3,
+                                  ),
+                                ),
                               ),
-                            ),
+                              Semantics(
+                                button: true,
+                                toggled: enabled,
+                                label: '${_dayLabels[day]} working day',
+                                value: enabled ? 'Open' : 'Closed',
+                                onTap: () => setState(
+                                  () => _hours[day]!['enabled'] = !enabled,
+                                ),
+                                child: ExcludeSemantics(
+                                  child: Switch(
+                                    value: enabled,
+                                    onChanged: (val) {
+                                      setState(
+                                        () => _hours[day]!['enabled'] = val,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
                           if (enabled) ...[
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => _pickTime(day, 'open'),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.bgInteract,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    data['open'],
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.t1,
-                                    ),
-                                    textAlign: TextAlign.center,
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _OnboardingTimeButton(
+                                    label: '${_dayLabels[day]} opening time',
+                                    value: data['open'] as String,
+                                    onTap: () => _pickTime(day, 'open'),
                                   ),
                                 ),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                              child: Text(
-                                '—',
-                                style: TextStyle(color: AppColors.t3),
-                              ),
-                            ),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => _pickTime(day, 'close'),
-                                child: Container(
+                                Padding(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.bgInteract,
-                                    borderRadius: BorderRadius.circular(8),
+                                    horizontal: 8,
                                   ),
                                   child: Text(
-                                    data['close'],
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.t1,
-                                    ),
-                                    textAlign: TextAlign.center,
+                                    '—',
+                                    style: TextStyle(color: AppColors.t3),
                                   ),
                                 ),
-                              ),
+                                Expanded(
+                                  child: _OnboardingTimeButton(
+                                    label: '${_dayLabels[day]} closing time',
+                                    value: data['close'] as String,
+                                    onTap: () => _pickTime(day, 'close'),
+                                  ),
+                                ),
+                              ],
                             ),
                           ] else ...[
-                            Expanded(
-                              child: Text(
-                                'Closed',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.t3,
-                                ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Closed',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.t3,
                               ),
                             ),
                           ],
-                          const SizedBox(width: 12),
-                          Switch(
-                            value: enabled,
-                            onChanged: (val) {
-                              setState(() => _hours[day]!['enabled'] = val);
-                            },
-                            activeThumbColor: AppColors.green,
-                            inactiveTrackColor: AppColors.bgInteract,
-                          ),
                         ],
                       ),
                     ),
@@ -215,7 +209,7 @@ class _ObHoursState extends ConsumerState<ObHours> {
             child: ElevatedButton(
               onPressed: _continue,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.green,
+                backgroundColor: AppColors.brandAccent,
                 foregroundColor: AppColors.onBrandAccent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -224,12 +218,60 @@ class _ObHoursState extends ConsumerState<ObHours> {
               ),
               child: const Text(
                 'Continue',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),
           const SizedBox(height: 32),
         ],
+      ),
+    );
+  }
+}
+
+class _OnboardingTimeButton extends StatelessWidget {
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  const _OnboardingTimeButton({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      value: value,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: AppColors.bgInteract,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: AppSpacing.minTouch),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.t1,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

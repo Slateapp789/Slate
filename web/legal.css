@@ -1,0 +1,141 @@
+:root {
+  color-scheme: dark;
+  --background: #101410;
+  --surface: #171d17;
+  --surface-strong: #202920;
+  --text: #f5f8f3;
+  --muted: #b9c4b5;
+  --neon: #c1ff72;
+  --neon-ink: #17200d;
+  --border: #2b362b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  color: var(--text);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 15% -10%, rgba(193, 255, 114, 0.14), transparent 32rem),
+    var(--background);
+}
+
+header,
+main,
+footer {
+  width: min(760px, calc(100% - 40px));
+  margin: 0 auto;
+}
+
+header {
+  padding: 48px 0 28px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-weight: 850;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--neon);
+  color: var(--neon-ink);
+  font-weight: 950;
+}
+
+h1 {
+  margin: 28px 0 8px;
+  font-size: clamp(2.2rem, 8vw, 4rem);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.updated,
+p,
+li {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.summary {
+  margin: 22px 0 30px;
+  padding: 20px;
+  border: 1px solid rgba(193, 255, 114, 0.26);
+  border-radius: 18px;
+  background: rgba(193, 255, 114, 0.07);
+  color: var(--text);
+}
+
+section {
+  margin: 14px 0;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(145deg, var(--surface), var(--surface-strong));
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  letter-spacing: -0.015em;
+}
+
+section p {
+  margin: 0;
+}
+
+a {
+  color: var(--neon);
+}
+
+.button {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  padding: 0 20px;
+  border-radius: 14px;
+  background: var(--neon);
+  color: var(--neon-ink);
+  font-weight: 850;
+  text-decoration: none;
+}
+
+footer {
+  padding: 28px 0 48px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}

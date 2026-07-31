@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/slate_models.dart';
+import 'repository_pagination.dart';
 import 'supabase_client_provider.dart';
 
 final notificationsRepositoryProvider = Provider<NotificationsRepository>((
@@ -29,12 +30,19 @@ class NotificationsRepository {
   }
 
   Future<int> unreadCount(String workspaceId) async {
-    final rows = await _client
-        .from('notifications')
-        .select('id')
-        .eq('workspace_id', workspaceId)
-        .eq('read', false);
-    return List<Map<String, dynamic>>.from(rows).length;
+    final rows = await fetchAllRepositoryPages<Map<String, dynamic>>(
+      loadPage: (from, to) async {
+        final page = await _client
+            .from('notifications')
+            .select('id')
+            .eq('workspace_id', workspaceId)
+            .eq('read', false)
+            .order('id', ascending: true)
+            .range(from, to);
+        return List<Map<String, dynamic>>.from(page);
+      },
+    );
+    return rows.length;
   }
 
   Future<Map<String, dynamic>?> preferences(String workspaceId) async {

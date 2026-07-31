@@ -2,11 +2,18 @@
 
 Date: 2026-07-19
 
+Historical status: this records the 2026-07-19 polish snapshot and its
+verification evidence. It is not the current release checklist. Launch
+hardening after this snapshot introduced the exact icon neon, real on-device
+reminders, transactional workflows, retry-safe imports, API 36/platform work,
+and CI. Use `docs/CurrentState.md` and `docs/LaunchReadiness.md` for current
+truth; do not treat the older build counts or blockers below as current.
+
 This document records the final full-application polish pass against the two supplied requirements briefs. It distinguishes shipped behaviour from deliberately unavailable or unverified capabilities so the product never over-promises.
 
 ## Product and UI foundation
 
-- The approved brand accent is centralised as `#C1FF72`; semantic foregrounds provide readable text and icons on lime.
+- The appearance-aware brand accent is centralised as forest `#246B4E` in Light mode and mint `#75C99A` in Dark mode; semantic foregrounds provide readable text and icons on both fills.
 - Light mode uses a warm white, extremely subtle textured backdrop. OLED-aware dark mode uses near-black semantic surfaces and a quieter texture.
 - Theme mode supports System, Light, and Dark and persists locally.
 - Shared typography, spacing, radius, border, motion, button, field, search, picker, segmented-control, surface, empty, loading, error, dialog, sheet, snackbar, switch, haptic, and navigation primitives are the default UI language.

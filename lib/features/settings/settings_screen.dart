@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/workloop_app_info.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../notifications/notifications_screen.dart';
@@ -34,36 +35,15 @@ class SettingsScreen extends ConsumerWidget {
                 AppSpacing.xxl,
               ),
               children: [
-                Row(
-                  children: [
-                    WorkloopIconButton(
-                      icon: LucideIcons.chevronLeft,
-                      semanticLabel: 'Back to more',
-                      onTap: () => Navigator.pop(context),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    const Expanded(
-                      child: Text(
-                        'Settings',
-                        style: TextStyle(
-                          color: AppColors.t1,
-                          fontSize: 26,
-                          height: 1.05,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
+                WorkloopRouteHeader(
+                  title: 'Settings',
+                  backSemanticLabel: 'Back to Home',
+                  onBack: () => Navigator.pop(context),
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                _AccountIdentity(name: name, email: email),
-                const SizedBox(height: AppSpacing.xxl),
-                const WorkloopSectionHeader(label: 'Your account'),
-                const SizedBox(height: AppSpacing.xs),
-                _SettingsRow(
-                  icon: LucideIcons.user,
-                  title: 'Account',
-                  subtitle: 'Personal details, password, data and sign out',
+                _AccountIdentity(
+                  name: name,
+                  email: email,
                   onTap: () => _open(
                     context,
                     ref,
@@ -71,6 +51,9 @@ class SettingsScreen extends ConsumerWidget {
                     child: const SettingsAccountTab(),
                   ),
                 ),
+                const SizedBox(height: AppSpacing.xxl),
+                const WorkloopSectionHeader(label: 'Preferences'),
+                const SizedBox(height: AppSpacing.xs),
                 _SettingsRow(
                   icon: LucideIcons.bell,
                   title: 'Notifications',
@@ -132,13 +115,13 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xxl),
-                const Text(
-                  'Workloop 1.0.0',
+                Text(
+                  'Workloop ${WorkloopAppInfo.version}',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.t4,
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -188,26 +171,10 @@ class _SettingsDestinationScreen extends StatelessWidget {
                     AppSpacing.pageX,
                     AppSpacing.xl,
                   ),
-                  child: Row(
-                    children: [
-                      WorkloopIconButton(
-                        icon: LucideIcons.chevronLeft,
-                        semanticLabel: 'Back to settings',
-                        onTap: () => Navigator.pop(context),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: const TextStyle(
-                            color: AppColors.t1,
-                            fontSize: 26,
-                            height: 1.05,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: WorkloopRouteHeader(
+                    title: title,
+                    backSemanticLabel: 'Back to settings',
+                    onBack: () => Navigator.pop(context),
                   ),
                 ),
                 Expanded(child: child),
@@ -223,60 +190,70 @@ class _SettingsDestinationScreen extends StatelessWidget {
 class _AccountIdentity extends StatelessWidget {
   final String? name;
   final String email;
+  final VoidCallback onTap;
 
-  const _AccountIdentity({required this.name, required this.email});
+  const _AccountIdentity({
+    required this.name,
+    required this.email,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final label = name?.isNotEmpty == true ? name! : 'Your account';
     final initial = label[0].toUpperCase();
-    return Row(
-      children: [
-        Container(
-          width: 52,
-          height: 52,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            color: AppColors.modBg,
-            shape: BoxShape.circle,
-          ),
-          child: Text(
-            initial,
-            style: const TextStyle(
-              color: AppColors.t1,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
+    return WorkloopSurface(
+      onTap: onTap,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: AppColors.modBg,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              initial,
+              style: const TextStyle(
+                color: AppColors.t1,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.t1,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.t1,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                email,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.t3,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.t3,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 18),
+        ],
+      ),
     );
   }
 }
@@ -316,7 +293,7 @@ class _SettingsRow extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t1,
           fontSize: 15,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(
@@ -324,7 +301,7 @@ class _SettingsRow extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t3,
           fontSize: 13,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w400,
         ),
       ),
       trailing: const Icon(

@@ -1,5 +1,8 @@
 # Workloop Full Audit
 
+> Historical snapshot from 2026-07-05. It does not describe the current
+> release candidate; use `CurrentState.md` and `LaunchReadiness.md`.
+
 Date: 2026-07-05
 Scope: Notion product context, Flutter app, local docs, Supabase schema/RLS/functions, live Supabase advisors, tests, and current setup state.
 

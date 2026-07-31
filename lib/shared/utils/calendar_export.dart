@@ -1,5 +1,8 @@
-String buildSlateIcs(List<Map<String, dynamic>> appointments) {
-  final now = _icsDate(DateTime.now().toUtc());
+String buildWorkloopIcs(
+  List<Map<String, dynamic>> appointments, {
+  DateTime? generatedAt,
+}) {
+  final now = _icsDate((generatedAt ?? DateTime.now()).toUtc());
   final events = appointments
       .where((row) => row['start_time'] != null)
       .map((row) => _event(row, now))
@@ -32,7 +35,7 @@ String _event(Map<String, dynamic> row, String stamp) {
       if (service != null) 'Service: $service',
       if (row['notes']?.toString().trim().isNotEmpty == true)
         row['notes'].toString(),
-    ].join('\\n'),
+    ].join('\n'),
   );
   final uid = _clean('${row['id'] ?? start.toIso8601String()}@workloop');
 

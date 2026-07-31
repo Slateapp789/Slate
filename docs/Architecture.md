@@ -1,23 +1,25 @@
-# Slate Architecture
+# Workloop Architecture
 
-Last updated: 2026-05-31
+Last updated: 2026-07-26
 
 ## Stack
 
-Slate is a Flutter application using:
+Workloop is a Flutter application using:
 
 - Flutter / Dart
 - Riverpod / flutter_riverpod for state management
-- Supabase for Auth, Postgres, and future storage/functions
+- Supabase for Auth, Postgres, RLS, RPC workflows, and Edge Functions
 - GoRouter for top-level routes
 - Material navigation for many nested flows
-- Google Fonts / Inter
-- Lucide icons
+- Bundled Instrument Sans variable font
+- `lucide_flutter` icons
 - url_launcher for phone/email/external actions
 - shared_preferences for non-critical, device-specific choices such as the default maps app
-- confetti for target celebration
+- `flutter_local_notifications` for opted-in on-device reminders
+- `device_calendar` and `file_picker` for reviewed imports and portable exports
 
-The app is multi-platform by Flutter structure, but current product design is mobile-first.
+The 1.0 product is phone-first: iPhone portrait on iOS 13+ and portrait Android
+on API 24+, targeting API 36.
 
 ## Folder Structure
 
@@ -31,12 +33,17 @@ lib/
   features/
     appointments/
     auth/
+    business_feed/
     calendar_sync/
     clients/
     dashboard/
     finance/
+    imports/
+    more/
+    notes/
     notifications/
     onboarding/
+    profile/
     public_profile/
     settings/
     tasks/
@@ -65,7 +72,8 @@ test/
 - Wraps the app in `ProviderScope`.
 - Builds `MaterialApp.router`.
 - Defines GoRouter routes.
-- Contains `AuthGate`, `WorkspaceGate`, `MainShell`, FAB sheet, and custom pill bottom nav.
+- Contains `AuthGate`, `WorkspaceGate`, `MainShell`, and the shared Workloop
+  bottom navigation.
 
 ## Auth and Workspace Flow
 
@@ -86,25 +94,35 @@ Top-level routes use GoRouter:
 
 - `/`
 - `/auth`
+- `/reset-password`
 - `/onboarding`
 - `/home`
+- `/business-feed`
+- `/clients`
+- `/clients/new`
 - `/tasks`
 - `/work`
+- `/bookings/new`
 - `/payments`
 - `/notifications`
+- `/notes`
 - `/booking-requests`
 - `/calendar-sync`
+- `/import-data`
 - `/p/:handle`
+- `/:handle` for public profile links
 
 Main app tabs are controlled by `MainShell` local state:
 
 - Home
 - Clients
 - Bookings
-- Money
-- Tasks
+- Tools
 
-Many detail and creation flows still use `Navigator.push` with `MaterialPageRoute`. This is acceptable for the current MVP but should eventually become a more consistent route strategy if deep linking and state restoration become important.
+Money, Tasks, and Notes are routed from Tools. Profile and Settings are opened
+from the Home header or direct feature links. Many detail and creation flows
+still use `Navigator.push`; this should migrate gradually when deeper
+restoration or linking requires it.
 
 ## State Management
 
@@ -127,7 +145,9 @@ Provider examples:
 - `tasksProvider`
 - `financeSummaryProvider`
 - `notificationsProvider`
-- `calendarSyncProvider`
+- `businessFeedProvider`
+- `dashboardAttentionProvider`
+- `workloopAppearanceProvider`
 
 ## Repository Pattern
 
@@ -147,7 +167,6 @@ Repositories include:
 - `DashboardRepository`
 - `ProfileRepository`
 - `NotificationsRepository`
-- `CalendarSyncRepository`
 - `PrivacyRepository`
 - `DebugDemoDataRepository`
 
@@ -191,16 +210,22 @@ Shared components live in:
 
 Important components:
 
-- `SlateSurface`
-- `SlateGlassSurface`
-- `SlateButton`
-- `SlateSheetFrame`
-- `SlateLoadingBlock`
-- supporting action/surface primitives
+- `WorkloopPage`
+- `WorkloopSurface`
+- `WorkloopPageHeader`
+- `WorkloopPrimaryButton`
+- `WorkloopBottomNav`
+- `WorkloopSegmentedControl`
+- `WorkloopPickerField`
+- `SlateErrorState` and retained compatibility primitives
 
 Theme tokens live in:
 
 `lib/core/theme/app_theme.dart`
+
+The exact icon/launch neon `#C1FF72` is the shared product accent. Dark
+foregrounds are used on neon fills; a deeper accent-ink role is used for small
+light-surface content.
 
 ## Current Naming Conventions
 

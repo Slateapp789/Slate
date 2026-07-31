@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/providers/appointments_provider.dart';
@@ -11,6 +11,8 @@ import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/currency_format.dart';
+import '../../shared/utils/workflow_idempotency.dart';
 import '../../shared/utils/working_hours.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../clients/widgets/client_form.dart';
@@ -61,6 +63,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   final List<TextEditingController> _taskControllers = [];
   bool _saving = false;
   bool _allowPop = false;
+  final String _workflowIdempotencyKey = createWorkflowIdempotencyKey();
   late DateTime _initialDate;
   late String? _initialClientId;
 
@@ -209,11 +212,19 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     try {
       final workspaceId = await ref.read(workspaceIdProvider.future);
       if (workspaceId == null) {
-        if (mounted) setState(() => _saving = false);
+        if (mounted) {
+          setState(() => _saving = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Your workspace is unavailable. Reload Workloop and try again.',
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
         return;
       }
-
-      var contactId = _selectedClientId;
 
       final startTime = DateTime(
         _selectedDate.year,
@@ -278,83 +289,44 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         );
       }
 
-      if (_creatingClient) {
-        contactId = await ref
-            .read(clientsRepositoryProvider)
-            .create(
-              workspaceId: workspaceId,
-              name: _newClientNameController.text,
-              phone: _newClientPhoneController.text,
-              email: _newClientEmailController.text,
-              address: _newClientAddressController.text,
-              status: 'active',
-            );
-      }
-
-      final bookingIds = await ref
-          .read(appointmentsRepositoryProvider)
-          .create(
-            workspaceId: workspaceId,
-            contactId: contactId!,
-            serviceId: _customService ? null : _selectedServiceId,
-            title: serviceName,
-            startTime: startTime,
-            endTime: endTime,
-            price: price,
-            notes: _notesController.text,
-            location: location,
-            recurrenceRule: recurrenceRule,
-            repeatOccurrences: repeatOccurrences,
-          );
       final taskTitles = _taskControllers
           .map((controller) => controller.text.trim())
           .where((title) => title.isNotEmpty)
           .toList();
-      if (taskTitles.isNotEmpty && bookingIds.isNotEmpty) {
-        await Future.wait(
-          taskTitles.map(
-            (title) => ref
-                .read(tasksRepositoryProvider)
-                .create(
-                  workspaceId: workspaceId,
-                  title: title,
-                  priority: 'medium',
-                  dueDate: _selectedDate,
-                  contactId: contactId,
-                  appointmentId: bookingIds.first,
-                ),
-          ),
-        );
-      }
-      if (_createPaymentDue && bookingIds.isNotEmpty && price > 0) {
-        for (final bookingId in bookingIds) {
-          await ref
-              .read(paymentsRepositoryProvider)
-              .create(
-                workspaceId: workspaceId,
-                amount: price,
-                status: 'sent',
-                date: startTime,
-                dueDate: startTime,
-                contactId: contactId,
-                appointmentId: bookingId,
-                notes: 'Payment due for $serviceLabel',
-              );
-        }
-      }
-      await ref
-          .read(notificationsRepositoryProvider)
-          .create(
-            workspaceId: workspaceId,
-            type: 'new_booking',
-            title: repeatOccurrences > 1
-                ? 'Repeating booking created'
-                : 'New booking created',
-            body: repeatOccurrences > 1
-                ? 'Created $repeatOccurrences bookings for $serviceLabel.'
-                : '$serviceLabel booked for ${_formatAppointmentDate(_selectedDate)}.',
-            deepLink: '/work',
-          );
+      await repository.createBookingWorkflow(
+        workspaceId: workspaceId,
+        idempotencyKey: _workflowIdempotencyKey,
+        contactId: _creatingClient ? null : _selectedClientId,
+        newContactName: _creatingClient ? _newClientNameController.text : null,
+        newContactPhone: _creatingClient
+            ? _newClientPhoneController.text
+            : null,
+        newContactEmail: _creatingClient
+            ? _newClientEmailController.text
+            : null,
+        newContactAddress: _creatingClient
+            ? _newClientAddressController.text
+            : null,
+        serviceId: _customService ? null : _selectedServiceId,
+        title: serviceName,
+        startTime: startTime,
+        endTime: endTime,
+        price: price,
+        notes: _notesController.text,
+        location: location,
+        recurrenceRule: recurrenceRule,
+        repeatOccurrences: repeatOccurrences,
+        taskTitles: taskTitles,
+        taskDueDate: _selectedDate,
+        createPaymentDue: _createPaymentDue && price > 0,
+        paymentNote: 'Payment due for $serviceLabel',
+        notificationTitle: repeatOccurrences > 1
+            ? 'Repeating booking created'
+            : 'New booking created',
+        notificationBody: repeatOccurrences > 1
+            ? 'Created $repeatOccurrences bookings for $serviceLabel.'
+            : '$serviceLabel booked for ${_formatAppointmentDate(_selectedDate)}.',
+      );
 
       ref.invalidate(appointmentsProvider);
       ref.invalidate(invoicesProvider);
@@ -537,35 +509,18 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                       AppSpacing.pageX,
                       0,
                     ),
-                    child: Row(
-                      children: [
-                        WorkloopIconButton(
-                          icon: LucideIcons.chevronLeft,
-                          semanticLabel: 'Back to bookings',
-                          onTap: _handleBack,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        const Expanded(
-                          child: Text(
-                            'New booking',
-                            style: TextStyle(
-                              color: AppColors.t1,
-                              fontSize: 26,
-                              height: 1.05,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        _BookingSaveAction(
-                          label: _repeatOccurrencesFor(_repeatMode) > 1
-                              ? 'Add ${_repeatOccurrencesFor(_repeatMode)}'
-                              : 'Add',
-                          loading: _saving,
-                          enabled: _canSave,
-                          onTap: _save,
-                        ),
-                      ],
+                    child: WorkloopRouteHeader(
+                      title: 'New booking',
+                      backSemanticLabel: 'Back to bookings',
+                      onBack: _handleBack,
+                      trailing: _BookingSaveAction(
+                        label: _repeatOccurrencesFor(_repeatMode) > 1
+                            ? 'Add ${_repeatOccurrencesFor(_repeatMode)}'
+                            : 'Add',
+                        loading: _saving,
+                        enabled: _canSave,
+                        onTap: _save,
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
@@ -592,8 +547,9 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                           clients.when(
                             loading: () =>
                                 const _AppointmentSkeleton(height: 54),
-                            error: (_, __) => const _AppointmentErrorBox(
-                              'Error loading clients',
+                            error: (_, _) => _AppointmentErrorBox(
+                              'Could not load clients',
+                              onRetry: () => ref.invalidate(clientsProvider),
                             ),
                             data: (data) => Column(
                               children: [
@@ -632,29 +588,21 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                     onChanged: (_) => setState(() {}),
                                   ),
                                   const SizedBox(height: 10),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _AppointmentTextInput(
-                                          controller: _newClientPhoneController,
-                                          label: 'Phone number',
-                                          hint: 'Phone',
-                                          icon: LucideIcons.phone,
-                                          keyboardType: TextInputType.phone,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: _AppointmentTextInput(
-                                          controller: _newClientEmailController,
-                                          label: 'Email address',
-                                          hint: 'Email',
-                                          icon: LucideIcons.mail,
-                                          keyboardType:
-                                              TextInputType.emailAddress,
-                                        ),
-                                      ),
-                                    ],
+                                  _ResponsiveBookingPair(
+                                    first: _AppointmentTextInput(
+                                      controller: _newClientPhoneController,
+                                      label: 'Phone number',
+                                      hint: 'Phone',
+                                      icon: LucideIcons.phone,
+                                      keyboardType: TextInputType.phone,
+                                    ),
+                                    second: _AppointmentTextInput(
+                                      controller: _newClientEmailController,
+                                      label: 'Email address',
+                                      hint: 'Email',
+                                      icon: LucideIcons.mail,
+                                      keyboardType: TextInputType.emailAddress,
+                                    ),
                                   ),
                                   const SizedBox(height: 10),
                                   BookingAddressField(
@@ -701,8 +649,9 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                           services.when(
                             loading: () =>
                                 const _AppointmentSkeleton(height: 54),
-                            error: (_, __) => const _AppointmentErrorBox(
-                              'Error loading services',
+                            error: (_, _) => _AppointmentErrorBox(
+                              'Could not load services',
+                              onRetry: () => ref.invalidate(servicesProvider),
                             ),
                             data: (data) => Column(
                               children: [
@@ -718,7 +667,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                         value: service['id'] as String,
                                         label: service['name'] as String,
                                         subtitle:
-                                            '£${(service['price'] as num).toStringAsFixed(0)} · ${service['duration_mins']} min',
+                                            '${formatPounds(service['price'] as num)} · ${service['duration_mins']} min',
                                       ),
                                     ),
                                     const WorkloopPickerOption(
@@ -763,7 +712,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                       ].contains(duration);
                                       _priceController.text = price == null
                                           ? ''
-                                          : price.toStringAsFixed(0);
+                                          : currencyInputValue(price);
                                       _durationController.text = '$duration';
                                     });
                                   },
@@ -784,7 +733,10 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                   label: 'Price',
                                   hint: 'Price',
                                   prefix: '£',
-                                  keyboardType: TextInputType.number,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
                                   onChanged: (_) => setState(() {}),
                                 ),
                                 const SizedBox(height: 12),
@@ -804,42 +756,54 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                             subtitle: 'When the work takes place.',
                           ),
                           const SizedBox(height: 8),
-                          GestureDetector(
+                          Semantics(
+                            button: true,
+                            label: 'Booking date',
+                            value: _formatAppointmentDate(_selectedDate),
                             onTap: _pickDate,
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.bgCard,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.calendar_today_rounded,
-                                    color: AppColors.t3,
-                                    size: 16,
+                            child: ExcludeSemantics(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: _pickDate,
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 16,
                                   ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    _formatAppointmentDate(_selectedDate),
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.t1,
-                                    ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.bgCard,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: AppColors.border),
                                   ),
-                                  const Spacer(),
-                                  const Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: AppColors.t3,
-                                    size: 18,
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.calendar_today_rounded,
+                                        color: AppColors.t3,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          _formatAppointmentDate(_selectedDate),
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w500,
+                                            color: AppColors.t1,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: AppSpacing.sm),
+                                      const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: AppColors.t3,
+                                        size: 18,
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           ),
@@ -862,39 +826,56 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                             ),
                             child: Column(
                               children: [
-                                GestureDetector(
+                                Semantics(
+                                  button: true,
+                                  label: 'Booking start time',
+                                  value:
+                                      '${_selectedHour.toString().padLeft(2, '0')}:${_selectedMinute.toString().padLeft(2, '0')}',
                                   onTap: _pickTime,
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.access_time_rounded,
-                                        color: AppColors.t3,
-                                        size: 16,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        '${_selectedHour.toString().padLeft(2, '0')}:${_selectedMinute.toString().padLeft(2, '0')}',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w800,
-                                          color: AppColors.t1,
+                                  child: ExcludeSemantics(
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: _pickTime,
+                                      child: ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          minHeight: AppSpacing.minTouch,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.access_time_rounded,
+                                              color: AppColors.t3,
+                                              size: 16,
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Text(
+                                              '${_selectedHour.toString().padLeft(2, '0')}:${_selectedMinute.toString().padLeft(2, '0')}',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.t1,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                'to $endStr',
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  color: AppColors.t3,
+                                                ),
+                                              ),
+                                            ),
+                                            const Icon(
+                                              Icons.chevron_right_rounded,
+                                              color: AppColors.t3,
+                                              size: 18,
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'to $endStr',
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          color: AppColors.t3,
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      const Icon(
-                                        Icons.chevron_right_rounded,
-                                        color: AppColors.t3,
-                                        size: 18,
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 14),
@@ -906,72 +887,16 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                       final selected =
                                           !_customDuration &&
                                           _selectedDurationValue == minutes;
-                                      return GestureDetector(
+                                      return WorkloopFilterChip(
+                                        label: '${minutes}m',
+                                        selected: selected,
                                         onTap: () => _setDuration(minutes),
-                                        child: AnimatedContainer(
-                                          duration: AppMotion.fast,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 8,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: selected
-                                                ? AppColors.slateLight
-                                                : AppColors.bgInteract,
-                                            borderRadius: BorderRadius.circular(
-                                              999,
-                                            ),
-                                            border: Border.all(
-                                              color: selected
-                                                  ? AppColors.borderStrong
-                                                  : AppColors.border,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            '${minutes}m',
-                                            style: TextStyle(
-                                              color: selected
-                                                  ? AppColors.panelInk
-                                                  : AppColors.t2,
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ),
                                       );
                                     }),
-                                    GestureDetector(
+                                    WorkloopFilterChip(
+                                      label: 'Custom',
+                                      selected: _customDuration,
                                       onTap: _showCustomDuration,
-                                      child: AnimatedContainer(
-                                        duration: AppMotion.fast,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 8,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _customDuration
-                                              ? AppColors.slateLight
-                                              : AppColors.bgInteract,
-                                          borderRadius: BorderRadius.circular(
-                                            999,
-                                          ),
-                                          border: Border.all(
-                                            color: _customDuration
-                                                ? AppColors.borderStrong
-                                                : AppColors.border,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          'Custom',
-                                          style: TextStyle(
-                                            color: _customDuration
-                                                ? AppColors.panelInk
-                                                : AppColors.t2,
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ),
                                     ),
                                   ],
                                 ),
@@ -1016,40 +941,12 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                 ].map((choice) {
                                   final selected =
                                       _locationMode == choice.value;
-                                  return GestureDetector(
+                                  return WorkloopFilterChip(
+                                    label: choice.label,
+                                    selected: selected,
                                     onTap: () => _setLocationMode(
                                       choice.value,
                                       clients.value ?? const <Client>[],
-                                    ),
-                                    child: AnimatedContainer(
-                                      duration: AppMotion.fast,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 13,
-                                        vertical: 9,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: selected
-                                            ? AppColors.slateLight
-                                            : AppColors.bgCard,
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                        border: Border.all(
-                                          color: selected
-                                              ? AppColors.borderStrong
-                                              : AppColors.border,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        choice.label,
-                                        style: TextStyle(
-                                          color: selected
-                                              ? AppColors.panelInk
-                                              : AppColors.t2,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
                                     ),
                                   );
                                 }).toList(),
@@ -1242,6 +1139,8 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                           ),
                                         ),
                                         IconButton(
+                                          tooltip:
+                                              'Remove linked task ${index + 1}',
                                           onPressed: () {
                                             setState(() {
                                               _taskControllers.removeAt(index);

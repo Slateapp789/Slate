@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/onboarding_provider.dart';
+import '../../../shared/utils/currency_format.dart';
+import '../../../shared/widgets/slate_ui.dart';
 
 const Map<String, List<Map<String, dynamic>>> industryServices = {
   'Hair & Barbering': [
@@ -79,7 +81,7 @@ class _ObServicesState extends ConsumerState<ObServices> {
 
   void _addService() {
     setState(() {
-      _services.add({'name': 'New Service', 'duration': 60, 'price': 50.0});
+      _services.add({'name': 'New service', 'duration': 60, 'price': 50.0});
     });
   }
 
@@ -100,7 +102,7 @@ class _ObServicesState extends ConsumerState<ObServices> {
             'Your services.',
             style: TextStyle(
               fontSize: 32,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
               color: AppColors.t1,
               letterSpacing: 0,
             ),
@@ -132,65 +134,46 @@ class _ObServicesState extends ConsumerState<ObServices> {
                           s['name'],
                           style: TextStyle(
                             fontSize: 15,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
                             color: AppColors.t1,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${s['duration']} min  ·  £${s['price'].toStringAsFixed(0)}',
+                          '${s['duration']} min  ·  ${formatPounds(s['price'] as num)}',
                           style: TextStyle(fontSize: 13, color: AppColors.t3),
                         ),
                       ],
                     ),
                   ),
-                  GestureDetector(
+                  WorkloopIconButton(
+                    icon: Icons.close_rounded,
+                    semanticLabel: 'Remove ${s['name']}',
+                    color: AppColors.error,
+                    backgroundColor: AppColors.errorDim,
                     onTap: () => _removeService(i),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: AppColors.errorDim,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.close_rounded,
-                        color: AppColors.error,
-                        size: 16,
-                      ),
-                    ),
                   ),
                 ],
               ),
             );
           }),
-          // Add service button
-          GestureDetector(
-            onTap: _addService,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.bgCard,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: AppColors.border,
-                  style: BorderStyle.solid,
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _addService,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.green,
+                backgroundColor: AppColors.bgCard,
+                minimumSize: const Size.fromHeight(52),
+                side: const BorderSide(color: AppColors.border),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add_rounded, color: AppColors.green, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Add a service',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.green,
-                    ),
-                  ),
-                ],
+              icon: const Icon(Icons.add_rounded, size: 20),
+              label: const Text(
+                'Add a service',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -201,7 +184,7 @@ class _ObServicesState extends ConsumerState<ObServices> {
             child: ElevatedButton(
               onPressed: _services.isNotEmpty ? _continue : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.green,
+                backgroundColor: AppColors.brandAccent,
                 disabledBackgroundColor: AppColors.bgInteract,
                 foregroundColor: AppColors.onBrandAccent,
                 disabledForegroundColor: AppColors.t3,
@@ -212,22 +195,15 @@ class _ObServicesState extends ConsumerState<ObServices> {
               ),
               child: const Text(
                 'Continue',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),
           const SizedBox(height: 16),
           Center(
-            child: GestureDetector(
-              onTap: widget.onNext,
-              child: Text(
-                'Skip — add services later',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.t3,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+            child: WorkloopTextButton(
+              label: 'Skip — add services later',
+              onPressed: widget.onNext,
             ),
           ),
           const SizedBox(height: 32),

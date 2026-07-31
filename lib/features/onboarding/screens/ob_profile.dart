@@ -75,7 +75,7 @@ class _ObProfileState extends ConsumerState<ObProfile> {
             'Tell us about\nyourself.',
             style: TextStyle(
               fontSize: 32,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
               color: AppColors.t1,
               letterSpacing: 0,
               height: 1.1,
@@ -125,7 +125,7 @@ class _ObProfileState extends ConsumerState<ObProfile> {
             child: ElevatedButton(
               onPressed: _canContinue ? _continue : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.green,
+                backgroundColor: AppColors.brandAccent,
                 disabledBackgroundColor: AppColors.bgInteract,
                 foregroundColor: AppColors.onBrandAccent,
                 disabledForegroundColor: AppColors.t3,
@@ -136,7 +136,7 @@ class _ObProfileState extends ConsumerState<ObProfile> {
               ),
               child: const Text(
                 'Continue',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -151,7 +151,7 @@ class _ObProfileState extends ConsumerState<ObProfile> {
       text,
       style: TextStyle(
         fontSize: 13,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w500,
         color: AppColors.t2,
         letterSpacing: 0,
       ),

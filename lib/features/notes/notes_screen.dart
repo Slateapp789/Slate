@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
@@ -8,6 +8,7 @@ import '../../shared/providers/notes_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/notes_repository.dart';
 import '../../shared/widgets/slate_ui.dart';
+import 'note_logic.dart';
 import '../imports/text_import_screen.dart';
 
 const _uncheckedChecklistMarker = '○  ';
@@ -76,47 +77,38 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
           SafeArea(
+            bottom: false,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.pageX,
-                    AppSpacing.lg,
+                    AppSpacing.screenTop,
                     AppSpacing.pageX,
                     0,
                   ),
-                  child: Row(
-                    children: [
-                      if (widget.showBackButton) ...[
-                        WorkloopIconButton(
-                          icon: LucideIcons.chevronLeft,
-                          semanticLabel: 'Back',
-                          onTap: () => Navigator.maybePop(context),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                      ],
-                      Expanded(
-                        child: WorkloopPageHeader(
-                          icon: LucideIcons.fileText,
+                  child: widget.showBackButton
+                      ? WorkloopRouteHeader(
                           title: 'Notes',
-                          subtitle: 'Capture context before it disappears.',
-                          color: AppColors.modNotes,
-                          trailing: WorkloopIconButton(
-                            icon: LucideIcons.plus,
+                          trailing: WorkloopTopAction(
+                            label: 'New note',
                             semanticLabel: 'New note',
-                            color: AppColors.modNotes,
-                            backgroundColor: AppColors.modNotes.withValues(
-                              alpha: 0.10,
-                            ),
+                            onTap: () => _openEditor(),
+                          ),
+                        )
+                      : WorkloopPageHeader(
+                          title: 'Notes',
+                          subtitle: 'Keep the context you will need later.',
+                          color: AppColors.modNotes,
+                          trailing: WorkloopTopAction(
+                            label: 'New note',
+                            semanticLabel: 'New note',
                             onTap: () => _openEditor(),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
                 ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.xl),
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.pageX,
@@ -139,11 +131,14 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                 Expanded(
                   child: notes.when(
                     loading: () => _loadingList(),
-                    error: (_, __) => const Padding(
-                      padding: EdgeInsets.symmetric(
+                    error: (_, _) => Padding(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.pageX,
                       ),
-                      child: SlateErrorState(message: 'Could not load notes'),
+                      child: SlateErrorState(
+                        message: 'Could not load notes. Check your connection.',
+                        onRetry: () => ref.invalidate(allNotesProvider),
+                      ),
                     ),
                     data: (data) => _NotesList(
                       notes: _filteredNotes(data),
@@ -199,8 +194,8 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         40,
       ),
       itemCount: 8,
-      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xs),
-      itemBuilder: (_, __) =>
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.xs),
+      itemBuilder: (_, _) =>
           const SlateLoadingBlock(height: 72, radius: AppRadius.md),
     );
   }
@@ -268,7 +263,7 @@ class _NotesList extends StatelessWidget {
           AppSpacing.pageX,
           0,
           AppSpacing.pageX,
-          112,
+          AppSpacing.bottomNavClearance,
         ),
         children: [
           if (notes.isEmpty)
@@ -284,12 +279,6 @@ class _NotesList extends StatelessWidget {
                         : 'Useful details will appear here.',
                   ),
                   if (!hasSearch) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    WorkloopPrimaryButton(
-                      label: 'Add note',
-                      icon: LucideIcons.plus,
-                      onPressed: onCreate,
-                    ),
                     const SizedBox(height: AppSpacing.xs),
                     WorkloopTextButton(
                       label: 'Import notes files',
@@ -326,7 +315,7 @@ class _NoteDateHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-      child: WorkloopSectionHeader(label: label),
+      child: WorkloopSectionHeader(label: label, quiet: true),
     );
   }
 }
@@ -383,7 +372,7 @@ class _NoteListRow extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t1,
           fontSize: 15,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Column(
@@ -394,7 +383,7 @@ class _NoteListRow extends StatelessWidget {
               children: [
                 TextSpan(
                   text: _noteDateLabel(note),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const TextSpan(text: '  '),
                 TextSpan(text: preview),
@@ -416,7 +405,7 @@ class _NoteListRow extends StatelessWidget {
               style: const TextStyle(
                 color: AppColors.t3,
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
               ),
             ),
         ],
@@ -503,48 +492,42 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
                       AppSpacing.pageX,
                       0,
                     ),
-                    child: Row(
-                      children: [
-                        WorkloopIconButton(
-                          icon: LucideIcons.chevronLeft,
-                          semanticLabel: 'Back to notes',
-                          onTap: _saving ? () {} : _saveAndClose,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        const Expanded(
-                          child: Text(
-                            'Note',
-                            style: TextStyle(
-                              color: AppColors.t1,
-                              fontSize: 26,
-                              height: 1.05,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        WorkloopIconButton(
-                          icon: _pinned ? LucideIcons.pinOff : LucideIcons.pin,
-                          semanticLabel: _pinned ? 'Unpin note' : 'Pin note',
-                          color: _pinned ? AppColors.modNotes : AppColors.t2,
-                          backgroundColor: _pinned
-                              ? AppColors.modNotes.withValues(alpha: 0.12)
-                              : null,
-                          size: 42,
-                          onTap: () => setState(() => _pinned = !_pinned),
-                        ),
-                        if (isEditing) ...[
-                          const SizedBox(width: AppSpacing.xs),
+                    child: WorkloopRouteHeader(
+                      title: 'Note',
+                      backSemanticLabel: 'Back to notes',
+                      onBack: _saving ? () {} : _saveAndClose,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           WorkloopIconButton(
-                            icon: LucideIcons.moreHorizontal,
-                            semanticLabel: 'Note actions',
-                            color: AppColors.t2,
+                            icon: _pinned
+                                ? LucideIcons.pinOff
+                                : LucideIcons.pin,
+                            semanticLabel: _pinned ? 'Unpin note' : 'Pin note',
+                            color: _pinned ? AppColors.modNotes : AppColors.t2,
+                            backgroundColor: _pinned
+                                ? AppColors.modNotes.withValues(alpha: 0.12)
+                                : null,
                             size: 42,
-                            onTap: _showNoteActions,
+                            onTap: () => setState(() => _pinned = !_pinned),
+                          ),
+                          if (isEditing) ...[
+                            const SizedBox(width: AppSpacing.xs),
+                            WorkloopIconButton(
+                              icon: LucideIcons.moreHorizontal,
+                              semanticLabel: 'Note actions',
+                              color: AppColors.t2,
+                              size: 42,
+                              onTap: _showNoteActions,
+                            ),
+                          ],
+                          const SizedBox(width: AppSpacing.xs),
+                          _NoteDoneAction(
+                            loading: _saving,
+                            onTap: _saveAndClose,
                           ),
                         ],
-                        const SizedBox(width: AppSpacing.xs),
-                        _NoteDoneAction(loading: _saving, onTap: _saveAndClose),
-                      ],
+                      ),
                     ),
                   ),
                   if (_error != null) ...[
@@ -566,6 +549,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
                         88,
                       ),
                       child: Stack(
+                        clipBehavior: Clip.none,
                         children: [
                           TextField(
                             controller: _controller,
@@ -581,7 +565,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
                               color: AppColors.t1,
                               fontSize: 17,
                               height: 1.45,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w400,
                             ),
                             decoration: const InputDecoration(
                               filled: false,
@@ -594,7 +578,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
                                 color: AppColors.t3,
                                 fontSize: 17,
                                 height: 1.55,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w400,
                               ),
                             ),
                           ),
@@ -632,6 +616,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
       _controller.text != _originalText || _pinned != _originalPinned;
 
   Future<void> _showNoteActions() async {
+    if (_saving) return;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -652,7 +637,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
               style: TextStyle(
                 color: AppColors.t1,
                 fontSize: 20,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -668,7 +653,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
                 style: TextStyle(
                   color: AppColors.error,
                   fontSize: 15,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               onTap: () {
@@ -743,6 +728,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
   }
 
   Future<void> _saveAndClose() async {
+    if (_saving) return;
     final saved = await _save();
     if (saved && mounted) {
       _allowPop = true;
@@ -751,7 +737,8 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
   }
 
   Future<bool> _save() async {
-    final draft = _NoteDraft.fromText(_controller.text);
+    if (_saving) return false;
+    final draft = parseNoteDraft(_controller.text);
     if (draft.isEmpty && widget.note == null) return true;
 
     setState(() {
@@ -797,35 +784,99 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
 
   Future<void> _confirmDelete() async {
     final note = widget.note;
-    if (note == null) return;
+    if (note == null || _saving) return;
+
+    var deleting = false;
+    String? deleteError;
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
-        title: const Text('Delete note?'),
-        content: Text(
-          note.title.trim().isEmpty ? 'This note will be deleted.' : note.title,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: AppColors.error),
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialog) => PopScope(
+          canPop: !deleting,
+          child: AlertDialog(
+            backgroundColor: AppColors.bgCard,
+            title: const Text('Delete note?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  note.title.trim().isEmpty
+                      ? 'This note will be permanently deleted.'
+                      : note.title,
+                ),
+                if (deleteError != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      deleteError!,
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
+            actions: [
+              TextButton(
+                onPressed: deleting
+                    ? null
+                    : () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: deleting
+                    ? null
+                    : () async {
+                        setDialog(() {
+                          deleting = true;
+                          deleteError = null;
+                        });
+                        try {
+                          await ref
+                              .read(notesRepositoryProvider)
+                              .delete(note.id);
+                        } catch (_) {
+                          if (!dialogContext.mounted) return;
+                          setDialog(() {
+                            deleting = false;
+                            deleteError =
+                                'Couldn’t delete this note. Nothing was removed. Please try again.';
+                          });
+                          return;
+                        }
+                        ref.invalidate(allNotesProvider);
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext, true);
+                        }
+                      },
+                child: deleting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          color: AppColors.error,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'Delete',
+                        style: TextStyle(color: AppColors.error),
+                      ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
     if (confirmed != true) return;
 
-    await ref.read(notesRepositoryProvider).delete(note.id);
-    ref.invalidate(allNotesProvider);
     if (mounted) {
       _allowPop = true;
       Navigator.pop(context);
@@ -917,13 +968,23 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
   List<Widget> _checklistMarkerButtons() {
     return _checklistMarkers().map((marker) {
       return Positioned(
-        left: -2,
-        top: marker.top,
-        width: 30,
-        height: 26,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
+        left: -12,
+        top: marker.top - 9,
+        width: AppSpacing.minTouch,
+        height: AppSpacing.minTouch,
+        child: Semantics(
+          button: true,
+          checked: marker.checked,
+          label: marker.checked
+              ? 'Mark checklist item incomplete'
+              : 'Mark checklist item complete',
           onTap: () => _toggleChecklistMarker(marker),
+          child: ExcludeSemantics(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _toggleChecklistMarker(marker),
+            ),
+          ),
         ),
       );
     }).toList();
@@ -1157,7 +1218,10 @@ class _NoteDoneAction extends StatelessWidget {
         onTap: loading ? null : onTap,
         borderRadius: BorderRadius.circular(AppRadius.pill),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 62, minHeight: 42),
+          constraints: const BoxConstraints(
+            minWidth: 62,
+            minHeight: AppSpacing.minTouch,
+          ),
           child: Center(
             child: loading
                 ? const SizedBox(
@@ -1173,7 +1237,7 @@ class _NoteDoneAction extends StatelessWidget {
                     style: TextStyle(
                       color: AppColors.modNotes,
                       fontSize: 14,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
           ),
@@ -1208,6 +1272,7 @@ class _FormatButton extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadius.md),
           child: AnimatedContainer(
+            key: ValueKey(Theme.of(context).brightness),
             duration: AppMotion.fast,
             curve: AppMotion.curve,
             height: 44,
@@ -1235,7 +1300,7 @@ class _FormatButton extends StatelessWidget {
                     style: TextStyle(
                       color: active ? AppColors.modNotes : AppColors.t2,
                       fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -1244,29 +1309,6 @@ class _FormatButton extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _NoteDraft {
-  final String title;
-  final String body;
-
-  const _NoteDraft({required this.title, required this.body});
-
-  bool get isEmpty => title.trim().isEmpty && body.trim().isEmpty;
-
-  factory _NoteDraft.fromText(String text) {
-    final normalized = text.replaceAll('\r\n', '\n').trimRight();
-    final lines = normalized.split('\n');
-    final titleIndex = lines.indexWhere((line) => line.trim().isNotEmpty);
-    if (titleIndex == -1) return const _NoteDraft(title: '', body: '');
-
-    final title = lines[titleIndex].trim();
-    final body = lines.skip(titleIndex + 1).join('\n').trim();
-    return _NoteDraft(
-      title: title.isEmpty ? 'Untitled note' : title,
-      body: body,
     );
   }
 }
@@ -1284,13 +1326,13 @@ class _NoteTextController extends TextEditingController {
     final headingStyle = baseStyle.copyWith(
       fontSize: 24,
       height: 1.24,
-      fontWeight: FontWeight.w900,
+      fontWeight: FontWeight.w600,
       color: AppColors.t1,
     );
     final bodyStyle = baseStyle.copyWith(
       fontSize: 17,
       height: 1.45,
-      fontWeight: FontWeight.w500,
+      fontWeight: FontWeight.w400,
       color: AppColors.t1,
     );
 
@@ -1346,9 +1388,9 @@ class _NoteTextController extends TextEditingController {
         TextSpan(
           text: checked ? _checkedChecklistMarker : _uncheckedChecklistMarker,
           style: style.copyWith(
-            color: checked ? AppColors.slateLight : AppColors.t3,
+            color: checked ? AppColors.accentPrimary : AppColors.t3,
             fontSize: 15,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
           ),
         ),
       );
@@ -1363,7 +1405,7 @@ class _NoteTextController extends TextEditingController {
           style: style.copyWith(
             color: AppColors.t3,
             fontSize: 15,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w600,
           ),
         ),
       );

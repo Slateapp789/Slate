@@ -47,24 +47,17 @@ Future<_PickedAppointmentDetailTime?> _showAppointmentDetailTimePicker({
                     'Select time',
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.t1,
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(
+                  WorkloopTextButton(
+                    label: 'Done',
+                    onPressed: () => Navigator.pop(
                       context,
                       _PickedAppointmentDetailTime(
                         hour: tempHour,
                         minute: tempMinute,
-                      ),
-                    ),
-                    child: const Text(
-                      'Done',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.green,
                       ),
                     ),
                   ),
@@ -95,7 +88,7 @@ Future<_PickedAppointmentDetailTime?> _showAppointmentDetailTimePicker({
                               style: TextStyle(
                                 fontSize: selected ? 24 : 18,
                                 fontWeight: selected
-                                    ? FontWeight.w800
+                                    ? FontWeight.w600
                                     : FontWeight.w400,
                                 color: selected ? AppColors.t1 : AppColors.t3,
                               ),
@@ -109,7 +102,7 @@ Future<_PickedAppointmentDetailTime?> _showAppointmentDetailTimePicker({
                     ':',
                     style: TextStyle(
                       fontSize: 28,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                       color: AppColors.t1,
                     ),
                   ),
@@ -135,7 +128,7 @@ Future<_PickedAppointmentDetailTime?> _showAppointmentDetailTimePicker({
                               style: TextStyle(
                                 fontSize: selected ? 24 : 18,
                                 fontWeight: selected
-                                    ? FontWeight.w800
+                                    ? FontWeight.w600
                                     : FontWeight.w400,
                                 color: selected ? AppColors.t1 : AppColors.t3,
                               ),
@@ -165,11 +158,13 @@ String _repeatLabel(String rule) {
 class _BookingTasksCard extends StatelessWidget {
   final AsyncValue<List<SlateTask>> tasks;
   final VoidCallback onAddTask;
+  final VoidCallback onRetry;
   final ValueChanged<SlateTask> onToggle;
 
   const _BookingTasksCard({
     required this.tasks,
     required this.onAddTask,
+    required this.onRetry,
     required this.onToggle,
   });
 
@@ -196,7 +191,7 @@ class _BookingTasksCard extends StatelessWidget {
                   style: TextStyle(
                     color: AppColors.t1,
                     fontSize: 15,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -213,9 +208,9 @@ class _BookingTasksCard extends StatelessWidget {
               padding: EdgeInsets.symmetric(vertical: 10),
               child: LinearProgressIndicator(minHeight: 2),
             ),
-            error: (_, __) => const Text(
-              'Could not load booking tasks',
-              style: TextStyle(color: AppColors.error, fontSize: 13),
+            error: (_, _) => SlateErrorState(
+              message: 'Could not load booking tasks.',
+              onRetry: onRetry,
             ),
             data: (items) {
               if (items.isEmpty) {
@@ -271,7 +266,7 @@ class _BookingPaymentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return payments.when(
       loading: () => const SlateLoadingBlock(height: 96, radius: 16),
-      error: (_, __) =>
+      error: (_, _) =>
           const SlateErrorState(message: 'Could not load booking payment'),
       data: (rows) {
         final paid = rows.where((payment) => payment.status == 'paid').toList();
@@ -321,16 +316,16 @@ class _BookingPaymentCard extends StatelessWidget {
                           'Payment',
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w600,
                             color: AppColors.t3,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '$statusLabel · £${amount.toStringAsFixed(0)}',
+                          '$statusLabel · ${formatPounds(amount)}',
                           style: TextStyle(
                             fontSize: 15,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w600,
                             color: paid.isNotEmpty
                                 ? AppColors.success
                                 : unpaid.isNotEmpty

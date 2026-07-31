@@ -33,25 +33,30 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
   supabase_flutter: ^2.12.4
-  riverpod: ^3.2.1
   flutter_riverpod: ^3.3.1
   go_router: ^17.0.0
-  google_fonts: ^6.3.2
-  lucide_icons: ^0.257.0
-  confetti: ^0.8.0
-  native_glass_navbar: ^1.0.1
+  # Used by Flutter's iOS-style transitions and kept tree-shakeable.
+  cupertino_icons: ^1.0.9
+  # Actively maintained and compatible with Dart 3.12's final IconData class.
+  lucide_flutter: ^1.25.0
   shared_preferences: ^2.5.3
   url_launcher: ^6.3.1
   flutter_contacts: ^2.1.0
   device_calendar: ^4.3.3
-  file_picker: ^10.3.10
+  file_picker: ^11.0.2
+  # This version remains compatible with device_calendar's timezone constraint.
+  flutter_local_notifications: ^18.0.1
+  # device_calendar 4.3.3 shares the 0.9.x timezone constraint.
+  timezone: ^0.9.4
+  # Reads the version/build embedded in each installed artifact so support
+  # diagnostics cannot drift from store build overrides.
+  package_info_plus: ^8.3.1
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
@@ -59,7 +64,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -71,6 +76,14 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/fonts/InstrumentSans-OFL.txt
+
+  fonts:
+    - family: Instrument Sans
+      fonts:
+        - asset: assets/fonts/InstrumentSans-Variable.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

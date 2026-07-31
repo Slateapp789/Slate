@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
@@ -56,6 +56,25 @@ class ProfileScreen extends ConsumerWidget {
     final services = ref.watch(settingsServicesProvider);
     final requests = ref.watch(bookingRequestsProvider);
     final auth = ref.watch(authRepositoryProvider);
+
+    final profileDataReady =
+        workspace.hasValue &&
+        profile.hasValue &&
+        settings.hasValue &&
+        services.hasValue &&
+        requests.hasValue;
+    final profileHasFailure =
+        workspace.hasError ||
+        profile.hasError ||
+        settings.hasError ||
+        services.hasError ||
+        requests.hasError;
+    if (!profileDataReady) {
+      return _ProfileInitialState(
+        failed: profileHasFailure,
+        onRetry: () => _refresh(ref),
+      );
+    }
 
     final workspaceData = workspace.value;
     final profileData = profile.value;
@@ -115,27 +134,6 @@ class ProfileScreen extends ConsumerWidget {
                       ref,
                       SettingsBusinessSection.business,
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  _ProfileSnapshot(
-                    services: servicesData.length,
-                    workingDays: workingHours.values.where((value) {
-                      if (value is! Map) return false;
-                      return Map<String, dynamic>.from(value)['enabled'] ==
-                          true;
-                    }).length,
-                    requests: pendingRequests,
-                    onServices: () => _openProfileEditor(
-                      context,
-                      ref,
-                      SettingsBusinessSection.services,
-                    ),
-                    onHours: () => _openProfileEditor(
-                      context,
-                      ref,
-                      SettingsBusinessSection.workingHours,
-                    ),
-                    onRequests: () => context.push('/booking-requests'),
                   ),
                   const SizedBox(height: AppSpacing.xxl),
                   const WorkloopSectionHeader(label: 'Business'),
@@ -221,6 +219,14 @@ class ProfileScreen extends ConsumerWidget {
                     onTap: () => context.push('/booking-requests'),
                     showDivider: false,
                   ),
+                  if (profileHasFailure) ...[
+                    const SizedBox(height: AppSpacing.xl),
+                    SlateErrorState(
+                      message:
+                          'Some profile details could not be refreshed. Existing details are still shown.',
+                      onRetry: () => _refresh(ref).ignore(),
+                    ),
+                  ],
                   if (workspace.isLoading ||
                       profile.isLoading ||
                       settings.isLoading ||
@@ -322,34 +328,68 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
+class _ProfileInitialState extends StatelessWidget {
+  final bool failed;
+  final Future<void> Function() onRetry;
+
+  const _ProfileInitialState({required this.failed, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: WorkloopTexturedBackdrop()),
+          SafeArea(
+            child: RefreshIndicator(
+              color: AppColors.accentPrimary,
+              onRefresh: onRetry,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.pageX,
+                  AppSpacing.lg,
+                  AppSpacing.pageX,
+                  AppSpacing.xxl,
+                ),
+                children: [
+                  const _ProfileHeader(onEdit: null),
+                  const SizedBox(height: AppSpacing.xl),
+                  if (failed)
+                    SlateErrorState(
+                      message:
+                          'Could not load your profile. Check your connection.',
+                      onRetry: () => onRetry().ignore(),
+                    )
+                  else ...[
+                    const SlateLoadingBlock(height: 92, radius: AppRadius.lg),
+                    const SizedBox(height: AppSpacing.md),
+                    const SlateLoadingBlock(height: 86, radius: AppRadius.lg),
+                    const SizedBox(height: AppSpacing.xl),
+                    const SlateLoadingBlock(height: 210, radius: AppRadius.lg),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ProfileHeader extends StatelessWidget {
-  final VoidCallback onEdit;
+  final VoidCallback? onEdit;
 
   const _ProfileHeader({required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        WorkloopIconButton(
-          icon: LucideIcons.chevronLeft,
-          semanticLabel: 'Back to more',
-          onTap: () => Navigator.pop(context),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        const Expanded(
-          child: Text(
-            'Profile',
-            style: TextStyle(
-              color: AppColors.t1,
-              fontSize: 26,
-              height: 1.05,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-        WorkloopTextButton(label: 'Edit', onPressed: onEdit),
-      ],
+    return WorkloopRouteHeader(
+      title: 'Profile',
+      backSemanticLabel: 'Back to Home',
+      trailing: WorkloopTextButton(label: 'Edit', onPressed: onEdit),
     );
   }
 }
@@ -392,9 +432,9 @@ class _ProfileIdentity extends StatelessWidget {
                   child: Text(
                     initial,
                     style: const TextStyle(
-                      color: AppColors.t1,
+                      color: AppColors.onBrandAccent,
                       fontSize: 25,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -411,7 +451,7 @@ class _ProfileIdentity extends StatelessWidget {
                           color: AppColors.t1,
                           fontSize: 22,
                           height: 1.15,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xxs),
@@ -422,7 +462,7 @@ class _ProfileIdentity extends StatelessWidget {
                         style: const TextStyle(
                           color: AppColors.t3,
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -435,7 +475,7 @@ class _ProfileIdentity extends StatelessWidget {
                         style: const TextStyle(
                           color: AppColors.t3,
                           fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ],
@@ -451,117 +491,6 @@ class _ProfileIdentity extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ProfileSnapshot extends StatelessWidget {
-  final int services;
-  final int workingDays;
-  final int requests;
-  final VoidCallback onServices;
-  final VoidCallback onHours;
-  final VoidCallback onRequests;
-
-  const _ProfileSnapshot({
-    required this.services,
-    required this.workingDays,
-    required this.requests,
-    required this.onServices,
-    required this.onHours,
-    required this.onRequests,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return WorkloopSurface(
-      color: AppColors.panelSoft.withValues(alpha: 0.82),
-      borderColor: AppColors.border.withValues(alpha: 0.82),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.md,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _SnapshotItem(
-              value: services.toString(),
-              label: 'Services',
-              onTap: onServices,
-            ),
-          ),
-          const _SnapshotDivider(),
-          Expanded(
-            child: _SnapshotItem(
-              value: workingDays.toString(),
-              label: 'Work days',
-              onTap: onHours,
-            ),
-          ),
-          const _SnapshotDivider(),
-          Expanded(
-            child: _SnapshotItem(
-              value: requests.toString(),
-              label: 'Requests',
-              onTap: onRequests,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SnapshotDivider extends StatelessWidget {
-  const _SnapshotDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: 1, height: 34, color: AppColors.border);
-  }
-}
-
-class _SnapshotItem extends StatelessWidget {
-  final String value;
-  final String label;
-  final VoidCallback onTap;
-
-  const _SnapshotItem({
-    required this.value,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.sm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.t1,
-                fontSize: 19,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              style: const TextStyle(
-                color: AppColors.t3,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -603,7 +532,7 @@ class _ProfileRow extends StatelessWidget {
         style: const TextStyle(
           color: AppColors.t1,
           fontSize: 15,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(
@@ -614,7 +543,7 @@ class _ProfileRow extends StatelessWidget {
           color: AppColors.t3,
           fontSize: 13,
           height: 1.3,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w400,
         ),
       ),
       trailing: Row(
@@ -626,7 +555,7 @@ class _ProfileRow extends StatelessWidget {
               style: const TextStyle(
                 color: AppColors.accentPrimary,
                 fontSize: 12,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(width: AppSpacing.xs),

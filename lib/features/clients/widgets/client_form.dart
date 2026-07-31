@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/slate_models.dart';
@@ -420,7 +420,7 @@ class _BookingAddressFieldState extends ConsumerState<BookingAddressField> {
             style: TextStyle(
               color: AppColors.t2,
               fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -473,7 +473,7 @@ class _BookingAddressFieldState extends ConsumerState<BookingAddressField> {
       style: const TextStyle(
         color: AppColors.t1,
         fontSize: 15,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w400,
       ),
       decoration: InputDecoration(
         hintText: hintText,
@@ -512,7 +512,7 @@ class _BookingAddressFieldState extends ConsumerState<BookingAddressField> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(
-            color: AppColors.accentPrimaryStrong,
+            color: AppColors.accentPrimary,
             width: 1.4,
           ),
         ),
@@ -594,7 +594,7 @@ class _AddressPredictions extends StatelessWidget {
                                   style: const TextStyle(
                                     color: AppColors.t1,
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                                 if (predictions[index]
@@ -643,7 +643,7 @@ class _AddressPredictions extends StatelessWidget {
                       style: TextStyle(
                         color: AppColors.t3,
                         fontSize: 10,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -654,7 +654,7 @@ class _AddressPredictions extends StatelessWidget {
                   style: TextStyle(
                     color: AppColors.t3,
                     fontSize: 10,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -682,7 +682,7 @@ class _FormSectionHeader extends StatelessWidget {
           style: const TextStyle(
             color: AppColors.t1,
             fontSize: 17,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: AppSpacing.xxs),
@@ -740,7 +740,7 @@ class _ClientTextField extends StatelessWidget {
           style: const TextStyle(
             color: AppColors.t2,
             fontSize: 13,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -760,7 +760,7 @@ class _ClientTextField extends StatelessWidget {
           style: const TextStyle(
             color: AppColors.t1,
             fontSize: 15,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w400,
           ),
           decoration: InputDecoration(
             hintText: hint,
@@ -790,7 +790,7 @@ class _ClientTextField extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadius.md),
               borderSide: BorderSide(
                 color: errorText == null
-                    ? AppColors.accentPrimaryStrong
+                    ? AppColors.accentPrimary
                     : AppColors.error,
                 width: 1.4,
               ),
@@ -840,7 +840,7 @@ class _ChoiceField extends StatelessWidget {
           style: const TextStyle(
             color: AppColors.t2,
             fontSize: 13,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -849,38 +849,51 @@ class _ChoiceField extends StatelessWidget {
           runSpacing: AppSpacing.xs,
           children: options.entries.map((entry) {
             final selected = entry.key == value;
+            void handleTap() {
+              SlateHaptics.tap();
+              onChanged(entry.key);
+            }
+
             return Semantics(
               button: true,
               selected: selected,
-              child: GestureDetector(
-                onTap: () {
-                  SlateHaptics.tap();
-                  onChanged(entry.key);
-                },
-                child: AnimatedContainer(
-                  duration: AppMotion.standard,
-                  curve: AppMotion.curve,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? AppColors.accentPrimary.withValues(alpha: 0.14)
-                        : AppColors.bgCard.withValues(alpha: 0.56),
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                    border: Border.all(
-                      color: selected
-                          ? AppColors.accentPrimary.withValues(alpha: 0.28)
-                          : AppColors.border,
+              label: entry.value,
+              onTap: handleTap,
+              child: ExcludeSemantics(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: handleTap,
+                  child: AnimatedContainer(
+                    key: ValueKey(Theme.of(context).brightness),
+                    duration: AppMotion.standard,
+                    curve: AppMotion.curve,
+                    constraints: const BoxConstraints(
+                      minHeight: AppSpacing.minTouch,
                     ),
-                  ),
-                  child: Text(
-                    entry.value,
-                    style: TextStyle(
-                      color: selected ? AppColors.accentPrimary : AppColors.t2,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? AppColors.accentPrimary.withValues(alpha: 0.14)
+                          : AppColors.bgCard.withValues(alpha: 0.56),
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      border: Border.all(
+                        color: selected
+                            ? AppColors.accentPrimary.withValues(alpha: 0.28)
+                            : AppColors.border,
+                      ),
+                    ),
+                    child: Text(
+                      entry.value,
+                      style: TextStyle(
+                        color: selected
+                            ? AppColors.accentPrimary
+                            : AppColors.t2,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
@@ -924,7 +937,7 @@ class _BirthdayField extends StatelessWidget {
                   style: TextStyle(
                     color: AppColors.t2,
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -935,18 +948,16 @@ class _BirthdayField extends StatelessWidget {
                 style: const TextStyle(
                   color: AppColors.t3,
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               if (birthday != null) ...[
                 const SizedBox(width: AppSpacing.xs),
-                GestureDetector(
+                WorkloopIconButton(
+                  icon: LucideIcons.x,
+                  semanticLabel: 'Clear birthday',
+                  color: AppColors.t3,
                   onTap: () => onChanged(null),
-                  child: const Icon(
-                    LucideIcons.x,
-                    color: AppColors.t3,
-                    size: 16,
-                  ),
                 ),
               ],
             ],

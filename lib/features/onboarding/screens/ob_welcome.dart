@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/slate_ui.dart';
 
@@ -25,7 +25,7 @@ class ObWelcome extends StatelessWidget {
             ),
             child: const Icon(
               LucideIcons.layers,
-              color: AppColors.slateLight,
+              color: AppColors.accentPrimary,
               size: 26,
             ),
           ),
@@ -34,7 +34,7 @@ class ObWelcome extends StatelessWidget {
             'Run your business.\nNot your admin.',
             style: TextStyle(
               fontSize: 36,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
               color: AppColors.t1,
               letterSpacing: 0,
               height: 1.1,
@@ -98,7 +98,7 @@ class _ValueProp extends StatelessWidget {
             style: const TextStyle(
               fontSize: 15,
               color: AppColors.t2,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w400,
             ),
           ),
         ),

@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_client_provider.dart';
 
+const workloopPasswordRecoveryRedirect = 'workloop://reset-password';
+
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(ref.watch(supabaseClientProvider));
 });
@@ -30,12 +32,18 @@ class AuthRepository {
     await _client.auth.signInWithPassword(email: email, password: password);
   }
 
-  Future<void> signUp({required String email, required String password}) async {
-    await _client.auth.signUp(email: email, password: password);
+  Future<AuthResponse> signUp({
+    required String email,
+    required String password,
+  }) {
+    return _client.auth.signUp(email: email, password: password);
   }
 
   Future<void> sendPasswordReset(String email) async {
-    await _client.auth.resetPasswordForEmail(email);
+    await _client.auth.resetPasswordForEmail(
+      email,
+      redirectTo: workloopPasswordRecoveryRedirect,
+    );
   }
 
   Future<void> updatePassword(String password) async {
