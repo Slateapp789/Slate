@@ -5,6 +5,7 @@ import UserNotifications
 @main
 @objc class AppDelegate: FlutterAppDelegate {
   private var statusBarScrollBridge: WorkloopStatusBarScrollBridge?
+  private var stripeTerminalBridge: WorkloopStripeTerminalBridge?
 
   override func application(
     _ application: UIApplication,
@@ -20,6 +21,7 @@ import UserNotifications
     )
     if let controller = window?.rootViewController as? FlutterViewController {
       statusBarScrollBridge = WorkloopStatusBarScrollBridge(controller: controller)
+      stripeTerminalBridge = WorkloopStripeTerminalBridge(controller: controller)
     }
     return launched
   }

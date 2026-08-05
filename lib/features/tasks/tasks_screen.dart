@@ -34,6 +34,16 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   _TaskView _view = _TaskView.now;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.createRequest != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showTaskEditor(context);
+      });
+    }
+  }
+
+  @override
   void didUpdateWidget(covariant TasksScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.createRequest == oldWidget.createRequest ||

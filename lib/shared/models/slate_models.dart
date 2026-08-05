@@ -272,6 +272,7 @@ class Payment {
   final DateTime? dueDate;
   final double total;
   final double amountPaid;
+  final double stripeAmountPaid;
   final String? notes;
   final String? clientName;
 
@@ -287,6 +288,7 @@ class Payment {
     this.dueDate,
     required this.total,
     this.amountPaid = 0,
+    this.stripeAmountPaid = 0,
     this.notes,
     this.clientName,
   });
@@ -326,6 +328,7 @@ class Payment {
       dueDate: _dateTimeFrom(map['due_date']),
       total: _doubleFrom(map['total']),
       amountPaid: _doubleFrom(map['amount_paid']),
+      stripeAmountPaid: _doubleFrom(map['stripe_amount_paid']),
       notes: _cleanDisplayText(map['notes']),
       clientName: contact?['name'] as String?,
     );
@@ -345,6 +348,7 @@ class Payment {
       'due_date': dueDate!.toIso8601String().split('T').first,
     'total': total,
     'amount_paid': amountPaid,
+    'stripe_amount_paid': stripeAmountPaid,
     'notes': notes,
   };
 }

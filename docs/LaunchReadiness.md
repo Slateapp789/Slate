@@ -30,7 +30,7 @@ actually connected and verified.
 | Visual system | Fixed, slightly lifted graphite Dark appearance; exact icon/launch neon `#C1FF72`; contrast-safe neon foregrounds; bundled Instrument Sans; shared shell geometry; reduced-motion handling; semantic labels |
 | Core workflows | Auth/onboarding, clients, atomic/idempotent booking and task workflows, money, notes, profile/settings, retry-safe imports, one-time calendar import/export, on-device reminders |
 | Trust | Workspace export, protected deletion request, in-app privacy/terms, public policy/deletion artifacts |
-| Platform | Flutter 3.44.8; iPhone-only portrait scope on iOS 13+; Android portrait, API 36 target/minimum API 24, Gradle 8.14.3, AGP 8.11.1, Kotlin 2.2.20, Java 17; production network permission, no cleartext release traffic, sensitive backup exclusion, iOS/Android recovery link |
+| Platform | Flutter 3.44.8; iPhone-only portrait scope on iOS 15+; Android portrait, API 36 target/minimum API 26, Gradle 8.14.3, AGP 8.11.1, Kotlin 2.2.20, Java 17; production network permission, no cleartext release traffic, sensitive backup exclusion, iOS/Android recovery link |
 | Quality | Formatting, analysis, full tests, Android profile build with 16 KB page alignment, iOS profile build, web release build, physical iPhone launch |
 | Automation | Secret-safe CI runs Flutter formatting/analysis/tests, Deno formatting/checks/tests, Gradle-wrapper validation, Android profile and web builds, plus an unsigned iOS profile build on macOS |
 
@@ -56,14 +56,16 @@ Connected project:
   `20260726000110` reserved public routes, and
   `20260726000118` transactional booking workflows, followed by
   `20260726000520` explicit client-deny policy for the private Edge rate-limit
-  ledger.
+  ledger. Test-mode Stripe payment storage and reconciliation were added by
+  `20260804181440` and its foreign-key indexes by `20260804181648`.
 - Repository source routes task creation, booking creation, booking-request
   conversion, and booking completion through authenticated, tenant-validating,
   idempotent workflows. Public request and Places source use bounded private
   rate-limit state.
-- Current active Edge deployments are `create-booking-request` v8,
-  `places-address-search` v8, `get-public-profile` v6,
-  `request-account-deletion` v6, and `complete-account-deletion` v9.
+- Current active Edge deployments include `create-booking-request` v9,
+  `places-address-search` v9, `get-public-profile` v7,
+  `request-account-deletion` v7, `complete-account-deletion` v10,
+  `workloop-ai-assistant` v4, `stripe-payments` v1, and `stripe-webhook` v1.
   Structural/grant smoke checks passed. The release gate remains open until the
   production-like signed-out, authenticated-workflow, and destructive deletion
   matrix is recorded.

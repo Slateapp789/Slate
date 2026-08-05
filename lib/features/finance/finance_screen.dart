@@ -14,6 +14,7 @@ import '../../shared/utils/currency_format.dart';
 import '../../shared/widgets/slate_ui.dart';
 import 'add_payment_screen.dart';
 import 'expense_editor_screen.dart';
+import 'payment_collection_sheet.dart';
 import 'widgets/money_summary_widgets.dart';
 import 'widgets/payment_cards.dart';
 
@@ -25,8 +26,13 @@ enum MoneySection { made, spent, owed }
 
 class FinanceScreen extends ConsumerStatefulWidget {
   final FinanceInitialFocus initialFocus;
+  final int createRequest;
 
-  const FinanceScreen({super.key, this.initialFocus = FinanceInitialFocus.top});
+  const FinanceScreen({
+    super.key,
+    this.initialFocus = FinanceInitialFocus.top,
+    this.createRequest = 0,
+  });
 
   @override
   ConsumerState<FinanceScreen> createState() => _FinanceScreenState();
@@ -48,6 +54,11 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       _section = MoneySection.owed;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _applyInitialFocus());
+    if (widget.createRequest != 0) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _openRequestedCreateFlow(),
+      );
+    }
   }
 
   @override
@@ -58,6 +69,12 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       _didApplyInitialFocus = false;
       _section = MoneySection.owed;
       WidgetsBinding.instance.addPostFrameCallback((_) => _applyInitialFocus());
+    }
+    if (widget.createRequest != oldWidget.createRequest &&
+        widget.createRequest != 0) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _openRequestedCreateFlow(),
+      );
     }
   }
 
@@ -85,6 +102,28 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       curve: AppMotion.curve,
       alignment: 0.08,
     );
+  }
+
+  void _openRequestedCreateFlow() {
+    if (!mounted) return;
+    _showMoneyCreateSheet(context);
+  }
+
+  Future<void> _showPaymentSetup(String workspaceId) async {
+    final action = await showPaymentSetupSheet(
+      context: context,
+      workspaceId: workspaceId,
+    );
+    if (!mounted || action != PaymentSetupAction.viewOwed) return;
+    SlateHaptics.action();
+    setState(() => _section = MoneySection.owed);
+    if (_scrollController.hasClients) {
+      await _scrollController.animateTo(
+        0,
+        duration: AppMotion.responsive(context, AppMotion.standard),
+        curve: AppMotion.curve,
+      );
+    }
   }
 
   @override
@@ -263,15 +302,27 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             data: (values) {
               final monthlyTarget =
                   (values?['revenue_target'] as num?)?.toDouble() ?? 0;
-              return _IncomeTargetProgress(
-                label: _period == FinancePeriod.month
-                    ? 'Monthly target'
-                    : 'Weekly target',
-                made: periodSummary.paid,
-                target: _period == FinancePeriod.month
-                    ? monthlyTarget
-                    : monthlyTarget / 4.345,
-                onEditTarget: () => _showTargetSheet(context, monthlyTarget),
+              final workspaceId = values?['workspace_id'] as String?;
+              return Column(
+                children: [
+                  _IncomeTargetProgress(
+                    label: _period == FinancePeriod.month
+                        ? 'Monthly target'
+                        : 'Weekly target',
+                    made: periodSummary.paid,
+                    target: _period == FinancePeriod.month
+                        ? monthlyTarget
+                        : monthlyTarget / 4.345,
+                    onEditTarget: () =>
+                        _showTargetSheet(context, monthlyTarget),
+                  ),
+                  if (workspaceId != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    PaymentSetupCard(
+                      onTap: () => _showPaymentSetup(workspaceId),
+                    ),
+                  ],
+                ],
               );
             },
           ),
@@ -935,8 +986,38 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     ],
                     if (canMarkPaid) ...[
                       SlateButton(
+                        label: 'Get paid with Stripe',
+                        icon: LucideIcons.creditCard,
+                        onPressed: updating
+                            ? null
+                            : () {
+                                Navigator.pop(ctx);
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) async {
+                                  if (!context.mounted) return;
+                                  final completed =
+                                      await showPaymentCollectionSheet(
+                                        context: context,
+                                        payment: payment,
+                                      );
+                                  if (!completed || !context.mounted) return;
+                                  _refreshPayment(payment);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '${formatPounds(payment.outstandingAmount)} payment accepted',
+                                      ),
+                                    ),
+                                  );
+                                });
+                              },
+                      ),
+                      const SizedBox(height: 10),
+                      SlateButton(
                         label: updating ? 'Updating...' : 'Mark as Received',
                         icon: LucideIcons.checkCircle,
+                        secondary: true,
                         onPressed: updating
                             ? null
                             : () async {
@@ -959,42 +1040,67 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                       ),
                       const SizedBox(height: 10),
                     ],
-                    SlateButton(
-                      label: 'Edit income',
-                      icon: LucideIcons.pencil,
-                      secondary: true,
-                      onPressed: updating
-                          ? null
-                          : () {
-                              Navigator.pop(ctx);
-                              WidgetsBinding.instance.addPostFrameCallback((
-                                _,
-                              ) async {
-                                if (!context.mounted) return;
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        AddPaymentScreen(payment: payment),
-                                  ),
-                                );
-                                _refreshPayment(payment);
-                              });
-                            },
-                    ),
-                    const SizedBox(height: 10),
-                    SlateButton(
-                      label: 'Delete income',
-                      icon: LucideIcons.trash2,
-                      destructive: true,
-                      onPressed: updating
-                          ? null
-                          : () {
-                              Navigator.pop(ctx);
-                              _confirmDeletePayment(context, payment);
-                            },
-                    ),
-                    const SizedBox(height: 10),
+                    if (payment.stripeAmountPaid > 0) ...[
+                      SlateButton(
+                        label: 'Card payment details',
+                        icon: LucideIcons.creditCard,
+                        secondary: true,
+                        onPressed: updating
+                            ? null
+                            : () {
+                                Navigator.pop(ctx);
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) async {
+                                  if (!context.mounted) return;
+                                  final changed =
+                                      await showPaymentCollectionSheet(
+                                        context: context,
+                                        payment: payment,
+                                      );
+                                  if (changed) _refreshPayment(payment);
+                                });
+                              },
+                      ),
+                      const SizedBox(height: 10),
+                    ] else ...[
+                      SlateButton(
+                        label: 'Edit income',
+                        icon: LucideIcons.pencil,
+                        secondary: true,
+                        onPressed: updating
+                            ? null
+                            : () {
+                                Navigator.pop(ctx);
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) async {
+                                  if (!context.mounted) return;
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          AddPaymentScreen(payment: payment),
+                                    ),
+                                  );
+                                  _refreshPayment(payment);
+                                });
+                              },
+                      ),
+                      const SizedBox(height: 10),
+                      SlateButton(
+                        label: 'Delete income',
+                        icon: LucideIcons.trash2,
+                        destructive: true,
+                        onPressed: updating
+                            ? null
+                            : () {
+                                Navigator.pop(ctx);
+                                _confirmDeletePayment(context, payment);
+                              },
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     SlateButton(
                       label: 'Close',
                       secondary: true,

@@ -15,8 +15,11 @@ class SlateTheme {
   const SlateTheme._();
 
   static WorkloopThemeTokens of(BuildContext context) {
-    return Theme.of(context).extension<WorkloopThemeTokens>() ??
-        WorkloopThemeTokens.dark;
+    final theme = Theme.of(context);
+    return theme.extension<WorkloopThemeTokens>() ??
+        (theme.brightness == Brightness.light
+            ? WorkloopThemeTokens.light
+            : WorkloopThemeTokens.dark);
   }
 }
 
@@ -1217,13 +1220,20 @@ class WorkloopInteractiveWorkspaceStack extends StatefulWidget {
 
 class _WorkloopInteractiveWorkspaceStackState
     extends State<WorkloopInteractiveWorkspaceStack>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _progress = AnimationController(
     vsync: this,
-    duration: AppMotion.standard,
+    duration: AppMotion.navigation,
   );
+  late final AnimationController _destinationProgress = AnimationController(
+    vsync: this,
+    duration: AppMotion.navigation,
+    value: 1,
+  )..addStatusListener(_handleDestinationStatus);
   double _availableWidth = 1;
   bool _settling = false;
+  int? _outgoingIndex;
+  double _destinationDirection = 1;
 
   bool get _canGoBack =>
       widget.previousIndex != null &&
@@ -1236,14 +1246,41 @@ class _WorkloopInteractiveWorkspaceStackState
     super.didUpdateWidget(oldWidget);
     if (oldWidget.index != widget.index ||
         oldWidget.previousIndex != widget.previousIndex) {
+      final completedInteractiveBack = _settling && _progress.value >= 1;
       _progress.value = 0;
       _settling = false;
+      if (oldWidget.index != widget.index && !completedInteractiveBack) {
+        _outgoingIndex = oldWidget.index;
+        _destinationDirection = widget.previousIndex == oldWidget.index
+            ? 1
+            : widget.index > oldWidget.index
+            ? 1
+            : -1;
+        if (MediaQuery.maybeOf(context)?.disableAnimations == true) {
+          _destinationProgress.value = 1;
+          _outgoingIndex = null;
+        } else {
+          _destinationProgress.forward(from: 0);
+        }
+      } else {
+        _destinationProgress.value = 1;
+        _outgoingIndex = null;
+      }
     }
+  }
+
+  void _handleDestinationStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed || _outgoingIndex == null) return;
+    if (!mounted) return;
+    setState(() => _outgoingIndex = null);
   }
 
   @override
   void dispose() {
     _progress.dispose();
+    _destinationProgress
+      ..removeStatusListener(_handleDestinationStatus)
+      ..dispose();
     super.dispose();
   }
 
@@ -1293,11 +1330,67 @@ class _WorkloopInteractiveWorkspaceStackState
     }
   }
 
-  Widget _retainedChild(int index, {required bool visible}) {
+  Widget _workspaceLayer({
+    required int index,
+    required bool visible,
+    required bool interactive,
+    required bool includeSemantics,
+    required bool tickerEnabled,
+    double horizontalOffset = 0,
+    double scale = 1,
+    double opacity = 1,
+    double overlayOpacity = 0,
+    bool showLeadingShadow = false,
+  }) {
     return Positioned.fill(
+      key: ValueKey('workloop-workspace-layer-$index'),
       child: Offstage(
         offstage: !visible,
-        child: TickerMode(enabled: visible, child: widget.children[index]),
+        child: TickerMode(
+          enabled: tickerEnabled,
+          child: ExcludeSemantics(
+            excluding: !includeSemantics,
+            child: IgnorePointer(
+              ignoring: !interactive,
+              child: Transform.translate(
+                key: ValueKey('workloop-workspace-transform-$index'),
+                offset: Offset(horizontalOffset, 0),
+                child: Transform.scale(
+                  scale: scale,
+                  child: Opacity(
+                    opacity: opacity.clamp(0.0, 1.0),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        boxShadow: showLeadingShadow
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.22),
+                                  blurRadius: 24,
+                                  offset: const Offset(-8, 0),
+                                ),
+                              ]
+                            : const [],
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          widget.children[index],
+                          IgnorePointer(
+                            child: ColoredBox(
+                              color: Colors.black.withValues(
+                                alpha: overlayOpacity.clamp(0.0, 1.0),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1310,64 +1403,115 @@ class _WorkloopInteractiveWorkspaceStackState
         final previousIndex = _canGoBack ? widget.previousIndex : null;
 
         return AnimatedBuilder(
-          animation: _progress,
+          animation: Listenable.merge([_progress, _destinationProgress]),
           builder: (context, _) {
-            final value = _progress.value;
-            final layers = <Widget>[
-              for (var index = 0; index < widget.children.length; index++)
-                if (index != widget.index && index != previousIndex)
-                  _retainedChild(index, visible: false),
-            ];
-
-            if (previousIndex != null) {
-              layers.add(
-                Positioned.fill(
-                  child: ExcludeSemantics(
-                    child: IgnorePointer(
-                      child: Transform.translate(
-                        key: const ValueKey('workloop-workspace-previous'),
-                        offset: Offset(
-                          -_availableWidth * 0.18 * (1 - value),
-                          0,
-                        ),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            widget.children[previousIndex],
-                            ColoredBox(
-                              color: Colors.black.withValues(
-                                alpha: 0.16 * (1 - value),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+            final outgoingIndex = _outgoingIndex;
+            final changingDestination =
+                outgoingIndex != null &&
+                outgoingIndex != widget.index &&
+                outgoingIndex >= 0 &&
+                outgoingIndex < widget.children.length &&
+                _destinationProgress.value < 1;
+            if (changingDestination) {
+              final progress = _destinationProgress.value;
+              final curved = AppMotion.curve.transform(progress);
+              final outgoingOpacity =
+                  1 -
+                  const Interval(
+                    0,
+                    0.55,
+                    curve: Curves.easeOut,
+                  ).transform(progress);
+              final incomingOpacity = const Interval(
+                0.12,
+                1,
+                curve: Curves.easeOutCubic,
+              ).transform(progress);
+              final layers = <Widget>[
+                for (var index = 0; index < widget.children.length; index++)
+                  if (index != widget.index && index != outgoingIndex)
+                    _workspaceLayer(
+                      index: index,
+                      visible: false,
+                      interactive: false,
+                      includeSemantics: false,
+                      tickerEnabled: false,
                     ),
+                _workspaceLayer(
+                  index: outgoingIndex,
+                  visible: true,
+                  interactive: false,
+                  includeSemantics: false,
+                  tickerEnabled: true,
+                  horizontalOffset:
+                      -_destinationDirection *
+                      AppMotion.destinationOffset *
+                      0.55 *
+                      curved,
+                  scale: 1 - (0.008 * curved),
+                  opacity: outgoingOpacity,
+                ),
+                _workspaceLayer(
+                  index: widget.index,
+                  visible: true,
+                  interactive: false,
+                  includeSemantics: true,
+                  tickerEnabled: true,
+                  horizontalOffset:
+                      _destinationDirection *
+                      AppMotion.destinationOffset *
+                      (1 - curved),
+                  scale: 0.992 + (0.008 * curved),
+                  opacity: incomingOpacity,
+                ),
+              ];
+              return ClipRect(
+                child: IgnorePointer(
+                  ignoring: true,
+                  child: ColoredBox(
+                    color: SlateTheme.of(context).background,
+                    child: Stack(children: layers),
                   ),
                 ),
               );
             }
 
-            layers.add(
-              Positioned.fill(
-                child: Transform.translate(
-                  key: const ValueKey('workloop-workspace-current'),
-                  offset: Offset(_availableWidth * value, 0),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      boxShadow: value <= 0
-                          ? const []
-                          : [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.22),
-                                blurRadius: 24,
-                                offset: const Offset(-8, 0),
-                              ),
-                            ],
-                    ),
-                    child: widget.children[widget.index],
+            final value = _progress.value;
+            final layers = <Widget>[
+              for (var index = 0; index < widget.children.length; index++)
+                if (index != widget.index && index != previousIndex)
+                  _workspaceLayer(
+                    index: index,
+                    visible: false,
+                    interactive: false,
+                    includeSemantics: false,
+                    tickerEnabled: false,
                   ),
+            ];
+
+            if (previousIndex != null) {
+              layers.add(
+                _workspaceLayer(
+                  index: previousIndex,
+                  visible: true,
+                  interactive: false,
+                  includeSemantics: false,
+                  tickerEnabled: value > 0,
+                  horizontalOffset: -_availableWidth * 0.18 * (1 - value),
+                  overlayOpacity: 0.16 * (1 - value),
                 ),
+              );
+            }
+
+            layers.add(
+              _workspaceLayer(
+                index: widget.index,
+                visible: true,
+                interactive: true,
+                includeSemantics: true,
+                tickerEnabled: true,
+                horizontalOffset: _availableWidth * value,
+                showLeadingShadow: value > 0,
               ),
             );
 
@@ -1390,7 +1534,15 @@ class _WorkloopInteractiveWorkspaceStackState
               );
             }
 
-            return ClipRect(child: Stack(children: layers));
+            return ClipRect(
+              child: IgnorePointer(
+                ignoring: false,
+                child: ColoredBox(
+                  color: SlateTheme.of(context).background,
+                  child: Stack(children: layers),
+                ),
+              ),
+            );
           },
         );
       },
@@ -1875,6 +2027,7 @@ class WorkloopTopAction extends StatelessWidget {
               decoration: BoxDecoration(
                 color: tokens.accentStrong,
                 borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(color: tokens.accentBorder, width: 1),
                 boxShadow: [
                   BoxShadow(
                     color: tokens.accent.withValues(alpha: 0.12),
@@ -2425,6 +2578,10 @@ class _WorkloopPickerRow<T> extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: tokens.accentStrong,
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: tokens.accentBorder,
+                          width: 1,
+                        ),
                       ),
                       child: Icon(
                         LucideIcons.check,
@@ -2604,8 +2761,9 @@ class WorkloopNavigationControl<T> extends StatelessWidget {
                           borderRadius: BorderRadius.circular(AppRadius.pill),
                           border: Border.all(
                             color: emphasized
-                                ? tokens.accentStrong
+                                ? tokens.accentBorder
                                 : tokens.dividerStrong,
+                            width: 1,
                           ),
                         ),
                       ),
@@ -2830,7 +2988,8 @@ class WorkloopBottomNav extends StatelessWidget {
                                     AppRadius.pill,
                                   ),
                                   border: Border.all(
-                                    color: tokens.accentStrong,
+                                    color: tokens.accentBorder,
+                                    width: 1,
                                   ),
                                 ),
                               ),
@@ -2951,6 +3110,9 @@ class _WorkloopFABState extends State<WorkloopFAB> {
       radius: AppRadius.pill,
       blur: 24,
       color: tokens.accentStrong,
+      borderColor: Theme.of(context).brightness == Brightness.light
+          ? tokens.accentBorder
+          : tokens.divider,
       child: GestureDetector(
         onTapDown: (_) => setState(() => _pressed = true),
         onTapCancel: () => setState(() => _pressed = false),
@@ -3034,6 +3196,7 @@ class SlateGlassSurface extends StatelessWidget {
   final double radius;
   final double blur;
   final Color? color;
+  final Color? borderColor;
 
   const SlateGlassSurface({
     super.key,
@@ -3042,6 +3205,7 @@ class SlateGlassSurface extends StatelessWidget {
     this.radius = AppRadius.pill,
     this.blur = 24,
     this.color,
+    this.borderColor,
   });
 
   @override
@@ -3056,7 +3220,7 @@ class SlateGlassSurface extends StatelessWidget {
           decoration: BoxDecoration(
             color: color ?? tokens.surfaceRaised.withValues(alpha: 0.78),
             borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: tokens.divider),
+            border: Border.all(color: borderColor ?? tokens.divider),
             boxShadow: AppShadows.glass,
           ),
           child: child,
@@ -3831,6 +3995,7 @@ class _SlateButtonState extends State<SlateButton> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     final enabled = widget.onPressed != null;
     final bg = widget.destructive
         ? AppColors.error
@@ -3870,7 +4035,10 @@ class _SlateButtonState extends State<SlateButton> {
                   border: Border.all(
                     color: widget.secondary
                         ? AppColors.border
-                        : Colors.transparent,
+                        : widget.destructive
+                        ? tokens.error
+                        : tokens.accentBorder,
+                    width: 1,
                   ),
                 ),
                 child: Row(

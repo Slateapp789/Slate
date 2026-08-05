@@ -1,0 +1,6 @@
+#!/bin/sh
+# Flutter's x64 Dart process can cause universal system Ruby to select its x64
+# slice on Apple Silicon, while the locally installed CocoaPods native gems are
+# arm64. Force the host architecture so pod install is deterministic.
+exec /usr/bin/arch -arm64 /usr/bin/ruby \
+  "$HOME/.gem/ruby/2.6.0/bin/pod" "$@"

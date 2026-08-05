@@ -102,77 +102,87 @@ void main() {
           ),
         ),
       ];
+      final appearances = <(String, ThemeData)>[
+        ('Light', AppTheme.light),
+        ('Dark', AppTheme.dark),
+      ];
 
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(() => WorkloopLegacyPalette.sync(Brightness.dark));
       for (final device in devices) {
         tester.view.physicalSize = device.size;
         tester.view.devicePixelRatio = 1;
         for (final scale in const [1.0, 2.0]) {
-          for (final surface in surfaces) {
-            await tester.pumpWidget(
-              ProviderScope(
-                overrides: [
-                  clientCrmRecordsProvider.overrideWith(
-                    (ref) async => const [],
-                  ),
-                  workspaceProvider.overrideWith(
-                    (ref) async => const {'id': 'workspace-1'},
-                  ),
-                  setupChecklistDismissedProvider.overrideWith(
-                    (ref) async => true,
-                  ),
-                  dashboardClockProvider.overrideWith(
-                    (ref) => Stream.value(DateTime(2026, 7, 30, 9)),
-                  ),
-                  dashboardAttentionProvider.overrideWith(
-                    (ref) async => const [],
-                  ),
-                  clientsProvider.overrideWith((ref) async => const []),
-                  appointmentsProvider.overrideWith((ref) async => const []),
-                  bookingRequestsProvider.overrideWith((ref) async => const []),
-                  invoicesProvider.overrideWith((ref) async => const []),
-                  expensesProvider.overrideWith((ref) async => const []),
-                  financeSummaryProvider.overrideWith((ref) async => finance),
-                  workspaceSettingsProvider.overrideWith(
-                    (ref) async => const {'revenue_target': 5000},
-                  ),
-                  allTasksProvider.overrideWith((ref) async => const []),
-                  allNotesProvider.overrideWith((ref) async => const []),
-                  businessFeedProvider.overrideWith((ref) async => const []),
-                  authRepositoryProvider.overrideWithValue(authRepository),
-                ],
-                child: MaterialApp(
-                  debugShowCheckedModeBanner: false,
-                  theme: AppTheme.dark.copyWith(platform: device.platform),
-                  home: MediaQuery(
-                    data: MediaQueryData(
-                      size: device.size,
-                      devicePixelRatio: 1,
-                      textScaler: TextScaler.linear(scale),
-                      disableAnimations: true,
-                      padding: device.platform == TargetPlatform.iOS
-                          ? const EdgeInsets.only(top: 47, bottom: 34)
-                          : const EdgeInsets.only(top: 24, bottom: 24),
+          for (final appearance in appearances) {
+            WorkloopLegacyPalette.sync(appearance.$2.brightness);
+            for (final surface in surfaces) {
+              await tester.pumpWidget(
+                ProviderScope(
+                  overrides: [
+                    clientCrmRecordsProvider.overrideWith(
+                      (ref) async => const [],
                     ),
-                    child: surface.builder(),
+                    workspaceProvider.overrideWith(
+                      (ref) async => const {'id': 'workspace-1'},
+                    ),
+                    setupChecklistDismissedProvider.overrideWith(
+                      (ref) async => true,
+                    ),
+                    dashboardClockProvider.overrideWith(
+                      (ref) => Stream.value(DateTime(2026, 7, 30, 9)),
+                    ),
+                    dashboardAttentionProvider.overrideWith(
+                      (ref) async => const [],
+                    ),
+                    clientsProvider.overrideWith((ref) async => const []),
+                    appointmentsProvider.overrideWith((ref) async => const []),
+                    bookingRequestsProvider.overrideWith(
+                      (ref) async => const [],
+                    ),
+                    invoicesProvider.overrideWith((ref) async => const []),
+                    expensesProvider.overrideWith((ref) async => const []),
+                    financeSummaryProvider.overrideWith((ref) async => finance),
+                    workspaceSettingsProvider.overrideWith(
+                      (ref) async => const {'revenue_target': 5000},
+                    ),
+                    allTasksProvider.overrideWith((ref) async => const []),
+                    allNotesProvider.overrideWith((ref) async => const []),
+                    businessFeedProvider.overrideWith((ref) async => const []),
+                    authRepositoryProvider.overrideWithValue(authRepository),
+                  ],
+                  child: MaterialApp(
+                    debugShowCheckedModeBanner: false,
+                    theme: appearance.$2.copyWith(platform: device.platform),
+                    home: MediaQuery(
+                      data: MediaQueryData(
+                        size: device.size,
+                        devicePixelRatio: 1,
+                        textScaler: TextScaler.linear(scale),
+                        disableAnimations: true,
+                        padding: device.platform == TargetPlatform.iOS
+                            ? const EdgeInsets.only(top: 47, bottom: 34)
+                            : const EdgeInsets.only(top: 24, bottom: 24),
+                      ),
+                      child: surface.builder(),
+                    ),
                   ),
                 ),
-              ),
-            );
-            await tester.pumpAndSettle();
-            final exception = tester.takeException();
-            expect(
-              exception,
-              isNull,
-              reason:
-                  '${surface.name} failed on ${device.name} at ${scale}x text',
-            );
+              );
+              await tester.pumpAndSettle();
+              final exception = tester.takeException();
+              expect(
+                exception,
+                isNull,
+                reason:
+                    '${surface.name} failed in ${appearance.$1} on ${device.name} at ${scale}x text',
+              );
+            }
           }
         }
       }
     },
-    timeout: const Timeout(Duration(minutes: 2)),
+    timeout: const Timeout(Duration(minutes: 3)),
   );
 
   testWidgets('client form remains reachable with keyboard and large text', (

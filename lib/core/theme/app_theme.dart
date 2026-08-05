@@ -1,28 +1,78 @@
+import 'dart:ui' show ColorSpace;
+
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
+/// Compatibility bridge for legacy widgets that still reference [AppColors].
+/// New and actively edited widgets should use [WorkloopThemeTokens] instead.
+class WorkloopLegacyPalette {
+  const WorkloopLegacyPalette._();
+
+  static Brightness brightness = Brightness.dark;
+
+  static void sync(Brightness value) => brightness = value;
+}
+
+class _AdaptiveColor extends Color {
+  final Color light;
+  final Color dark;
+
+  const _AdaptiveColor(this.light, this.dark) : super(0x00000000);
+
+  Color get _resolved =>
+      WorkloopLegacyPalette.brightness == Brightness.dark ? dark : light;
+
+  @override
+  double get a => _resolved.a;
+
+  @override
+  double get r => _resolved.r;
+
+  @override
+  double get g => _resolved.g;
+
+  @override
+  double get b => _resolved.b;
+
+  @override
+  ColorSpace get colorSpace => _resolved.colorSpace;
+
+  @override
+  int toARGB32() => _resolved.toARGB32();
+}
+
 class AppColors {
-  // Workloop is intentionally dark-only. These graphite layers are slightly
-  // lifted from black so surfaces stay calm without collapsing together.
-  static const bg = Color(0xFF151A16);
-  static const bgCard = Color(0xFF1C231D);
-  static const bgRaised = Color(0xFF252E26);
-  static const bgInteract = Color(0xFF2C372D);
-  static const border = Color(0xFF3E4B3F);
-  static const borderStrong = Color(0xFF5E705F);
+  // Warm paper in Light and lifted graphite in Dark. Adaptive aliases
+  // keep older screens legible while they migrate to semantic theme tokens.
+  static const bg = _AdaptiveColor(Color(0xFFEEEDE8), Color(0xFF151A16));
+  static const bgCard = _AdaptiveColor(Color(0xFFFFFEFA), Color(0xFF1C231D));
+  static const bgRaised = _AdaptiveColor(Color(0xFFF8F7F2), Color(0xFF252E26));
+  static const bgInteract = _AdaptiveColor(
+    Color(0xFFD9DDD5),
+    Color(0xFF2C372D),
+  );
+  static const border = _AdaptiveColor(Color(0xFFC6CAC2), Color(0xFF3E4B3F));
+  static const borderStrong = _AdaptiveColor(
+    Color(0xFF929990),
+    Color(0xFF5E705F),
+  );
 
   // Text
-  static const t1 = Color(0xFFF4F7F3);
-  static const t2 = Color(0xFFCDD5CC);
-  static const t3 = Color(0xFFA6B1A5);
-  static const t4 = Color(0xFF899588);
+  static const t1 = _AdaptiveColor(Color(0xFF171B18), Color(0xFFF4F7F3));
+  static const t2 = _AdaptiveColor(Color(0xFF3C443E), Color(0xFFCDD5CC));
+  static const t3 = _AdaptiveColor(Color(0xFF5C655E), Color(0xFFA6B1A5));
+  static const t4 = _AdaptiveColor(Color(0xFF7C847E), Color(0xFF899588));
 
   // Workloop's signature neon is sampled directly from the app icon and launch
   // artwork. It is reserved for primary actions and active states; filled
   // controls use the dark [onBrandAccent] foreground.
   static const brandAccent = Color(0xFFC1FF72);
   static const onBrandAccent = Color(0xFF17200D);
-  static const accentInk = Color(0xFFC1FF72);
+  static const accentInk = _AdaptiveColor(Color(0xFF355A0C), Color(0xFFC1FF72));
+  static const accentBorder = _AdaptiveColor(
+    Color(0xFF91B560),
+    Color(0xFFC1FF72),
+  );
   static const slate = brandAccent;
   static const slateLight = brandAccent;
   static const slateDim = Color(0x33C1FF72);
@@ -32,7 +82,10 @@ class AppColors {
   // Compatibility alias for older foreground/status call sites. Filled brand
   // controls must use brandAccent/accentPrimaryStrong explicitly.
   static const green = accentInk;
-  static const greenLight = Color(0xFF202B17);
+  static const greenLight = _AdaptiveColor(
+    Color(0xFFEDF3E6),
+    Color(0xFF202B17),
+  );
   static const greenDim = slateDim;
   static const greenGlow = slateGlow;
 
@@ -42,34 +95,55 @@ class AppColors {
   static const violetGlow = Color(0x33B05884);
 
   // Semantic
-  static const statusSuccess = Color(0xFFA8E85B);
-  static const statusSuccessDim = Color(0x385C8F25);
+  static const statusSuccess = _AdaptiveColor(
+    Color(0xFF3D6B1D),
+    Color(0xFFA8E85B),
+  );
+  static const statusSuccessDim = _AdaptiveColor(
+    Color(0x293D6B1D),
+    Color(0x385C8F25),
+  );
   static const success = statusSuccess;
   static const successDim = statusSuccessDim;
-  static const warning = Color(0xFFF2C56B);
-  static const warningDim = Color(0x38332A13);
-  static const error = Color(0xFFFF7A73);
-  static const errorDim = Color(0x4D351817);
+  static const warning = _AdaptiveColor(Color(0xFF7D5900), Color(0xFFF2C56B));
+  static const warningDim = _AdaptiveColor(
+    Color(0x24A67300),
+    Color(0x38332A13),
+  );
+  static const error = _AdaptiveColor(Color(0xFFA43D37), Color(0xFFFF7A73));
+  static const errorDim = _AdaptiveColor(Color(0x24A43D37), Color(0x4D351817));
 
   // Module colours.
   static const modHome = accentInk;
   static const modClients = accentInk;
-  static const modCalendar = Color(0xFF75C9B8);
+  static const modCalendar = _AdaptiveColor(
+    Color(0xFF216D63),
+    Color(0xFF75C9B8),
+  );
   static const modFinance = accentInk;
-  static const modTasks = Color(0xFFD19ABA);
-  static const modNotes = Color(0xFF83BDD3);
+  static const modTasks = _AdaptiveColor(Color(0xFF814A68), Color(0xFFD19ABA));
+  static const modNotes = _AdaptiveColor(Color(0xFF2F6D82), Color(0xFF83BDD3));
 
   // Module icon backgrounds.
-  static const modBg = Color(0xFF2C372D);
+  static const modBg = _AdaptiveColor(Color(0xFFD9DDD5), Color(0xFF2C372D));
 
   // Hero/summary panels used for financial and high-trust information.
-  static const panelSoft = Color(0xFF191F15);
-  static const panelSoftRaised = Color(0xFF242F1A);
+  static const panelSoft = _AdaptiveColor(Color(0xFFF7F6F1), Color(0xFF191F15));
+  static const panelSoftRaised = _AdaptiveColor(
+    Color(0xFFE7EAE2),
+    Color(0xFF242F1A),
+  );
   // Foreground used whenever the exact brand neon is the background fill.
   // This stays dark to preserve contrast on the neon fill.
   static const panelInk = onBrandAccent;
-  static const panelMuted = Color(0xFFC3CCC2);
-  static const panelFaint = Color(0x38C1FF72);
+  static const panelMuted = _AdaptiveColor(
+    Color(0xFF4D5A50),
+    Color(0xFFC3CCC2),
+  );
+  static const panelFaint = _AdaptiveColor(
+    Color(0x24C1FF72),
+    Color(0x38C1FF72),
+  );
 }
 
 @immutable
@@ -87,6 +161,7 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
   final Color accent;
   final Color accentStrong;
   final Color accentInk;
+  final Color accentBorder;
   final Color onAccent;
   final Color success;
   final Color successContainer;
@@ -114,6 +189,7 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
     required this.accent,
     required this.accentStrong,
     required this.accentInk,
+    required this.accentBorder,
     required this.onAccent,
     required this.success,
     required this.successContainer,
@@ -127,6 +203,35 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
     required this.skeletonBase,
     required this.skeletonHighlight,
   });
+
+  static const light = WorkloopThemeTokens(
+    background: Color(0xFFEEEDE8),
+    surface: Color(0xFFFFFEFA),
+    surfaceRaised: Color(0xFFF8F7F2),
+    surfaceSubtle: Color(0xFFD9DDD5),
+    divider: Color(0xFFC6CAC2),
+    dividerStrong: Color(0xFF929990),
+    textPrimary: Color(0xFF171B18),
+    textSecondary: Color(0xFF3C443E),
+    textTertiary: Color(0xFF5C655E),
+    textDisabled: Color(0xFF7C847E),
+    accent: Color(0xFFC1FF72),
+    accentStrong: Color(0xFFC1FF72),
+    accentInk: Color(0xFF355A0C),
+    accentBorder: Color(0xFF91B560),
+    onAccent: Color(0xFF17200D),
+    success: Color(0xFF3F681E),
+    successContainer: Color(0xFFEAF2DF),
+    warning: Color(0xFF7B5807),
+    warningContainer: Color(0xFFF7EDD6),
+    error: Color(0xFF9C3E38),
+    errorContainer: Color(0xFFF5E7E4),
+    info: Color(0xFF28627B),
+    infoContainer: Color(0xFFE3EFF3),
+    scrim: Color(0x52000000),
+    skeletonBase: Color(0xFFD8D9D3),
+    skeletonHighlight: Color(0xFFF7F6F2),
+  );
 
   static const dark = WorkloopThemeTokens(
     background: Color(0xFF151A16),
@@ -142,6 +247,7 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
     accent: Color(0xFFC1FF72),
     accentStrong: Color(0xFFC1FF72),
     accentInk: Color(0xFFC1FF72),
+    accentBorder: Color(0xFFC1FF72),
     onAccent: Color(0xFF17200D),
     success: Color(0xFFA8E85B),
     successContainer: Color(0xFF202B17),
@@ -171,6 +277,7 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
     Color? accent,
     Color? accentStrong,
     Color? accentInk,
+    Color? accentBorder,
     Color? onAccent,
     Color? success,
     Color? successContainer,
@@ -198,6 +305,7 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
       accent: accent ?? this.accent,
       accentStrong: accentStrong ?? this.accentStrong,
       accentInk: accentInk ?? this.accentInk,
+      accentBorder: accentBorder ?? this.accentBorder,
       onAccent: onAccent ?? this.onAccent,
       success: success ?? this.success,
       successContainer: successContainer ?? this.successContainer,
@@ -234,6 +342,7 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
       accent: blend(accent, other.accent),
       accentStrong: blend(accentStrong, other.accentStrong),
       accentInk: blend(accentInk, other.accentInk),
+      accentBorder: blend(accentBorder, other.accentBorder),
       onAccent: blend(onAccent, other.onAccent),
       success: blend(success, other.success),
       successContainer: blend(successContainer, other.successContainer),
@@ -279,6 +388,9 @@ class AppMotion {
   static const fast = Duration(milliseconds: 160);
   static const standard = Duration(milliseconds: 240);
   static const deliberate = Duration(milliseconds: 360);
+  static const navigation = standard;
+  static const double navigationOffset = 0.04;
+  static const double destinationOffset = 14;
   static const curve = Curves.easeOutCubic;
   static const emphasized = Curves.easeOutBack;
 
@@ -308,16 +420,43 @@ class AppShadows {
 }
 
 class AppTheme {
-  static const themeMode = ThemeMode.dark;
+  static ThemeData get light =>
+      _build(tokens: WorkloopThemeTokens.light, brightness: Brightness.light);
 
-  static ThemeData get dark {
-    const tokens = WorkloopThemeTokens.dark;
+  static ThemeData get dark =>
+      _build(tokens: WorkloopThemeTokens.dark, brightness: Brightness.dark);
+
+  static ThemeData _build({
+    required WorkloopThemeTokens tokens,
+    required Brightness brightness,
+  }) {
+    final colorScheme = brightness == Brightness.dark
+        ? ColorScheme.dark(
+            primary: tokens.accent,
+            onPrimary: tokens.onAccent,
+            secondary: tokens.accent,
+            onSecondary: tokens.onAccent,
+            surface: tokens.surface,
+            onSurface: tokens.textPrimary,
+            error: tokens.error,
+          )
+        : ColorScheme.light(
+            primary: tokens.accent,
+            onPrimary: tokens.onAccent,
+            secondary: tokens.accentInk,
+            onSecondary: tokens.surface,
+            surface: tokens.surface,
+            onSurface: tokens.textPrimary,
+            error: tokens.error,
+          );
     return ThemeData(
       useMaterial3: true,
       fontFamily: 'Instrument Sans',
-      brightness: Brightness.dark,
-      extensions: const [tokens],
+      brightness: brightness,
+      extensions: [tokens],
       scaffoldBackgroundColor: tokens.background,
+      canvasColor: tokens.background,
+      cardColor: tokens.surface,
       focusColor: tokens.accent.withValues(alpha: 0.24),
       highlightColor: tokens.accent.withValues(alpha: 0.12),
       splashColor: tokens.accent.withValues(alpha: 0.14),
@@ -330,15 +469,7 @@ class AppTheme {
           TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
         },
       ),
-      colorScheme: ColorScheme.dark(
-        primary: tokens.accent,
-        onPrimary: tokens.onAccent,
-        secondary: tokens.accent,
-        onSecondary: tokens.onAccent,
-        surface: tokens.surface,
-        onSurface: tokens.textPrimary,
-        error: tokens.error,
-      ),
+      colorScheme: colorScheme,
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         foregroundColor: tokens.textPrimary,
@@ -419,6 +550,14 @@ class AppTheme {
         filled: true,
         fillColor: tokens.surface,
         hintStyle: TextStyle(color: tokens.textTertiary),
+        labelStyle: TextStyle(color: tokens.textSecondary),
+        floatingLabelStyle: TextStyle(
+          color: tokens.accentInk,
+          fontWeight: FontWeight.w600,
+        ),
+        errorStyle: TextStyle(color: tokens.error),
+        prefixIconColor: tokens.textSecondary,
+        suffixIconColor: tokens.textSecondary,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide(color: tokens.divider),
@@ -441,6 +580,7 @@ class AppTheme {
           backgroundColor: tokens.accentStrong,
           foregroundColor: tokens.onAccent,
           elevation: 0,
+          side: BorderSide(color: tokens.accentBorder, width: 1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
@@ -456,6 +596,7 @@ class AppTheme {
           backgroundColor: tokens.accentStrong,
           foregroundColor: tokens.onAccent,
           minimumSize: const Size(44, 44),
+          side: BorderSide(color: tokens.accentBorder, width: 1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
@@ -499,7 +640,9 @@ class AppTheme {
         focusElevation: 0,
         hoverElevation: 0,
         highlightElevation: 0,
-        shape: const CircleBorder(),
+        shape: CircleBorder(
+          side: BorderSide(color: tokens.accentBorder, width: 1),
+        ),
       ),
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith(
@@ -601,14 +744,28 @@ class _SlatePageTransitionsBuilder extends PageTransitionsBuilder {
       curve: AppMotion.curve,
       reverseCurve: Curves.easeInCubic,
     );
-    return FadeTransition(
-      opacity: curved,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0.035, 0),
-          end: Offset.zero,
-        ).animate(curved),
-        child: child,
+    final outgoing = CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: AppMotion.curve,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: Offset.zero,
+        end: const Offset(-0.015, 0),
+      ).animate(outgoing),
+      child: FadeTransition(
+        opacity: Tween<double>(begin: 1, end: 0.96).animate(outgoing),
+        child: FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(AppMotion.navigationOffset, 0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
+        ),
       ),
     );
   }

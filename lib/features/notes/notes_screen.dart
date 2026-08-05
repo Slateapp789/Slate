@@ -55,6 +55,16 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   _NoteFilter _filter = _NoteFilter.all;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.createRequest != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openEditor();
+      });
+    }
+  }
+
+  @override
   void didUpdateWidget(covariant NotesScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.createRequest == oldWidget.createRequest ||

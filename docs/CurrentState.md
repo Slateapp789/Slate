@@ -1,8 +1,28 @@
 # Workloop Current State
 
-Last updated: 2026-07-30
+Last updated: 2026-08-03
 
 ## Completed / Mostly Working Features
+
+### 2026-07-31 appearance and Tools workflow pass
+
+- Workloop supports persisted System, Light, and Dark appearances from a
+  dedicated Settings destination. System follows the phone; manual choices
+  apply immediately and survive relaunch.
+- Light uses a low-glare warm-stone `#EEEDE8` canvas, ivory content surfaces,
+  neutral grey interaction layers, dark operational text, and the exact
+  `#C1FF72` neon only for confident fills and selected states. Accent-filled
+  controls have a quiet one-pixel sage edge; neutral cards stay neutral. Dark
+  retains the existing lifted graphite palette.
+- Legacy screen colours now resolve through the effective appearance while
+  current shared components continue to use semantic tokens. Native iOS and
+  Android startup configuration no longer forces Dark when the system is Light.
+- Tools now leads with Record money, New task, and New note capture actions.
+  These open the existing canonical creation flows directly, while the three
+  workspace rows retain equal hierarchy and add live money/task/note context.
+- Theme tests protect text, status, module-icon, focus, button, navigation, and
+  disabled-state contrast in both appearances. The responsive launch matrix
+  now renders Light and Dark across six phone sizes and two text scales.
 
 ### 2026-07-30 visual hierarchy and daily-focus pass
 
@@ -41,11 +61,10 @@ Last updated: 2026-07-30
 
 ### Final application foundation
 
-- Workloop ships with one fixed Dark appearance. The graphite canvas was lifted
-  slightly to `#151A16`, with layered `#1C231D`, `#252E26`, and `#2C372D`
-  surfaces so it remains calm without feeling black or oppressive. The exact
-  icon and launch-artwork neon `#C1FF72` remains the restrained brand accent,
-  with dark `#17200D` content on neon fills and tested contrast pairs.
+- Workloop ships coordinated System, Light, and Dark appearances. Dark uses the
+  lifted `#151A16` graphite canvas; Light uses low-glare `#EEEDE8` warm paper. The
+  exact icon and launch-artwork neon `#C1FF72` remains the restrained brand
+  accent, with dark `#17200D` content on neon fills and tested contrast pairs.
 - Instrument Sans is bundled with its licence so launch typography does not
   depend on a runtime font download. The app-wide weight scale is capped at
   semibold, with regular-weight body copy for a calmer, more minimal hierarchy.
@@ -135,8 +154,9 @@ Last updated: 2026-07-30
 - Main shell with a four-item glass/pill bottom navigation: Home, Clients,
   Bookings, Tools.
 - Tools presents Money, Tasks, and Notes as equal, full-width operating
-  workspaces. Profile and Settings are direct secondary controls in the Home
-  header rather than content sections in the daily dashboard.
+  workspaces with live orientation text, plus direct Record money, New task,
+  and New note capture. Profile and Settings are direct secondary controls in
+  the Home header rather than content sections in the daily dashboard.
 - Clients, Bookings, Money, Tasks, and Notes expose the same labelled neon
   create action in each feature header. Money opens a two-choice sheet for
   income or expense instead of mixing unrelated controls.
@@ -165,6 +185,13 @@ Last updated: 2026-07-30
   Their iOS back swipe now moves with the finger, reveals that workspace with
   Cupertino-style parallax, and can be cancelled before returning—normally to
   Tools, or Home when Money was opened from a Home follow-up.
+- Every programmatic shell destination change now uses the same restrained
+  240ms fade-through and directional offset. This covers Home, Clients,
+  Bookings, Tools, and forward entry into Money, Tasks, and Notes while
+  preserving each destination's mounted state and scroll position. Reduced
+  motion switches immediately. Retained destinations keep a stable keyed layer
+  through every animation phase, and Tools create requests are cleared after
+  their first delivery so Money, Task, or Note creation cannot replay later.
 - Clients gives the top shortcut precedence over a tappable client row occupying
   the top zone after scrolling. Filter changes remain explicit through the
   visible filter rail rather than a competing full-screen horizontal gesture.
@@ -276,7 +303,8 @@ Last updated: 2026-07-30
 - Business details, Working hours, Public profile, and Services use dedicated Profile-owned screens while reusing the established repositories and save logic. Business Info includes the owner's preferred name, business name, and industry. Working hours use scrolling time wheels in a direct full-screen day-by-day editor.
 - Booking requests use a compact, filterable inbox. Each request opens a focused detail screen for calling, marking contacted, declining, or converting into a booking.
 - Settings is intentionally separate and contains Account, Notifications, and
-  App preferences. Workloop has no user-selectable appearance.
+  App preferences. Appearance is a dedicated Settings destination rather than
+  being mixed into general app connections.
 
 ### Money
 
@@ -337,8 +365,8 @@ Last updated: 2026-07-30
 
 - Calm Settings overview with account identity and dedicated Account,
   Notifications, and App preferences destinations.
-- The app uses one fixed dark semantic palette; there is no appearance state,
-  persisted mode, or OS-brightness transition to reconcile.
+- System, Light, and Dark appearance choice is stored locally and applied at
+  the app boundary; no workspace schema or account data is involved.
 - App preferences is reserved for maps, calendar, and Workloop information.
 - Account owns preferred name, email, password, workspace export, account deletion request, and sign out.
 - Notifications owns booking, payment, task, follow-up, digest, summary, and quiet-time preferences.
@@ -370,7 +398,7 @@ Last updated: 2026-07-30
   promotion.
 - Schema contract.
 - GitHub remote connected.
-- iOS launch scope is iPhone portrait on iOS 13+; Android is portrait with minimum API 24 and target/compile API 36.
+- iOS launch scope is iPhone portrait on iOS 15+; Android is portrait with minimum API 26 and target/compile API 36. Tap to Pay has stricter runtime device requirements.
 - CI is defined for Flutter 3.44.8 formatting, analysis, tests, Deno formatting/type checks/tests, Android profile and web builds, plus a separate unsigned iOS profile build on macOS. Android uses Gradle 8.14.3, Android Gradle Plugin 8.11.1, Kotlin 2.2.20, and Java 17.
 - Model serialization tests.
 - `flutter analyze` clean at latest verification.
@@ -396,7 +424,7 @@ Last updated: 2026-07-30
   the launch command completed successfully and the Workloop process was
   confirmed running through CoreDevice.
 - Android debug/profile compilation passed with package
-  `com.ismaeel.workloop`, minimum API 24, target/compile API 36, and portrait
+  `com.ismaeel.workloop`, minimum API 26, target/compile API 36, and portrait
   activity. The profile APK passed `zipalign -c -P 16 -v 4` and signature
   verification.
 - The web release build passed. Android App Bundle release signing fails closed
@@ -447,7 +475,12 @@ V1 before beta:
 
 Post-V1 / V2:
 
-- Stripe/pay-now/deposits.
+- Stripe payment collection is deployed in test mode: Connect uses direct
+  merchant charges, the connected-account webhook and authenticated payment
+  API are active, database/RLS tests pass, platform fees are disabled, and
+  live keys remain blocked. Test connected-account onboarding, simulated and
+  physical payment/refund QA, Apple entitlements, and explicit live-mode
+  approval remain. Deposits remain future scope.
 - Full public slot-selection booking engine.
 - Reviews system.
 - Intake forms.

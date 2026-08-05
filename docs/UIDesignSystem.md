@@ -1,16 +1,18 @@
 # Workloop UI Design System
 
-Last updated: 2026-07-30
+Last updated: 2026-08-03
 
 ## Design Intent
 
 Workloop should feel premium, calm, modern, mobile-first, and high-trust. It is a working tool for people running real businesses from their phone.
 
-Current design direction is one slightly lifted graphite Dark appearance, with
-the exact icon/launch neon as the brand accent. Workloop should feel operational
-and premium: calm layered surfaces, clear hierarchy, and `#C1FF72` used
-sparingly so important actions and selected states are obvious. Workloop does
-not ship a user-selectable Light or System appearance.
+Current design direction supports System, Light, and Dark appearance choices,
+with the exact icon/launch neon as the brand accent. Dark uses slightly lifted
+graphite; Light uses a warm stone paper canvas and clean ivory surfaces rather
+than pure white or a green-tinted wash.
+Both should feel operational and premium: calm layered surfaces, clear
+hierarchy, and `#C1FF72` used sparingly so important actions and selected states
+are obvious.
 
 ## Current Colour System
 
@@ -18,18 +20,18 @@ Source: `lib/core/theme/app_theme.dart`
 
 Canonical semantic roles:
 
-| Role | Value |
-|---|---:|
-| Background | `#151A16` |
-| Surface | `#1C231D` |
-| Raised surface | `#252E26` |
-| Interactive surface | `#2C372D` |
-| Divider | `#3E4B3F` |
-| Strong divider | `#5E705F` |
-| Primary text | `#F4F7F3` |
-| Secondary text | `#CDD5CC` |
-| Tertiary text | `#A6B1A5` |
-| Disabled text | `#899588` |
+| Role | Light | Dark |
+|---|---:|---:|
+| Background | `#EEEDE8` | `#151A16` |
+| Surface | `#FFFEFA` | `#1C231D` |
+| Raised surface | `#F8F7F2` | `#252E26` |
+| Interactive surface | `#D9DDD5` | `#2C372D` |
+| Divider | `#C6CAC2` | `#3E4B3F` |
+| Strong divider | `#929990` | `#5E705F` |
+| Primary text | `#171B18` | `#F4F7F3` |
+| Secondary text | `#3C443E` | `#CDD5CC` |
+| Tertiary text | `#5C655E` | `#A6B1A5` |
+| Disabled text | `#7C847E` | `#899588` |
 
 Accent:
 
@@ -38,9 +40,16 @@ Accent:
   `AppColors.accentInk` resolve to the exact neon.
   `AppColors.onBrandAccent` is dark `#17200D`.
 - Reserve the brand accent for the main CTA, active navigation, selection, focus, and restrained status emphasis.
+- Light uses deep `#355A0C` accent ink for small text, thin icons, and focus
+  outlines; the exact neon remains the fill for primary and selected controls.
+- In Light, neon-filled controls use a one-pixel `#91B560` semantic accent
+  border. This applies to primary buttons, root create actions, selected
+  navigation, floating actions, and compact accent chips so the fill remains
+  defined without a heavy outline. Neutral cards and hero surfaces keep neutral
+  dividers; Dark retains its existing accent edges.
 - Legacy green/violet aliases remain in code for compatibility and should be gradually renamed only when safe.
 
-Accessibility refinement (2026-07-26):
+Accessibility refinement (updated 2026-07-31):
 
 - Primary navigation and primary controls use an opaque accent fill. Secondary
   display and time filters use raised graphite with an accent label so they do
@@ -50,8 +59,11 @@ Accessibility refinement (2026-07-26):
   restrained status signal.
 - Essential text never uses the disabled role, and tertiary copy remains readable against the page canvas.
 - Primary, secondary, tertiary, and accent text roles meet WCAG AA normal-text
-  contrast against the shipped dark canvas. Disabled text is reserved for
-  unavailable controls, never essential information.
+  contrast against both canvases. Disabled text is reserved for unavailable
+  controls, never essential information.
+- Button and active-navigation content always uses dark `#17200D` on the neon
+  fill. Light-mode module icons use darker adaptive foregrounds rather than the
+  pastel Dark variants.
 
 Semantic:
 
@@ -224,6 +236,9 @@ Current main navigation:
 - Labels appear under icons.
 - Tabs: Home, Clients, Bookings, Tools.
 - Tools contains Money, Tasks, and Notes as equal full-width workspace rows.
+- Tools also provides direct Record money, New task, and New note capture
+  actions before the workspace rows. Each row shows a small live orientation
+  signal such as money to collect, open tasks, or saved notes.
 - Profile and Settings use compact, direct controls in the Home header rather
   than occupying tool rows or permanent bottom-navigation destinations.
 - Create-capable feature screens use one labelled top-right action instead of a
@@ -281,6 +296,19 @@ Rules:
 
 - Motion should feel calm and premium.
 - Animate navigation state, sheet entry, filter/pill transitions, completion affordances, and empty state transitions.
+- Programmatic shell changes use one 240ms fade-through with a restrained
+  14-point directional offset. The outgoing destination remains mounted until
+  the incoming destination is established, so retained state never flashes or
+  rebuilds. Each retained destination keeps one stable keyed layer throughout
+  every animation phase; transition wrappers must never reparent a feature
+  screen or replay one-shot create intents.
+- Pushed routes inherit the app theme transition instead of defining local
+  animation. Android uses the same restrained fade and horizontal offset;
+  iOS keeps the native Cupertino transition so interactive back remains
+  finger-tracked and cancellable.
+- Reduced-motion users receive an immediate destination change. Navigation
+  motion must never delay saving, validation, draft guards, or destructive
+  confirmation.
 - Avoid gimmicky animation that slows business work.
 
 ## Current Visual Debt
@@ -288,7 +316,11 @@ Rules:
 - Some design tokens still have legacy names (`green`, `violet`) even though the intended role is now `accentPrimary`.
 - Large screens still contain local UI variants that should be consolidated.
 - Money and Bookings have evolved quickly and need a final consistency pass.
-- Current palette is intentionally dark graphite with a single bright accent; future colour experiments should be done as a deliberate theme pass, not piecemeal.
+- Legacy `AppColors` call sites use an appearance-aware compatibility bridge;
+  touched screens should continue migrating to `WorkloopThemeTokens` rather
+  than adding local Light/Dark conditions.
+- Both palettes intentionally use one bright accent; future colour experiments
+  should be done as a deliberate theme pass, not piecemeal.
 
 ## 2026-07-07 Minimal Refoundation
 
@@ -316,8 +348,9 @@ Historical appearance status:
 - System, Light, and OLED-aware Dark appearances were available from Settings >
   App appearance.
 - This choice and its compatibility bridge were superseded by the
-  2026-07-28 dark-only launch decision. Production now has one fixed semantic
-  palette and no appearance setting.
+  2026-07-28 dark-only launch decision, then restored on 2026-07-31 with a
+  softer Light canvas, persisted System/Light/Dark choice, and expanded
+  cross-appearance contrast and responsive coverage.
 
 ## 2026-07-07 Final UI System Implementation
 
@@ -354,6 +387,6 @@ Current scope:
 
 - Dashboard, Business Feed, Clients, Bookings, Money, Tasks, Notes, Settings, Onboarding, bottom navigation, and global workspace error chrome now reference the canonical primitives where they touch shared system UI.
 - Bookings and Settings use the shared segmented control instead of local pill-tab containers.
-- This section records the 2026-07-07 implementation. As of 2026-07-28, only
-  the canonical dark appearance is supported; new work must continue to use
+- This section records the 2026-07-07 implementation. As of 2026-07-31,
+  System, Light, and Dark are supported again; new work must continue to use
   semantic theme tokens rather than local colours.

@@ -13,6 +13,7 @@ export 'privacy_repository.dart';
 export 'profile_repository.dart';
 export 'repository_pagination.dart';
 export 'services_repository.dart';
+export 'stripe_payments_repository.dart';
 export 'supabase_client_provider.dart';
 export 'tasks_repository.dart';
 export 'workspace_repository.dart';

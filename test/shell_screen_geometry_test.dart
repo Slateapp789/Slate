@@ -11,6 +11,8 @@ import 'package:workloop/features/public_profile/booking_requests_screen.dart';
 import 'package:workloop/shared/providers/appointments_provider.dart';
 import 'package:workloop/shared/providers/clients_provider.dart';
 import 'package:workloop/shared/providers/finance_provider.dart';
+import 'package:workloop/shared/providers/notes_provider.dart';
+import 'package:workloop/shared/providers/tasks_provider.dart';
 import 'package:workloop/shared/providers/workspace_settings_provider.dart';
 import 'package:workloop/shared/widgets/slate_ui.dart';
 
@@ -31,6 +33,8 @@ void main() {
       invoicesProvider.overrideWith((ref) async => const []),
       expensesProvider.overrideWith((ref) async => const []),
       financeSummaryProvider.overrideWith((ref) async => finance),
+      allTasksProvider.overrideWith((ref) async => const []),
+      allNotesProvider.overrideWith((ref) async => const []),
       workspaceSettingsProvider.overrideWith(
         (ref) async => const {'revenue_target': 5000},
       ),

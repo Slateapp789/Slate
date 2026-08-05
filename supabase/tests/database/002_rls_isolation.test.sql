@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(12);
+select plan(14);
 
 insert into auth.users (
   id,
@@ -67,6 +67,19 @@ insert into public.contacts (id, workspace_id, name) values
     'User B client'
   );
 
+insert into public.workspace_payment_accounts(
+  workspace_id,
+  stripe_account_id
+) values
+  (
+    '11000000-0000-4000-8000-000000000001',
+    'acct_QualityWorkspaceA123'
+  ),
+  (
+    '22000000-0000-4000-8000-000000000002',
+    'acct_QualityWorkspaceB123'
+  );
+
 create temporary table quality_mutation_results (
   result_name text primary key,
   passed boolean not null
@@ -94,6 +107,27 @@ select is(
   (select min(name) from public.contacts),
   'User A client',
   'User A cannot read User B content'
+);
+
+select is(
+  (select count(*)::bigint from public.workspace_payment_accounts),
+  1::bigint,
+  'User A sees only User A payment account status'
+);
+
+select throws_ok(
+  $$
+    insert into public.workspace_payment_accounts(
+      workspace_id,
+      stripe_account_id
+    ) values (
+      '11000000-0000-4000-8000-000000000001',
+      'acct_ForbiddenClientWrite123'
+    )
+  $$,
+  '42501',
+  null,
+  'authenticated clients cannot write provider account state'
 );
 
 with changed as (

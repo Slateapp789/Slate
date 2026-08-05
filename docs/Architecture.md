@@ -18,8 +18,9 @@ Workloop is a Flutter application using:
 - `flutter_local_notifications` for opted-in on-device reminders
 - `device_calendar` and `file_picker` for reviewed imports and portable exports
 
-The 1.0 product is phone-first: iPhone portrait on iOS 13+ and portrait Android
-on API 24+, targeting API 36.
+The 1.0 product is phone-first: iPhone portrait on iOS 15+ and portrait Android
+on API 26+, targeting API 36. These minimums follow Stripe Terminal 5.x; Tap to
+Pay has stricter runtime device requirements documented in `StripePayments.md`.
 
 ## Folder Structure
 

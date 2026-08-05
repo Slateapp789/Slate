@@ -394,3 +394,105 @@ shortcut.
 | iOS profile build | Pass; 34.9 MB `Runner.app` | Development signing |
 | Android profile build | Pass; 113.6 MB APK | Profile artifact, not Play signing |
 | Physical iPhone profile | Exact profile artifact installed and launched on iOS 26.5.2; CoreDevice confirmed PID 37567 | Process/launch proof; final human feel confirmation remains with the user |
+
+## 20. 2026-07-31 adaptive appearance and Tools launchpad
+
+This pass restored a persisted System/Light/Dark appearance choice, introduced
+a low-glare light palette through the shared theme system, and turned Tools
+into a useful launchpad with direct capture actions and live workspace context.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| Theme and appearance tests | System default, persistence, rollback, adaptive aliases, contrast, native startup resources, and Settings selection passed | Automated colour and state contracts; not a manual colour-vision review |
+| Launch responsive matrix | 12 surfaces x 6 phone viewports x 2 text scales x 2 appearances = 288 render combinations passed | Widget layouts; not a physical VoiceOver or TalkBack pass |
+| Golden suite | 14/14 tests passed; updated Tools and Settings dark images plus new light images visually reviewed | Declared fixtures only |
+| `flutter analyze` | No issues | Static analysis cannot assess subjective appearance or physical interaction feel |
+| `flutter test --dart-define-from-file=.env` | 305/305 tests passed | Authenticated staging and production backend journeys remain open |
+| iOS profile build | Pass; 34.9 MB `Runner.app` | Development signing, not App Store distribution |
+| Android profile APK | Pass; 113.7 MB | Profile artifact, not Play release signing |
+| Physical iPhone profile | Exact profile artifact installed on the paired iPhone 15 Pro Max | Automatic launch was denied because the phone was locked; no process-level launch confirmation in this pass |
+
+The iOS build continues to warn that `device_calendar` and
+`flutter_local_notifications` do not declare Swift Package Manager support.
+The current CocoaPods build succeeds. The adaptive compatibility palette keeps
+legacy feature widgets coherent while they are migrated gradually to direct
+semantic theme tokens.
+
+## 21. 2026-08-03 cohesive navigation-motion pass
+
+This pass centralised forward motion for retained shell destinations and
+refined the shared Android page transition while preserving native iOS
+interactive navigation and all existing route and draft contracts.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| Navigation-assist tests | 19/19 passed | Covers programmatic shell switching, forward retained-tool entry, reduced motion, native iOS back swipe, cancellation, retained workspaces, and draft guards |
+| `flutter analyze` | No issues | Static analysis cannot assess subjective motion feel |
+| `flutter test --dart-define-from-file=.env` | 308/308 tests passed | Automated evidence; authenticated staging journeys remain open |
+| iOS profile build | Pass; 34.9 MB `Runner.app` | Development signing, not App Store distribution |
+| Android profile APK | Pass; 113.7 MB | Profile artifact, not Play release signing |
+| Physical iPhone profile | Exact profile artifact installed and launched on the paired iPhone 15 Pro Max | CoreDevice launch confirmation; final transition feel remains a human review |
+
+The iOS build continues to warn that `device_calendar` and
+`flutter_local_notifications` do not declare Swift Package Manager support.
+The current CocoaPods build succeeds.
+
+## 22. 2026-08-03 retained-screen replay regression correction
+
+A physical screen recording exposed repeated Add to Money sheets while moving
+among New task, Home, Tools, and Tasks. The transition stack was remounting
+retained feature screens and replaying an already-delivered create request.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| Recording inspection | 60 frames sampled across the 29.65-second physical recording; repeated Money sheet replay confirmed across unrelated destinations | Visual diagnosis, not instrumentation |
+| Navigation-assist tests | 20/20 passed | Includes retained create-request replay across repeated animated destination changes |
+| `flutter analyze` | No issues | Static analysis cannot assess subjective motion feel |
+| `flutter test --dart-define-from-file=.env` | 309/309 tests passed | Automated evidence; authenticated staging journeys remain open |
+| iOS profile build | Pass; 34.9 MB `Runner.app` | Development signing, not App Store distribution |
+| Physical iPhone profile | Exact corrected artifact installed on the paired iPhone 15 Pro Max | Automatic launch was denied because the phone was locked; final replay check remains with the user |
+
+The corrected stack keeps an identical outer tree and stable keyed layer for
+every retained destination. Tools also clears Money, Task, and Note create
+inputs after their first frame so remounting elsewhere cannot replay them.
+
+## 23. 2026-08-03 light-mode contrast refinement
+
+Physical dashboard review showed that the first low-glare Light palette was
+readable but too tonally compressed. This pass increased layer separation and
+added a canonical one-pixel border around neon-filled interactive controls.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| Theme contracts | Light surface separation, divider contrast, accent-border contrast, and Material button border roles passed | Numeric and widget contracts; not a colour-vision simulation |
+| Golden suite | 14/14 tests passed; 15 images generated, including a new dashboard Light fixture plus refreshed Tools and Settings Light fixtures | Declared deterministic data only |
+| Visual review | Dashboard, Tools, and Settings Light fixtures reviewed at 390 x 844; canvas, surfaces, dividers, accent controls, and hierarchy remain distinct | Desktop image inspection, not ambient-light device measurement |
+| `flutter analyze` | No issues | Static analysis cannot assess subjective appearance |
+| `flutter test --dart-define-from-file=.env` | 310/310 tests passed | Authenticated staging journeys remain open |
+| iOS profile build | Pass; 34.9 MB `Runner.app` | Development signing, not App Store distribution |
+| Physical iPhone profile | Exact refreshed artifact installed on the paired iPhone 15 Pro Max | Automatic launch was denied because the phone was locked; final ambient-light review remains with the user |
+
+The iOS build continues to warn that `device_calendar` and
+`flutter_local_notifications` do not declare Swift Package Manager support.
+The current CocoaPods build succeeds.
+
+## 24. 2026-08-03 warm-neutral Light mode redesign
+
+The green-grey Light treatment and strong green outlines were replaced with a
+warm stone canvas, ivory surfaces, neutral interaction layers, and selective
+quiet sage edges around accent-filled controls. Dark mode and product workflows
+were not changed.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| Theme contracts | Warm layer separation, semantic text/status contrast, focus visibility, and one-pixel accent-edge roles passed | Numeric and widget contracts; not a colour-vision simulation |
+| Golden suite | 14/14 tests passed; Light Dashboard, Tools, and Settings fixtures regenerated | Declared deterministic data only |
+| Visual review | Home, Tools, and Settings reviewed at 390 x 844; page, cards, rows, text, and lime actions are clearly separated without green surface tint | Desktop image inspection, not ambient-light device measurement |
+| `flutter analyze` | No issues | Static analysis cannot assess subjective appearance |
+| `flutter test --dart-define-from-file=.env` | 310/310 tests passed | Authenticated staging journeys remain open |
+| iOS profile build | Pass; 34.9 MB `Runner.app` | Development signing, not App Store distribution |
+| Physical iPhone profile | Exact refreshed artifact installed on the paired iPhone 15 Pro Max | Automatic launch was denied because the phone was locked; final ambient-light review remains with the user |
+
+The iOS build continues to warn that `device_calendar` and
+`flutter_local_notifications` do not declare Swift Package Manager support.
+The current CocoaPods build succeeds.

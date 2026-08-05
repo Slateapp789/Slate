@@ -1,9 +1,13 @@
 import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workloop/core/theme/app_theme.dart';
 import 'package:workloop/features/more/more_screen.dart';
+import 'package:workloop/shared/providers/finance_provider.dart';
+import 'package:workloop/shared/providers/notes_provider.dart';
+import 'package:workloop/shared/providers/tasks_provider.dart';
 
 void main() {
   testWidgets('core workspaces lead the page and remain directly actionable', (
@@ -13,14 +17,21 @@ void main() {
     var moneyOpens = 0;
     var taskOpens = 0;
     var noteOpens = 0;
+    var moneyCreates = 0;
+    var taskCreates = 0;
+    var noteCreates = 0;
 
     await _pumpMoreScreen(
       tester,
       onOpenMoney: () => moneyOpens++,
       onOpenTasks: () => taskOpens++,
       onOpenNotes: () => noteOpens++,
+      onCreateMoney: () => moneyCreates++,
+      onCreateTask: () => taskCreates++,
+      onCreateNote: () => noteCreates++,
     );
 
+    expect(find.text('Quick capture'), findsOneWidget);
     expect(find.text('Business tools'), findsOneWidget);
     expect(find.text('Profile'), findsNothing);
     expect(find.text('Settings'), findsNothing);
@@ -75,6 +86,15 @@ void main() {
     expect(taskOpens, 1);
     expect(noteOpens, 1);
 
+    await tester.tap(find.byKey(const ValueKey('tools-quick-money')));
+    await tester.tap(find.byKey(const ValueKey('tools-quick-task')));
+    await tester.tap(find.byKey(const ValueKey('tools-quick-note')));
+    await tester.pump();
+
+    expect(moneyCreates, 1);
+    expect(taskCreates, 1);
+    expect(noteCreates, 1);
+
     semantics.dispose();
   });
 
@@ -95,6 +115,10 @@ void main() {
     );
 
     expect(tester.takeException(), isNull);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('more-workspace-money')),
+      120,
+    );
     expect(
       tester.getSize(find.byKey(const ValueKey('more-workspace-money'))).height,
       greaterThanOrEqualTo(44),
@@ -107,23 +131,36 @@ Future<void> _pumpMoreScreen(
   required VoidCallback onOpenMoney,
   required VoidCallback onOpenTasks,
   required VoidCallback onOpenNotes,
+  VoidCallback? onCreateMoney,
+  VoidCallback? onCreateTask,
+  VoidCallback? onCreateNote,
   TextScaler textScaler = TextScaler.noScaling,
 }) async {
   await tester.pumpWidget(
-    MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
-      home: MediaQuery(
-        data: MediaQueryData(
-          size: tester.view.physicalSize / tester.view.devicePixelRatio,
-          devicePixelRatio: tester.view.devicePixelRatio,
-          textScaler: textScaler,
-          padding: const EdgeInsets.only(top: 47, bottom: 34),
-        ),
-        child: MoreScreen(
-          onOpenMoney: onOpenMoney,
-          onOpenTasks: onOpenTasks,
-          onOpenNotes: onOpenNotes,
+    ProviderScope(
+      overrides: [
+        invoicesProvider.overrideWith((ref) async => const []),
+        allTasksProvider.overrideWith((ref) async => const []),
+        allNotesProvider.overrideWith((ref) async => const []),
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.dark,
+        home: MediaQuery(
+          data: MediaQueryData(
+            size: tester.view.physicalSize / tester.view.devicePixelRatio,
+            devicePixelRatio: tester.view.devicePixelRatio,
+            textScaler: textScaler,
+            padding: const EdgeInsets.only(top: 47, bottom: 34),
+          ),
+          child: MoreScreen(
+            onOpenMoney: onOpenMoney,
+            onOpenTasks: onOpenTasks,
+            onOpenNotes: onOpenNotes,
+            onCreateMoney: onCreateMoney,
+            onCreateTask: onCreateTask,
+            onCreateNote: onCreateNote,
+          ),
         ),
       ),
     ),

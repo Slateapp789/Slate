@@ -4,12 +4,14 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/workloop_app_info.dart';
+import '../../shared/providers/theme_mode_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../notifications/notifications_screen.dart';
 import '../imports/import_data_screen.dart';
 import 'support_screen.dart';
 import 'widgets/settings_account_tab.dart';
+import 'widgets/settings_appearance_view.dart';
 import 'widgets/settings_app_tab.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -20,6 +22,15 @@ class SettingsScreen extends ConsumerWidget {
     final auth = ref.watch(authRepositoryProvider);
     final name = auth.currentFirstName?.trim();
     final email = auth.currentEmail;
+    final appearance =
+        ref.watch(workloopAppearanceProvider).value ??
+        WorkloopAppearance.system;
+    final effectiveAppearance = Theme.of(context).brightness == Brightness.dark
+        ? 'Dark'
+        : 'Light';
+    final appearanceSubtitle = appearance == WorkloopAppearance.system
+        ? 'System · currently $effectiveAppearance'
+        : '${appearance.label} appearance';
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -54,6 +65,17 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.xxl),
                 const WorkloopSectionHeader(label: 'Preferences'),
                 const SizedBox(height: AppSpacing.xs),
+                _SettingsRow(
+                  icon: LucideIcons.sunMoon,
+                  title: 'App appearance',
+                  subtitle: appearanceSubtitle,
+                  onTap: () => _open(
+                    context,
+                    ref,
+                    title: 'App appearance',
+                    child: const SettingsAppearanceView(),
+                  ),
+                ),
                 _SettingsRow(
                   icon: LucideIcons.bell,
                   title: 'Notifications',

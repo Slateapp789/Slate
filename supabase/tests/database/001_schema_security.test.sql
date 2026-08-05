@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(31);
+select plan(36);
 
 select has_table('public', table_name, table_name || ' exists')
 from unnest(array[
@@ -26,7 +26,10 @@ from unnest(array[
   'task_checklist_items',
   'expenses',
   'account_deletion_audit',
-  'notes'
+  'notes',
+  'workspace_payment_accounts',
+  'payment_transactions',
+  'payment_refunds'
 ]) as expected(table_name);
 
 select is(
@@ -55,7 +58,10 @@ select is(
         'task_checklist_items',
         'expenses',
         'account_deletion_audit',
-        'notes'
+        'notes',
+        'workspace_payment_accounts',
+        'payment_transactions',
+        'payment_refunds'
       ])
       and not relation.relrowsecurity
   ),
@@ -89,7 +95,10 @@ select is(
         'task_checklist_items',
         'expenses',
         'account_deletion_audit',
-        'notes'
+        'notes',
+        'workspace_payment_accounts',
+        'payment_transactions',
+        'payment_refunds'
       ])
   ),
   0::bigint,
@@ -127,7 +136,10 @@ select is(
         'notifications',
         'task_checklist_items',
         'expenses',
-        'notes'
+        'notes',
+        'workspace_payment_accounts',
+        'payment_transactions',
+        'payment_refunds'
       ])
       and not exists (
         select 1
@@ -159,6 +171,18 @@ select ok(
 select ok(
   to_regprocedure('app_private.complete_booking_workflow(jsonb)') is not null,
   'private completion implementation exists'
+);
+select ok(
+  to_regprocedure(
+    'public.claim_stripe_webhook_event(text,text,text,boolean,jsonb)'
+  ) is not null,
+  'service-only Stripe webhook claim function exists'
+);
+select ok(
+  to_regprocedure(
+    'public.finish_stripe_webhook_event(text,text,text)'
+  ) is not null,
+  'service-only Stripe webhook completion function exists'
 );
 
 select is(

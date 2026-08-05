@@ -20,6 +20,7 @@ import '../../shared/widgets/slate_ui.dart';
 import '../clients/client_detail_screen.dart';
 import '../clients/widgets/client_form.dart';
 import '../finance/add_payment_screen.dart';
+import '../finance/payment_collection_sheet.dart';
 import 'widgets/appointment_detail_widgets.dart';
 
 part 'appointment_detail_sections.dart';
@@ -359,6 +360,30 @@ class _AppointmentDetailScreenState
     );
   }
 
+  Future<void> _completeAndCollectPayment(Payment? linkedPayment) async {
+    Navigator.pop(context);
+    final completed = await _runCompletionWorkflow(
+      paymentMode: linkedPayment == null ? 'unpaid' : 'linked_unpaid',
+      linkedPayment: linkedPayment,
+    );
+    if (!completed || !mounted) return;
+    final payments = await ref
+        .read(paymentsRepositoryProvider)
+        .forAppointment(_appt['id'] as String);
+    final payment = payments
+        .where((item) => item.outstandingAmount > 0)
+        .firstOrNull;
+    if (payment == null || !mounted) {
+      _snack('The booking is complete, but no payment is ready to collect.');
+      return;
+    }
+    final collected = await showPaymentCollectionSheet(
+      context: context,
+      payment: payment,
+    );
+    if (collected) _refreshPaymentState();
+  }
+
   Future<bool> _runCompletionWorkflow({
     required String paymentMode,
     Payment? linkedPayment,
@@ -494,8 +519,16 @@ class _AppointmentDetailScreenState
             const SizedBox(height: 18),
             if (unpaidLinkedPayment != null) ...[
               SlateButton(
+                label: 'Take Card Payment',
+                icon: LucideIcons.smartphoneNfc,
+                onPressed: () =>
+                    _completeAndCollectPayment(unpaidLinkedPayment),
+              ),
+              const SizedBox(height: 10),
+              SlateButton(
                 label: 'Mark Linked Payment Paid',
                 icon: LucideIcons.checkCircle,
+                secondary: true,
                 onPressed: () => _completeWithLinkedPayment(
                   payment: unpaidLinkedPayment,
                   markPaid: true,
@@ -512,8 +545,15 @@ class _AppointmentDetailScreenState
               const SizedBox(height: 10),
             ] else if (!hasLinkedPayment && amount > 0) ...[
               SlateButton(
+                label: 'Take Card Payment',
+                icon: LucideIcons.smartphoneNfc,
+                onPressed: () => _completeAndCollectPayment(null),
+              ),
+              const SizedBox(height: 10),
+              SlateButton(
                 label: 'Mark Paid',
                 icon: LucideIcons.checkCircle,
+                secondary: true,
                 onPressed: () => _completeWithPayment('paid'),
               ),
               const SizedBox(height: 10),

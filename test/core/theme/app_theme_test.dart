@@ -3,8 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workloop/core/theme/app_theme.dart';
 
 void main() {
-  test('brand accent remains exact and readable in the dark-only theme', () {
+  test('brand accent remains exact and readable in both appearances', () {
     expect(AppColors.brandAccent.toARGB32(), 0xFFC1FF72);
+    expect(WorkloopThemeTokens.light.accent.toARGB32(), 0xFFC1FF72);
     expect(WorkloopThemeTokens.dark.accent.toARGB32(), 0xFFC1FF72);
     expect(WorkloopThemeTokens.dark.accentStrong.toARGB32(), 0xFFC1FF72);
     expect(
@@ -37,58 +38,165 @@ void main() {
     },
   );
 
-  test('legacy colour aliases resolve to the one shipped palette', () {
-    const tokens = WorkloopThemeTokens.dark;
+  test('light layers are warm, low-glare, and visibly distinct', () {
+    const tokens = WorkloopThemeTokens.light;
 
-    expect(AppColors.bg, tokens.background);
-    expect(AppColors.bgCard, tokens.surface);
-    expect(AppColors.bgRaised, tokens.surfaceRaised);
-    expect(AppColors.bgInteract, tokens.surfaceSubtle);
-    expect(AppColors.t1, tokens.textPrimary);
-    expect(AppColors.accentInk, tokens.accentInk);
-    expect(AppColors.panelInk, AppColors.onBrandAccent);
+    expect(tokens.background.computeLuminance(), lessThan(0.9));
+    expect(tokens.background, isNot(tokens.surface));
+    expect(tokens.surface, isNot(tokens.surfaceRaised));
+    expect(tokens.surfaceRaised, isNot(tokens.surfaceSubtle));
+    expect(
+      _contrastRatio(tokens.surface, tokens.background),
+      greaterThanOrEqualTo(1.15),
+    );
+    expect(
+      _contrastRatio(tokens.surfaceRaised, tokens.background),
+      greaterThanOrEqualTo(1.08),
+    );
+    expect(_contrastRatio(tokens.divider, tokens.surface), greaterThan(1.5));
+    expect(
+      _contrastRatio(tokens.dividerStrong, tokens.surface),
+      greaterThanOrEqualTo(2.5),
+    );
   });
 
-  test('dark semantic text roles meet contrast targets', () {
-    const tokens = WorkloopThemeTokens.dark;
-    for (final color in [
-      tokens.textPrimary,
-      tokens.textSecondary,
-      tokens.textTertiary,
-      tokens.accentInk,
+  test('legacy colour aliases follow the effective appearance', () {
+    WorkloopLegacyPalette.sync(Brightness.dark);
+    expect(
+      AppColors.bg.toARGB32(),
+      WorkloopThemeTokens.dark.background.toARGB32(),
+    );
+    expect(
+      AppColors.t1.toARGB32(),
+      WorkloopThemeTokens.dark.textPrimary.toARGB32(),
+    );
+
+    WorkloopLegacyPalette.sync(Brightness.light);
+    expect(
+      AppColors.bg.toARGB32(),
+      WorkloopThemeTokens.light.background.toARGB32(),
+    );
+    expect(
+      AppColors.accentInk.toARGB32(),
+      WorkloopThemeTokens.light.accentInk.toARGB32(),
+    );
+    expect(
+      AppColors.accentBorder.toARGB32(),
+      WorkloopThemeTokens.light.accentBorder.toARGB32(),
+    );
+    expect(AppColors.panelInk, AppColors.onBrandAccent);
+
+    addTearDown(() => WorkloopLegacyPalette.sync(Brightness.dark));
+  });
+
+  test('semantic text roles meet contrast targets in both appearances', () {
+    for (final tokens in [
+      WorkloopThemeTokens.light,
+      WorkloopThemeTokens.dark,
     ]) {
+      for (final color in [
+        tokens.textPrimary,
+        tokens.textSecondary,
+        tokens.textTertiary,
+        tokens.accentInk,
+      ]) {
+        expect(
+          _contrastRatio(color, tokens.background),
+          greaterThanOrEqualTo(4.5),
+        );
+      }
       expect(
-        _contrastRatio(color, tokens.background),
+        _contrastRatio(tokens.textDisabled, tokens.background),
+        greaterThanOrEqualTo(3),
+      );
+      expect(
+        _contrastRatio(tokens.onAccent, tokens.accentStrong),
         greaterThanOrEqualTo(4.5),
       );
     }
-    expect(
-      _contrastRatio(tokens.textDisabled, tokens.background),
-      greaterThanOrEqualTo(3),
-    );
   });
 
   test('focus indicators remain visible without diluting the neon fill', () {
-    final border =
-        AppTheme.dark.inputDecorationTheme.focusedBorder as OutlineInputBorder;
+    for (final entry in [
+      (AppTheme.light, WorkloopThemeTokens.light),
+      (AppTheme.dark, WorkloopThemeTokens.dark),
+    ]) {
+      final border =
+          entry.$1.inputDecorationTheme.focusedBorder as OutlineInputBorder;
+      expect(border.borderSide.color, entry.$2.accentInk);
+      expect(
+        _contrastRatio(border.borderSide.color, entry.$2.surface),
+        greaterThanOrEqualTo(3),
+      );
+    }
+  });
 
-    expect(border.borderSide.color, WorkloopThemeTokens.dark.accentInk);
-    expect(
-      _contrastRatio(border.borderSide.color, WorkloopThemeTokens.dark.surface),
-      greaterThanOrEqualTo(3),
-    );
+  test('accent fills use a visible one-pixel semantic border', () {
+    for (final entry in [
+      (AppTheme.light, WorkloopThemeTokens.light),
+      (AppTheme.dark, WorkloopThemeTokens.dark),
+    ]) {
+      if (entry.$1.brightness == Brightness.light) {
+        expect(
+          _contrastRatio(entry.$2.accentBorder, entry.$2.accentStrong),
+          greaterThanOrEqualTo(1.5),
+        );
+      }
+      final elevatedSide = entry.$1.elevatedButtonTheme.style?.side?.resolve(
+        {},
+      );
+      final filledSide = entry.$1.filledButtonTheme.style?.side?.resolve({});
+      expect(elevatedSide?.color, entry.$2.accentBorder);
+      expect(elevatedSide?.width, 1);
+      expect(filledSide?.color, entry.$2.accentBorder);
+      expect(filledSide?.width, 1);
+    }
+  });
+
+  test('module and semantic foregrounds stay legible in both appearances', () {
+    for (final entry in [
+      (Brightness.light, WorkloopThemeTokens.light),
+      (Brightness.dark, WorkloopThemeTokens.dark),
+    ]) {
+      WorkloopLegacyPalette.sync(entry.$1);
+      for (final color in [
+        AppColors.modHome,
+        AppColors.modClients,
+        AppColors.modCalendar,
+        AppColors.modFinance,
+        AppColors.modTasks,
+        AppColors.modNotes,
+      ]) {
+        expect(
+          _contrastRatio(color, entry.$2.surface),
+          greaterThanOrEqualTo(3),
+        );
+      }
+      for (final color in [
+        AppColors.statusSuccess,
+        AppColors.warning,
+        AppColors.error,
+      ]) {
+        expect(
+          _contrastRatio(color, entry.$2.surface),
+          greaterThanOrEqualTo(4.5),
+        );
+      }
+    }
+    addTearDown(() => WorkloopLegacyPalette.sync(Brightness.dark));
   });
 
   test('interactive controls keep the Workloop typeface', () {
-    final theme = AppTheme.dark;
-    final styles = [
-      theme.elevatedButtonTheme.style,
-      theme.filledButtonTheme.style,
-      theme.textButtonTheme.style,
-      theme.outlinedButtonTheme.style,
-    ];
-    for (final style in styles) {
-      expect(style?.textStyle?.resolve({})?.fontFamily, 'Instrument Sans');
+    for (final theme in [AppTheme.light, AppTheme.dark]) {
+      final styles = [
+        theme.elevatedButtonTheme.style,
+        theme.filledButtonTheme.style,
+        theme.textButtonTheme.style,
+        theme.outlinedButtonTheme.style,
+      ];
+      for (final style in styles) {
+        expect(style?.textStyle?.resolve({})?.fontFamily, 'Instrument Sans');
+      }
     }
   });
 }

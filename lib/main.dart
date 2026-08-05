@@ -31,6 +31,7 @@ import 'features/notifications/notifications_screen.dart';
 import 'features/public_profile/booking_requests_screen.dart';
 import 'features/public_profile/public_profile_screen.dart';
 import 'shared/providers/debug_demo_data_provider.dart';
+import 'shared/providers/theme_mode_provider.dart';
 import 'shared/providers/workspace_provider.dart';
 import 'shared/notifications/local_reminder_bootstrap.dart';
 import 'shared/utils/public_profile_routes.dart';
@@ -65,14 +66,14 @@ void main() async {
   runApp(const ProviderScope(child: WorkloopApp()));
 }
 
-class WorkloopApp extends StatefulWidget {
+class WorkloopApp extends ConsumerStatefulWidget {
   const WorkloopApp({super.key});
 
   @override
-  State<WorkloopApp> createState() => _WorkloopAppState();
+  ConsumerState<WorkloopApp> createState() => _WorkloopAppState();
 }
 
-class _WorkloopAppState extends State<WorkloopApp> {
+class _WorkloopAppState extends ConsumerState<WorkloopApp> {
   StreamSubscription<AuthState>? _authSubscription;
 
   @override
@@ -96,21 +97,30 @@ class _WorkloopAppState extends State<WorkloopApp> {
 
   @override
   Widget build(BuildContext context) {
+    final appearance = ref.watch(workloopAppearanceProvider);
     return MaterialApp.router(
       title: 'Workloop',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
+      theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: AppTheme.themeMode,
+      themeMode: appearance.value?.themeMode ?? ThemeMode.system,
       themeAnimationDuration: Duration.zero,
       scrollBehavior: const WorkloopScrollBehavior(),
       routerConfig: _router,
       builder: (context, child) {
-        final overlayStyle = SystemUiOverlayStyle.light.copyWith(
-          statusBarColor: Colors.transparent,
-          systemNavigationBarColor: SlateTheme.of(context).background,
-          systemNavigationBarIconBrightness: Brightness.light,
-        );
+        final brightness = Theme.of(context).brightness;
+        WorkloopLegacyPalette.sync(brightness);
+        final overlayStyle = brightness == Brightness.dark
+            ? SystemUiOverlayStyle.light.copyWith(
+                statusBarColor: Colors.transparent,
+                systemNavigationBarColor: SlateTheme.of(context).background,
+                systemNavigationBarIconBrightness: Brightness.light,
+              )
+            : SystemUiOverlayStyle.dark.copyWith(
+                statusBarColor: Colors.transparent,
+                systemNavigationBarColor: SlateTheme.of(context).background,
+                systemNavigationBarIconBrightness: Brightness.dark,
+              );
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: overlayStyle,
           child: WorkloopNavigationAssistRegion(
@@ -301,6 +311,9 @@ class _MainShellState extends State<MainShell> {
   late int _currentIndex;
   int? _secondaryReturnIndex;
   FinanceInitialFocus _financeInitialFocus = FinanceInitialFocus.top;
+  int _moneyCreateRequest = 0;
+  int _taskCreateRequest = 0;
+  int _noteCreateRequest = 0;
   late final List<Widget?> _destinations;
   late final List<ScrollController> _navigationScrollControllers;
 
@@ -333,13 +346,22 @@ class _MainShellState extends State<MainShell> {
       ),
       1 => const ClientsScreen(),
       2 => const AppointmentsScreen(),
-      3 => FinanceScreen(initialFocus: _financeInitialFocus),
-      4 => const TasksScreen(),
-      5 => const NotesScreen(showBackButton: false),
+      3 => FinanceScreen(
+        initialFocus: _financeInitialFocus,
+        createRequest: _moneyCreateRequest,
+      ),
+      4 => TasksScreen(createRequest: _taskCreateRequest),
+      5 => NotesScreen(
+        showBackButton: false,
+        createRequest: _noteCreateRequest,
+      ),
       6 => MoreScreen(
         onOpenMoney: () => _navigateTo(3),
         onOpenTasks: () => _navigateTo(4),
         onOpenNotes: () => _navigateTo(5),
+        onCreateMoney: _createMoneyFromTools,
+        onCreateTask: _createTaskFromTools,
+        onCreateNote: _createNoteFromTools,
       ),
       _ => const SizedBox.shrink(),
     };
@@ -388,6 +410,50 @@ class _MainShellState extends State<MainShell> {
     final returnIndex = _secondaryReturnIndex;
     if (returnIndex == null) return;
     _navigateTo(returnIndex);
+  }
+
+  void _createMoneyFromTools() {
+    _financeInitialFocus = FinanceInitialFocus.top;
+    _moneyCreateRequest += 1;
+    final request = _moneyCreateRequest;
+    _destinations[3] = FinanceScreen(
+      initialFocus: _financeInitialFocus,
+      createRequest: request,
+    );
+    _navigateTo(3);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _moneyCreateRequest != request) return;
+      setState(() {
+        _destinations[3] = FinanceScreen(initialFocus: _financeInitialFocus);
+      });
+    });
+  }
+
+  void _createTaskFromTools() {
+    _taskCreateRequest += 1;
+    final request = _taskCreateRequest;
+    _destinations[4] = TasksScreen(createRequest: request);
+    _navigateTo(4);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _taskCreateRequest != request) return;
+      setState(() => _destinations[4] = const TasksScreen());
+    });
+  }
+
+  void _createNoteFromTools() {
+    _noteCreateRequest += 1;
+    final request = _noteCreateRequest;
+    _destinations[5] = NotesScreen(
+      showBackButton: false,
+      createRequest: request,
+    );
+    _navigateTo(5);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _noteCreateRequest != request) return;
+      setState(() {
+        _destinations[5] = const NotesScreen(showBackButton: false);
+      });
+    });
   }
 
   @override

@@ -105,44 +105,57 @@ void main() {
       now: now,
     );
 
-    await _pumpSurface(
-      tester,
-      DashboardScreen(onNavigate: (_) {}, onOpenMoneyFollowUps: () {}),
-      overrides: [
-        authRepositoryProvider.overrideWithValue(authRepository),
-        dashboardClockProvider.overrideWith((ref) => Stream.value(now)),
-        workspaceProvider.overrideWith(
-          (ref) async => const {'id': 'workspace-1'},
-        ),
-        setupChecklistDismissedProvider.overrideWith((ref) async => true),
-        clientsProvider.overrideWith((ref) async => const []),
-        appointmentsProvider.overrideWith(
-          (ref) async => [
-            {
-              'id': 'appointment-focus',
-              'workspace_id': 'workspace-1',
-              'start_time': DateTime(2026, 7, 30, 10).toIso8601String(),
-              'end_time': DateTime(2026, 7, 30, 11).toIso8601String(),
-              'status': 'scheduled',
-              'contacts': {'name': 'Maya Johnson'},
-              'services': {'name': 'Signature appointment'},
-            },
-          ],
-        ),
-        invoicesProvider.overrideWith((ref) async => const []),
-        financeSummaryProvider.overrideWith((ref) async => summary),
-        dashboardAttentionProvider.overrideWith((ref) async => const []),
-        allTasksProvider.overrideWith((ref) async => const []),
-        allNotesProvider.overrideWith((ref) async => const []),
-        businessFeedProvider.overrideWith((ref) async => const []),
-      ],
+    final overrides = <Override>[
+      authRepositoryProvider.overrideWithValue(authRepository),
+      dashboardClockProvider.overrideWith((ref) => Stream.value(now)),
+      workspaceProvider.overrideWith(
+        (ref) async => const {'id': 'workspace-1'},
+      ),
+      setupChecklistDismissedProvider.overrideWith((ref) async => true),
+      clientsProvider.overrideWith((ref) async => const []),
+      appointmentsProvider.overrideWith(
+        (ref) async => [
+          {
+            'id': 'appointment-focus',
+            'workspace_id': 'workspace-1',
+            'start_time': DateTime(2026, 7, 30, 10).toIso8601String(),
+            'end_time': DateTime(2026, 7, 30, 11).toIso8601String(),
+            'status': 'scheduled',
+            'contacts': {'name': 'Maya Johnson'},
+            'services': {'name': 'Signature appointment'},
+          },
+        ],
+      ),
+      invoicesProvider.overrideWith((ref) async => const []),
+      financeSummaryProvider.overrideWith((ref) async => summary),
+      dashboardAttentionProvider.overrideWith((ref) async => const []),
+      allTasksProvider.overrideWith((ref) async => const []),
+      allNotesProvider.overrideWith((ref) async => const []),
+      businessFeedProvider.overrideWith((ref) async => const []),
+    ];
+    final screen = DashboardScreen(
+      onNavigate: (_) {},
+      onOpenMoneyFollowUps: () {},
     );
+
+    await _pumpSurface(tester, screen, overrides: overrides);
 
     expect(find.semantics.byLabel('Open profile'), findsOneWidget);
     expect(find.semantics.byLabel('Open settings'), findsOneWidget);
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/dashboard-focus.png'),
+    );
+
+    await _pumpSurface(
+      tester,
+      screen,
+      overrides: overrides,
+      theme: AppTheme.light,
+    );
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/dashboard-focus-light.png'),
     );
   });
 
@@ -213,14 +226,38 @@ void main() {
     await _pumpSurface(
       tester,
       MoreScreen(onOpenMoney: () {}, onOpenTasks: () {}, onOpenNotes: () {}),
+      overrides: [
+        invoicesProvider.overrideWith((ref) async => const []),
+        allTasksProvider.overrideWith((ref) async => const []),
+        allNotesProvider.overrideWith((ref) async => const []),
+      ],
     );
 
+    expect(find.text('Quick capture'), findsOneWidget);
     expect(find.text('Business tools'), findsOneWidget);
     expect(find.text('Profile'), findsNothing);
     expect(find.text('Settings'), findsNothing);
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/more-workspaces.png'),
+    );
+  });
+
+  testWidgets('Tools light appearance surface', (tester) async {
+    await _pumpSurface(
+      tester,
+      MoreScreen(onOpenMoney: () {}, onOpenTasks: () {}, onOpenNotes: () {}),
+      theme: AppTheme.light,
+      overrides: [
+        invoicesProvider.overrideWith((ref) async => const []),
+        allTasksProvider.overrideWith((ref) async => const []),
+        allNotesProvider.overrideWith((ref) async => const []),
+      ],
+    );
+
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/more-workspaces-light.png'),
     );
   });
 
@@ -263,7 +300,7 @@ void main() {
     );
   });
 
-  testWidgets('settings dark-only surface', (tester) async {
+  testWidgets('settings appearance surface', (tester) async {
     final authRepository = AuthRepository(
       SupabaseClient(
         'https://example.supabase.co',
@@ -280,6 +317,27 @@ void main() {
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/settings-dark-only.png'),
+    );
+  });
+
+  testWidgets('settings light appearance surface', (tester) async {
+    final authRepository = AuthRepository(
+      SupabaseClient(
+        'https://example.supabase.co',
+        'test-anon-key',
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      ),
+    );
+    await _pumpSurface(
+      tester,
+      const SettingsScreen(),
+      theme: AppTheme.light,
+      overrides: [authRepositoryProvider.overrideWithValue(authRepository)],
+    );
+
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/settings-light.png'),
     );
   });
 
@@ -343,6 +401,8 @@ Future<void> _pumpSurface(
   ThemeData? theme,
 }) async {
   final resolvedTheme = theme ?? AppTheme.dark;
+  WorkloopLegacyPalette.sync(resolvedTheme.brightness);
+  addTearDown(() => WorkloopLegacyPalette.sync(Brightness.dark));
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);

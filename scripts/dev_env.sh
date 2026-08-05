@@ -12,6 +12,7 @@ fi
 script_dir="$(cd "$(dirname "$script_path")" && pwd)"
 repo_dir="$(cd "$script_dir/.." && pwd)"
 ruby_gem_bin="$HOME/.gem/ruby/2.6.0/bin"
+workloop_tool_bin="$repo_dir/scripts/bin"
 
 if [ -n "${FLUTTER_ROOT:-}" ] && [ -x "$FLUTTER_ROOT/bin/flutter" ]; then
   flutter_bin="$FLUTTER_ROOT/bin"
@@ -36,6 +37,10 @@ case ":$PATH:" in
   *":$ruby_gem_bin:"*) ;;
   *) PATH="$ruby_gem_bin:$PATH" ;;
 esac
+
+# Keep the repository's architecture-safe tool shims first even when this
+# environment script is sourced repeatedly in the same shell.
+PATH="$workloop_tool_bin:$PATH"
 
 export PATH
 

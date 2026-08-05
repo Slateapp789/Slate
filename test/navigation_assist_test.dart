@@ -471,7 +471,7 @@ void main() {
       expect(
         tester
             .widget<Transform>(
-              find.byKey(const ValueKey('workloop-workspace-current')),
+              find.byKey(const ValueKey('workloop-workspace-transform-1')),
             )
             .transform
             .getTranslation()
@@ -486,7 +486,7 @@ void main() {
       expect(
         tester
             .widget<Transform>(
-              find.byKey(const ValueKey('workloop-workspace-current')),
+              find.byKey(const ValueKey('workloop-workspace-transform-1')),
             )
             .transform
             .getTranslation()
@@ -495,6 +495,193 @@ void main() {
       );
     },
   );
+
+  testWidgets('programmatic shell navigation uses one calm transition', (
+    tester,
+  ) async {
+    var currentIndex = 0;
+    late void Function(int index) showDestination;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            showDestination = (index) => setState(() => currentIndex = index);
+            return Scaffold(
+              body: WorkloopInteractiveWorkspaceStack(
+                index: currentIndex,
+                previousIndex: null,
+                onBack: () {},
+                children: const [
+                  Center(child: Text('First destination')),
+                  Center(child: Text('Second destination')),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    showDestination(1);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
+
+    expect(find.text('First destination'), findsOneWidget);
+    expect(find.text('Second destination'), findsOneWidget);
+    expect(
+      tester
+          .widget<Transform>(
+            find.byKey(const ValueKey('workloop-workspace-transform-1')),
+          )
+          .transform
+          .getTranslation()
+          .x,
+      greaterThan(0),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('First destination'), findsNothing);
+    expect(find.text('Second destination'), findsOneWidget);
+  });
+
+  testWidgets('shell transitions never replay a retained create request', (
+    tester,
+  ) async {
+    var currentIndex = 0;
+    var createOpenings = 0;
+    late void Function(int index) showDestination;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            showDestination = (index) => setState(() => currentIndex = index);
+            return Scaffold(
+              body: WorkloopInteractiveWorkspaceStack(
+                index: currentIndex,
+                previousIndex: null,
+                onBack: () {},
+                children: [
+                  _CreateReplayProbe(
+                    key: const ValueKey('retained-create-probe'),
+                    createRequest: 1,
+                    onOpened: () => createOpenings++,
+                  ),
+                  const Center(child: Text('Other destination')),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(createOpenings, 1);
+
+    showDestination(1);
+    await tester.pumpAndSettle();
+    showDestination(0);
+    await tester.pumpAndSettle();
+    showDestination(1);
+    await tester.pumpAndSettle();
+
+    expect(
+      createOpenings,
+      1,
+      reason: 'Retained Money/Task/Note intents must not replay on navigation',
+    );
+  });
+
+  testWidgets('reduced motion switches shell destinations immediately', (
+    tester,
+  ) async {
+    var currentIndex = 0;
+    late void Function(int index) showDestination;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              showDestination = (index) => setState(() => currentIndex = index);
+              return Scaffold(
+                body: WorkloopInteractiveWorkspaceStack(
+                  index: currentIndex,
+                  previousIndex: null,
+                  onBack: () {},
+                  children: const [
+                    Center(child: Text('Reduced first')),
+                    Center(child: Text('Reduced second')),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    showDestination(1);
+    await tester.pump();
+
+    expect(find.text('Reduced first'), findsNothing);
+    expect(find.text('Reduced second'), findsOneWidget);
+  });
+
+  testWidgets('entering a retained tool always reads as forward navigation', (
+    tester,
+  ) async {
+    var currentIndex = 1;
+    int? previousIndex;
+    late VoidCallback openTool;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            openTool = () => setState(() {
+              previousIndex = currentIndex;
+              currentIndex = 0;
+            });
+            return Scaffold(
+              body: WorkloopInteractiveWorkspaceStack(
+                index: currentIndex,
+                previousIndex: previousIndex,
+                onBack: () {},
+                children: const [
+                  Center(child: Text('Retained tool')),
+                  Center(child: Text('Tools launchpad')),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    openTool();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+
+    expect(
+      tester
+          .widget<Transform>(
+            find.byKey(const ValueKey('workloop-workspace-transform-0')),
+          )
+          .transform
+          .getTranslation()
+          .x,
+      greaterThan(0),
+    );
+    await tester.pumpAndSettle();
+  });
 
   testWidgets('a completed retained-workspace swipe navigates once', (
     tester,
@@ -593,6 +780,37 @@ Widget _navigationHarness({
     ),
     home: home,
   );
+}
+
+class _CreateReplayProbe extends StatefulWidget {
+  final int createRequest;
+  final VoidCallback onOpened;
+
+  const _CreateReplayProbe({
+    super.key,
+    required this.createRequest,
+    required this.onOpened,
+  });
+
+  @override
+  State<_CreateReplayProbe> createState() => _CreateReplayProbeState();
+}
+
+class _CreateReplayProbeState extends State<_CreateReplayProbe> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.createRequest != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onOpened();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(child: Text('Create destination'));
+  }
 }
 
 class _RetainedTabsHarness extends StatefulWidget {

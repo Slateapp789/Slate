@@ -197,12 +197,22 @@ PaymentUpdateState resolvePaymentUpdateState({
   required DateTime selectedDate,
   required bool paymentStateChanged,
 }) {
+  if (amount < existingPayment.stripeAmountPaid) {
+    throw ArgumentError(
+      'A payment total cannot be lower than the amount collected by Stripe.',
+    );
+  }
   if (paymentStateChanged) {
     final isPaid = selectedStatus == 'paid';
+    final providerAmount = existingPayment.stripeAmountPaid
+        .clamp(0, amount)
+        .toDouble();
     return (
-      status: isPaid ? 'paid' : 'sent',
-      amountPaid: isPaid ? amount : 0,
-      incomeRecordedAt: isPaid ? selectedDate.toUtc().toIso8601String() : null,
+      status: isPaid || providerAmount >= amount ? 'paid' : 'sent',
+      amountPaid: isPaid ? amount : providerAmount,
+      incomeRecordedAt: isPaid || providerAmount > 0
+          ? selectedDate.toUtc().toIso8601String()
+          : null,
     );
   }
 

@@ -1,4 +1,4 @@
-platform :ios, '13.0'
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -29,6 +29,9 @@ flutter_ios_podfile_setup
 target 'Runner' do
   use_frameworks!
 
+  # First-party SDK used by Workloop's native Tap to Pay bridge.
+  pod 'StripeTerminal', '~> 5.0'
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths
@@ -41,8 +44,8 @@ post_install do |installer|
 
     target.build_configurations.each do |configuration|
       deployment_target = configuration.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
-      if deployment_target.nil? || Gem::Version.new(deployment_target) < Gem::Version.new('13.0')
-        configuration.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      if deployment_target.nil? || Gem::Version.new(deployment_target) < Gem::Version.new('15.0')
+        configuration.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       end
     end
 

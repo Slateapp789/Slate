@@ -1,6 +1,6 @@
 # Workloop Decisions Log
 
-Last updated: 2026-07-29
+Last updated: 2026-08-03
 
 This log consolidates Notion decisions, Git history, and codebase reality.
 
@@ -1084,3 +1084,204 @@ Consequences:
   sections that compete with Today.
 - The old `MoreScreen` implementation name can be migrated separately; no
   architecture or data contract depends on that private presentation name.
+
+## 2026-07-31 - Appearance Choice Returns With A Low-Glare Light Mode
+
+Status: Supersedes the 2026-07-28 dark-only launch decision.
+
+Decision:
+
+Support persisted System, Light, and Dark appearances through a dedicated App
+appearance destination in Settings. Keep the current lifted graphite Dark
+palette and introduce a low-glare green-grey Light palette rather than a bright
+white inversion.
+
+Reasoning:
+
+Appearance is a familiar device-level preference and users may need a lighter
+canvas in bright environments. The choice should not weaken Workloop's calm
+identity or create per-screen exceptions. A semantic theme plus an adaptive
+compatibility bridge lets current screens move together while older static
+colour call sites are migrated gradually.
+
+Consequences:
+
+- System follows platform brightness; Light and Dark override it and persist
+  locally without changing workspace schema or account data.
+- The exact `#C1FF72` brand neon remains the primary fill in both appearances.
+  Light uses deep `#3F6711` accent ink for small foregrounds and focus states.
+- Primary, secondary, tertiary, disabled, accent, status, module-icon, button,
+  navigation, and field-focus pairs are contrast-tested in both appearances.
+- iOS no longer forces `UIUserInterfaceStyle=Dark`; Android uses matching base
+  and night startup resources before Flutter draws.
+- Theme changes are applied atomically with no animation so semantic tokens and
+  compatibility colours do not display different appearances between frames.
+
+## 2026-07-31 - Tools Is A Launchpad, Not A Sparse Directory
+
+Decision:
+
+Keep Money, Tasks, and Notes grouped behind the stable Tools tab, but add direct
+Record money, New task, and New note actions above their equal workspace rows.
+Add one quiet live orientation line to each workspace rather than adding more
+modules or moving secondary tools into the bottom navigation.
+
+Reasoning:
+
+The grouped navigation remains clearer than a six-item bottom bar, but a page
+that only repeats three destinations wastes space and adds a navigation step to
+frequent capture. Direct capture turns Tools into a useful operating surface
+while preserving the existing information architecture.
+
+Consequences:
+
+- Quick actions invoke the existing Money choice sheet, Task editor, and Note
+  editor; no parallel creation flow or business logic is introduced.
+- Money shows the amount to collect, Tasks shows open work, and Notes shows the
+  saved count when data is available. Load failures point users into the owning
+  workspace rather than presenting false zeroes.
+- The four-tab shell, retained workspace state, back-swipe behaviour, routes,
+  providers, repositories, and Supabase contracts remain unchanged.
+
+## 2026-08-03 - Navigation Motion Is One Shared System
+
+Decision:
+
+Give all programmatic shell destination changes one shared 240ms fade-through
+with a small directional offset. Keep pushed routes theme-driven: restrained
+fade and horizontal movement on Android, and native Cupertino movement on iOS
+so the previous page continues to track an interactive back swipe.
+
+Reasoning:
+
+Pushed screens already inherited a common theme transition, but Home, Clients,
+Bookings, Tools, Money, Tasks, and Notes changed in place without forward
+motion. Fixing the retained shell primitive closes that inconsistency without
+adding animation code to individual features or changing the route model.
+
+Consequences:
+
+- Root tabs and retained workspaces now enter through the same motion contract.
+- The outgoing destination remains mounted during the transition, preserving
+  providers, form state, scroll positions, and bottom navigation ownership.
+- Existing iOS finger-tracked back gestures and Save/Discard/Keep editing
+  guards remain authoritative.
+- Reduced-motion settings bypass programmatic destination animation entirely.
+- Feature screens must continue relying on shared navigation primitives rather
+  than defining local full-screen transitions.
+
+## 2026-08-03 - Retained Screens Must Never Be Reparented During Motion
+
+Decision:
+
+Keep every shell destination in one stable keyed layer for its entire lifetime.
+Animation may change offset, scale, opacity, semantics, hit testing, and paint
+order, but it must not move a feature screen between different wrapper trees.
+Treat Tools create requests as one-shot intents and clear their widget input
+after delivery.
+
+Reasoning:
+
+Physical-device recording showed the Add to Money sheet repeatedly appearing
+over Tasks and Tools. The first navigation-motion implementation rebuilt its
+outer stack structure between resting and animated phases. Flutter therefore
+remounted retained Money, saw the previous non-zero create request in
+`initState`, and replayed the sheet.
+
+Consequences:
+
+- Money, Tasks, Notes, and root destinations retain their State objects across
+  forward transitions, tab changes, settled states, and interactive back.
+- Dismissed creation sheets cannot reopen merely because another destination
+  animates.
+- A regression test holds a non-zero create request while switching repeatedly
+  and proves it is delivered only once.
+- Native iOS back-swipe, reduced motion, scroll retention, and draft guards are
+  unchanged.
+
+## 2026-08-03 - Light Mode Uses Stronger Layer Separation And Accent Edges
+
+Decision:
+
+Increase the tonal distance between the Light canvas, white content surfaces,
+raised controls, and dividers. Give every neon-filled interactive primitive a
+one-pixel semantic deep-green border rather than allowing the lime fill to
+bleed into pale neighbouring surfaces.
+
+Reasoning:
+
+Physical review showed that the first low-glare Light palette was readable but
+too tonally compressed. The dashboard canvas, daily focus, navigation capsule,
+icon controls, and accent actions appeared to merge, weakening hierarchy.
+
+Consequences:
+
+- Light uses `#E7ECE4` background, `#FAFCF8` surface, `#D4DED2` raised surface,
+  and darker divider roles while remaining softer than pure white.
+- `accentBorder` is a canonical semantic token (`#5A8126`) used by buttons,
+  top actions, selected navigation, floating actions, and accent icon chips.
+- Dark retains its existing graphite layers and quieter accent edges.
+- Contrast and golden tests protect the revised layer separation and border
+  treatment.
+
+## 2026-08-03 - Light Mode Uses Warm Neutrals And Selective Accent Edges
+
+Decision:
+
+Supersede the green-grey Light palette with a warm neutral system. Use a stone
+page canvas, ivory content and raised surfaces, neutral grey interaction layers,
+and the exact brand lime only for actions, selection, and compact emphasis.
+Restrict the semantic accent border to genuinely accent-filled or accent-tinted
+controls; high-level cards use neutral edges.
+
+Reasoning:
+
+Visual review of the stronger-separation pass showed that green tint across the
+canvas and cards made the whole interface feel muddy, while deep green borders
+made too many elements compete for attention. Hierarchy should come from
+typography, spacing, surface luminosity, and a small number of confident lime
+actions.
+
+Consequences:
+
+- Light uses `#EEEDE8` background, `#FFFEFA` surface, `#F8F7F2` raised surface,
+  and neutral grey divider and interaction roles.
+- `accentBorder` becomes quiet sage `#91B560`: still visible at one pixel on
+  lime controls without reading as a dark frame.
+- The dashboard focus hero uses a neutral border; its action and compact icon
+  retain the accent treatment.
+- Dark colours, navigation behaviour, workflows, and data contracts remain
+  unchanged.
+- Theme contrast contracts and Light dashboard, Tools, and Settings goldens
+  protect the new direction.
+
+## 2026-08-04 - Card Collection Uses Stripe Connect Direct Charges
+
+Decision:
+
+Extend the existing booking-linked Money record with Stripe Connect direct
+charges. The connected business is the merchant of record and fee payer.
+Workloop's platform fee remains server-controlled, disabled, and zero by
+default. Support Tap to Pay and hosted Checkout links through authenticated
+Supabase functions and signed, idempotent webhooks.
+
+Reasoning:
+
+Payment collection belongs at the end of the existing Client to Booking to Work
+to Payment loop. A separate wallet or ledger would duplicate income and increase
+reconciliation risk. Direct charges preserve clear merchant responsibility,
+while Stripe-hosted onboarding and card entry keep regulated payment data out of
+Workloop.
+
+Consequences:
+
+- Provider transactions reconcile atomically into `invoices.amount_paid` and
+  retain a distinct provider-collected amount for refunds and manual edits.
+- Authenticated clients can read their workspace's provider state but cannot
+  mutate Stripe accounts, transactions, refunds, or webhook state directly.
+- Provider-backed Money entries cannot be deleted while their ledger exists.
+- iOS minimum support moves to 15 and Android minimum support to API 26 for the
+  first-party Stripe Terminal 5.x SDKs.
+- Production Tap to Pay on iPhone remains gated by Apple's development and
+  distribution proximity-reader entitlements and App Review.
+- Live mode remains disabled until a separate explicit go-live approval.

@@ -734,7 +734,9 @@ class _DailyFocusHero extends StatelessWidget {
     final tokens = SlateTheme.of(context);
     return WorkloopSurface(
       color: tokens.surfaceRaised,
-      borderColor: tokens.accent.withValues(alpha: 0.28),
+      borderColor: Theme.of(context).brightness == Brightness.light
+          ? tokens.divider
+          : tokens.accent.withValues(alpha: 0.28),
       radius: AppRadius.xl,
       elevated: true,
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -749,6 +751,12 @@ class _DailyFocusHero extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: tokens.accent.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? tokens.accentBorder
+                        : Colors.transparent,
+                    width: 1,
+                  ),
                 ),
                 child: Icon(icon, color: tokens.accentInk, size: 17),
               ),

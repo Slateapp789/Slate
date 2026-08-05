@@ -131,26 +131,29 @@ Dependencies:
 - Services show-on-profile.
 - Booking requests.
 
-## Future Milestone: Payment Expansion
+## Active Milestone: Payment Collection
 
 Goal:
 
-Upgrade Money from tracking to collection when the core UX is stable.
+Upgrade Money from tracking to secure card collection without weakening the
+existing booking and reconciliation workflow.
 
 Scope:
 
-- Pay-now links.
-- Stripe connection.
-- Deposits.
-- Public invoice/payment links.
-- Payment receipts.
+- Stripe Connect onboarding, Tap to Pay, Checkout links, receipts, refunds, and
+  webhook reconciliation are implemented and deployed in test mode. The
+  platform fee remains disabled and live keys are blocked.
+- Connected-account onboarding, simulated and physical-device/payment QA,
+  Apple entitlement approval, and explicit live-mode approval remain before
+  live use.
+- Deposits and public-profile pay-now entry points remain future scope.
 
 Dependencies:
 
 - Stable Money tracking.
 - Public profile routes.
 - Security/privacy review.
-- Stripe integration design.
+- Apple Tap to Pay development and distribution entitlements.
 
 ## Future Milestone: V2 Intelligence and Scale
 
