@@ -974,3 +974,30 @@ external Auth lifecycle and clean current signed-artifact provenance are green.
 
 The previous Auth failure is closed by the visible `auth-first-run-cta` and the
 passing simulator journey. Production was not migrated or redeployed.
+
+## 47. 2026-08-13 exact-tag beta-candidate verification
+
+This evidence was produced against clean app-source tag `v1.0.0-beta.4` at
+`81673f6e5f67b11a5c4f2697e51477d95811ab4f`. This documentation update is a
+later evidence-only commit and does not move the tag or change the binary.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| Dart/Flutter | 222 files formatted; analysis clean; 375/375 tests pass | Local source evidence |
+| Coverage | 10,810/20,449 lines, 52.86% | Aggregate coverage is not E2E proof |
+| Protected visuals | Golden tests pass without baseline update | Representative fixtures; physical review remains separate |
+| iOS simulator integration | Signed-out Auth/navigation journey passes; three staging journeys compile and skip safely | No authenticated hosted staging result |
+| Deno | 32 files formatted, 24 linted, eight entry points checked, 32/32 tests pass | Candidate source, not deployed behaviour |
+| Local Supabase | 52 migrations replay from empty; database lint clean; 83/83 pgTAP pass | Isolated local Postgres, not a live-derived branch |
+| Local Auth/Data API | Confirmation, sign-in, recovery/password update, refresh-token revocation, TOTP/AAL2 and denial boundaries pass | Mailpit/local GoTrue, not external provider delivery |
+| Android profile | 132,102,618-byte QA APK builds; 16 KB alignment and v2 signature pass | Debug/profile signer; no release AAB or physical Android |
+| Web/iOS compilation | Web release and unsigned iOS profile/release pass | Compile evidence only |
+| App Store IPA | 33,854,083 bytes; SHA-256 `2dc632e23f5ea00a54df57405d9b675fb8ca33b749310ba4df5c461a0ca3c6fa`; strict Apple Distribution signature; Store profile; build 4 | Not uploaded or TestFlight-installed |
+| Physical iPhone | Build 4 profile is installed and launches; CoreDevice confirmed Runner PID 99913 after unlock | Install/launch only; no exact-build manual/VoiceOver pass |
+| Public URLs | Apex, privacy, terms and deletion return 200; canonical support/navigation are current | Live policy copy remains less complete than tagged source |
+
+Verdict: **not ready to upload** under the strict brief. Local source, database
+and distribution artifact gates are green; hosted staging, destructive
+deletion, external Auth, exact-build manual accessibility/lifecycle, support
+and legal operations, observability/load, and safe production promotion remain
+open.

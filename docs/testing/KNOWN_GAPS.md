@@ -150,3 +150,28 @@ In particular, the MFA/payment/retention fixes are unapplied until a clean
 dirty owner worktree is not a release candidate; and operational support,
 external Auth, physical accessibility, Stripe onboarding/live refund, store,
 brand, performance/load, and crash-observability work remain external gates.
+
+## 2026-08-13 superseding gap status
+
+- H-01 is closed for local evidence: all 52 migrations replayed from empty and
+  83/83 current pgTAP assertions passed with clean database lint.
+- H-08 is closed for the iOS artifact boundary: clean source is committed and
+  locally tagged, and an exact-SHA Apple Distribution IPA with matching
+  checksum/provenance exists. Apple upload and TestFlight install are not done;
+  Android store signing remains open.
+- H-07 is narrower than the historical row: live pages already use
+  `support@workloop.uk` and current Business deletion navigation. The live
+  12 August policy copy still trails the fuller tagged copy, and monitored
+  support, named controller details and professional legal review remain open.
+- H-02, H-03, H-04 and H-05 remain high. The guarded hosted staging journeys
+  have not run because the only configured remote is production and creating a
+  preview branch incurs metered cost requiring owner approval.
+- H-06 and H-09 remain high: local Auth is substantially proven, but external
+  provider/email/linking and exact-build physical accessibility, permissions,
+  lifecycle, deep-link, reinstall and upgrade evidence are absent.
+- M-01, M-02, M-04 and M-05 remain open: no hosted load run, measured startup/
+  frame/memory profile, exact-SHA hosted CI, or production crash reporting.
+
+The strict current verdict is **not ready to upload**, despite a valid signed
+iOS IPA, because the hosted staging and human/operational gates above remain
+unclosed.

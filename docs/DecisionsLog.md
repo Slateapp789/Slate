@@ -2009,3 +2009,31 @@ Consequences:
 - Payment exports include account, transaction and refund records.
 - Stripe test-mode offboarding/deletion E2E and legal review remain mandatory
   before the source is promoted.
+
+## 2026-08-13 - Freeze Beta 4 With Payment Collection Off
+
+Decision:
+
+Keep `v1.0.0-beta.4` immutable on app-source commit
+`81673f6e5f67b11a5c4f2697e51477d95811ab4f`. Preserve its exact App Store IPA
+and provenance, keep both client and candidate server payment gates false, and
+record later verification in a documentation-only commit rather than moving
+the tag.
+
+Reasoning:
+
+The source, clean database replay and signed iOS artifact are reproducible, but
+hosted staging, external Auth, exact-build manual accessibility and production
+promotion are not complete. Moving the tag or enabling payments would blur the
+artifact boundary and overstate the tested beta scope.
+
+Consequences:
+
+- Beta 4 may continue as an internal developer/founder candidate, but is not
+  authorised for upload or tester distribution under the strict release brief.
+- A disposable Supabase preview branch requires explicit cost approval before
+  the hosted journeys can run.
+- Production migration/Edge promotion, Apple upload and live-money activity
+  remain separate approval boundaries.
+- Any app-source change requires a new monotonically increasing build and tag;
+  documentation-only evidence must identify the immutable binary SHA.

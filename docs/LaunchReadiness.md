@@ -501,3 +501,24 @@ the preceding audit section:
 Production migrations and Edge Functions were deliberately not changed from a
 dirty local tree. The release-candidate preflight exits 78 until every tracked
 and untracked change is intentionally resolved.
+
+## 2026-08-13 exact candidate gate
+
+| Gate | Current exact-tag result | Remaining boundary |
+| --- | --- | --- |
+| Release identity | Clean `81673f6e5f67b11a5c4f2697e51477d95811ab4f`, local `v1.0.0-beta.4`, `1.0.0+4` | Branch/tag are local-only; no exact-SHA hosted CI evidence |
+| Flutter | 222 files formatted, analysis clean, 375/375 tests, 52.86% line coverage, protected goldens pass | Automation is not physical/manual workflow proof |
+| Edge | Format/lint/type checks pass; 32/32 Deno tests | Candidate functions are not deployed to staging or production |
+| Database | Empty local rebuild applies all 52 migrations; 83/83 pgTAP pass; lint clean | Hosted live-derived staging and safe production promotion remain open |
+| Auth | Local confirmation, recovery/password update, token revocation and TOTP/AAL2 pass | Fresh external email/provider/linking and restart/expiry evidence remain open |
+| Integration | Signed-out simulator journey passes; three staging suites compile and safely skip | Core, isolation, public booking and deletion require hosted staging |
+| iOS artifact | Distribution-signed App Store IPA, strict-valid, `1.0.0 (4)`, 33,854,083 bytes, SHA-256 `2dc632e23f5ea00a54df57405d9b675fb8ca33b749310ba4df5c461a0ca3c6fa` | Not uploaded; no TestFlight install/manual VoiceOver matrix |
+| Android | Profile APK builds, is 16 KB aligned and v2-signed for QA | No upload key, release AAB, physical Android or TalkBack evidence |
+| Payments | Flutter and candidate Edge gates default false | Production Edge is behind candidate; merchant restricted; no payment/refund evidence |
+| Public/legal | Live apex, privacy, terms and deletion return 200 and use `support@workloop.uk`; deletion navigation is current | Live 12 August copy trails the tagged fuller copy; controller details, monitoring and legal review remain open |
+
+Verdict: **not ready to upload**. A valid exact-tag IPA exists, but the strict
+definition also requires hosted staging, external Auth and manual exact-build
+device evidence. The required Supabase preview branch begins at $0.01344/hour
+plus metered usage and needs explicit owner approval. Uploading remains a
+separate prohibited boundary until final approval.

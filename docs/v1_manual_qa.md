@@ -86,3 +86,22 @@ appearance, system text size, pass/fail result, evidence link, and defect ID.
 - Install the exact signed candidate on supported iOS and Android devices.
 - Treat build/install/launch, interactive workflow QA, accessibility QA,
   store-console completion, and payment operation as separate evidence.
+
+## 2026-08-13 candidate execution record
+
+Candidate: `1.0.0 (4)`, `v1.0.0-beta.4`,
+`81673f6e5f67b11a5c4f2697e51477d95811ab4f`.
+
+- Automated compact/current phone, large-text, reduced-motion, semantics,
+  Light/Dark and golden contracts pass in the 375-test suite.
+- The signed-out Auth journey passes on the iPhone 17 Pro simulator.
+- The paired iPhone records Workloop `1.0.0 (4)` installed and a fresh launch
+  after unlock; CoreDevice confirmed Runner PID 99913. This is not an
+  interactive workflow or VoiceOver pass.
+- No physical Android or Android emulator is available in this environment.
+- VoiceOver, TalkBack, real permissions, reminders, offline/background,
+  recovery deep links, reinstall/upgrade and DST interaction remain unchecked.
+
+Do not tick or infer the human-only items above from the automated results.
+Record each completed physical pass with tester, device/OS, timestamp and
+defect/evidence reference before changing the upload verdict.

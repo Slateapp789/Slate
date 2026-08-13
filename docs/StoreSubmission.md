@@ -185,3 +185,62 @@ manually exercised:
 - Reduced-motion settings suppress non-essential UI motion.
 - Contrast remains readable in light and OLED dark appearances.
 - Every workflow is usable without relying on colour alone.
+
+## TestFlight beta 4 handoff draft
+
+Build name: `Workloop 1.0.0 (4) - Payments-off beta`
+
+### Plain-English release notes
+
+This beta strengthens Workloop's connected Today -> Client -> Work -> Money ->
+Repeat workflow. It includes the five-part Today, Clients, Work, Money and
+Business workspace, improved booking-request and calendar recovery, clearer
+first-run account and legal access, responsive Light/Dark layouts, and safer
+workspace export and account-deletion boundaries.
+
+Card collection, Tap to Pay and payment links are intentionally unavailable.
+Money records remain manual, and customer booking submissions are requests that
+the business owner reviews rather than automatic confirmations.
+
+### What to Test
+
+- Create an account, confirm the email, sign in and complete business setup.
+- Add and edit a client; create, edit, complete and cancel one-off bookings.
+- Use Work > Schedule, Tasks and Notes and confirm each retained view keeps its
+  place and context.
+- Record received, outstanding and expense entries manually; verify Today,
+  Money and client history stay aligned.
+- Configure and share the booking page; submit a signed-out request and approve
+  or decline it as the owner.
+- Exercise reminder settings, calendar import/export, support, Terms, Privacy,
+  workspace export, sign-out and password recovery.
+- Confirm no Stripe setup, Tap to Pay, card collection or payment-link entry
+  point is visible.
+
+Report the screen, action, expected result, actual result, screenshot, device,
+OS version and Workloop build number to `support@workloop.uk`.
+
+### Known beta limitations
+
+- One-off booking creation only; historic recurring records remain readable.
+- Public booking is a request, not live availability or automatic confirmation.
+- Calendar export is point-in-time ICS, not live two-way sync.
+- Reminders are on-device; remote push is not a beta capability.
+- Card collection, payment links and Tap to Pay are disabled.
+- No bank feed, accounting replacement, staff/team operation or AI workflow.
+- iPhone portrait is the TestFlight layout promise; iPad and landscape are not.
+
+### App Store Connect completion checklist
+
+- App Privacy: use the data map above and recheck Apple's current definitions.
+- Export compliance: `ITSAppUsesNonExemptEncryption=false`; answer that the app
+  does not use non-exempt encryption.
+- Reviewer contact: the owner must enter a monitored name, phone and
+  `support@workloop.uk`; do not invent those details in source.
+- Review access: provide a dedicated fictional-data account only after its Auth
+  confirmation/recovery journey passes and it is intentionally created for
+  Apple.
+- Internal testers: prepare the existing internal group, but do not attach the
+  build or add testers until upload approval and processing succeed.
+- External testers: defer until internal smoke, support monitoring, legal
+  controller details and external-beta review information are complete.

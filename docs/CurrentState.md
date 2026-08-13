@@ -1182,3 +1182,39 @@ Current verdict: the source-level Auth, MFA-boundary, payment-data, legal-copy,
 responsive and release-process defects found in the audit are remediated. An
 external beta remains gated by clean database/staging evidence, external Auth
 lifecycle proof, support/legal operation, and a clean tagged TestFlight build.
+
+### 2026-08-13 exact beta-candidate evidence refresh
+
+- Candidate source is clean and immutable at
+  `81673f6e5f67b11a5c4f2697e51477d95811ab4f`, local tag
+  `v1.0.0-beta.4`, version `1.0.0+4`. The tag remains on the app-source commit;
+  this later documentation-only evidence does not describe a different binary.
+- Fresh exact-tag verification passes formatting across 222 Dart files,
+  Flutter analysis, 375/375 Flutter tests, 52.86% line coverage, protected
+  goldens, the signed-out iOS simulator journey, 32/32 Deno tests, eight Edge
+  entry-point type checks, and four deterministic data-profile dry runs.
+- An isolated local Supabase stack rebuilt all 52 migrations from an empty
+  database. All three pgTAP files passed with 83 assertions, database lint had
+  no warning-level findings, and local Data API/Auth checks covered anonymous
+  denial, tenant isolation, confirmation, recovery/password replacement,
+  refresh-token revocation, TOTP challenge and AAL2 enforcement.
+- The exact-tag App Store IPA is 33,854,083 bytes with SHA-256
+  `2dc632e23f5ea00a54df57405d9b675fb8ca33b749310ba4df5c461a0ca3c6fa`.
+  Strict verification passes under Apple Distribution team `6RH526FD7B`; its
+  Store profile has `beta-reports-active=true`, `get-task-allow=false`, Sign in
+  with Apple, and no unsupported proximity-reader entitlement. It is not
+  uploaded.
+- Production remains behind local security/payment source. Do not blanket-push
+  migrations. Hosted staging must reconcile the missing booking/contact
+  hardening before the privileged MFA/payment-retention migration, then deploy
+  candidate Edge Functions with both payment gates false.
+- Dynamic hosted staging core, two-user, public-booking and deletion journeys
+  remain blocked pending owner approval for a disposable paid preview branch.
+  External Auth/provider delivery, physical accessibility/lifecycle QA,
+  support monitoring/legal approval, crash visibility and load measurements
+  remain separate human or operational gates.
+
+Current verdict: **not ready to upload** under the strict beta definition. The
+signed artifact is valid and reproducible, but hosted staging, external Auth,
+exact-build manual-device, support/legal and production-promotion gates remain
+open.

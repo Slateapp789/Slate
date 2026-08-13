@@ -52,6 +52,7 @@ STRIPE_CHECKOUT_CANCEL_URL=https://<workloop-domain>/payments/cancel
 WORKLOOP_PLATFORM_FEE_BPS=0
 WORKLOOP_PLATFORM_FEE_ENABLED=false
 STRIPE_LIVE_MODE_ALLOWED=false
+WORKLOOP_PAYMENTS_BETA_ENABLED=false
 ```
 
 The webhook endpoint must receive events for connected accounts. Its URL is:

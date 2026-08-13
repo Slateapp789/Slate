@@ -99,3 +99,29 @@ The public booking/profile Edge Functions remain deployed with JWT verification 
   opt-in MFA enforcement are configured. External fresh signup/confirmation,
   recovery/password-change, identity linking, deletion completion and deployed
   abuse controls remain dynamic release evidence, not configuration claims.
+
+## 2026-08-13 exact-tag security evidence
+
+- The isolated local stack rebuilt all 52 migrations from empty and passed
+  83/83 pgTAP assertions across schema/grants, tenant isolation and privileged
+  MFA/payment-retention boundaries. Database lint reported no warning-level
+  findings.
+- All 23 public and four private local application tables have RLS. Anonymous
+  application DML and client private-table DML are absent. Local Data API tests
+  denied anonymous reads, non-member reads, cross-tenant inserts, deletion-audit
+  reads and `app_private` exposure.
+- Local GoTrue/Mailpit tests passed confirmation, sign-in, recovery/password
+  replacement, refresh-token revocation, TOTP enrollment/challenge and AAL2
+  enforcement. These do not prove external SMTP, Apple/Google linking or
+  physical-device restart/expiry behaviour.
+- Deno format/lint/type checks and 32/32 Edge tests pass. Candidate payments
+  fail closed unless `WORKLOOP_PAYMENTS_BETA_ENABLED=true`; the webhook remains
+  intentionally ungated for signed reconciliation.
+- Read-only production inspection remains materially behind candidate source:
+  privileged workflow MFA, payment gate, webhook retention/scrubbing and Stripe
+  account offboarding are not live. Do not use blanket `supabase db push`
+  because live migration timestamps diverge from local history.
+- Production promotion must first be rehearsed on a disposable live-derived
+  branch, with the missing booking/contact hardening applied before the
+  privileged MFA/payment-retention migration. Production changes remain
+  unauthorised in this evidence run.
