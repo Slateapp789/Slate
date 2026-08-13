@@ -29,6 +29,52 @@ class ClientsRepository {
     return rows.map<Client>(Client.fromMap).toList();
   }
 
+  Future<List<Client>> followUpsForBusinessFeed(
+    String workspaceId, {
+    required DateTime leadBefore,
+    required DateTime inactiveBefore,
+    int limitPerGroup = 80,
+  }) async {
+    Future<List<dynamic>> load({
+      required bool leads,
+      required DateTime before,
+    }) {
+      final cutoff = before.toUtc().toIso8601String();
+      var query = _client
+          .from('contacts')
+          .select()
+          .eq('workspace_id', workspaceId);
+      query = leads ? query.eq('status', 'lead') : query.eq('status', 'active');
+      return query
+          .or(
+            'last_activity_at.lt.$cutoff,'
+            'and(last_activity_at.is.null,created_at.lt.$cutoff)',
+          )
+          .order('last_activity_at', ascending: false)
+          .order('id', ascending: true)
+          .limit(limitPerGroup);
+    }
+
+    final results = await Future.wait([
+      load(leads: true, before: leadBefore),
+      load(leads: false, before: inactiveBefore),
+    ]);
+    final clients = results
+        .expand((rows) => rows)
+        .map<Client>(
+          (row) => Client.fromMap(Map<String, dynamic>.from(row as Map)),
+        )
+        .toList();
+    clients.sort((a, b) {
+      final aDate = a.lastActivityAt ?? a.createdAt;
+      final bDate = b.lastActivityAt ?? b.createdAt;
+      if (aDate == null) return bDate == null ? 0 : 1;
+      if (bDate == null) return -1;
+      return bDate.compareTo(aDate);
+    });
+    return clients.take(limitPerGroup).toList();
+  }
+
   Future<Client?> getById(String id) async {
     final row = await _client
         .from('contacts')

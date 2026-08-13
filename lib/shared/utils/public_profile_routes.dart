@@ -19,6 +19,7 @@ const reservedPublicHandles = <String>{
   'import-data',
   'profile',
   'settings',
+  'security',
   'p',
   'app',
   'api',

@@ -216,7 +216,7 @@ class _FeedPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+        borderRadius: BorderRadius.circular(AppRadius.capsule),
       ),
       child: Text(
         label,

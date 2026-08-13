@@ -1,5 +1,12 @@
 enum AuthFormIntent { signIn, signUp, resetPassword }
 
+const minimumWorkloopPasswordLength = 12;
+
+const workloopPasswordLengthMessage =
+    'Password must be at least $minimumWorkloopPasswordLength characters.';
+const workloopPasswordStrengthMessage =
+    'Include uppercase, lowercase, a number, and a symbol.';
+
 bool isValidAuthEmail(String value) {
   final email = value.trim();
   if (email.isEmpty || email.length > 254) return false;
@@ -15,16 +22,32 @@ String? validateAuthForm({
   if (!isValidAuthEmail(email)) return 'Enter a valid email address.';
   if (intent == AuthFormIntent.resetPassword) return null;
   if (password.isEmpty) return 'Enter your password.';
-  if (intent == AuthFormIntent.signUp && password.length < 8) {
-    return 'Password must be at least 8 characters.';
+  if (intent == AuthFormIntent.signUp &&
+      password.length < minimumWorkloopPasswordLength) {
+    return workloopPasswordLengthMessage;
+  }
+  if (intent == AuthFormIntent.signUp && !isStrongWorkloopPassword(password)) {
+    return workloopPasswordStrengthMessage;
   }
   return null;
 }
 
 String? validateNewPasswordPair(String password, String confirmation) {
-  if (password.length < 8) return 'Use at least 8 characters.';
+  if (password.length < minimumWorkloopPasswordLength) {
+    return workloopPasswordLengthMessage;
+  }
+  if (!isStrongWorkloopPassword(password)) {
+    return workloopPasswordStrengthMessage;
+  }
   if (password != confirmation) return 'The passwords do not match.';
   return null;
+}
+
+bool isStrongWorkloopPassword(String password) {
+  return RegExp(r'[a-z]').hasMatch(password) &&
+      RegExp(r'[A-Z]').hasMatch(password) &&
+      RegExp(r'\d').hasMatch(password) &&
+      RegExp(r'''[!@#$%^&*()_+\-=\[\]{};'":|<>?,./`~\\]''').hasMatch(password);
 }
 
 String friendlyAuthErrorMessage(String rawMessage) {
@@ -40,8 +63,11 @@ String friendlyAuthErrorMessage(String rawMessage) {
       message.contains('already been registered')) {
     return 'An account already exists for that email. Try signing in.';
   }
+  if (message.contains('pwned') || message.contains('leaked')) {
+    return 'That password has appeared in a known data breach. Choose a unique password.';
+  }
   if (message.contains('password') && message.contains('weak')) {
-    return 'Choose a stronger password.';
+    return workloopPasswordStrengthMessage;
   }
   if (message.contains('rate limit') || message.contains('too many')) {
     return 'Too many attempts. Please wait a moment and try again.';

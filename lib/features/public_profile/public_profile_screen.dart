@@ -233,19 +233,15 @@ class _ProfileContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final bookingClosed = profile.profile.bookingMode != 'manual';
     final bookingSectionKey = GlobalKey();
-    final enabledBadges = <_ProfileBadgeData>[
-      if (profile.profile.reviewsEnabled)
-        const _ProfileBadgeData(LucideIcons.star, 'Reviews enabled'),
-      if (profile.profile.galleryEnabled)
-        const _ProfileBadgeData(
-          LucideIcons.galleryThumbnails,
-          'Gallery enabled',
-        ),
-    ];
 
     return SafeArea(
       child: ListView(
-        padding: EdgeInsets.fromLTRB(20, topInset, 20, 40),
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.pageX,
+          topInset,
+          AppSpacing.pageX,
+          40,
+        ),
         children: [
           _Hero(profile: profile),
           if (!bookingClosed && !sent) ...[
@@ -264,30 +260,16 @@ class _ProfileContent extends StatelessWidget {
                 );
               },
             ),
+            const SizedBox(height: AppSpacing.xs),
+            const Text(
+              'Send a preferred time. The business will contact you before anything is confirmed.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.t3, fontSize: 12, height: 1.4),
+            ),
           ],
           const SizedBox(height: 24),
-          if (enabledBadges.isNotEmpty) ...[
-            _ProfileBadges(items: enabledBadges),
-            const SizedBox(height: 16),
-          ],
           if (profile.profile.isNoticeActive()) ...[
             _Notice(text: profile.profile.noticeText!),
-            const SizedBox(height: 16),
-          ],
-          if (profile.profile.galleryEnabled &&
-              profile.profile.galleryImageUrls.isNotEmpty) ...[
-            _Section(
-              title: 'Gallery',
-              child: _GalleryGrid(urls: profile.profile.galleryImageUrls),
-            ),
-            const SizedBox(height: 16),
-          ],
-          if (profile.profile.reviewsEnabled &&
-              profile.profile.reviewQuotes.isNotEmpty) ...[
-            _Section(
-              title: 'Reviews',
-              child: _ReviewsList(quotes: profile.profile.reviewQuotes),
-            ),
             const SizedBox(height: 16),
           ],
           _Section(
@@ -313,24 +295,7 @@ class _ProfileContent extends StatelessWidget {
           const SizedBox(height: 16),
           _Section(
             title: 'Working hours',
-            child: profile.workingHours.isEmpty
-                ? const Text(
-                    'Hours not published yet.',
-                    style: TextStyle(color: AppColors.t3),
-                  )
-                : Column(
-                    children: workingHourDays.map((day) {
-                      final shortDay = shortToLongDay.entries
-                          .firstWhere((entry) => entry.value == day)
-                          .key;
-                      return _HoursRow(
-                        day: day,
-                        value:
-                            profile.workingHours[day] ??
-                            profile.workingHours[shortDay],
-                      );
-                    }).toList(),
-                  ),
+            child: _PublishedHours(workingHours: profile.workingHours),
           ),
           const SizedBox(height: 16),
           Container(
@@ -340,9 +305,19 @@ class _ProfileContent extends StatelessWidget {
               child: bookingClosed
                   ? const _ClosedBookingState()
                   : sent
-                  ? const _SentState()
+                  ? _SentState(businessName: profile.businessName)
                   : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const Text(
+                          'This is a request, not a confirmed appointment. The business will contact you to agree the details.',
+                          style: TextStyle(
+                            color: AppColors.t3,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
                         _ProfileField(
                           controller: nameController,
                           label: 'Name',
@@ -388,12 +363,12 @@ class _ProfileContent extends StatelessWidget {
                         const SizedBox(height: 10),
                         _ProfileField(
                           controller: preferredTimeController,
-                          label: 'Preferred time',
-                          hint: 'Preferred day or time',
+                          label: 'Preferred day or time',
+                          hint: 'For example, Tuesday morning',
                           maxLength: 160,
                         ),
                         const SizedBox(height: 8),
-                        _PreferredTimeShortcuts(onPick: onPreferredTimePicked),
+                        _PreferredTimeChoices(onPick: onPreferredTimePicked),
                         const SizedBox(height: 10),
                         _ProfileField(
                           controller: messageController,
@@ -502,175 +477,97 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     final coverUrl = profile.profile.coverPhotoUrl;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (coverUrl?.isNotEmpty == true) ...[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.network(
-                coverUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  color: AppColors.bgCard,
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    LucideIcons.imageOff,
-                    color: AppColors.t3,
-                    size: 30,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-        ] else ...[
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppColors.accentPrimaryStrong,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Center(
-              child: Text(
-                profile.businessName.isEmpty
-                    ? 'S'
-                    : profile.businessName[0].toUpperCase(),
-                style: const TextStyle(
-                  color: AppColors.onBrandAccent,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-        ],
-        Text(
-          profile.businessName,
-          style: const TextStyle(
-            color: AppColors.t1,
-            fontSize: 32,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          profile.profile.bio?.isNotEmpty == true
-              ? profile.profile.bio!
-              : profile.industry ?? 'Independent service business',
-          style: const TextStyle(
-            color: AppColors.t2,
-            fontSize: 15,
-            height: 1.35,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            const Icon(LucideIcons.link, color: AppColors.t3, size: 15),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                'workloop.app/${profile.profile.handle}',
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.t3, fontSize: 13),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _GalleryGrid extends StatelessWidget {
-  final List<String> urls;
-
-  const _GalleryGrid({required this.urls});
-
-  @override
-  Widget build(BuildContext context) {
-    final visibleUrls = urls.take(6).toList();
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 1.12,
-      ),
-      itemCount: visibleUrls.length,
-      itemBuilder: (context, index) => ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Image.network(
-          visibleUrls[index],
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => Container(
-            color: AppColors.bgInteract,
-            alignment: Alignment.center,
-            child: const Icon(
-              LucideIcons.imageOff,
-              color: AppColors.t3,
-              size: 22,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ReviewsList extends StatelessWidget {
-  final List<String> quotes;
-
-  const _ReviewsList({required this.quotes});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: quotes
-          .take(3)
-          .map(
-            (quote) => Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.bgInteract,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    LucideIcons.star,
-                    color: AppColors.green,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      quote,
-                      style: const TextStyle(
-                        color: AppColors.t2,
-                        fontSize: 13,
-                        height: 1.38,
-                      ),
+    return WorkloopSurface(
+      color: tokens.inkSurface,
+      borderColor: tokens.divider,
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (coverUrl?.isNotEmpty == true) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Image.network(
+                  coverUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    color: AppColors.bgCard,
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      LucideIcons.imageOff,
+                      color: AppColors.t3,
+                      size: 30,
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-          )
-          .toList(),
+            const SizedBox(height: 18),
+          ] else ...[
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: tokens.surfaceRaised,
+                shape: BoxShape.circle,
+                border: Border.all(color: tokens.divider),
+              ),
+              child: Center(
+                child: Text(
+                  profile.businessName.isEmpty
+                      ? 'S'
+                      : profile.businessName[0].toUpperCase(),
+                  style: TextStyle(
+                    color: tokens.accentInk,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
+          Text(
+            profile.businessName,
+            style: TextStyle(
+              color: tokens.onInk,
+              fontSize: 28,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            profile.profile.bio?.isNotEmpty == true
+                ? profile.profile.bio!
+                : profile.industry ?? 'Independent service business',
+            style: TextStyle(
+              color: tokens.onInkMuted,
+              fontSize: 15,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(LucideIcons.link, color: tokens.accentInk, size: 15),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Powered by Workloop',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: tokens.onInkMuted, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -696,54 +593,6 @@ class _Notice extends StatelessWidget {
   }
 }
 
-class _ProfileBadgeData {
-  final IconData icon;
-  final String label;
-
-  const _ProfileBadgeData(this.icon, this.label);
-}
-
-class _ProfileBadges extends StatelessWidget {
-  final List<_ProfileBadgeData> items;
-
-  const _ProfileBadges({required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: items
-          .map(
-            (item) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(
-                color: AppColors.bgCard,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(item.icon, color: AppColors.green, size: 15),
-                  const SizedBox(width: 7),
-                  Text(
-                    item.label,
-                    style: const TextStyle(
-                      color: AppColors.t2,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
 class _Section extends StatelessWidget {
   final String title;
   final Widget child;
@@ -751,29 +600,22 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title.toUpperCase(),
-            style: const TextStyle(
-              color: AppColors.t3,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: AppColors.t1,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
           ),
-          const SizedBox(height: 14),
-          child,
-        ],
-      ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        child,
+        const SizedBox(height: AppSpacing.lg),
+        const Divider(height: 1, thickness: 1, color: AppColors.border),
+      ],
     );
   }
 }
@@ -839,38 +681,66 @@ class _ServiceRow extends StatelessWidget {
   }
 }
 
-class _HoursRow extends StatelessWidget {
-  final String day;
-  final dynamic value;
-  const _HoursRow({required this.day, required this.value});
+class _PublishedHours extends StatelessWidget {
+  final Map<String, dynamic> workingHours;
+
+  const _PublishedHours({required this.workingHours});
 
   @override
   Widget build(BuildContext context) {
-    final map = value is Map
-        ? Map<String, dynamic>.from(value as Map)
-        : <String, dynamic>{};
-    final enabled = map['enabled'] as bool? ?? false;
-    final label = enabled ? formatWorkingHourValue(map) : 'Closed';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(day, style: const TextStyle(color: AppColors.t2)),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Flexible(
-            child: Text(
-              label,
-              textAlign: TextAlign.end,
-              style: const TextStyle(
-                color: AppColors.t1,
-                fontWeight: FontWeight.w500,
-              ),
+    final openDays = <({String day, Map<String, dynamic> hours})>[];
+    for (final day in workingHourDays) {
+      final shortDay = shortToLongDay.entries
+          .firstWhere((entry) => entry.value == day)
+          .key;
+      final value = workingHours[day] ?? workingHours[shortDay];
+      final hours = value is Map
+          ? Map<String, dynamic>.from(value)
+          : <String, dynamic>{};
+      if (hours['enabled'] == true) openDays.add((day: day, hours: hours));
+    }
+    if (openDays.isEmpty) {
+      return const Text(
+        'Hours not published yet.',
+        style: TextStyle(color: AppColors.t3),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final entry in openDays)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    entry.day,
+                    style: const TextStyle(color: AppColors.t2),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Flexible(
+                  child: Text(
+                    formatWorkingHourValue(entry.hours),
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                      color: AppColors.t1,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+        if (openDays.length < workingHourDays.length) ...[
+          const SizedBox(height: 2),
+          const Text(
+            'Closed on other days',
+            style: TextStyle(color: AppColors.t3, fontSize: 12),
+          ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -924,29 +794,59 @@ class _ProfileField extends StatelessWidget {
   }
 }
 
-class _PreferredTimeShortcuts extends StatelessWidget {
+class _PreferredTimeChoices extends StatelessWidget {
   final ValueChanged<String> onPick;
 
-  const _PreferredTimeShortcuts({required this.onPick});
+  const _PreferredTimeChoices({required this.onPick});
+
+  Future<void> _pickDateAndTime(BuildContext context) async {
+    final now = DateTime.now();
+    final date = await showWorkloopDatePicker(
+      context: context,
+      initialDate: now.add(const Duration(days: 1)),
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 1),
+    );
+    if (date == null || !context.mounted) return;
+    final time = await showWorkloopTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 9, minute: 0),
+    );
+    if (!context.mounted) return;
+    final localizations = MaterialLocalizations.of(context);
+    final dateLabel = localizations.formatMediumDate(date);
+    onPick(
+      time == null
+          ? dateLabel
+          : '$dateLabel at ${localizations.formatTimeOfDay(time)}',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     const options = ['This week', 'Next week', 'Weekend', 'Evening'];
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: options
-            .map(
-              (option) => WorkloopFilterChip(
-                label: option,
-                selected: false,
-                onTap: () => onPick(option),
-              ),
-            )
-            .toList(),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        WorkloopTextButton(
+          label: 'Choose a date and time',
+          onPressed: () => _pickDateAndTime(context),
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options
+              .map(
+                (option) => WorkloopFilterChip(
+                  label: option,
+                  selected: false,
+                  onTap: () => onPick(option),
+                ),
+              )
+              .toList(),
+        ),
+      ],
     );
   }
 }
@@ -979,20 +879,26 @@ InputDecoration _fieldDecoration(
 }
 
 class _SentState extends StatelessWidget {
-  const _SentState();
+  final String businessName;
+
+  const _SentState({required this.businessName});
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       liveRegion: true,
       container: true,
-      label: 'Request sent. The business owner will contact you to confirm.',
-      child: const ExcludeSemantics(
+      label: 'Request sent. $businessName will contact you to confirm.',
+      child: ExcludeSemantics(
         child: Column(
           children: [
-            Icon(LucideIcons.checkCircle2, color: AppColors.success, size: 34),
-            SizedBox(height: 10),
-            Text(
+            const Icon(
+              LucideIcons.checkCircle2,
+              color: AppColors.success,
+              size: 34,
+            ),
+            const SizedBox(height: 10),
+            const Text(
               'Request sent',
               style: TextStyle(
                 color: AppColors.t1,
@@ -1000,11 +906,15 @@ class _SentState extends StatelessWidget {
                 fontSize: 17,
               ),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Text(
-              'The business owner will contact you to confirm.',
+              '$businessName will contact you to agree the details. Nothing is booked until they confirm it with you.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.t3, fontSize: 13),
+              style: const TextStyle(
+                color: AppColors.t3,
+                fontSize: 13,
+                height: 1.4,
+              ),
             ),
           ],
         ),

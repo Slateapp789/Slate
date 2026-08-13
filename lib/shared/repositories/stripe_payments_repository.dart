@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../utils/workflow_idempotency.dart';
 import 'supabase_client_provider.dart';
 
 final stripePaymentsRepositoryProvider = Provider<StripePaymentsRepository>((
@@ -31,7 +30,12 @@ class StripeAccountStatus {
     this.requirementsDue = const [],
   });
 
-  bool get ready => connected && chargesEnabled && onboardingStatus == 'ready';
+  bool get ready =>
+      connected &&
+      detailsSubmitted &&
+      chargesEnabled &&
+      payoutsEnabled &&
+      onboardingStatus == 'ready';
 
   factory StripeAccountStatus.fromMap(Map<String, dynamic> map) {
     return StripeAccountStatus(
@@ -101,8 +105,9 @@ class StripePaymentsRepository {
   Future<TerminalPaymentRequest> createTerminalPayment({
     required String workspaceId,
     required String invoiceId,
+    required String idempotencyKey,
+    String? receiptEmail,
     int? amountMinor,
-    String? idempotencyKey,
   }) async {
     final data = await _invoke(
       'createTerminalPaymentIntent',
@@ -110,7 +115,8 @@ class StripePaymentsRepository {
       body: {
         'invoiceId': invoiceId,
         'amountMinor': ?amountMinor,
-        'idempotencyKey': idempotencyKey ?? createWorkflowIdempotencyKey(),
+        'receiptEmail': ?receiptEmail,
+        'idempotencyKey': idempotencyKey,
       },
     );
     final transaction = _map(data['transaction']);
@@ -132,8 +138,8 @@ class StripePaymentsRepository {
   Future<PaymentLinkResult> createPaymentLink({
     required String workspaceId,
     required String invoiceId,
+    required String idempotencyKey,
     int? amountMinor,
-    String? idempotencyKey,
   }) async {
     final data = await _invoke(
       'createPaymentLink',
@@ -141,7 +147,7 @@ class StripePaymentsRepository {
       body: {
         'invoiceId': invoiceId,
         'amountMinor': ?amountMinor,
-        'idempotencyKey': idempotencyKey ?? createWorkflowIdempotencyKey(),
+        'idempotencyKey': idempotencyKey,
       },
     );
     final transaction = _map(data['transaction']);
@@ -154,15 +160,16 @@ class StripePaymentsRepository {
   Future<void> refund({
     required String workspaceId,
     required String transactionId,
-    int? amountMinor,
+    required int amountMinor,
+    required String idempotencyKey,
   }) async {
     await _invoke(
       'refund',
       workspaceId,
       body: {
         'transactionId': transactionId,
-        'amountMinor': ?amountMinor,
-        'idempotencyKey': createWorkflowIdempotencyKey(),
+        'amountMinor': amountMinor,
+        'idempotencyKey': idempotencyKey,
       },
     );
   }

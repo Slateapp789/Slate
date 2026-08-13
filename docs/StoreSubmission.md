@@ -1,6 +1,6 @@
 # Workloop Store Submission Draft
 
-Last updated: 2026-07-26
+Last updated: 2026-08-13
 
 This copy is a launch draft, not a substitute for App Store Connect, Play
 Console, privacy, or trade-mark review.
@@ -14,10 +14,10 @@ Console, privacy, or trade-mark review.
   `Clients, bookings, money and follow-ups in one calm daily business loop.`
 - Primary category: Productivity
 - Secondary iOS category: Business
-- Support email: `support@workloop.app`
-- Privacy URL: `https://workloop.app/privacy.html`
-- Terms URL: `https://workloop.app/terms.html`
-- Account deletion URL: `https://workloop.app/delete-account.html`
+- Support email: `support@workloop.uk`
+- Privacy URL: `https://workloop.uk/privacy.html`
+- Terms URL: `https://workloop.uk/terms.html`
+- Account deletion URL: `https://workloop.uk/delete-account.html`
 - Launch device scope: iPhone portrait on iOS; portrait orientation on Android.
   iPad and landscape layouts are not part of the 1.0 store promise.
 
@@ -50,7 +50,8 @@ KEEP CLIENT CONTEXT TOGETHER
 
 RUN BOOKINGS WITH CONFIDENCE
 
-- Create one-off and recurring bookings.
+- Create and manage focused one-off bookings. Existing historic recurring
+  records remain readable, but new recurring-series creation is outside V1.
 - Track status, service, location, price, and client details.
 - Export your schedule as a standard calendar file.
 
@@ -72,8 +73,13 @@ BUILT FOR TRUST
 - Workspace export and a protected sole-owner account-deletion workflow.
 - Optional contact, calendar, and file imports stay under your control.
 
-Workloop organises business records; it is not a bank, card processor,
-accountant, or replacement for professional advice.
+Workloop organises business records; it is not a bank, accountant, or
+replacement for professional advice.
+
+The default beta build sets `PAYMENT_COLLECTION_ENABLED=false`. Do not add a
+Stripe collection claim, payment screenshot, or payment reviewer instruction
+unless the submitted build explicitly enables that capability and every
+payment release gate has passed.
 
 ## Suggested iOS keywords
 
@@ -86,13 +92,14 @@ Recheck the 100-character App Store limit when entered in App Store Connect.
 Use real in-app screens with fictional data. Do not composite features that the
 release does not contain.
 
-1. **Know what needs attention** — Home with today’s schedule and next action.
+1. **Know what needs attention** — Today with the schedule and next action.
 2. **Every client in context** — client overview with linked history.
 3. **Bookings without the admin** — booking list and focused detail.
 4. **See what you earned** — Money summary with received and outstanding.
 5. **Follow through calmly** — tasks/checklist/reminder view.
-6. **Your business, one loop** — Tools showing Money, Tasks, and Notes, with
-   Profile and Settings visible from the Home header.
+6. **Your business, one loop** — Business showing the booking page, services,
+   working hours, business profile, and Settings; Work keeps Schedule, Tasks,
+   and Notes together.
 
 Use the exact icon neon `#C1FF72`, restrained dark or neutral backgrounds, large
 legible copy, and no more than one claim per frame.
@@ -105,6 +112,7 @@ legible copy, and no more than one claim per frame.
 | Calendar | Review and import selected events as bookings. Android's calendar provider grants the package's required read/write permission pair, but Workloop's launch flow does not modify device events. | Manual booking entry and `.ics` export remain available |
 | Files | Select supported exports for reviewed import or save an export | Clipboard/manual entry remains available where offered |
 | Notifications | Schedule opted-in on-device task and booking reminders | Workloop remains usable; reminders stay visible in-app |
+| Location / Bluetooth / NFC | Connect to an eligible Stripe reader or Tap to Pay flow only in a payment-enabled build on supported hardware | Manual payment records remain available |
 | Internet | Secure authentication, workspace sync, public booking, and address lookup | Clear retry/error states are shown |
 
 Reviewer notes should explicitly say:
@@ -114,12 +122,21 @@ Reviewer notes should explicitly say:
   Workloop V1 only reads events the user reviews for import and does not modify
   the device calendar.
 - Google Places is optional; addresses can be entered manually.
-- “Money” records operational income/expense information and does not process
-  cards or connect to a bank.
+- The iOS file-picker dependency links camera/photo chooser support, which is
+  why the binary includes purpose strings. Workloop V1 exposes only reviewed
+  CSV, text and Markdown imports plus ICS/JSON export; it does not expose a
+  camera or photo-library import workflow.
+- “Money” records operational income/expense information and does not connect
+  to a bank feed. In the default beta, Stripe collection entry points are off.
+  In a separately approved payment-enabled build, Stripe processes collection
+  for an eligible connected business and Workloop does not store full card
+  numbers.
 - Calendar export is point-in-time `.ics`, not live two-way sync.
 - Any reminder delivered in V1 is on-device, not marketing or remote push.
 - Public booking is a request that the owner reviews and confirms; V1 does not
-  advertise live slot selection, deposits, card processing, or pay-now.
+  advertise live slot selection or automatic confirmation. Payment collection
+  must be described only if the submitted build and connected-account operation
+  have completed their payment release gates.
 - The iOS review build is iPhone-only and both platform builds are
   portrait-oriented; do not supply landscape or iPad marketing media.
 
@@ -129,18 +146,19 @@ Review the final App Store Connect definitions before submission.
 
 | Data type | Collected | Linked to user | Tracking | Purpose |
 | --- | --- | --- | --- | --- |
-| Name and email | Yes | Yes | No | Account and app functionality |
+| Name and email | Yes | Yes | No | Account, app functionality and optional Stripe receipt delivery when payment collection is enabled |
 | Phone/address | Optional | Yes | No | Business/client workflow |
 | Contacts | Optional | Yes | No | User-selected client import |
 | User content | Yes | Yes | No | Notes, tasks, bookings, support, business records |
-| Other financial info | Optional | Yes | No | User-entered income and expense tracking |
+| Other financial info | Optional | Yes | No | User-entered income/expense tracking and payment status/provider references |
 | User ID | Yes | Yes | No | Authentication and security |
 | Calendar events | Optional | Yes | No | User-selected booking import |
 | Diagnostics | Support-only, user initiated | Potentially | No | Troubleshooting |
 
 The current source has no advertising SDK and no cross-app tracking SDK.
-Supabase and Google Places are service providers; their processing must still
-be described in the public privacy policy and store answers.
+Supabase, Stripe, Resend, Google OAuth and Google Places are service providers;
+their actual processing must be reflected in the public privacy policy and
+store answers.
 
 ## Google Play Data safety working map
 
@@ -148,7 +166,10 @@ be described in the public privacy policy and store answers.
 - Account deletion can be requested in-app and through the public deletion URL.
 - Data collected for account/app functionality may include personal info,
   contacts, calendar events, files selected for import, user-generated content,
-  and user-entered financial records.
+  and user-entered financial records. A payment-enabled build may additionally
+  process connected-account identity, provider transaction/refund/dispute
+  references, and a customer email supplied for receipt delivery through
+  Stripe.
 - Contacts, calendar, files, and notifications are optional.
 - No data is sold and the current source has no advertising SDK.
 - Confirm Play’s current distinction between service-provider processing and

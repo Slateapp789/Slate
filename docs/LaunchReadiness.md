@@ -1,6 +1,6 @@
 # Workloop Launch Readiness
 
-Last updated: 2026-07-28
+Last updated: 2026-08-13
 
 This is the release gate for Workloop 1.0 on iOS and Android. “Code ready”
 means the repository passes its automated and device checks. “Store ready”
@@ -18,20 +18,23 @@ business owners. Its promise is one calm daily loop:
 
 Clients, bookings, money, tasks, and notes are connected operating modules, not
 separate mini-apps. V1 must not claim real-time calendar sync, automated bank
-feeds, card processing, or remote push notifications unless those services are
-actually connected and verified.
+feeds, operational card collection, or remote push notifications unless those
+services are actually connected and verified. Stripe live credentials and the
+server-side live-mode switch are configured, but the first merchant is still
+pending hosted onboarding and no live charge/refund has been completed. Payment
+collection therefore remains release-gated.
 
 ## Repository launch gates
 
 | Area | Gate |
 | --- | --- |
-| Identity | Workloop name, `com.ismaeel.workloop` identifiers, exact `#C1FF72` icon/splash accent |
-| Navigation | Home, Clients, Bookings, Tools; Money, Tasks, and Notes remain feature-local destinations |
-| Visual system | Fixed, slightly lifted graphite Dark appearance; exact icon/launch neon `#C1FF72`; contrast-safe neon foregrounds; bundled Instrument Sans; shared shell geometry; reduced-motion handling; semantic labels |
-| Core workflows | Auth/onboarding, clients, atomic/idempotent booking and task workflows, money, notes, profile/settings, retry-safe imports, one-time calendar import/export, on-device reminders |
+| Identity | Workloop name, `com.ismaeel.workloop` identifiers, existing `#C1FF72` app icon, Studio indigo native startup |
+| Navigation | Today, Clients, Work, Money, Business; Schedule, Tasks, and Notes are retained views inside Work |
+| Visual system | Persisted System/Light/Dark appearances; porcelain Light and midnight Dark; Studio indigo actions; bundled Manrope; shared floating-dock and control geometry; reduced-motion handling; semantic labels |
+| Core workflows | Auth/onboarding, clients, atomic/idempotent single-booking and task workflows, money, notes, profile/settings, retry-safe imports, one-time calendar import/export, on-device reminders; recurring-series creation is intentionally outside V1 |
 | Trust | Workspace export, protected deletion request, in-app privacy/terms, public policy/deletion artifacts |
 | Platform | Flutter 3.44.8; iPhone-only portrait scope on iOS 15+; Android portrait, API 36 target/minimum API 26, Gradle 8.14.3, AGP 8.11.1, Kotlin 2.2.20, Java 17; production network permission, no cleartext release traffic, sensitive backup exclusion, iOS/Android recovery link |
-| Quality | Formatting, analysis, full tests, Android profile build with 16 KB page alignment, iOS profile build, web release build, physical iPhone launch |
+| Quality | Formatting, analysis, full tests, Android profile build with 16 KB page alignment, iOS profile build, web release build; current-candidate physical iPhone install and CoreDevice-confirmed launch, recorded separately from interactive workflow QA |
 | Automation | Secret-safe CI runs Flutter formatting/analysis/tests, Deno formatting/checks/tests, Gradle-wrapper validation, Android profile and web builds, plus an unsigned iOS profile build on macOS |
 
 The final verification evidence for a release candidate must be appended to
@@ -43,7 +46,7 @@ Connected project:
 
 - Project: `imtbyrvsonzvtddswbtb`
 - Region: London (`eu-west-2`)
-- Status checked 2026-07-26: healthy
+- Status checked 2026-08-08: active and healthy on Postgres 17.6.1
 - Client access is protected by workspace-scoped RLS; the current security
   advisor reports no missing-RLS or RLS-enabled-without-policy finding.
 - Anonymous Data API table grants are removed. Authenticated app tables expose
@@ -58,30 +61,41 @@ Connected project:
   `20260726000520` explicit client-deny policy for the private Edge rate-limit
   ledger. Test-mode Stripe payment storage and reconciliation were added by
   `20260804181440` and its foreign-key indexes by `20260804181648`.
+  Retry/RLS hardening followed as `20260805210418`, with explicit private-ledger
+  deny policies in `20260805210559`.
 - Repository source routes task creation, booking creation, booking-request
   conversion, and booking completion through authenticated, tenant-validating,
   idempotent workflows. Public request and Places source use bounded private
   rate-limit state.
-- Current active Edge deployments include `create-booking-request` v9,
+- The last recorded active Edge deployments include `create-booking-request` v9,
   `places-address-search` v9, `get-public-profile` v7,
   `request-account-deletion` v7, `complete-account-deletion` v10,
-  `workloop-ai-assistant` v4, `stripe-payments` v1, and `stripe-webhook` v1.
+  `workloop-ai-assistant` v4 and `stripe-payments` v8. Re-read deployed versions
+  from the release environment before promotion rather than relying on this
+  historical inventory.
   Structural/grant smoke checks passed. The release gate remains open until the
   production-like signed-out, authenticated-workflow, and destructive deletion
   matrix is recorded.
-- The audit candidate adds booking-request/contact/notification hardening in
-  migration `20260726005736` and updated `create-booking-request` source. These
-  changes were deliberately not deployed to production during QA. They must
-  first pass a clean replay and isolated staging workflow.
+- The historical transaction-wrapped live schema and tenant-isolation scripts
+  reached their final 47th and 14th successful assertions. This validated that
+  project state without persisting fixtures; it is not a clean database replay.
+- A 2026-08-08 read-only grant/RLS refresh found RLS on all 23 public and all
+  four private application tables, zero anonymous table grants, zero client
+  grants on private tables, and `account_deletion_audit` as the sole public
+  table intentionally unavailable to authenticated clients. The security
+  advisor reported only leaked-password protection at that time. The 2026-08-11
+  hardening record below supersedes that historical advisor state.
 
 Before submission:
 
-- [ ] Add `workloop://reset-password` to Supabase Auth redirect URLs.
-- [ ] Enable Supabase Auth leaked-password protection. This is the remaining
-      security-advisor warning.
-- [ ] Configure production SMTP, sender identity, email confirmation, and
-      password-reset delivery; test fresh-account and recovery emails outside
-      the development team.
+- [x] Add `workloop://reset-password` to Supabase Auth redirect URLs.
+- [x] Enable Supabase Auth leaked-password protection. The live Auth service
+      also enforces the 12-character uppercase/lowercase/number/symbol policy,
+      and the security advisor reports no findings.
+- [x] Production SMTP, `auth@workloop.uk`, DKIM/SPF/DMARC and one real
+      password-recovery delivery are configured and verified.
+- [ ] Complete fresh-account confirmation, password change and recovery with an
+      address outside the development team before external beta invitations.
 - [ ] Review Auth signup/reset rate limits and enable CAPTCHA if public signup
       abuse warrants it.
 - [ ] Confirm `GOOGLE_PLACES_API_KEY` is a restricted server key with quotas and
@@ -135,7 +149,7 @@ Completed 2026-07-26:
 - iOS IPA export is blocked by the missing Distribution certificate/profile.
   Android AAB creation fails closed until the production upload keystore is
   configured.
-- Clean Supabase replay/43 pgTAP assertions, authenticated staging E2E, and
+- Clean Supabase replay/82 current pgTAP assertions, authenticated staging E2E, and
   backend load testing were not executed and remain release gates.
 
 Refreshed 2026-07-28 after the final UI/UX refinement:
@@ -162,6 +176,39 @@ Refreshed 2026-07-28 after the final UI/UX refinement:
 - The source-level UI/UX gate is materially stronger; the backend, security,
   store signing, legal hosting, and manual-device blockers below are unchanged.
 
+Refreshed 2026-08-08 after the final completion sweep:
+
+- Formatting is clean across 205 Dart files, analysis reports no issues, all
+  340 Flutter tests pass, and coverage is 9,650/19,424 lines (49.68%).
+- The protected golden suite passes 19/19 across 23 image files; the signed-out
+  iOS simulator journey passes 1/1.
+- Deno format/lint, all eight Edge entry-point checks, and 25/25 Deno tests
+  pass. Clean local Supabase replay and pgTAP remain blocked by absent Docker.
+- iOS profile (70.7 MB), universal Android profile (155.6 MB), Android arm64
+  profile (129.4 MB), and web release (43 MB) builds pass. The arm64 APK passes
+  16 KB alignment and v2 signature verification; the iOS app passes strict
+  local signature verification.
+- The exact iOS candidate installed and launched on the paired iPhone after an
+  initial locked-device denial; CoreDevice confirmed the running process.
+  Install/launch does not replace interactive workflow or accessibility QA.
+- Recurring-series creation is removed from V1 rather than left partially
+  functional. Historic recurrence data remains readable and data-compatible.
+
+Refreshed 2026-08-10 after Booking page and public-web consolidation:
+
+- Formatting is clean across 206 Dart files, analysis reports no issues, all
+  349 Flutter tests pass, and the protected golden suite passes against its
+  reviewed updated Home, Tools, Business profile and public booking images.
+- The iOS profile build succeeds at 71.0 MB. The exact build installed and
+  launched on the paired physical iPhone through CoreDevice.
+- Managed Sites version 4 is publicly deployed with production Supabase runtime
+  configuration. Live Home, `/:handle`, privacy, terms and deletion requests
+  return successfully, and a honeypot booking request reached the Edge boundary
+  without creating data.
+- The canonical apex and `www` host are attached but await the supplied DNS
+  validation/A/CNAME records and SSL activation. Support monitoring, manual
+  signed-out submission, legal approval and store gates remain open.
+
 ## External launch blockers
 
 These cannot be completed safely from source code alone:
@@ -182,8 +229,17 @@ decision.
 
 ### 2. Public domain and support operation
 
-As checked on 2026-07-26, the apex HTTPS host timed out and `www` still served
-a Namecheap registration/parking page. The repository now contains:
+On 2026-08-10 the public Sites deployment was published at
+`https://workloop-os.ismaeelsmiley.chatgpt.site`. It serves customer booking
+pages and the exact public legal endpoints below without Workloop or Sites
+authentication. A non-persisting honeypot request also reached the production
+booking Edge Function and returned its expected accepted response. On
+2026-08-11 the owner registered `workloop.uk`, attached the apex and `www`
+hostnames, and published the required routing and validation DNS records. TLS
+is active on both hosts and the canonical routes respond over HTTPS. Publication
+of the saved `workloop.uk` legal, support, current-navigation and payment-data
+copy remains pending explicit approval. The deployed 10 August pages still
+contain the previous `workloop.app` support identity and navigation wording.
 
 - `/privacy.html`
 - `/terms.html`
@@ -191,10 +247,14 @@ a Namecheap registration/parking page. The repository now contains:
 
 Before submission:
 
-- [ ] Deploy the release web artifact and make those exact HTTPS URLs public,
-      stable, crawlable, and accessible without signing in.
+- [x] Deploy the release web artifact and make the hosted legal URLs public and
+      accessible without signing in.
+- [ ] Publish the current reviewed local legal artifact, then verify the live
+      content, dates, support identity and deletion navigation match the app.
+- [x] Apply the supplied apex, `www` CNAME, and validation DNS records, then
+      prove those exact custom-domain legal and booking URLs over HTTPS.
 - [ ] Redirect the apex and `www` hosts consistently.
-- [ ] Create and actively monitor `support@workloop.app`.
+- [ ] Create and actively monitor `support@workloop.uk`.
 - [ ] Replace generic operator wording in the policies with the legal
       controller/business name, contact address, and any company number.
 - [ ] Have the privacy policy and terms reviewed for the launch markets.
@@ -204,9 +264,9 @@ Before submission:
 - [ ] Create the Android upload key, keep two encrypted backups, and enable Play
       App Signing. Never commit `android/key.properties` or a keystore.
 - [ ] Create the Play Console app with package `com.ismaeel.workloop`.
-- [ ] Install an iOS Distribution certificate and App Store provisioning
-      profile for `com.ismaeel.workloop`; then confirm the team, agreements,
-      tax, and banking status in App Store Connect.
+- [x] Connect the Apple Developer team, allow Xcode-managed App Store signing
+      for `com.ismaeel.workloop`, accept the required App Store Connect
+      agreement, and export the 1.0.0 (1) App Store IPA successfully.
 - [ ] Use the same public version on both stores; build numbers may differ but
       must always increase.
 
@@ -219,8 +279,9 @@ Before submission:
       read-only launch behavior.
 - [ ] Supply a dedicated review account with realistic, non-personal sample
       data and working public-profile/booking flows.
-- [ ] Add review notes explaining why contacts/calendar are optional imports
-      and that financial records are tracking records, not payment processing.
+- [ ] Add review notes explaining why contacts/calendar are optional imports,
+      that Money always supports manual operational records, and whether the
+      exact submitted build has the default-off Stripe capability enabled.
 
 ## Release commands
 
@@ -257,9 +318,14 @@ profile build, verify native-library packaging with the SDK's
 For the signed store artifacts:
 
 ```bash
-flutter build appbundle --release --dart-define-from-file=.env
-flutter build ipa --release --dart-define-from-file=.env
+RUN_SIGNED_BUILDS=true RELEASE_EXPECTED_SHA=<reviewed-full-commit-sha> scripts/qa_all.sh
 ```
+
+The signed-build path fails on every tracked or untracked worktree change,
+rejects tracked Android signing material and stale target AAB/IPA files,
+verifies the expected commit, and records commit/version/toolchain plus each
+new artifact's byte size and SHA-256 under `build/release/`. Keep that
+provenance beside the candidate artifacts and store-upload record.
 
 The Android release command is expected to fail immediately until a valid
 production keystore is configured. Never work around that guard with a debug or
@@ -276,12 +342,12 @@ Test at minimum:
 - Portrait layout on every launch device. iPad is excluded by the iOS target
   family; Android tablet compatibility needs an explicit Play/device decision.
   Landscape must not be implied by store media.
-- The fixed dark appearance, reduced motion, VoiceOver, and TalkBack.
+- System, Light, and Dark appearances, reduced motion, VoiceOver, and TalkBack.
 - Fresh install, sign-up, password recovery, interrupted onboarding, sign-out,
   returning session, and offline/error recovery.
 - Empty, realistic, and high-volume workspaces.
-- UK daylight-saving transition, month-end recurrence, and cross-midnight
-  bookings.
+- UK daylight-saving transition and cross-midnight bookings, plus read-only
+  rendering of any legacy recurring records.
 - Contacts/calendar permission accepted, denied, and later revoked.
 - Task and booking reminder permission accepted, denied, later revoked,
   rescheduled after record changes, restored after app/device restart, and
@@ -297,3 +363,141 @@ Test at minimum:
 Ship only when every repository gate passes and every external blocker has a
 named owner. A feature that is not operationally connected must be described
 honestly or removed from the release surface.
+
+## 2026-08-11 Stripe and TestFlight gates
+
+- [x] Deploy authenticated `stripe-payments` v3 in Stripe test mode.
+- [x] Verify Flutter analysis, 359 Flutter tests, Stripe Deno checks, Android
+      native compilation, and unauthenticated Edge Function rejection.
+- [x] Enable Sign in with Apple for the Workloop App ID.
+- [x] Enable Supabase breached-password checks, strong password policy, TOTP,
+      bounded sessions, refresh-token replay detection, MFA-aware RLS and
+      mandatory database SSL; security advisor is clear.
+- [x] Create the App Store Connect Workloop record for `com.ismaeel.workloop`
+      (Apple app ID `6800472527`).
+- [x] Add the Apple Developer account to Xcode, regenerate signing profiles and
+      export a valid 34.3 MB App Store/TestFlight IPA.
+- [x] Create the automatically distributed `Workloop Internal Beta` TestFlight
+      group. Build 1's upload exposed missing camera/photo-library purpose
+      strings from the file-import dependency; build 2 includes the fix, passed
+      processing, and is attached to the group as `Ready to Submit`.
+- [ ] Build 3 is a locally archived and signature-verified owned-domain
+      candidate. Its upload was stopped before acceptance at the owner's request;
+      App Store Connect still lists only builds 1 and 2. Do not upload another
+      build until the remaining app work is complete and the owner explicitly
+      approves it.
+- [ ] Google OAuth is configured, enabled and redirect-tested for the owner in
+      consent-screen testing mode. Test existing-email identity linking and
+      publish the consent screen before a wider external cohort.
+- [ ] Verified custom SMTP delivered a real Supabase password-recovery email.
+      Confirm fresh signup, confirmation and secure password-change delivery
+      with an external beta address before invitations begin.
+- [ ] Confirm a fresh Pro scheduled backup appears after 8 August 2026. Decide
+      separately whether the paid point-in-time recovery add-on is justified.
+- [x] Review and submit the Apple Tap to Pay entitlement request.
+- [ ] Await Apple approval, then obtain both development and distribution
+      entitlement support before adding the proximity-reader entitlement.
+- [x] Complete Stripe platform identity verification; the dashboard also
+      confirms business verification complete.
+- [x] Review and submit the public `@workloopapp` Stripe profile, including the
+      public business contact details.
+- [x] Confirm the direct-charge Connect model and Stripe Connect Platform
+      Agreement in the dashboard.
+- [x] Deploy and verify the public payment setup, success and cancellation
+      handoff routes; all four production URLs return HTTP 200.
+- [x] Configure the production connected-account webhook and store its signing
+      secret plus all four public handoff URLs in Supabase.
+- [x] Remove the approved test-only Stripe state, install the authenticated live
+      Stripe API key and set `STRIPE_LIVE_MODE_ALLOWED=true` during an explicit,
+      supervised cutover. The payment tables are empty after cleanup.
+- [x] Verify the live credential against the expected Stripe platform account
+      and prove the payment function reaches its HTTP 401 authentication
+      boundary rather than the HTTP 503 live-mode block.
+- [x] Deploy `stripe-payments` v8 so Stripe platform-profile failures return a
+      stable, non-sensitive public error; normalize Edge Function failures in
+      Flutter and render them with the shared inline error component. The live
+      platform's account creation and onboarding path now uses Accounts v2 with
+      the Merchant configuration rather than deprecated v1 account types.
+- [x] Retry the deployed Accounts v2 onboarding path from the authenticated app
+      and verify the live connected-account row. The account is pending hosted
+      onboarding with charges and payouts disabled until requirements are met.
+- [ ] Complete Stripe-hosted onboarding, refresh Workloop status and verify the
+      connected-account webhook before treating collection as operational.
+- [x] Owner reviewed and accepted Stripe's negative-balance liability and ongoing
+      seller-compliance acknowledgements. These create financial, reserve,
+      risk-monitoring and connected-account communication responsibilities;
+      Stripe records both as completed on 12 August 2026.
+- [ ] Perform a real-device test-mode matrix: onboarding, payment link success
+      and cancel, Tap to Pay, receipt delivery, full/partial refund, dispute and
+      interrupted-network retry.
+- [ ] Perform one tightly bounded live-money smoke payment and refund after all
+      preceding gates pass.
+
+## 2026-08-12 release-candidate audit gate
+
+- Local static analysis and all 360 Flutter unit/widget tests passed before this
+  documentation/QA remediation. `git diff --check` was also clean.
+- The current signed-out iOS simulator integration journey is **red**: on the
+  402 x 874 iPhone 17 Pro simulator the Auth mode toggle is below the tappable
+  viewport, so the tap misses and the expected Create-account state never
+  appears. This is a beta blocker until fixed and rerun on the exact candidate.
+- The current database inventory contains 51 schema/security, 16 isolation and
+  15 privileged-MFA/payment-retention assertions (82 total). They are authored,
+  not passed: Docker, Supabase CLI and
+  a clean replay result were unavailable in this local audit.
+- The guarded two-account staging test now attempts read, insert, update and
+  delete isolation across contacts, services, appointments, invoices and line
+  items, expenses, tasks and checklists, notes, notifications, booking requests,
+  push tokens and calendar-sync accounts, while recording owner-cleanup rows
+  and refusing production/write execution by default. It still needs a passing
+  disposable-staging run on the release SHA.
+- `scripts/qa_release_candidate.sh` is now the signed-artifact boundary. The
+  signed-build path also rejects stale target AAB/IPA files and records the
+  size and SHA-256 of each artifact produced after the clean-SHA preflight. The
+  present working tree is intentionally dirty with in-progress owner work, so
+  that preflight must fail and no signed artifact from this tree is a candidate.
+- Build 3 remains locally archived/signature-verified but was not accepted by
+  App Store Connect. It also predates current source/backend payment changes and
+  must not be uploaded as the beta candidate.
+
+Release position: source confidence is strong enough for continued developer
+testing only. A small invitation-only beta should wait for the red Auth journey,
+clean replay/82 pgTAP checks, disposable staging E2E/isolation, fresh external
+Auth lifecycle, support/legal operation and current signed-artifact provenance.
+Physical Android, accessibility, performance/load, crash observability, Stripe
+onboarding/payment/refund and full store operation remain public-launch gates.
+
+## 2026-08-12 remediation verification gate
+
+The current local remediation supersedes the failed signed-out Auth result in
+the preceding audit section:
+
+- [x] The first-run Create account action is visible without scrolling and the
+      signed-out iPhone 17 Pro simulator journey passes.
+- [x] Formatting is clean across 220 Dart files, analysis is clean, and all
+      371 Flutter unit/widget/golden tests pass with 52.84% line coverage.
+- [x] The 27 protected golden scenarios pass after visual review of the
+      intentional Auth and Business compact-layout changes.
+- [x] Deno formatting/lint, all eight Edge entry-point checks, and 30/30 Deno
+      tests pass using Deno 2.9.5.
+- [x] Four deterministic data profiles pass in dry-run mode.
+- [x] The signed iOS profile build passes at 71.3 MB and strict code-sign
+      verification succeeds.
+- [x] The same signed profile installs and launches on the paired iPhone 15 Pro
+      Max; CoreDevice confirms the running process. Manual workflow and
+      VoiceOver coverage remain open.
+- [x] The Android profile APK passes at 158.7 MB, 16 KB alignment, and v2
+      signature verification. The profile signature is intentionally a debug
+      certificate and is not a store credential.
+- [x] The web release build passes.
+- [ ] Run the clean migration replay and all 82 pgTAP assertions. No local
+      Docker, Postgres, or Supabase CLI runtime is available.
+- [ ] Run core, public-booking, expanded two-user isolation, Stripe test-mode
+      offboarding, and deletion journeys against a disposable non-production
+      project. The connected Supabase account exposes production only.
+- [ ] Freeze the reviewed work in a clean commit/tag, rerun this gate against
+      that SHA, produce a fresh IPA, upload it, and install the TestFlight copy.
+
+Production migrations and Edge Functions were deliberately not changed from a
+dirty local tree. The release-candidate preflight exits 78 until every tracked
+and untracked change is intentionally resolved.

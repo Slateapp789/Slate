@@ -3,21 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workloop/core/theme/app_theme.dart';
-import 'package:workloop/features/appointments/appointments_screen.dart';
+import 'package:workloop/features/business/business_screen.dart';
 import 'package:workloop/features/clients/clients_screen.dart';
 import 'package:workloop/features/finance/finance_screen.dart';
-import 'package:workloop/features/more/more_screen.dart';
 import 'package:workloop/features/public_profile/booking_requests_screen.dart';
+import 'package:workloop/features/work/work_screen.dart';
+import 'package:workloop/features/settings/providers/settings_providers.dart';
 import 'package:workloop/shared/providers/appointments_provider.dart';
 import 'package:workloop/shared/providers/clients_provider.dart';
 import 'package:workloop/shared/providers/finance_provider.dart';
 import 'package:workloop/shared/providers/notes_provider.dart';
 import 'package:workloop/shared/providers/tasks_provider.dart';
 import 'package:workloop/shared/providers/workspace_settings_provider.dart';
+import 'package:workloop/shared/providers/workspace_provider.dart';
 import 'package:workloop/shared/widgets/slate_ui.dart';
 
 void main() {
-  testWidgets('shell page headers share one safe-area top position', (
+  testWidgets('shell page headers begin inside the safe-area command region', (
     tester,
   ) async {
     final finance = FinanceSummary.from(
@@ -38,16 +40,18 @@ void main() {
       workspaceSettingsProvider.overrideWith(
         (ref) async => const {'revenue_target': 5000},
       ),
+      workspaceProvider.overrideWith(
+        (ref) async => const {'id': 'workspace-1', 'name': 'Workloop Studio'},
+      ),
+      settingsBusinessProfileProvider.overrideWith((ref) async => null),
+      settingsWorkspaceSettingsProvider.overrideWith((ref) async => const {}),
+      settingsServicesProvider.overrideWith((ref) async => const []),
     ];
     final screens = <String, Widget>{
       'Clients': const ClientsScreen(),
-      'Bookings': const AppointmentsScreen(),
+      'Work': const WorkScreen(),
       'Money': const FinanceScreen(),
-      'Tools': MoreScreen(
-        onOpenMoney: () {},
-        onOpenTasks: () {},
-        onOpenNotes: () {},
-      ),
+      'Business': const BusinessScreen(),
     };
     final topPositions = <String, double>{};
 
@@ -80,14 +84,28 @@ void main() {
           .getTopLeft(find.byType(WorkloopPageHeader))
           .dy;
       expect(tester.takeException(), isNull);
+
+      if (screen.key != 'Business') {
+        expect(
+          tester.getSize(find.byType(WorkloopTopAction)),
+          const Size.square(46),
+          reason: '${screen.key} must use the canonical feature plus action',
+        );
+      }
     }
 
     final expectedTop = 47 + AppSpacing.screenTop;
     for (final position in topPositions.entries) {
       expect(
         position.value,
-        moreOrLessEquals(expectedTop, epsilon: 0.01),
-        reason: '${position.key} header drifted from the shell grid',
+        greaterThanOrEqualTo(expectedTop),
+        reason: '${position.key} header entered the unsafe region',
+      );
+      expect(
+        position.value,
+        lessThanOrEqualTo(expectedTop + AppSpacing.xl),
+        reason:
+            '${position.key} header drifted below the Studio command region',
       );
     }
   });

@@ -11,6 +11,7 @@ import 'package:workloop/features/onboarding/screens/ob_first_booking.dart';
 import 'package:workloop/features/onboarding/screens/ob_hours.dart';
 import 'package:workloop/features/onboarding/screens/ob_revenue_target.dart';
 import 'package:workloop/features/onboarding/screens/ob_services.dart';
+import 'package:workloop/features/onboarding/screens/ob_welcome.dart';
 
 Future<void> _pumpOnboardingScreen(WidgetTester tester, Widget screen) async {
   SharedPreferencesAsyncPlatform.instance =
@@ -39,6 +40,26 @@ Future<void> _pumpOnboardingScreen(WidgetTester tester, Widget screen) async {
 }
 
 void main() {
+  testWidgets(
+    'welcome explains the operating loop on a compact large-text phone',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      await _pumpOnboardingScreen(tester, ObWelcome(onNext: () {}));
+
+      expect(
+        find.bySemanticsLabel(
+          'Workloop operating loop: client, booking, work, payment, repeat.',
+        ),
+        findsOneWidget,
+      );
+      await tester.scrollUntilVisible(find.text('Get started'), 160);
+      expect(find.text('Get started'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      semantics.dispose();
+    },
+  );
+
   testWidgets('working hours remain usable on a small phone at large text', (
     tester,
   ) async {

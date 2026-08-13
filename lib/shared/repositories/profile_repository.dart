@@ -109,6 +109,25 @@ class ProfileRepository {
     return rows.map<BookingRequest>(BookingRequest.fromMap).toList();
   }
 
+  Future<List<BookingRequest>> pendingBookingRequestsForBusinessFeed(
+    String workspaceId, {
+    int limit = 8,
+  }) async {
+    final rows = await _client
+        .from('booking_requests')
+        .select('*, services(name, duration_mins, price)')
+        .eq('workspace_id', workspaceId)
+        .eq('status', 'pending')
+        .order('created_at', ascending: false)
+        .order('id', ascending: true)
+        .limit(limit);
+    return rows
+        .map<BookingRequest>(
+          (row) => BookingRequest.fromMap(Map<String, dynamic>.from(row)),
+        )
+        .toList();
+  }
+
   Future<void> updateBookingRequestStatus({
     required String requestId,
     required String workspaceId,

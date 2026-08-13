@@ -13,17 +13,17 @@ import 'core/theme/workloop_font_license.dart';
 import 'core/supabase/supabase_config.dart';
 import 'core/workloop_app_info.dart';
 import 'features/auth/auth_screen.dart';
+import 'features/auth/mfa_screens.dart';
 import 'features/auth/password_recovery_screen.dart';
 import 'features/business_feed/business_feed_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/clients/clients_screen.dart';
 import 'features/clients/add_client_screen.dart';
-import 'features/appointments/appointments_screen.dart';
 import 'features/appointments/add_appointment_screen.dart';
+import 'features/business/business_screen.dart';
 import 'features/finance/finance_screen.dart';
-import 'features/notes/notes_screen.dart';
-import 'features/tasks/tasks_screen.dart';
-import 'features/more/more_screen.dart';
+import 'features/work/work_screen.dart';
+import 'features/work/work_workspace_switcher.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/calendar_sync/calendar_sync_screen.dart';
 import 'features/imports/import_data_screen.dart';
@@ -31,6 +31,8 @@ import 'features/notifications/notifications_screen.dart';
 import 'features/public_profile/booking_requests_screen.dart';
 import 'features/public_profile/public_profile_screen.dart';
 import 'shared/providers/debug_demo_data_provider.dart';
+import 'shared/providers/appointments_provider.dart';
+import 'shared/providers/dashboard_provider.dart';
 import 'shared/providers/theme_mode_provider.dart';
 import 'shared/providers/workspace_provider.dart';
 import 'shared/notifications/local_reminder_bootstrap.dart';
@@ -56,7 +58,7 @@ void main() async {
   final appInfoFuture = WorkloopAppInfo.initialize();
   await Supabase.initialize(
     url: SupabaseConfig.supabaseUrl,
-    publishableKey: SupabaseConfig.supabaseAnonKey,
+    publishableKey: SupabaseConfig.supabasePublishableKey,
   );
   await appInfoFuture;
   final remaining = remainingLaunchDuration(launchClock.elapsed);
@@ -73,12 +75,14 @@ class WorkloopApp extends ConsumerStatefulWidget {
   ConsumerState<WorkloopApp> createState() => _WorkloopAppState();
 }
 
-class _WorkloopAppState extends ConsumerState<WorkloopApp> {
+class _WorkloopAppState extends ConsumerState<WorkloopApp>
+    with WidgetsBindingObserver {
   StreamSubscription<AuthState>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
       state,
     ) {
@@ -91,25 +95,43 @@ class _WorkloopAppState extends ConsumerState<WorkloopApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authSubscription?.cancel();
     super.dispose();
   }
 
   @override
+  void didChangePlatformBrightness() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     final appearance = ref.watch(workloopAppearanceProvider);
+    final themeMode = appearance.value?.themeMode ?? ThemeMode.system;
+    final effectiveBrightness = WorkloopLegacyPalette.resolve(
+      themeMode: themeMode,
+      platformBrightness:
+          WidgetsBinding.instance.platformDispatcher.platformBrightness,
+    );
+
+    // Legacy adaptive colours must resolve before MaterialApp builds its child
+    // tree. Synchronising inside MaterialApp.builder is one frame too late: the
+    // new theme reaches the screen while legacy icon chips still paint with the
+    // outgoing appearance until another rebuild.
+    WorkloopLegacyPalette.sync(effectiveBrightness);
+
     return MaterialApp.router(
       title: 'Workloop',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: appearance.value?.themeMode ?? ThemeMode.system,
+      themeMode: themeMode,
       themeAnimationDuration: Duration.zero,
       scrollBehavior: const WorkloopScrollBehavior(),
       routerConfig: _router,
       builder: (context, child) {
         final brightness = Theme.of(context).brightness;
-        WorkloopLegacyPalette.sync(brightness);
         final overlayStyle = brightness == Brightness.dark
             ? SystemUiOverlayStyle.light.copyWith(
                 statusBarColor: Colors.transparent,
@@ -147,6 +169,11 @@ final _router = GoRouter(
     GoRoute(
       path: '/reset-password',
       builder: (context, state) => const PasswordRecoveryScreen(),
+    ),
+    GoRoute(
+      path: '/security/2fa',
+      builder: (context, state) =>
+          const AuthGate(authenticatedChild: MfaSetupScreen()),
     ),
     GoRoute(path: '/onboarding', builder: (context, state) => const AuthGate()),
     GoRoute(
@@ -262,6 +289,14 @@ class _AuthGateState extends ConsumerState<AuthGate> {
           });
         }
         if (session == null) return const AuthScreen();
+        final assurance = Supabase.instance.client.auth.mfa
+            .getAuthenticatorAssuranceLevel();
+        final needsMfa =
+            assurance.currentLevel == AuthenticatorAssuranceLevels.aal1 &&
+            assurance.nextLevel == AuthenticatorAssuranceLevels.aal2;
+        if (needsMfa) {
+          return MfaChallengeScreen(onVerified: () => setState(() {}));
+        }
         return WorkspaceGate(child: widget.authenticatedChild);
       },
     );
@@ -293,8 +328,58 @@ class WorkspaceGate extends ConsumerWidget {
         if (kDebugMode && seedDemoData) {
           ref.watch(debugDemoSeedProvider);
         }
-        return child;
+        final destination = child;
+        final opensOnDashboard =
+            destination is MainShell && destination.initialIndex == 0;
+        return opensOnDashboard ? _DashboardInitialGate(child: child) : child;
       },
+    );
+  }
+}
+
+class _DashboardInitialGate extends ConsumerStatefulWidget {
+  final Widget child;
+
+  const _DashboardInitialGate({required this.child});
+
+  @override
+  ConsumerState<_DashboardInitialGate> createState() =>
+      _DashboardInitialGateState();
+}
+
+class _DashboardInitialGateState extends ConsumerState<_DashboardInitialGate> {
+  bool _opened = false;
+  bool _revealScheduled = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final appointments = ref.watch(appointmentsProvider);
+    final attention = ref.watch(dashboardAttentionProvider);
+    final sourcesSettled =
+        (appointments.hasValue || appointments.hasError) &&
+        (attention.hasValue || attention.hasError);
+
+    if (!_opened && sourcesSettled && !_revealScheduled) {
+      _revealScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _opened = true);
+      });
+    }
+
+    return AnimatedSwitcher(
+      duration: AppMotion.responsive(context, AppMotion.standard),
+      switchInCurve: AppMotion.curve,
+      switchOutCurve: Curves.easeOut,
+      child: _opened
+          ? KeyedSubtree(
+              key: const ValueKey('dashboard-ready'),
+              child: widget.child,
+            )
+          : const KeyedSubtree(
+              key: ValueKey('dashboard-opening'),
+              child: _LoadingScreen(),
+            ),
     );
   }
 }
@@ -309,18 +394,18 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   late int _currentIndex;
-  int? _secondaryReturnIndex;
   FinanceInitialFocus _financeInitialFocus = FinanceInitialFocus.top;
-  int _moneyCreateRequest = 0;
-  int _taskCreateRequest = 0;
-  int _noteCreateRequest = 0;
+  late final ValueNotifier<WorkWorkspaceSection> _workSectionController;
   late final List<Widget?> _destinations;
   late final List<ScrollController> _navigationScrollControllers;
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
+    _currentIndex = _shellDestination(widget.initialIndex);
+    _workSectionController = ValueNotifier(
+      _workSectionForDestination(widget.initialIndex),
+    );
     _destinations = List<Widget?>.filled(7, null);
     _navigationScrollControllers = List<ScrollController>.generate(
       7,
@@ -331,6 +416,7 @@ class _MainShellState extends State<MainShell> {
 
   @override
   void dispose() {
+    _workSectionController.dispose();
     for (final controller in _navigationScrollControllers) {
       controller.dispose();
     }
@@ -345,31 +431,27 @@ class _MainShellState extends State<MainShell> {
             _navigateTo(3, financeFocus: FinanceInitialFocus.followUps),
       ),
       1 => const ClientsScreen(),
-      2 => const AppointmentsScreen(),
-      3 => FinanceScreen(
-        initialFocus: _financeInitialFocus,
-        createRequest: _moneyCreateRequest,
-      ),
-      4 => TasksScreen(createRequest: _taskCreateRequest),
-      5 => NotesScreen(
-        showBackButton: false,
-        createRequest: _noteCreateRequest,
-      ),
-      6 => MoreScreen(
-        onOpenMoney: () => _navigateTo(3),
-        onOpenTasks: () => _navigateTo(4),
-        onOpenNotes: () => _navigateTo(5),
-        onCreateMoney: _createMoneyFromTools,
-        onCreateTask: _createTaskFromTools,
-        onCreateNote: _createNoteFromTools,
-      ),
+      2 => WorkScreen(sectionController: _workSectionController),
+      3 => FinanceScreen(initialFocus: _financeInitialFocus),
+      4 || 5 => const SizedBox.shrink(),
+      6 => const BusinessScreen(),
       _ => const SizedBox.shrink(),
     };
   }
 
   Object _navigationScopeId(int index) => 'main-shell-$index';
 
-  bool _isSecondaryWorkspace(int index) => index >= 3 && index <= 5;
+  int _shellDestination(int destination) => switch (destination) {
+    4 || 5 => 2,
+    _ => destination,
+  };
+
+  WorkWorkspaceSection _workSectionForDestination(int destination) =>
+      switch (destination) {
+        4 => WorkWorkspaceSection.tasks,
+        5 => WorkWorkspaceSection.notes,
+        _ => WorkWorkspaceSection.schedule,
+      };
 
   @override
   void didChangeDependencies() {
@@ -385,6 +467,10 @@ class _MainShellState extends State<MainShell> {
     int index, {
     FinanceInitialFocus financeFocus = FinanceInitialFocus.top,
   }) {
+    if (index == 2 || index == 4 || index == 5) {
+      _workSectionController.value = _workSectionForDestination(index);
+      index = 2;
+    }
     if (index == 3 && _financeInitialFocus != financeFocus) {
       _financeInitialFocus = financeFocus;
       _destinations[3] = FinanceScreen(initialFocus: financeFocus);
@@ -392,11 +478,6 @@ class _MainShellState extends State<MainShell> {
     _ensureDestination(index);
     if (index == _currentIndex) return;
     setState(() {
-      if (_isSecondaryWorkspace(index)) {
-        _secondaryReturnIndex ??= _currentIndex;
-      } else {
-        _secondaryReturnIndex = null;
-      }
       _currentIndex = index;
     });
     WorkloopNavigationAssistRegion.activateScope(
@@ -406,55 +487,14 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  void _returnFromSecondaryWorkspace() {
-    final returnIndex = _secondaryReturnIndex;
-    if (returnIndex == null) return;
-    _navigateTo(returnIndex);
-  }
-
-  void _createMoneyFromTools() {
-    _financeInitialFocus = FinanceInitialFocus.top;
-    _moneyCreateRequest += 1;
-    final request = _moneyCreateRequest;
-    _destinations[3] = FinanceScreen(
-      initialFocus: _financeInitialFocus,
-      createRequest: request,
-    );
-    _navigateTo(3);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _moneyCreateRequest != request) return;
-      setState(() {
-        _destinations[3] = FinanceScreen(initialFocus: _financeInitialFocus);
-      });
-    });
-  }
-
-  void _createTaskFromTools() {
-    _taskCreateRequest += 1;
-    final request = _taskCreateRequest;
-    _destinations[4] = TasksScreen(createRequest: request);
-    _navigateTo(4);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _taskCreateRequest != request) return;
-      setState(() => _destinations[4] = const TasksScreen());
-    });
-  }
-
-  void _createNoteFromTools() {
-    _noteCreateRequest += 1;
-    final request = _noteCreateRequest;
-    _destinations[5] = NotesScreen(
-      showBackButton: false,
-      createRequest: request,
-    );
-    _navigateTo(5);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _noteCreateRequest != request) return;
-      setState(() {
-        _destinations[5] = const NotesScreen(showBackButton: false);
-      });
-    });
-  }
+  int _primaryNavIndexForDestination(int destination) => switch (destination) {
+    0 => 0,
+    1 => 1,
+    2 || 4 || 5 => 2,
+    3 => 3,
+    6 => 4,
+    _ => 0,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -475,17 +515,15 @@ class _MainShellState extends State<MainShell> {
       body: WorkloopInteractiveWorkspaceStack(
         key: const ValueKey('main-shell-tabs'),
         index: _currentIndex,
-        previousIndex: _isSecondaryWorkspace(_currentIndex)
-            ? _secondaryReturnIndex
-            : null,
-        onBack: _returnFromSecondaryWorkspace,
+        previousIndex: null,
+        onBack: () {},
         children: destinationChildren,
       ),
       bottomNavigationBar: WorkloopBottomNav(
-        currentIndex: _currentIndex <= 2 ? _currentIndex : 3,
+        currentIndex: _primaryNavIndexForDestination(_currentIndex),
         items: const [
           WorkloopNavItem(
-            label: 'Home',
+            label: 'Today',
             icon: LucideIcons.home,
             color: AppColors.accentPrimary,
           ),
@@ -495,18 +533,30 @@ class _MainShellState extends State<MainShell> {
             color: AppColors.accentPrimary,
           ),
           WorkloopNavItem(
-            label: 'Bookings',
-            icon: LucideIcons.calendarDays,
+            label: 'Work',
+            icon: LucideIcons.briefcase,
             color: AppColors.accentPrimary,
           ),
           WorkloopNavItem(
-            label: 'Tools',
-            icon: LucideIcons.layoutGrid,
+            label: 'Money',
+            icon: LucideIcons.circlePoundSterling,
+            color: AppColors.accentPrimary,
+          ),
+          WorkloopNavItem(
+            label: 'Business',
+            icon: LucideIcons.store,
             color: AppColors.accentPrimary,
           ),
         ],
         onTap: (i) {
-          final destination = i == 3 ? 6 : i;
+          final destination = switch (i) {
+            0 => 0,
+            1 => 1,
+            2 => 2,
+            3 => 3,
+            4 => 6,
+            _ => 0,
+          };
           if (destination == _currentIndex) return;
           _navigateTo(destination);
         },

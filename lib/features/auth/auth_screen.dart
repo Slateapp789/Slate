@@ -1,12 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../../shared/widgets/workloop_studio_graphics.dart';
+import '../settings/legal_document_screen.dart';
 import 'auth_validation.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
@@ -21,6 +25,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _passwordController = TextEditingController();
   _AuthMode _mode = _AuthMode.login;
   bool _isLoading = false;
+  String? _socialProvider;
   String? _error;
   String? _success;
 
@@ -29,6 +34,50 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _signInWithSocial(String provider) async {
+    if (_isLoading || _socialProvider != null) return;
+    setState(() {
+      _socialProvider = provider;
+      _error = null;
+      _success = null;
+    });
+    try {
+      if (provider == 'apple') {
+        await ref.read(authRepositoryProvider).signInWithApple();
+        if (mounted) context.go('/');
+      } else {
+        final opened = await ref
+            .read(authRepositoryProvider)
+            .signInWithGoogle();
+        if (!opened) {
+          throw const AuthException('Could not open Google sign in.');
+        }
+        if (mounted) {
+          setState(() {
+            _success =
+                'Finish signing in with Google, then return to Workloop.';
+          });
+        }
+      }
+    } on SignInWithAppleAuthorizationException catch (error) {
+      if (error.code != AuthorizationErrorCode.canceled && mounted) {
+        setState(
+          () => _error = 'Apple sign in could not be completed. Try again.',
+        );
+      }
+    } on AuthException catch (error) {
+      if (mounted) {
+        setState(() => _error = friendlyAuthErrorMessage(error.message));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Sign in could not be completed. Try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _socialProvider = null);
+    }
   }
 
   Future<void> _submit() async {
@@ -121,6 +170,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
+                final compactHeight = constraints.maxHeight < 700;
                 return SingleChildScrollView(
                   padding: const EdgeInsets.all(AppSpacing.pageX),
                   child: ConstrainedBox(
@@ -132,26 +182,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Spacer(),
-                            Container(
-                              width: 54,
-                              height: 54,
-                              decoration: BoxDecoration(
-                                color: AppColors.t1.withValues(alpha: 0.07),
-                                borderRadius: BorderRadius.circular(
-                                  AppRadius.lg,
-                                ),
-                                border: Border.all(
-                                  color: AppColors.t1.withValues(alpha: 0.09),
-                                ),
-                              ),
-                              child: const Icon(
-                                LucideIcons.layers,
-                                color: AppColors.accentPrimary,
-                                size: 24,
-                              ),
+                            _AuthBrandPanel(compact: compactHeight),
+                            SizedBox(
+                              height: compactHeight
+                                  ? AppSpacing.lg
+                                  : AppSpacing.xxl,
                             ),
-                            const SizedBox(height: AppSpacing.lg),
                             AnimatedSwitcher(
                               duration: AppMotion.responsive(
                                 context,
@@ -161,8 +197,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                 _mode.title,
                                 key: ValueKey(_mode),
                                 style: const TextStyle(
-                                  fontSize: 30,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w700,
                                   color: AppColors.t1,
                                   letterSpacing: 0,
                                   height: 1.05,
@@ -177,7 +213,26 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                 color: AppColors.t3,
                               ),
                             ),
-                            const Spacer(),
+                            if (_mode == _AuthMode.login) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton(
+                                  key: const ValueKey('auth-first-run-cta'),
+                                  onPressed: () => _setMode(_AuthMode.signup),
+                                  style: TextButton.styleFrom(
+                                    minimumSize: const Size(44, 44),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.xs,
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'New to Workloop? Create account',
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: AppSpacing.xl),
                             _SlateTextField(
                               controller: _emailController,
                               hint: 'Email address',
@@ -207,7 +262,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               if (_mode == _AuthMode.signup) ...[
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Use at least 8 characters.',
+                                  'Use $minimumWorkloopPasswordLength+ characters with uppercase, lowercase, a number, and a symbol.',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: AppColors.t3,
@@ -231,6 +286,53 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               icon: _isLoading ? null : LucideIcons.arrowRight,
                               onPressed: _isLoading ? null : _submit,
                             ),
+                            if (_mode != _AuthMode.reset) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              _AuthLegalNotice(
+                                onOpen: (document) => Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => LegalDocumentScreen(
+                                      document: document,
+                                      backSemanticLabel:
+                                          'Back to account access',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              const _AuthDivider(),
+                              const SizedBox(height: AppSpacing.md),
+                              if (!kIsWeb &&
+                                  defaultTargetPlatform ==
+                                      TargetPlatform.iOS) ...[
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 50,
+                                  child: SignInWithAppleButton(
+                                    key: const ValueKey('auth-apple'),
+                                    onPressed: _socialProvider == null
+                                        ? () => _signInWithSocial('apple')
+                                        : () {},
+                                    style: SignInWithAppleButtonStyle.white,
+                                    borderRadius: const BorderRadius.all(
+                                      Radius.circular(AppRadius.md),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                              ],
+                              WorkloopPrimaryButton(
+                                key: const ValueKey('auth-google'),
+                                label: _socialProvider == 'google'
+                                    ? 'Opening Google'
+                                    : 'Continue with Google',
+                                secondary: true,
+                                onPressed: _socialProvider == null
+                                    ? () => _signInWithSocial('google')
+                                    : null,
+                              ),
+                            ],
                             if (_mode == _AuthMode.login) ...[
                               const SizedBox(height: 12),
                               Center(
@@ -260,7 +362,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                     key: ValueKey('auth-toggle-$_mode'),
                                     text: TextSpan(
                                       style: TextStyle(
-                                        fontFamily: 'Instrument Sans',
+                                        fontFamily: 'Manrope',
                                         fontSize: 14,
                                         color: AppColors.t3,
                                       ),
@@ -290,6 +392,167 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AuthDivider extends StatelessWidget {
+  const _AuthDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: [
+        Expanded(child: Divider(color: AppColors.border)),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          child: Text(
+            'OR',
+            style: TextStyle(
+              color: AppColors.t3,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        Expanded(child: Divider(color: AppColors.border)),
+      ],
+    );
+  }
+}
+
+class _AuthLegalNotice extends StatelessWidget {
+  final ValueChanged<WorkloopLegalDocument> onOpen;
+
+  const _AuthLegalNotice({required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final linkStyle = TextButton.styleFrom(
+      minimumSize: const Size(44, 44),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      textStyle: const TextStyle(
+        fontFamily: 'Manrope',
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+    return Semantics(
+      container: true,
+      child: Column(
+        children: [
+          const Text(
+            'By continuing, you agree to Workloop’s terms and acknowledge its privacy policy.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.t3, fontSize: 11, height: 1.35),
+          ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.xxs,
+            children: [
+              TextButton(
+                key: const ValueKey('auth-terms-link'),
+                onPressed: () => onOpen(WorkloopLegalDocument.terms),
+                style: linkStyle,
+                child: const Text('Terms of use'),
+              ),
+              const Text('and', style: TextStyle(color: AppColors.t3)),
+              TextButton(
+                key: const ValueKey('auth-privacy-link'),
+                onPressed: () => onOpen(WorkloopLegalDocument.privacy),
+                style: linkStyle,
+                child: const Text('Privacy policy'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuthBrandPanel extends StatelessWidget {
+  final bool compact;
+
+  const _AuthBrandPanel({this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    final mediaQuery = MediaQuery.of(context);
+    return MediaQuery(
+      // The panel is a graphic brand asset; operational form copy below keeps
+      // the user's full text scale.
+      data: mediaQuery.copyWith(textScaler: TextScaler.noScaling),
+      child: Container(
+        height: compact ? 246 : 258,
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [tokens.accentStrong, tokens.primaryAction],
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          boxShadow: [
+            BoxShadow(
+              color: tokens.accentStrong.withValues(alpha: 0.28),
+              blurRadius: 32,
+              offset: const Offset(0, 16),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -8,
+              top: 28,
+              child: WorkloopStudioLoopMark(
+                size: compact ? 120 : 138,
+                color: tokens.onAccent,
+                secondaryColor: AppColors.modClients,
+              ),
+            ),
+            Positioned.fill(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'WORKLOOP',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      letterSpacing: 1.35,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'Your work,\nin motion.',
+                    style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                      color: Colors.white,
+                      fontSize: 32,
+                      height: 1.05,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Client · Booking · Work · Payment',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.74),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

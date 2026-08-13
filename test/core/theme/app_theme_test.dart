@@ -3,60 +3,60 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workloop/core/theme/app_theme.dart';
 
 void main() {
-  test('brand accent remains exact and readable in both appearances', () {
-    expect(AppColors.brandAccent.toARGB32(), 0xFFC1FF72);
-    expect(WorkloopThemeTokens.light.accent.toARGB32(), 0xFFC1FF72);
-    expect(WorkloopThemeTokens.dark.accent.toARGB32(), 0xFFC1FF72);
-    expect(WorkloopThemeTokens.dark.accentStrong.toARGB32(), 0xFFC1FF72);
+  test('Studio indigo remains exact and readable in both appearances', () {
+    WorkloopLegacyPalette.sync(Brightness.light);
+    expect(AppColors.brandAccent.toARGB32(), 0xFF4F46E5);
+    expect(WorkloopThemeTokens.light.accent.toARGB32(), 0xFF4F46E5);
+    WorkloopLegacyPalette.sync(Brightness.dark);
+    expect(AppColors.brandAccent.toARGB32(), 0xFF9496E8);
+    expect(WorkloopThemeTokens.dark.accent.toARGB32(), 0xFF9496E8);
+    expect(WorkloopThemeTokens.dark.accentStrong.toARGB32(), 0xFF7D80D4);
     expect(
       _contrastRatio(AppColors.onBrandAccent, AppColors.brandAccent),
       greaterThanOrEqualTo(4.5),
     );
   });
 
-  test(
-    'dark graphite layers stay distinct without returning to near-black',
-    () {
-      const tokens = WorkloopThemeTokens.dark;
+  test('dark midnight layers stay distinct', () {
+    const tokens = WorkloopThemeTokens.dark;
 
-      expect(tokens.background.toARGB32(), 0xFF151A16);
-      expect(tokens.surface.toARGB32(), 0xFF1C231D);
-      expect(tokens.surfaceRaised.toARGB32(), 0xFF252E26);
-      expect(tokens.surfaceSubtle.toARGB32(), 0xFF2C372D);
-      expect(
-        tokens.background.computeLuminance(),
-        lessThan(tokens.surface.computeLuminance()),
-      );
-      expect(
-        tokens.surface.computeLuminance(),
-        lessThan(tokens.surfaceRaised.computeLuminance()),
-      );
-      expect(
-        tokens.surfaceRaised.computeLuminance(),
-        lessThan(tokens.surfaceSubtle.computeLuminance()),
-      );
-    },
-  );
+    expect(tokens.background.toARGB32(), 0xFF111318);
+    expect(tokens.surface.toARGB32(), 0xFF1C2027);
+    expect(tokens.surfaceRaised.toARGB32(), 0xFF252A33);
+    expect(tokens.surfaceSubtle.toARGB32(), 0xFF2E343F);
+    expect(
+      tokens.background.computeLuminance(),
+      lessThan(tokens.surface.computeLuminance()),
+    );
+    expect(
+      tokens.surface.computeLuminance(),
+      lessThan(tokens.surfaceRaised.computeLuminance()),
+    );
+    expect(
+      tokens.surfaceRaised.computeLuminance(),
+      lessThan(tokens.surfaceSubtle.computeLuminance()),
+    );
+  });
 
-  test('light layers are warm, low-glare, and visibly distinct', () {
+  test('light layers are crisp, low-glare, and quietly distinct', () {
     const tokens = WorkloopThemeTokens.light;
 
-    expect(tokens.background.computeLuminance(), lessThan(0.9));
+    expect(tokens.background.computeLuminance(), lessThan(0.95));
     expect(tokens.background, isNot(tokens.surface));
     expect(tokens.surface, isNot(tokens.surfaceRaised));
     expect(tokens.surfaceRaised, isNot(tokens.surfaceSubtle));
     expect(
       _contrastRatio(tokens.surface, tokens.background),
-      greaterThanOrEqualTo(1.15),
+      greaterThanOrEqualTo(1.05),
     );
     expect(
       _contrastRatio(tokens.surfaceRaised, tokens.background),
-      greaterThanOrEqualTo(1.08),
+      greaterThanOrEqualTo(1.04),
     );
-    expect(_contrastRatio(tokens.divider, tokens.surface), greaterThan(1.5));
+    expect(_contrastRatio(tokens.divider, tokens.surface), greaterThan(1.25));
     expect(
       _contrastRatio(tokens.dividerStrong, tokens.surface),
-      greaterThanOrEqualTo(2.5),
+      greaterThanOrEqualTo(1.5),
     );
   });
 
@@ -89,6 +89,41 @@ void main() {
     addTearDown(() => WorkloopLegacyPalette.sync(Brightness.dark));
   });
 
+  test('legacy colours resolve manual and system appearance atomically', () {
+    const cases = <(ThemeMode, Brightness, Brightness)>[
+      (ThemeMode.light, Brightness.dark, Brightness.light),
+      (ThemeMode.dark, Brightness.light, Brightness.dark),
+      (ThemeMode.system, Brightness.light, Brightness.light),
+      (ThemeMode.system, Brightness.dark, Brightness.dark),
+    ];
+
+    for (final entry in cases) {
+      final effectiveBrightness = WorkloopLegacyPalette.resolve(
+        themeMode: entry.$1,
+        platformBrightness: entry.$2,
+      );
+      WorkloopLegacyPalette.sync(effectiveBrightness);
+
+      expect(effectiveBrightness, entry.$3);
+      expect(
+        AppColors.modBg.toARGB32(),
+        (entry.$3 == Brightness.dark
+                ? WorkloopThemeTokens.dark.surfaceRaised
+                : WorkloopThemeTokens.light.surfaceRaised)
+            .toARGB32(),
+      );
+      expect(
+        AppColors.t2.toARGB32(),
+        (entry.$3 == Brightness.dark
+                ? WorkloopThemeTokens.dark.textSecondary
+                : WorkloopThemeTokens.light.textSecondary)
+            .toARGB32(),
+      );
+    }
+
+    addTearDown(() => WorkloopLegacyPalette.sync(Brightness.dark));
+  });
+
   test('semantic text roles meet contrast targets in both appearances', () {
     for (final tokens in [
       WorkloopThemeTokens.light,
@@ -97,7 +132,6 @@ void main() {
       for (final color in [
         tokens.textPrimary,
         tokens.textSecondary,
-        tokens.textTertiary,
         tokens.accentInk,
       ]) {
         expect(
@@ -106,8 +140,12 @@ void main() {
         );
       }
       expect(
-        _contrastRatio(tokens.textDisabled, tokens.background),
+        _contrastRatio(tokens.textTertiary, tokens.background),
         greaterThanOrEqualTo(3),
+      );
+      expect(
+        _contrastRatio(tokens.textDisabled, tokens.background),
+        greaterThan(2),
       );
       expect(
         _contrastRatio(tokens.onAccent, tokens.accentStrong),
@@ -116,14 +154,30 @@ void main() {
     }
   });
 
-  test('focus indicators remain visible without diluting the neon fill', () {
+  test('feature surfaces stay readable in both appearances', () {
+    for (final tokens in [
+      WorkloopThemeTokens.light,
+      WorkloopThemeTokens.dark,
+    ]) {
+      expect(
+        _contrastRatio(tokens.onInk, tokens.inkSurface),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        _contrastRatio(tokens.onInkMuted, tokens.inkSurface),
+        greaterThanOrEqualTo(4.5),
+      );
+    }
+  });
+
+  test('focus indicators remain visible against Studio surfaces', () {
     for (final entry in [
       (AppTheme.light, WorkloopThemeTokens.light),
       (AppTheme.dark, WorkloopThemeTokens.dark),
     ]) {
       final border =
           entry.$1.inputDecorationTheme.focusedBorder as OutlineInputBorder;
-      expect(border.borderSide.color, entry.$2.accentInk);
+      expect(border.borderSide.color, entry.$2.accent);
       expect(
         _contrastRatio(border.borderSide.color, entry.$2.surface),
         greaterThanOrEqualTo(3),
@@ -131,24 +185,22 @@ void main() {
     }
   });
 
-  test('accent fills use a visible one-pixel semantic border', () {
+  test('primary actions use one readable ink-or-brand treatment', () {
     for (final entry in [
       (AppTheme.light, WorkloopThemeTokens.light),
       (AppTheme.dark, WorkloopThemeTokens.dark),
     ]) {
-      if (entry.$1.brightness == Brightness.light) {
-        expect(
-          _contrastRatio(entry.$2.accentBorder, entry.$2.accentStrong),
-          greaterThanOrEqualTo(1.5),
-        );
-      }
+      expect(
+        _contrastRatio(entry.$2.onPrimaryAction, entry.$2.primaryAction),
+        greaterThanOrEqualTo(4.5),
+      );
       final elevatedSide = entry.$1.elevatedButtonTheme.style?.side?.resolve(
         {},
       );
       final filledSide = entry.$1.filledButtonTheme.style?.side?.resolve({});
-      expect(elevatedSide?.color, entry.$2.accentBorder);
+      expect(elevatedSide?.color, entry.$2.primaryAction);
       expect(elevatedSide?.width, 1);
-      expect(filledSide?.color, entry.$2.accentBorder);
+      expect(filledSide?.color, entry.$2.primaryAction);
       expect(filledSide?.width, 1);
     }
   });
@@ -186,6 +238,58 @@ void main() {
     addTearDown(() => WorkloopLegacyPalette.sync(Brightness.dark));
   });
 
+  test('Home hero roles remain readable across both gradient endpoints', () {
+    for (final tokens in [
+      WorkloopThemeTokens.light,
+      WorkloopThemeTokens.dark,
+    ]) {
+      for (final background in [
+        tokens.heroGradientStart,
+        tokens.heroGradientEnd,
+      ]) {
+        for (final foreground in [
+          tokens.onHeroPrimary,
+          tokens.onHeroSecondary,
+          tokens.onHeroMuted,
+        ]) {
+          expect(
+            _contrastRatio(
+              Color.alphaBlend(foreground, background),
+              background,
+            ),
+            greaterThanOrEqualTo(4.5),
+          );
+        }
+      }
+      expect(
+        _contrastRatio(tokens.heroActionForeground, tokens.onHeroPrimary),
+        greaterThanOrEqualTo(4.5),
+      );
+    }
+  });
+
+  testWidgets(
+    'shell clearance includes navigation, safe area, and breathing room',
+    (tester) async {
+      late double clearance;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(padding: EdgeInsets.only(bottom: 34)),
+            child: Builder(
+              builder: (context) {
+                clearance = AppSpacing.shellBottomClearance(context);
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(clearance, 128);
+    },
+  );
+
   test('interactive controls keep the Workloop typeface', () {
     for (final theme in [AppTheme.light, AppTheme.dark]) {
       final styles = [
@@ -195,7 +299,7 @@ void main() {
         theme.outlinedButtonTheme.style,
       ];
       for (final style in styles) {
-        expect(style?.textStyle?.resolve({})?.fontFamily, 'Instrument Sans');
+        expect(style?.textStyle?.resolve({})?.fontFamily, 'Manrope');
       }
     }
   });

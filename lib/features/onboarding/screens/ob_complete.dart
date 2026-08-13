@@ -7,6 +7,7 @@ import '../../../shared/providers/onboarding_provider.dart';
 import '../../../shared/providers/workspace_provider.dart';
 import '../../../shared/repositories/slate_repositories.dart';
 import '../../../shared/utils/currency_format.dart';
+import '../../../shared/utils/public_booking_url.dart';
 
 class ObComplete extends ConsumerStatefulWidget {
   const ObComplete({super.key});
@@ -123,7 +124,7 @@ class _ObCompleteState extends ConsumerState<ObComplete>
             ? constraints.maxHeight - 48
             : 0.0;
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(AppSpacing.pageX),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: minHeight),
             child: AnimatedBuilder(
@@ -157,7 +158,7 @@ class _ObCompleteState extends ConsumerState<ObComplete>
                           ? 'Your workspace\nis ready.'
                           : 'Setup needs\none more try.',
                       style: TextStyle(
-                        fontSize: 36,
+                        fontSize: 32,
                         fontWeight: FontWeight.w600,
                         color: _saveError == null
                             ? AppColors.t1
@@ -174,7 +175,7 @@ class _ObCompleteState extends ConsumerState<ObComplete>
                     const SizedBox(height: 10),
                     _SummaryRow(
                       icon: Icons.link_rounded,
-                      label: 'workloop.app/${onboarding.handle}',
+                      label: publicBookingPageDisplayUrl(onboarding.handle),
                       color: AppColors.green,
                     ),
                     const SizedBox(height: 10),
@@ -218,15 +219,6 @@ class _ObCompleteState extends ConsumerState<ObComplete>
                             : _saved
                             ? _goToDashboard
                             : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.brandAccent,
-                          disabledBackgroundColor: AppColors.bgInteract,
-                          foregroundColor: AppColors.onBrandAccent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          elevation: 0,
-                        ),
                         child: _saving
                             ? const SizedBox(
                                 width: 20,

@@ -86,7 +86,12 @@ class ClientAppointmentsTab extends ConsumerWidget {
                         ref.invalidate(clientAppointmentsProvider(clientId)),
                     color: AppColors.green,
                     child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.pageX,
+                        0,
+                        AppSpacing.pageX,
+                        40,
+                      ),
                       itemCount: appts.length,
                       separatorBuilder: (_, _) => const SizedBox.shrink(),
                       itemBuilder: (context, i) {

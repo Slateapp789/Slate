@@ -8,14 +8,42 @@ import 'package:workloop/features/profile/working_hours_editor.dart';
 import 'package:workloop/features/public_profile/booking_requests_screen.dart';
 import 'package:workloop/features/public_profile/public_profile_screen.dart';
 import 'package:workloop/features/settings/providers/settings_providers.dart';
+import 'package:workloop/features/settings/widgets/settings_business_tab.dart';
 import 'package:workloop/features/tasks/tasks_screen.dart';
 import 'package:workloop/shared/models/slate_models.dart';
 import 'package:workloop/shared/providers/appointments_provider.dart';
 import 'package:workloop/shared/providers/clients_provider.dart';
 import 'package:workloop/shared/providers/tasks_provider.dart';
+import 'package:workloop/shared/providers/workspace_provider.dart';
 import 'package:workloop/shared/repositories/profile_repository.dart';
 
 void main() {
+  testWidgets('business settings load failures expose an accessible retry', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          workspaceProvider.overrideWith(
+            (ref) async => throw StateError('offline'),
+          ),
+          settingsBusinessProfileProvider.overrideWith((ref) async => null),
+          settingsWorkspaceSettingsProvider.overrideWith((ref) async => null),
+          settingsServicesProvider.overrideWith((ref) async => const []),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: SettingsBusinessTab(showOnlySelected: true)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not load workspace'), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
+    expect(find.bySemanticsLabel('Try again'), findsOneWidget);
+    expect(find.bySemanticsLabel('Could not load workspace'), findsOneWidget);
+  });
+
   testWidgets(
     'client overview reports provider failure instead of trustworthy-looking zeroes',
     (tester) async {
@@ -83,7 +111,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsLabel('Show calendar'));
+    await tester.tap(find.bySemanticsLabel('Calendar'));
     await tester.pumpAndSettle();
 
     final previous = find.byTooltip('Previous month');

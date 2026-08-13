@@ -13,6 +13,9 @@ class MoreScreen extends ConsumerWidget {
   final VoidCallback onOpenMoney;
   final VoidCallback onOpenTasks;
   final VoidCallback onOpenNotes;
+  final VoidCallback? onOpenBookingPage;
+  final VoidCallback? onOpenProfile;
+  final VoidCallback? onOpenSettings;
   final VoidCallback? onCreateMoney;
   final VoidCallback? onCreateTask;
   final VoidCallback? onCreateNote;
@@ -22,6 +25,9 @@ class MoreScreen extends ConsumerWidget {
     required this.onOpenMoney,
     required this.onOpenTasks,
     required this.onOpenNotes,
+    this.onOpenBookingPage,
+    this.onOpenProfile,
+    this.onOpenSettings,
     this.onCreateMoney,
     this.onCreateTask,
     this.onCreateNote,
@@ -71,11 +77,11 @@ class MoreScreen extends ConsumerWidget {
           SafeArea(
             bottom: false,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(
+              padding: EdgeInsets.fromLTRB(
                 AppSpacing.pageX,
                 AppSpacing.screenTop,
                 AppSpacing.pageX,
-                AppSpacing.bottomNavClearance,
+                AppSpacing.shellBottomClearance(context),
               ),
               children: [
                 WorkloopPageHeader(
@@ -84,13 +90,7 @@ class MoreScreen extends ConsumerWidget {
                       'Capture the admin around your work, then get back to your day.',
                   color: tokens.accentInk,
                 ),
-                const SizedBox(height: AppSpacing.xl),
-                _QuickCaptureSection(
-                  onCreateMoney: onCreateMoney ?? onOpenMoney,
-                  onCreateTask: onCreateTask ?? onOpenTasks,
-                  onCreateNote: onCreateNote ?? onOpenNotes,
-                ),
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: AppSpacing.lg),
                 _WorkspaceSection(
                   moneyStatus: moneyStatus,
                   taskStatus: taskStatus,
@@ -99,11 +99,105 @@ class MoreScreen extends ConsumerWidget {
                   onOpenTasks: onOpenTasks,
                   onOpenNotes: onOpenNotes,
                 ),
+                const SizedBox(height: AppSpacing.xl),
+                _QuickCaptureSection(
+                  onCreateMoney: onCreateMoney ?? onOpenMoney,
+                  onCreateTask: onCreateTask ?? onOpenTasks,
+                  onCreateNote: onCreateNote ?? onOpenNotes,
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                _BusinessSetupSection(
+                  onOpenBookingPage: onOpenBookingPage ?? _doNothing,
+                  onOpenProfile: onOpenProfile ?? _doNothing,
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                _AccountSection(onOpenSettings: onOpenSettings ?? _doNothing),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+void _doNothing() {}
+
+class _BusinessSetupSection extends StatelessWidget {
+  final VoidCallback onOpenBookingPage;
+  final VoidCallback onOpenProfile;
+
+  const _BusinessSetupSection({
+    required this.onOpenBookingPage,
+    required this.onOpenProfile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const WorkloopSectionHeader(label: 'Business setup'),
+        const SizedBox(height: AppSpacing.xs),
+        WorkloopSurface(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+          borderColor: Colors.transparent,
+          child: Column(
+            children: [
+              WorkloopModuleRow(
+                key: const ValueKey('tools-booking-page'),
+                icon: LucideIcons.calendarCheck2,
+                title: 'Booking page',
+                color: AppColors.accentPrimary,
+                subtitle: 'Preview, manage and share your public link',
+                semanticLabel: 'Open Booking page',
+                onTap: onOpenBookingPage,
+              ),
+              WorkloopModuleRow(
+                key: const ValueKey('tools-business-profile'),
+                icon: LucideIcons.store,
+                title: 'Business profile',
+                color: AppColors.accentPrimary,
+                subtitle: 'Business details, services and working hours',
+                semanticLabel: 'Open Business profile',
+                showDivider: false,
+                onTap: onOpenProfile,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AccountSection extends StatelessWidget {
+  final VoidCallback onOpenSettings;
+
+  const _AccountSection({required this.onOpenSettings});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const WorkloopSectionHeader(label: 'Account & app'),
+        const SizedBox(height: AppSpacing.xs),
+        WorkloopSurface(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+          borderColor: Colors.transparent,
+          child: WorkloopModuleRow(
+            key: const ValueKey('tools-settings'),
+            icon: LucideIcons.settings,
+            title: 'Settings',
+            color: AppColors.accentPrimary,
+            subtitle: 'Account, appearance, notifications and privacy',
+            semanticLabel: 'Open Settings',
+            showDivider: false,
+            onTap: onOpenSettings,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -126,31 +220,40 @@ class _QuickCaptureSection extends StatelessWidget {
         key: const ValueKey('tools-quick-money'),
         icon: LucideIcons.circlePoundSterling,
         label: 'Record money',
+        color: AppColors.accentPrimary,
         onTap: onCreateMoney,
       ),
       _QuickActionData(
         key: const ValueKey('tools-quick-task'),
         icon: LucideIcons.listPlus,
         label: 'New task',
+        color: AppColors.accentPrimary,
         onTap: onCreateTask,
       ),
       _QuickActionData(
         key: const ValueKey('tools-quick-note'),
         icon: LucideIcons.filePlus,
         label: 'New note',
+        color: AppColors.accentPrimary,
         onTap: onCreateNote,
       ),
     ];
 
+    final tokens = SlateTheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const WorkloopSectionHeader(label: 'Quick capture'),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          'Record it without breaking your flow.',
+          style: TextStyle(color: tokens.textTertiary, fontSize: 12),
+        ),
+        const SizedBox(height: AppSpacing.md),
         LayoutBuilder(
           builder: (context, constraints) {
             final stackActions =
-                constraints.maxWidth < 340 ||
+                constraints.maxWidth < 306 ||
                 MediaQuery.textScalerOf(context).scale(1) > 1.35;
             if (stackActions) {
               return Column(
@@ -183,12 +286,14 @@ class _QuickActionData {
   final Key key;
   final IconData icon;
   final String label;
+  final Color color;
   final VoidCallback onTap;
 
   const _QuickActionData({
     required this.key,
     required this.icon,
     required this.label,
+    required this.color,
     required this.onTap,
   });
 }
@@ -215,7 +320,7 @@ class _QuickAction extends StatelessWidget {
       child: ExcludeSemantics(
         child: Material(
           key: data.key,
-          color: tokens.surfaceRaised,
+          color: tokens.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
             side: BorderSide(color: tokens.divider),
@@ -224,16 +329,16 @@ class _QuickAction extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadius.md),
             onTap: handleTap,
             child: SizedBox(
-              height: compact ? 58 : 96,
+              height: compact ? 52 : 80,
               child: Padding(
                 padding: EdgeInsets.symmetric(
                   horizontal: compact ? AppSpacing.md : AppSpacing.xs,
-                  vertical: AppSpacing.sm,
+                  vertical: compact ? AppSpacing.xs : AppSpacing.xxs,
                 ),
                 child: compact
                     ? Row(
                         children: [
-                          _QuickActionIcon(icon: data.icon),
+                          _QuickActionIcon(icon: data.icon, color: data.color),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(child: _QuickActionLabel(label: data.label)),
                           Icon(
@@ -246,7 +351,7 @@ class _QuickAction extends StatelessWidget {
                     : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _QuickActionIcon(icon: data.icon),
+                          _QuickActionIcon(icon: data.icon, color: data.color),
                           const SizedBox(height: AppSpacing.xs),
                           _QuickActionLabel(label: data.label),
                         ],
@@ -262,28 +367,26 @@ class _QuickAction extends StatelessWidget {
 
 class _QuickActionIcon extends StatelessWidget {
   final IconData icon;
+  final Color color;
 
-  const _QuickActionIcon({required this.icon});
+  const _QuickActionIcon({required this.icon, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    final tokens = SlateTheme.of(context);
     return Container(
       width: 34,
       height: 34,
       decoration: BoxDecoration(
-        color: tokens.accentStrong,
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: tokens.accentBorder, width: 1),
       ),
-      child: Icon(icon, color: tokens.onAccent, size: 17),
+      child: Icon(icon, color: color, size: 17),
     );
   }
 }
 
 class _QuickActionLabel extends StatelessWidget {
   final String label;
-
   const _QuickActionLabel({required this.label});
 
   @override
@@ -326,151 +429,44 @@ class _WorkspaceSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const WorkloopSectionHeader(label: 'Business tools'),
-        const SizedBox(height: AppSpacing.sm),
-        _WorkspaceLauncher(
-          key: const ValueKey('more-workspace-money'),
-          icon: LucideIcons.banknote,
-          title: 'Money',
-          subtitle: 'See what came in, went out, and is still owed',
-          status: moneyStatus,
-          semanticLabel: 'Open Money workspace',
-          onTap: onOpenMoney,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _WorkspaceLauncher(
-          key: const ValueKey('more-workspace-tasks'),
-          icon: LucideIcons.listChecks,
-          title: 'Tasks',
-          subtitle: 'Plan follow-ups and the work that needs doing',
-          status: taskStatus,
-          semanticLabel: 'Open Tasks workspace',
-          onTap: onOpenTasks,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        _WorkspaceLauncher(
-          key: const ValueKey('more-workspace-notes'),
-          icon: LucideIcons.stickyNote,
-          title: 'Notes',
-          subtitle: 'Keep useful client and business context close',
-          status: noteStatus,
-          semanticLabel: 'Open Notes workspace',
-          onTap: onOpenNotes,
-        ),
-      ],
-    );
-  }
-}
-
-class _WorkspaceLauncher extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String status;
-  final String semanticLabel;
-  final VoidCallback onTap;
-
-  const _WorkspaceLauncher({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.status,
-    required this.semanticLabel,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = SlateTheme.of(context);
-
-    void handleTap() {
-      onTap();
-    }
-
-    return Semantics(
-      button: true,
-      label: semanticLabel,
-      hint: status,
-      onTap: handleTap,
-      child: ExcludeSemantics(
-        child: SlateSurface(
-          padding: EdgeInsets.zero,
-          color: tokens.surface,
-          borderColor: tokens.divider,
-          onTap: handleTap,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 108),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: tokens.surfaceSubtle,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Icon(icon, color: tokens.accentInk, size: 21),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: tokens.textPrimary,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            Icon(
-                              LucideIcons.arrowUpRight,
-                              color: tokens.textTertiary,
-                              size: 17,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.xxs),
-                        Text(
-                          subtitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: tokens.textTertiary,
-                            fontSize: 12,
-                            height: 1.3,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          status,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: tokens.accentInk,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+        const SizedBox(height: AppSpacing.xs),
+        WorkloopSurface(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+          borderColor: Colors.transparent,
+          child: Column(
+            children: [
+              WorkloopModuleRow(
+                key: const ValueKey('more-workspace-money'),
+                icon: LucideIcons.banknote,
+                title: 'Money',
+                color: AppColors.accentPrimary,
+                subtitle: moneyStatus,
+                semanticLabel: 'Open Money workspace',
+                onTap: onOpenMoney,
               ),
-            ),
+              WorkloopModuleRow(
+                key: const ValueKey('more-workspace-tasks'),
+                icon: LucideIcons.listChecks,
+                title: 'Tasks',
+                color: AppColors.accentPrimary,
+                subtitle: taskStatus,
+                semanticLabel: 'Open Tasks workspace',
+                onTap: onOpenTasks,
+              ),
+              WorkloopModuleRow(
+                key: const ValueKey('more-workspace-notes'),
+                icon: LucideIcons.stickyNote,
+                title: 'Notes',
+                color: AppColors.accentPrimary,
+                subtitle: noteStatus,
+                semanticLabel: 'Open Notes workspace',
+                showDivider: false,
+                onTap: onOpenNotes,
+              ),
+            ],
           ),
         ),
-      ),
+      ],
     );
   }
 }

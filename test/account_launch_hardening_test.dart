@@ -24,14 +24,18 @@ void main() {
 
   test('password recovery uses the registered application scheme', () {
     expect(workloopPasswordRecoveryRedirect, 'workloop://reset-password');
+    expect(workloopOAuthRedirect, 'workloop://auth-callback');
     expect(validateRecoveryPassword('short', 'short'), isNotNull);
     expect(
       validateRecoveryPassword('safe-password', 'different-password'),
       isNotNull,
     );
-    expect(validateRecoveryPassword('safe-password', 'safe-password'), isNull);
     expect(
-      validateRecoveryPassword(' password ', ' password '),
+      validateRecoveryPassword('Safer-password2!', 'Safer-password2!'),
+      isNull,
+    );
+    expect(
+      validateRecoveryPassword(' Long password 2! ', ' Long password 2! '),
       isNull,
       reason: 'Leading and trailing password characters are significant.',
     );

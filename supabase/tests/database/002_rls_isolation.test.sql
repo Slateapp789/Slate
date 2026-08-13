@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(14);
+select plan(16);
 
 insert into auth.users (
   id,
@@ -210,6 +210,50 @@ select is(
   (select count(*)::bigint from public.contacts),
   1::bigint,
   'User B sees only User B contacts'
+);
+
+reset role;
+insert into auth.mfa_factors (
+  id,
+  user_id,
+  friendly_name,
+  factor_type,
+  status,
+  created_at,
+  updated_at,
+  secret
+) values (
+  '20000000-0000-4000-8000-000000000099',
+  '20000000-0000-4000-8000-000000000002',
+  'Quality authenticator',
+  'totp',
+  'verified',
+  now(),
+  now(),
+  'quality-secret'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal1"}',
+  true
+);
+select is(
+  (select count(*)::bigint from public.contacts),
+  0::bigint,
+  'an opted-in user cannot access data with an AAL1 session'
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2"}',
+  true
+);
+select is(
+  (select count(*)::bigint from public.contacts),
+  1::bigint,
+  'an opted-in user regains tenant-scoped access with an AAL2 session'
 );
 
 reset role;

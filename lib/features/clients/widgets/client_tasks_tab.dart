@@ -327,14 +327,6 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                               });
                             }
                           },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.brandAccent,
-                      foregroundColor: AppColors.onBrandAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      elevation: 0,
-                    ),
                     child: saving
                         ? const SizedBox(
                             width: 18,
@@ -378,7 +370,12 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
           canPop: !deleting,
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                AppSpacing.sm,
+                AppSpacing.pageX,
+                AppSpacing.xl,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -605,7 +602,12 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                     ref.invalidate(clientTasksProvider(widget.clientId)),
                 color: AppColors.green,
                 child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    0,
+                    AppSpacing.pageX,
+                    40,
+                  ),
                   itemCount: tks.length,
                   separatorBuilder: (_, _) => const SizedBox.shrink(),
                   itemBuilder: (context, i) {
@@ -617,7 +619,10 @@ class _ClientTasksTabState extends ConsumerState<ClientTasksTab> {
                       onTap: () => _showTaskActions(task),
                       leading: AnimatedContainer(
                         key: ValueKey(Theme.of(context).brightness),
-                        duration: const Duration(milliseconds: 200),
+                        duration: AppMotion.responsive(
+                          context,
+                          AppMotion.standard,
+                        ),
                         width: 22,
                         height: 22,
                         decoration: BoxDecoration(
@@ -824,7 +829,7 @@ class _PriorityChip extends StatelessWidget {
               color: active
                   ? color.withValues(alpha: 0.15)
                   : AppColors.bgInteract,
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(color: active ? color : Colors.transparent),
             ),
             child: Text(

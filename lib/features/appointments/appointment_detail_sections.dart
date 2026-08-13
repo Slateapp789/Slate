@@ -39,7 +39,10 @@ Future<_PickedAppointmentDetailTime?> _showAppointmentDetailTimePicker({
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.pageX,
+                vertical: AppSpacing.md,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -101,7 +104,7 @@ Future<_PickedAppointmentDetailTime?> _showAppointmentDetailTimePicker({
                   const Text(
                     ':',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 24,
                       fontWeight: FontWeight.w600,
                       color: AppColors.t1,
                     ),

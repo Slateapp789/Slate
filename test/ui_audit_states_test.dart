@@ -56,7 +56,7 @@ void main() {
     expect(attempts, 2);
   });
 
-  testWidgets('notification cards expose their state and action', (
+  testWidgets('notification list exposes state without redundant filters', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -87,6 +87,8 @@ void main() {
     final semantics = tester.getSemantics(notification);
     expect(semantics.flagsCollection.isButton, isTrue);
     expect(semantics.hint, 'Marks as read and opens the related item');
+    expect(find.text('All'), findsNothing);
+    expect(find.text('Unread'), findsNothing);
   });
 
   testWidgets('notification header is safe at large text and reports failure', (

@@ -42,6 +42,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Repeat booking'), findsNothing);
+      expect(find.text('Create future bookings automatically.'), findsNothing);
+
       final scrollable = find.byType(Scrollable).first;
       await tester.scrollUntilVisible(
         find.bySemanticsLabel('Booking date'),

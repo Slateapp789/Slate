@@ -24,7 +24,12 @@ class CalendarSyncScreen extends ConsumerWidget {
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
           SafeArea(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                AppSpacing.screenTop,
+                AppSpacing.pageX,
+                40,
+              ),
               children: [
                 const WorkloopRouteHeader(
                   title: 'Calendar tools',
@@ -120,16 +125,27 @@ class CalendarSyncScreen extends ConsumerWidget {
   }
 
   Future<void> _copyIcsData(BuildContext context, WidgetRef ref) async {
-    final ics = await _icsData(ref);
-    await Clipboard.setData(ClipboardData(text: ics));
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Calendar export data copied'),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    try {
+      final ics = await _icsData(ref);
+      await Clipboard.setData(ClipboardData(text: ics));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Calendar export data copied'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Calendar export data could not be copied'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }
 

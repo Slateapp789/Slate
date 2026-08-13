@@ -11,6 +11,15 @@ class WorkloopLegacyPalette {
   static Brightness brightness = Brightness.dark;
 
   static void sync(Brightness value) => brightness = value;
+
+  static Brightness resolve({
+    required ThemeMode themeMode,
+    required Brightness platformBrightness,
+  }) => switch (themeMode) {
+    ThemeMode.light => Brightness.light,
+    ThemeMode.dark => Brightness.dark,
+    ThemeMode.system => platformBrightness,
+  };
 }
 
 class _AdaptiveColor extends Color {
@@ -42,107 +51,103 @@ class _AdaptiveColor extends Color {
 }
 
 class AppColors {
-  // Warm paper in Light and lifted graphite in Dark. Adaptive aliases
-  // keep older screens legible while they migrate to semantic theme tokens.
-  static const bg = _AdaptiveColor(Color(0xFFEEEDE8), Color(0xFF151A16));
-  static const bgCard = _AdaptiveColor(Color(0xFFFFFEFA), Color(0xFF1C231D));
-  static const bgRaised = _AdaptiveColor(Color(0xFFF8F7F2), Color(0xFF252E26));
+  // Workloop Studio replaces the retired lime/graphite identity with a warm
+  // porcelain and midnight system led by confident indigo and human teal.
+  static const bg = _AdaptiveColor(Color(0xFFF6F4EF), Color(0xFF111318));
+  static const bgCard = _AdaptiveColor(Color(0xFFFFFFFF), Color(0xFF1C2027));
+  static const bgRaised = _AdaptiveColor(Color(0xFFF0EEF8), Color(0xFF252A33));
   static const bgInteract = _AdaptiveColor(
-    Color(0xFFD9DDD5),
-    Color(0xFF2C372D),
+    Color(0xFFECEFF3),
+    Color(0xFF2E343F),
   );
-  static const border = _AdaptiveColor(Color(0xFFC6CAC2), Color(0xFF3E4B3F));
+  static const border = _AdaptiveColor(Color(0xFFDDE2E8), Color(0xFF3A414D));
   static const borderStrong = _AdaptiveColor(
-    Color(0xFF929990),
-    Color(0xFF5E705F),
+    Color(0xFFC7CED8),
+    Color(0xFF545D6B),
   );
 
-  // Text
-  static const t1 = _AdaptiveColor(Color(0xFF171B18), Color(0xFFF4F7F3));
-  static const t2 = _AdaptiveColor(Color(0xFF3C443E), Color(0xFFCDD5CC));
-  static const t3 = _AdaptiveColor(Color(0xFF5C655E), Color(0xFFA6B1A5));
-  static const t4 = _AdaptiveColor(Color(0xFF7C847E), Color(0xFF899588));
+  static const t1 = _AdaptiveColor(Color(0xFF172033), Color(0xFFF6F7FB));
+  static const t2 = _AdaptiveColor(Color(0xFF5F6B7A), Color(0xFFC5CAD3));
+  static const t3 = _AdaptiveColor(Color(0xFF7C8795), Color(0xFF9CA4B0));
+  static const t4 = _AdaptiveColor(Color(0xFF929BA7), Color(0xFF7E8794));
 
-  // Workloop's signature neon is sampled directly from the app icon and launch
-  // artwork. It is reserved for primary actions and active states; filled
-  // controls use the dark [onBrandAccent] foreground.
-  static const brandAccent = Color(0xFFC1FF72);
-  static const onBrandAccent = Color(0xFF17200D);
-  static const accentInk = _AdaptiveColor(Color(0xFF355A0C), Color(0xFFC1FF72));
+  static const brandAccent = _AdaptiveColor(
+    Color(0xFF4F46E5),
+    Color(0xFF9496E8),
+  );
+  static const onBrandAccent = _AdaptiveColor(
+    Color(0xFFFFFFFF),
+    Color(0xFF111427),
+  );
+  static const accentInk = brandAccent;
   static const accentBorder = _AdaptiveColor(
-    Color(0xFF91B560),
-    Color(0xFFC1FF72),
+    Color(0xFF4038C9),
+    Color(0xFF7D80D4),
   );
   static const slate = brandAccent;
   static const slateLight = brandAccent;
-  static const slateDim = Color(0x33C1FF72);
-  static const slateGlow = Color(0x55C1FF72);
+  static const slateDim = _AdaptiveColor(Color(0xFFE9E8FF), Color(0xFF2A2D3E));
+  static const slateGlow = _AdaptiveColor(Color(0x334F46E5), Color(0x309496E8));
   static const accentPrimary = accentInk;
   static const accentPrimaryStrong = brandAccent;
-  // Compatibility alias for older foreground/status call sites. Filled brand
-  // controls must use brandAccent/accentPrimaryStrong explicitly.
   static const green = accentInk;
-  static const greenLight = _AdaptiveColor(
-    Color(0xFFEDF3E6),
-    Color(0xFF202B17),
-  );
+  static const greenLight = slateDim;
   static const greenDim = slateDim;
   static const greenGlow = slateGlow;
 
-  // Aliases so existing code doesn't break
-  static const violet = Color(0xFFE58AB5);
-  static const violetDim = Color(0x24B05884);
-  static const violetGlow = Color(0x33B05884);
+  static const violet = _AdaptiveColor(Color(0xFF7557D9), Color(0xFF9A96E3));
+  static const violetDim = _AdaptiveColor(Color(0xFFECE7FF), Color(0xFF302F45));
+  static const violetGlow = _AdaptiveColor(
+    Color(0x337557D9),
+    Color(0x309A96E3),
+  );
 
-  // Semantic
   static const statusSuccess = _AdaptiveColor(
-    Color(0xFF3D6B1D),
-    Color(0xFFA8E85B),
+    Color(0xFF19704E),
+    Color(0xFF65D9A5),
   );
   static const statusSuccessDim = _AdaptiveColor(
-    Color(0x293D6B1D),
-    Color(0x385C8F25),
+    Color(0xFFDFF3E9),
+    Color(0xFF173A31),
   );
   static const success = statusSuccess;
   static const successDim = statusSuccessDim;
-  static const warning = _AdaptiveColor(Color(0xFF7D5900), Color(0xFFF2C56B));
+  static const warning = _AdaptiveColor(Color(0xFF8B5A12), Color(0xFFF2BE62));
   static const warningDim = _AdaptiveColor(
-    Color(0x24A67300),
-    Color(0x38332A13),
+    Color(0xFFFFF0D6),
+    Color(0xFF42331E),
   );
-  static const error = _AdaptiveColor(Color(0xFFA43D37), Color(0xFFFF7A73));
-  static const errorDim = _AdaptiveColor(Color(0x24A43D37), Color(0x4D351817));
+  static const error = _AdaptiveColor(Color(0xFFB23C4A), Color(0xFFFF8490));
+  static const errorDim = _AdaptiveColor(Color(0xFFF9E4E7), Color(0xFF44232B));
 
-  // Module colours.
-  static const modHome = accentInk;
-  static const modClients = accentInk;
-  static const modCalendar = _AdaptiveColor(
-    Color(0xFF216D63),
-    Color(0xFF75C9B8),
+  static const modHome = brandAccent;
+  static const modClients = _AdaptiveColor(
+    Color(0xFF168F83),
+    Color(0xFF5FD6C5),
   );
-  static const modFinance = accentInk;
-  static const modTasks = _AdaptiveColor(Color(0xFF814A68), Color(0xFFD19ABA));
-  static const modNotes = _AdaptiveColor(Color(0xFF2F6D82), Color(0xFF83BDD3));
+  static const modCalendar = violet;
+  static const modFinance = _AdaptiveColor(
+    Color(0xFFB87516),
+    Color(0xFFF1B85B),
+  );
+  static const modTasks = _AdaptiveColor(Color(0xFFC65E55), Color(0xFFFF9188));
+  static const modNotes = _AdaptiveColor(Color(0xFF3185B8), Color(0xFF78C8F3));
 
-  // Module icon backgrounds.
-  static const modBg = _AdaptiveColor(Color(0xFFD9DDD5), Color(0xFF2C372D));
+  static const modBg = _AdaptiveColor(Color(0xFFF0EEF8), Color(0xFF252A33));
 
-  // Hero/summary panels used for financial and high-trust information.
-  static const panelSoft = _AdaptiveColor(Color(0xFFF7F6F1), Color(0xFF191F15));
+  static const panelSoft = _AdaptiveColor(Color(0xFFE9E8FF), Color(0xFF2A2D3E));
   static const panelSoftRaised = _AdaptiveColor(
-    Color(0xFFE7EAE2),
-    Color(0xFF242F1A),
+    Color(0xFFDDF5F1),
+    Color(0xFF173A38),
   );
-  // Foreground used whenever the exact brand neon is the background fill.
-  // This stays dark to preserve contrast on the neon fill.
   static const panelInk = onBrandAccent;
   static const panelMuted = _AdaptiveColor(
-    Color(0xFF4D5A50),
-    Color(0xFFC3CCC2),
+    Color(0xFF5F6B7A),
+    Color(0xFFC5CAD3),
   );
   static const panelFaint = _AdaptiveColor(
-    Color(0x24C1FF72),
-    Color(0x38C1FF72),
+    Color(0x334F46E5),
+    Color(0x309496E8),
   );
 }
 
@@ -163,6 +168,11 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
   final Color accentInk;
   final Color accentBorder;
   final Color onAccent;
+  final Color primaryAction;
+  final Color onPrimaryAction;
+  final Color inkSurface;
+  final Color onInk;
+  final Color onInkMuted;
   final Color success;
   final Color successContainer;
   final Color warning;
@@ -174,6 +184,22 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
   final Color scrim;
   final Color skeletonBase;
   final Color skeletonHighlight;
+
+  // Hero roles are explicit because Dark mode uses a deep, muted indigo field
+  // rather than expanding the brighter interactive accent across the screen.
+  bool get _isDarkContract => background.computeLuminance() < 0.1;
+  Color get heroGradientStart =>
+      _isDarkContract ? const Color(0xFF333852) : accentStrong;
+  Color get heroGradientEnd =>
+      _isDarkContract ? const Color(0xFF414866) : primaryAction;
+  Color get onHeroPrimary =>
+      _isDarkContract ? const Color(0xFFF8F9FC) : onPrimaryAction;
+  Color get heroActionForeground => _isDarkContract ? onAccent : primaryAction;
+  Color get onHeroSecondary => onHeroPrimary.withValues(alpha: 0.92);
+  Color get onHeroMuted => onHeroPrimary.withValues(alpha: 0.82);
+  Color get heroBorder => onHeroPrimary.withValues(alpha: 0.20);
+  Color get heroSurface => onHeroPrimary.withValues(alpha: 0.08);
+  Color get heroControlSurface => onHeroPrimary.withValues(alpha: 0.10);
 
   const WorkloopThemeTokens({
     required this.background,
@@ -191,6 +217,11 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
     required this.accentInk,
     required this.accentBorder,
     required this.onAccent,
+    required this.primaryAction,
+    required this.onPrimaryAction,
+    required this.inkSurface,
+    required this.onInk,
+    required this.onInkMuted,
     required this.success,
     required this.successContainer,
     required this.warning,
@@ -205,61 +236,71 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
   });
 
   static const light = WorkloopThemeTokens(
-    background: Color(0xFFEEEDE8),
-    surface: Color(0xFFFFFEFA),
-    surfaceRaised: Color(0xFFF8F7F2),
-    surfaceSubtle: Color(0xFFD9DDD5),
-    divider: Color(0xFFC6CAC2),
-    dividerStrong: Color(0xFF929990),
-    textPrimary: Color(0xFF171B18),
-    textSecondary: Color(0xFF3C443E),
-    textTertiary: Color(0xFF5C655E),
-    textDisabled: Color(0xFF7C847E),
-    accent: Color(0xFFC1FF72),
-    accentStrong: Color(0xFFC1FF72),
-    accentInk: Color(0xFF355A0C),
-    accentBorder: Color(0xFF91B560),
-    onAccent: Color(0xFF17200D),
-    success: Color(0xFF3F681E),
-    successContainer: Color(0xFFEAF2DF),
-    warning: Color(0xFF7B5807),
-    warningContainer: Color(0xFFF7EDD6),
-    error: Color(0xFF9C3E38),
-    errorContainer: Color(0xFFF5E7E4),
-    info: Color(0xFF28627B),
-    infoContainer: Color(0xFFE3EFF3),
+    background: Color(0xFFF6F4EF),
+    surface: Color(0xFFFFFFFF),
+    surfaceRaised: Color(0xFFF0EEF8),
+    surfaceSubtle: Color(0xFFECEFF3),
+    divider: Color(0xFFDDE2E8),
+    dividerStrong: Color(0xFFC7CED8),
+    textPrimary: Color(0xFF172033),
+    textSecondary: Color(0xFF5F6B7A),
+    textTertiary: Color(0xFF7C8795),
+    textDisabled: Color(0xFF929BA7),
+    accent: Color(0xFF4F46E5),
+    accentStrong: Color(0xFF4038C9),
+    accentInk: Color(0xFF4F46E5),
+    accentBorder: Color(0xFF4038C9),
+    onAccent: Color(0xFFFFFFFF),
+    primaryAction: Color(0xFF4F46E5),
+    onPrimaryAction: Color(0xFFFFFFFF),
+    inkSurface: Color(0xFF4F46E5),
+    onInk: Color(0xFFFFFFFF),
+    onInkMuted: Color(0xFFE9E8FF),
+    success: Color(0xFF19704E),
+    successContainer: Color(0xFFDFF3E9),
+    warning: Color(0xFF8B5A12),
+    warningContainer: Color(0xFFFFF0D6),
+    error: Color(0xFFB23C4A),
+    errorContainer: Color(0xFFF9E4E7),
+    info: Color(0xFF246F9E),
+    infoContainer: Color(0xFFE1F1FA),
     scrim: Color(0x52000000),
-    skeletonBase: Color(0xFFD8D9D3),
-    skeletonHighlight: Color(0xFFF7F6F2),
+    skeletonBase: Color(0xFFE2E5EA),
+    skeletonHighlight: Color(0xFFF7F8FA),
   );
 
   static const dark = WorkloopThemeTokens(
-    background: Color(0xFF151A16),
-    surface: Color(0xFF1C231D),
-    surfaceRaised: Color(0xFF252E26),
-    surfaceSubtle: Color(0xFF2C372D),
-    divider: Color(0xFF3E4B3F),
-    dividerStrong: Color(0xFF5E705F),
-    textPrimary: Color(0xFFF4F7F3),
-    textSecondary: Color(0xFFCDD5CC),
-    textTertiary: Color(0xFFA6B1A5),
-    textDisabled: Color(0xFF899588),
-    accent: Color(0xFFC1FF72),
-    accentStrong: Color(0xFFC1FF72),
-    accentInk: Color(0xFFC1FF72),
-    accentBorder: Color(0xFFC1FF72),
-    onAccent: Color(0xFF17200D),
-    success: Color(0xFFA8E85B),
-    successContainer: Color(0xFF202B17),
-    warning: Color(0xFFF2C56B),
-    warningContainer: Color(0xFF332A13),
-    error: Color(0xFFFF7A73),
-    errorContainer: Color(0xFF351817),
-    info: Color(0xFF72C7EA),
-    infoContainer: Color(0xFF162D36),
+    background: Color(0xFF111318),
+    surface: Color(0xFF1C2027),
+    surfaceRaised: Color(0xFF252A33),
+    surfaceSubtle: Color(0xFF2E343F),
+    divider: Color(0xFF3A414D),
+    dividerStrong: Color(0xFF545D6B),
+    textPrimary: Color(0xFFF6F7FB),
+    textSecondary: Color(0xFFC5CAD3),
+    textTertiary: Color(0xFF9CA4B0),
+    textDisabled: Color(0xFF7E8794),
+    accent: Color(0xFF9496E8),
+    accentStrong: Color(0xFF7D80D4),
+    accentInk: Color(0xFFA4A6F2),
+    accentBorder: Color(0xFF7D80D4),
+    onAccent: Color(0xFF111427),
+    primaryAction: Color(0xFF9496E8),
+    onPrimaryAction: Color(0xFF111427),
+    inkSurface: Color(0xFF2A2D3E),
+    onInk: Color(0xFFF6F7FB),
+    onInkMuted: Color(0xFFC5CAD3),
+    success: Color(0xFF65D9A5),
+    successContainer: Color(0xFF173A31),
+    warning: Color(0xFFF2BE62),
+    warningContainer: Color(0xFF42331E),
+    error: Color(0xFFFF8490),
+    errorContainer: Color(0xFF44232B),
+    info: Color(0xFF78C8F3),
+    infoContainer: Color(0xFF183548),
     scrim: Color(0xA6000000),
-    skeletonBase: Color(0xFF3E4B3F),
-    skeletonHighlight: Color(0xFF5B6C5C),
+    skeletonBase: Color(0xFF2E343F),
+    skeletonHighlight: Color(0xFF414955),
   );
 
   @override
@@ -279,6 +320,11 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
     Color? accentInk,
     Color? accentBorder,
     Color? onAccent,
+    Color? primaryAction,
+    Color? onPrimaryAction,
+    Color? inkSurface,
+    Color? onInk,
+    Color? onInkMuted,
     Color? success,
     Color? successContainer,
     Color? warning,
@@ -307,6 +353,11 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
       accentInk: accentInk ?? this.accentInk,
       accentBorder: accentBorder ?? this.accentBorder,
       onAccent: onAccent ?? this.onAccent,
+      primaryAction: primaryAction ?? this.primaryAction,
+      onPrimaryAction: onPrimaryAction ?? this.onPrimaryAction,
+      inkSurface: inkSurface ?? this.inkSurface,
+      onInk: onInk ?? this.onInk,
+      onInkMuted: onInkMuted ?? this.onInkMuted,
       success: success ?? this.success,
       successContainer: successContainer ?? this.successContainer,
       warning: warning ?? this.warning,
@@ -344,6 +395,11 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
       accentInk: blend(accentInk, other.accentInk),
       accentBorder: blend(accentBorder, other.accentBorder),
       onAccent: blend(onAccent, other.onAccent),
+      primaryAction: blend(primaryAction, other.primaryAction),
+      onPrimaryAction: blend(onPrimaryAction, other.onPrimaryAction),
+      inkSurface: blend(inkSurface, other.inkSurface),
+      onInk: blend(onInk, other.onInk),
+      onInkMuted: blend(onInkMuted, other.onInkMuted),
       success: blend(success, other.success),
       successContainer: blend(successContainer, other.successContainer),
       warning: blend(warning, other.warning),
@@ -367,32 +423,50 @@ class AppSpacing {
   static const double lg = 20;
   static const double xl = 24;
   static const double xxl = 32;
-  static const double pageX = 20;
+  static const double pageX = 18;
+  static const double section = 24;
 
   /// Canonical content inset below the platform safe area.
-  static const double screenTop = lg;
+  static const double screenTop = 12;
   static const double minTouch = 44;
-  static const double bottomNavClearance = 104;
+
+  /// Shared floating-navigation geometry. Shell screens calculate their final
+  /// content inset from these values and the real device safe area.
+  static const double bottomNavHeight = 66;
+  static const double bottomNavOffset = 10;
+  static const double bottomNavBreathingRoom = 18;
+
+  static double shellBottomClearance(BuildContext context) {
+    return bottomNavHeight +
+        bottomNavOffset +
+        MediaQuery.paddingOf(context).bottom +
+        bottomNavBreathingRoom;
+  }
 }
 
 class AppRadius {
   static const double xs = 8;
-  static const double sm = 12;
+  static const double sm = 10;
   static const double md = 14;
   static const double lg = 18;
-  static const double xl = 22;
-  static const double pill = 999;
+  static const double xl = 24;
+  static const double sheet = 28;
+
+  /// Reserved for status, compact filters and progress markers.
+  static const double capsule = 999;
 }
 
 class AppMotion {
-  static const fast = Duration(milliseconds: 160);
-  static const standard = Duration(milliseconds: 240);
-  static const deliberate = Duration(milliseconds: 360);
-  static const navigation = standard;
+  static const fast = Duration(milliseconds: 140);
+  static const standard = Duration(milliseconds: 200);
+  static const deliberate = Duration(milliseconds: 280);
+  static const celebration = Duration(milliseconds: 440);
+  static const navigation = Duration(milliseconds: 220);
   static const double navigationOffset = 0.04;
   static const double destinationOffset = 14;
   static const curve = Curves.easeOutCubic;
   static const emphasized = Curves.easeOutBack;
+  static const double pressedScale = 0.98;
 
   static Duration responsive(BuildContext context, Duration duration) {
     return MediaQuery.maybeOf(context)?.disableAnimations == true
@@ -404,16 +478,24 @@ class AppMotion {
 class AppShadows {
   static List<BoxShadow> get soft => [
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.035),
-      blurRadius: 18,
-      offset: const Offset(0, 10),
+      color: const Color(0xFF172033).withValues(alpha: 0.07),
+      blurRadius: 24,
+      offset: const Offset(0, 12),
     ),
   ];
 
   static List<BoxShadow> get glass => [
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.07),
-      blurRadius: 28,
+      color: const Color(0xFF172033).withValues(alpha: 0.14),
+      blurRadius: 32,
+      offset: const Offset(0, 16),
+    ),
+  ];
+
+  static List<BoxShadow> get dock => [
+    BoxShadow(
+      color: const Color(0xFF172033).withValues(alpha: 0.16),
+      blurRadius: 30,
       offset: const Offset(0, 12),
     ),
   ];
@@ -451,7 +533,7 @@ class AppTheme {
           );
     return ThemeData(
       useMaterial3: true,
-      fontFamily: 'Instrument Sans',
+      fontFamily: 'Manrope',
       brightness: brightness,
       extensions: [tokens],
       scaffoldBackgroundColor: tokens.background,
@@ -485,64 +567,66 @@ class AppTheme {
       ),
       textTheme: TextTheme(
         displayLarge: TextStyle(
-          fontSize: 40,
-          fontWeight: FontWeight.w600,
+          fontSize: 34,
+          fontWeight: FontWeight.w700,
           letterSpacing: -0.8,
-          height: 1.05,
+          height: 40 / 34,
           color: tokens.textPrimary,
         ),
         displayMedium: TextStyle(
-          fontSize: 32,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.45,
-          height: 1.06,
+          fontSize: 30,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.65,
+          height: 34 / 30,
           color: tokens.textPrimary,
         ),
         headlineLarge: TextStyle(
           fontSize: 26,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.25,
-          height: 1.1,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.45,
+          height: 32 / 26,
           color: tokens.textPrimary,
         ),
         headlineMedium: TextStyle(
-          fontSize: 21,
+          fontSize: 19,
           fontWeight: FontWeight.w600,
-          letterSpacing: 0,
-          height: 1.12,
+          height: 24 / 19,
           color: tokens.textPrimary,
         ),
         titleLarge: TextStyle(
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
+          height: 21 / 16,
           color: tokens.textPrimary,
         ),
         titleMedium: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          height: 18 / 14,
           color: tokens.textPrimary,
         ),
         bodyLarge: TextStyle(
-          fontSize: 16,
+          fontSize: 15,
           fontWeight: FontWeight.w400,
-          height: 1.38,
+          height: 22 / 15,
           color: tokens.textPrimary,
         ),
         bodyMedium: TextStyle(
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: FontWeight.w400,
-          height: 1.36,
+          height: 19 / 13,
           color: tokens.textSecondary,
         ),
         labelLarge: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          height: 18 / 14,
           color: tokens.textPrimary,
         ),
         labelSmall: TextStyle(
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
-          letterSpacing: 0,
+          height: 14 / 11,
           color: tokens.textTertiary,
         ),
       ),
@@ -568,51 +652,60 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: tokens.accentInk, width: 1.5),
+          borderSide: BorderSide(color: tokens.accent, width: 2),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderSide: BorderSide(color: tokens.divider),
         ),
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 16,
+          horizontal: 16,
+          vertical: 17,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: tokens.accentStrong,
-          foregroundColor: tokens.onAccent,
-          elevation: 0,
-          side: BorderSide(color: tokens.accentBorder, width: 1),
+          backgroundColor: tokens.primaryAction,
+          foregroundColor: tokens.onPrimaryAction,
+          minimumSize: const Size(44, 52),
+          elevation: 1,
+          shadowColor: tokens.accent.withValues(alpha: 0.2),
+          side: BorderSide(color: tokens.primaryAction, width: 1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           textStyle: const TextStyle(
-            fontFamily: 'Instrument Sans',
-            fontSize: 15,
+            fontFamily: 'Manrope',
+            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: tokens.accentStrong,
-          foregroundColor: tokens.onAccent,
-          minimumSize: const Size(44, 44),
-          side: BorderSide(color: tokens.accentBorder, width: 1),
+          backgroundColor: tokens.primaryAction,
+          foregroundColor: tokens.onPrimaryAction,
+          minimumSize: const Size(44, 52),
+          side: BorderSide(color: tokens.primaryAction, width: 1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           textStyle: const TextStyle(
-            fontFamily: 'Instrument Sans',
-            fontSize: 15,
+            fontFamily: 'Manrope',
+            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: tokens.accentInk,
+          foregroundColor: tokens.textPrimary,
           minimumSize: const Size(44, 44),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
           textStyle: const TextStyle(
-            fontFamily: 'Instrument Sans',
+            fontFamily: 'Manrope',
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -621,27 +714,28 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: tokens.textPrimary,
-          minimumSize: const Size(44, 44),
+          minimumSize: const Size(44, 50),
           side: BorderSide(color: tokens.dividerStrong),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           textStyle: const TextStyle(
-            fontFamily: 'Instrument Sans',
+            fontFamily: 'Manrope',
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: tokens.accentStrong,
-        foregroundColor: tokens.onAccent,
+        backgroundColor: tokens.primaryAction,
+        foregroundColor: tokens.onPrimaryAction,
         elevation: 0,
         focusElevation: 0,
         hoverElevation: 0,
         highlightElevation: 0,
-        shape: CircleBorder(
-          side: BorderSide(color: tokens.accentBorder, width: 1),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          side: BorderSide(color: tokens.primaryAction, width: 1),
         ),
       ),
       checkboxTheme: CheckboxThemeData(
@@ -676,7 +770,7 @@ class AppTheme {
         dragHandleColor: tokens.dividerStrong,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppRadius.xl),
+            top: Radius.circular(AppRadius.sheet),
           ),
         ),
       ),

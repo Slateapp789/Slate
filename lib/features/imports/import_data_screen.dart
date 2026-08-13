@@ -138,7 +138,10 @@ class _ImportRow extends StatelessWidget {
     return WorkloopListRow(
       onTap: onTap,
       showDivider: showDivider,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
       leading: Container(
         width: 40,
         height: 40,

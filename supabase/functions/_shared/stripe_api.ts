@@ -15,6 +15,7 @@ type StripeRequestOptions = {
   accountId?: string;
   idempotencyKey?: string;
   form?: Array<[string, string]>;
+  json?: unknown;
 };
 
 export async function stripeRequest<T>(
@@ -31,11 +32,18 @@ export async function stripeRequest<T>(
     headers.set("Idempotency-Key", options.idempotencyKey);
   }
 
-  let body: URLSearchParams | undefined;
+  if (options.form && options.json !== undefined) {
+    throw new Error("Stripe requests cannot contain both form and JSON bodies");
+  }
+
+  let body: URLSearchParams | string | undefined;
   if (options.form) {
     body = new URLSearchParams();
     for (const [key, value] of options.form) body.append(key, value);
     headers.set("Content-Type", "application/x-www-form-urlencoded");
+  } else if (options.json !== undefined) {
+    body = JSON.stringify(options.json);
+    headers.set("Content-Type", "application/json");
   }
 
   const response = await fetch(`https://api.stripe.com${path}`, {
@@ -130,6 +138,17 @@ export async function verifyStripeSignature(
 
 export function publicStripeError(error: unknown) {
   if (error instanceof StripeApiError) {
+    const normalizedMessage = error.message.toLowerCase();
+    if (
+      normalizedMessage.includes("responsibilities of managing losses") ||
+      normalizedMessage.includes("/settings/connect/platform-profile")
+    ) {
+      return {
+        status: 503,
+        message: "Payment setup is being finalised. Please try again shortly.",
+        code: "platform_configuration_required",
+      };
+    }
     return {
       status: error.status >= 400 && error.status < 500 ? 400 : 502,
       message: error.message,

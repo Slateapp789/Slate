@@ -28,7 +28,7 @@ class ObPreferences extends ConsumerWidget {
           'Bring your work with you',
           style: TextStyle(
             color: AppColors.t1,
-            fontSize: 30,
+            fontSize: 27,
             height: 1.05,
             fontWeight: FontWeight.w600,
           ),
@@ -117,7 +117,10 @@ class _PreferenceSwitch extends StatelessWidget {
     final tokens = SlateTheme.of(context);
     return WorkloopListRow(
       onTap: () => onChanged(!value),
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
       leading: Container(
         width: 42,
         height: 42,

@@ -75,6 +75,7 @@ export function setup() {
   if (
     lowered.includes(productionProjectRef) ||
     lowered.includes("workloop.app") ||
+    lowered.includes("workloop.uk") ||
     lowered.includes("workloop.co.uk")
   ) {
     fail("Refusing to run against the known Workloop production target.");

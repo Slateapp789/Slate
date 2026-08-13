@@ -49,6 +49,17 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Record clean candidate provenance
+        run: bash scripts/qa_release_candidate.sh --prepare
+
+      - name: Upload candidate provenance
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-candidate-provenance
+          path: build/release/release-provenance.txt
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -94,10 +105,12 @@ jobs:
           deno check --config supabase/functions/get-public-profile/deno.json supabase/functions/get-public-profile/index.ts
           deno check --config supabase/functions/places-address-search/deno.json supabase/functions/places-address-search/index.ts
           deno check --config supabase/functions/request-account-deletion/deno.json supabase/functions/request-account-deletion/index.ts
+          deno check --config supabase/functions/stripe-payments/deno.json supabase/functions/stripe-payments/index.ts
+          deno check --config supabase/functions/stripe-webhook/deno.json supabase/functions/stripe-webhook/index.ts
           deno check supabase/functions/workloop-ai-assistant/index.ts
 
       - name: Test Edge Function logic
-        run: deno test supabase/functions
+        run: deno test --allow-env supabase/functions
 
       - name: Build Android profile APK
         run: >-

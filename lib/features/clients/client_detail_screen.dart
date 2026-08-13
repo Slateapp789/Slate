@@ -281,7 +281,12 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
           canPop: !deleting,
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                AppSpacing.sm,
+                AppSpacing.pageX,
+                AppSpacing.xl,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -648,9 +653,9 @@ class _ClientCompactHeader extends StatelessWidget {
         : status == 'lead'
         ? AppColors.warning
         : AppColors.t3;
-    return SlateGlassSurface(
-      blur: 18,
+    return WorkloopSurface(
       color: AppColors.bgCard.withValues(alpha: 0.68),
+      borderColor: AppColors.border,
       padding: const EdgeInsets.all(AppSpacing.sm),
       child: Row(
         children: [
@@ -737,10 +742,10 @@ class _CompactContactButton extends StatelessWidget {
         color: onTap == null
             ? AppColors.bgInteract.withValues(alpha: 0.55)
             : AppColors.modClients.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           child: SizedBox(
             width: AppSpacing.minTouch,
             height: AppSpacing.minTouch,
@@ -776,10 +781,10 @@ class _HeaderAction extends StatelessWidget {
       color: primary && enabled
           ? AppColors.accentPrimary.withValues(alpha: 0.14)
           : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadius.pill),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: ConstrainedBox(
           constraints: const BoxConstraints(
             minWidth: 58,
@@ -827,96 +832,13 @@ class _ClientWorkspaceNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = SlateTheme.of(context);
-    return SlateGlassSurface(
-      blur: 16,
-      color: tokens.surface,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-      child: SizedBox(
-        height: 54,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final itemWidth = constraints.maxWidth / _labels.length;
-
-            void select(int next) {
-              if (next == index) return;
-              SlateHaptics.tap();
-              onChanged(next);
-            }
-
-            void handleDrag(double dx) {
-              select((dx / itemWidth).floor().clamp(0, _labels.length - 1));
-            }
-
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onHorizontalDragStart: (details) {
-                handleDrag(details.localPosition.dx);
-              },
-              onHorizontalDragUpdate: (details) {
-                handleDrag(details.localPosition.dx);
-              },
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  AnimatedPositioned(
-                    duration: AppMotion.deliberate,
-                    curve: AppMotion.emphasized,
-                    left: index * itemWidth,
-                    top: 6,
-                    width: itemWidth,
-                    height: 42,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: tokens.accentStrong,
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                          border: Border.all(color: tokens.accentStrong),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Row(
-                    children: List.generate(
-                      _labels.length,
-                      (tabIndex) => Expanded(
-                        child: Semantics(
-                          button: true,
-                          selected: tabIndex == index,
-                          label: '${_labels[tabIndex]} client workspace tab',
-                          onTap: () => select(tabIndex),
-                          child: ExcludeSemantics(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () => select(tabIndex),
-                              child: Center(
-                                child: AnimatedDefaultTextStyle(
-                                  key: ValueKey(Theme.of(context).brightness),
-                                  duration: AppMotion.standard,
-                                  style: TextStyle(
-                                    fontFamily: 'Instrument Sans',
-                                    color: tabIndex == index
-                                        ? tokens.onAccent
-                                        : tokens.textSecondary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  child: Text(_labels[tabIndex]),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
+    return WorkloopNavigationControl<int>(
+      selected: index,
+      onChanged: onChanged,
+      segments: [
+        for (final (tabIndex, label) in _labels.indexed)
+          WorkloopSegment(value: tabIndex, label: label),
+      ],
     );
   }
 }

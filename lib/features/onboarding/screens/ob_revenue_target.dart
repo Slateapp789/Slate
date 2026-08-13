@@ -55,7 +55,7 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpacing.pageX),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -63,7 +63,7 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
           const Text(
             'Set your\nrevenue target.',
             style: TextStyle(
-              fontSize: 32,
+              fontSize: 28,
               fontWeight: FontWeight.w600,
               color: AppColors.t1,
               letterSpacing: 0,
@@ -172,16 +172,6 @@ class _ObRevenueTargetState extends ConsumerState<ObRevenueTarget> {
             height: 54,
             child: ElevatedButton(
               onPressed: _hasValue ? _continue : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.brandAccent,
-                disabledBackgroundColor: AppColors.bgInteract,
-                foregroundColor: AppColors.onBrandAccent,
-                disabledForegroundColor: AppColors.t3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 0,
-              ),
               child: const Text(
                 'Continue',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),

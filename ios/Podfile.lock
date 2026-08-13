@@ -10,7 +10,7 @@ DEPENDENCIES:
   - device_calendar (from `.symlinks/plugins/device_calendar/ios`)
   - Flutter (from `Flutter`)
   - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
-  - StripeTerminal (~> 5.0)
+  - StripeTerminal (~> 5.7)
 
 SPEC REPOS:
   trunk:
@@ -30,6 +30,6 @@ SPEC CHECKSUMS:
   flutter_local_notifications: df98d66e515e1ca797af436137b4459b160ad8c9
   StripeTerminal: eb4b4a85efe1365f562dab7e589cfa77ec2bdc99
 
-PODFILE CHECKSUM: 7955ea164bcb193c32245305dea86d8889b28f04
+PODFILE CHECKSUM: dfeeb33e561d322bdb3e8dc7cae4a630786b9c80
 
 COCOAPODS: 1.16.2

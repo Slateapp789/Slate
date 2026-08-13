@@ -31,20 +31,3 @@ ClientView clientViewAtHorizontalPosition({
   );
   return clientViewOrder[index];
 }
-
-ClientView clientViewAfterSwipe({
-  required ClientView current,
-  required double dragDistance,
-  required double velocity,
-  double minimumDistance = 52,
-  double minimumVelocity = 420,
-}) {
-  final hasDistance = dragDistance.abs() >= minimumDistance;
-  final hasVelocity = velocity.abs() >= minimumVelocity;
-  if (!hasDistance && !hasVelocity) return current;
-
-  final direction = hasDistance ? dragDistance : velocity;
-  final currentIndex = clientViewOrder.indexOf(current);
-  final targetIndex = direction < 0 ? currentIndex + 1 : currentIndex - 1;
-  return clientViewOrder[targetIndex.clamp(0, clientViewOrder.length - 1)];
-}

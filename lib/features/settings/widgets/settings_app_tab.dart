@@ -109,7 +109,10 @@ class _PreferenceRow extends StatelessWidget {
     return WorkloopListRow(
       onTap: onTap,
       showDivider: false,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
       leading: Container(
         width: 40,
         height: 40,

@@ -3,19 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:workloop/core/theme/app_theme.dart';
-import 'package:workloop/features/appointments/appointments_screen.dart';
+import 'package:workloop/features/appointments/appointment_detail_screen.dart';
 import 'package:workloop/features/auth/auth_screen.dart';
+import 'package:workloop/features/business/business_screen.dart';
 import 'package:workloop/features/business_feed/business_feed_screen.dart';
 import 'package:workloop/features/clients/add_client_screen.dart';
 import 'package:workloop/features/clients/clients_screen.dart';
 import 'package:workloop/features/dashboard/dashboard_screen.dart';
 import 'package:workloop/features/finance/finance_screen.dart';
-import 'package:workloop/features/more/more_screen.dart';
+import 'package:workloop/features/finance/payment_collection_sheet.dart';
 import 'package:workloop/features/notes/notes_screen.dart';
+import 'package:workloop/features/profile/booking_page_screen.dart';
 import 'package:workloop/features/public_profile/booking_requests_screen.dart';
 import 'package:workloop/features/public_profile/public_profile_screen.dart';
 import 'package:workloop/features/settings/settings_screen.dart';
+import 'package:workloop/features/settings/providers/settings_providers.dart';
 import 'package:workloop/features/tasks/tasks_screen.dart';
+import 'package:workloop/features/work/work_screen.dart';
 import 'package:workloop/shared/models/slate_models.dart';
 import 'package:workloop/shared/providers/appointments_provider.dart';
 import 'package:workloop/shared/providers/business_feed_provider.dart';
@@ -23,12 +27,15 @@ import 'package:workloop/shared/providers/clients_provider.dart';
 import 'package:workloop/shared/providers/dashboard_provider.dart';
 import 'package:workloop/shared/providers/finance_provider.dart';
 import 'package:workloop/shared/providers/notes_provider.dart';
+import 'package:workloop/shared/providers/notifications_provider.dart';
 import 'package:workloop/shared/providers/setup_checklist_provider.dart';
 import 'package:workloop/shared/providers/tasks_provider.dart';
 import 'package:workloop/shared/providers/workspace_provider.dart';
 import 'package:workloop/shared/providers/workspace_settings_provider.dart';
 import 'package:workloop/shared/repositories/auth_repository.dart';
 import 'package:workloop/shared/repositories/profile_repository.dart';
+import 'package:workloop/shared/repositories/services_repository.dart';
+import 'package:workloop/main.dart' show MainShell;
 
 void main() {
   testWidgets(
@@ -41,6 +48,13 @@ void main() {
         now: DateTime(2026, 7, 26),
       );
       final authRepository = AuthRepository(
+        SupabaseClient(
+          'https://example.supabase.co',
+          'test-anon-key',
+          authOptions: const AuthClientOptions(autoRefreshToken: false),
+        ),
+      );
+      final servicesRepository = _ResponsiveServicesRepository(
         SupabaseClient(
           'https://example.supabase.co',
           'test-anon-key',
@@ -79,15 +93,20 @@ void main() {
               DashboardScreen(onNavigate: (_) {}, onOpenMoneyFollowUps: () {}),
         ),
         _SurfaceCase('clients', () => const ClientsScreen()),
-        _SurfaceCase('bookings', () => const AppointmentsScreen()),
+        _SurfaceCase('main shell', () => const MainShell()),
+        _SurfaceCase('work', () => const WorkScreen()),
         _SurfaceCase('money', () => const FinanceScreen()),
+        _SurfaceCase('business', () => const BusinessScreen()),
+        _SurfaceCase('booking page', () => const BookingPageScreen()),
         _SurfaceCase(
-          'more',
-          () => MoreScreen(
-            onOpenMoney: () {},
-            onOpenTasks: () {},
-            onOpenNotes: () {},
+          'booking detail',
+          () => const AppointmentDetailScreen(
+            appointment: _appointmentDetailFixture,
           ),
+        ),
+        _SurfaceCase(
+          'payment setup',
+          () => Scaffold(body: PaymentSetupCard(onTap: _noOp)),
         ),
         _SurfaceCase('tasks', () => const TasksScreen()),
         _SurfaceCase('notes', () => const NotesScreen(showBackButton: false)),
@@ -135,10 +154,17 @@ void main() {
                     dashboardAttentionProvider.overrideWith(
                       (ref) async => const [],
                     ),
+                    unreadNotificationsProvider.overrideWith((ref) async => 0),
                     clientsProvider.overrideWith((ref) async => const []),
                     appointmentsProvider.overrideWith((ref) async => const []),
                     bookingRequestsProvider.overrideWith(
                       (ref) async => const [],
+                    ),
+                    appointmentTasksProvider.overrideWith(
+                      (ref, appointmentId) async => const [],
+                    ),
+                    appointmentPaymentsProvider.overrideWith(
+                      (ref, appointmentId) async => const [],
                     ),
                     invoicesProvider.overrideWith((ref) async => const []),
                     expensesProvider.overrideWith((ref) async => const []),
@@ -146,10 +172,46 @@ void main() {
                     workspaceSettingsProvider.overrideWith(
                       (ref) async => const {'revenue_target': 5000},
                     ),
+                    settingsBusinessProfileProvider.overrideWith(
+                      (ref) async => const BusinessProfile(
+                        id: 'profile-1',
+                        workspaceId: 'workspace-1',
+                        handle: 'quality-studio',
+                        bookingMode: 'manual',
+                      ),
+                    ),
+                    settingsWorkspaceSettingsProvider.overrideWith(
+                      (ref) async => const {
+                        'working_hours': {
+                          'Monday': {
+                            'enabled': true,
+                            'blocks': [
+                              {'start': '09:00', 'end': '17:00'},
+                            ],
+                          },
+                        },
+                      },
+                    ),
+                    settingsServicesProvider.overrideWith(
+                      (ref) async => const [
+                        {
+                          'id': 'service-1',
+                          'workspace_id': 'workspace-1',
+                          'name': 'Signature consultation',
+                          'duration_mins': 60,
+                          'price': 85.0,
+                          'active': true,
+                          'show_on_profile': true,
+                        },
+                      ],
+                    ),
                     allTasksProvider.overrideWith((ref) async => const []),
                     allNotesProvider.overrideWith((ref) async => const []),
                     businessFeedProvider.overrideWith((ref) async => const []),
                     authRepositoryProvider.overrideWithValue(authRepository),
+                    servicesRepositoryProvider.overrideWithValue(
+                      servicesRepository,
+                    ),
                   ],
                   child: MaterialApp(
                     debugShowCheckedModeBanner: false,
@@ -214,7 +276,44 @@ void main() {
     expect(find.byType(Scrollable), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('first-run account action is visible without scrolling', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: const MediaQuery(
+          data: MediaQueryData(
+            size: Size(320, 568),
+            devicePixelRatio: 1,
+            disableAnimations: true,
+          ),
+          child: AuthScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final action = find.byKey(const ValueKey('auth-first-run-cta'));
+    expect(action, findsOneWidget);
+    expect(tester.getTopLeft(action).dy, greaterThanOrEqualTo(0));
+    expect(tester.getBottomRight(action).dy, lessThanOrEqualTo(568));
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(find.text('Create your account.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
+
+void _noOp() {}
 
 class _DeviceCase {
   final String name;
@@ -229,6 +328,14 @@ class _SurfaceCase {
   final Widget Function() builder;
 
   const _SurfaceCase(this.name, this.builder);
+}
+
+class _ResponsiveServicesRepository extends ServicesRepository {
+  const _ResponsiveServicesRepository(super.client);
+
+  @override
+  Future<List<Map<String, dynamic>>> listRows(String workspaceId) async =>
+      const [];
 }
 
 const _previewProfile = PublicProfile(
@@ -260,3 +367,17 @@ const _previewProfile = PublicProfile(
     ),
   ],
 );
+
+const _appointmentDetailFixture = <String, dynamic>{
+  'id': 'appointment-detail-1',
+  'workspace_id': 'workspace-1',
+  'contact_id': 'client-1',
+  'service_id': 'service-1',
+  'title': 'Signature consultation',
+  'start_time': '2026-07-30T10:00:00.000',
+  'end_time': '2026-07-30T11:00:00.000',
+  'status': 'scheduled',
+  'price': 85.0,
+  'contacts': {'name': 'Aisha Morgan'},
+  'services': {'name': 'Signature consultation'},
+};

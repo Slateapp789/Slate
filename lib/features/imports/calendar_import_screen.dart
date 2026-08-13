@@ -1,6 +1,7 @@
 import 'package:device_calendar/device_calendar.dart' as device;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_contacts/flutter_contacts.dart' as contacts;
 import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -63,12 +64,14 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
   DateTime _to = DateTime.now().add(const Duration(days: 90));
   bool _loading = false;
   bool _importing = false;
+  bool _permissionDenied = false;
   String? _message;
 
   Future<void> _loadCalendars() async {
     if (_loading || _importing) return;
     setState(() {
       _loading = true;
+      _permissionDenied = false;
       _message = null;
     });
     try {
@@ -78,10 +81,11 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
       }
       if (permission.data != true) {
         if (mounted) {
-          setState(
-            () => _message =
-                'Calendar access is off. Enable it in system settings to choose events.',
-          );
+          setState(() {
+            _permissionDenied = true;
+            _message =
+                'Calendar access is off. Enable it in system settings to choose events.';
+          });
         }
         return;
       }
@@ -89,6 +93,7 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
       final calendars = result.data?.toList() ?? const <device.Calendar>[];
       if (!mounted) return;
       setState(() {
+        _permissionDenied = false;
         _calendars = calendars;
         _calendarId =
             calendars
@@ -110,6 +115,17 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _openSettings() async {
+    try {
+      await contacts.FlutterContacts.permissions.openSettings();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('System settings could not be opened')),
+      );
     }
   }
 
@@ -380,6 +396,16 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
               icon: LucideIcons.calendarDays,
               onPressed: _loading ? null : _loadCalendars,
             ),
+            if (_permissionDenied) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: WorkloopTextButton(
+                  label: 'Open system settings',
+                  onPressed: _openSettings,
+                ),
+              ),
+            ],
           ] else ...[
             const Text(
               'Calendar',

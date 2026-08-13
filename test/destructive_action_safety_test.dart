@@ -168,7 +168,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField).first, 'taken-handle');
-    await tester.tap(find.text('Save public profile'));
+    await tester.tap(find.text('Save booking page'));
     await tester.pumpAndSettle();
 
     expect(repository.availabilityChecks, 1);

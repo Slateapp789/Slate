@@ -108,7 +108,7 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
     final services = ref.watch(onboardingProvider).services;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpacing.pageX),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -116,7 +116,7 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
           Text(
             'Create your\nfirst booking.',
             style: TextStyle(
-              fontSize: 32,
+              fontSize: 28,
               fontWeight: FontWeight.w600,
               color: AppColors.t1,
               letterSpacing: 0,
@@ -280,16 +280,6 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
             height: 54,
             child: ElevatedButton(
               onPressed: _canContinue ? _saveAndContinue : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.brandAccent,
-                disabledBackgroundColor: AppColors.bgInteract,
-                foregroundColor: AppColors.onBrandAccent,
-                disabledForegroundColor: AppColors.t3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 0,
-              ),
               child: const Text(
                 'Create booking',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),

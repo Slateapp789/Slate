@@ -56,10 +56,10 @@ class _TaskSaveAction extends StatelessWidget {
       color: enabled
           ? AppColors.modTasks.withValues(alpha: 0.14)
           : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadius.pill),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         onTap: enabled && !loading ? onTap : null,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: ConstrainedBox(
           constraints: const BoxConstraints(
             minWidth: 58,
@@ -419,7 +419,7 @@ class _TaskOptionsDisclosure extends StatelessWidget {
                 ),
                 AnimatedRotation(
                   turns: expanded ? 0.5 : 0,
-                  duration: AppMotion.standard,
+                  duration: AppMotion.responsive(context, AppMotion.standard),
                   child: const Icon(
                     LucideIcons.chevronDown,
                     size: 16,
@@ -558,7 +558,7 @@ class _PriorityChoice extends StatelessWidget {
                 color: active
                     ? color.withValues(alpha: 0.15)
                     : AppColors.bgInteract,
-                borderRadius: BorderRadius.circular(AppRadius.pill),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 border: Border.all(color: active ? color : Colors.transparent),
               ),
               child: Text(

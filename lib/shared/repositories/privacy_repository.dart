@@ -27,6 +27,9 @@ const workspacePrivacyExportTables = <String>{
   'notifications',
   'push_tokens',
   'calendar_sync_accounts',
+  'workspace_payment_accounts',
+  'payment_transactions',
+  'payment_refunds',
   'account_deletion_requests',
 };
 
@@ -119,6 +122,18 @@ class PrivacyRepository {
         workspaceId,
         warnings,
       ),
+      'workspace_payment_account': await _maybeSingle(
+        'workspace_payment_accounts',
+        'workspace_id',
+        workspaceId,
+        warnings,
+      ),
+      'payment_transactions': await _list(
+        'payment_transactions',
+        workspaceId,
+        warnings,
+      ),
+      'payment_refunds': await _list('payment_refunds', workspaceId, warnings),
       'account_deletion_requests': await _list(
         'account_deletion_requests',
         workspaceId,

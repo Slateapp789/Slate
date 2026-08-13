@@ -1,6 +1,9 @@
 import {
   amountToMinor,
+  publicStripeError,
   safePlatformFeeMinor,
+  StripeApiError,
+  stripeRequest,
   verifyStripeSignature,
 } from "./stripe_api.ts";
 
@@ -19,6 +22,65 @@ Deno.test("platform fee remains zero unless explicitly enabled", () => {
     }
   } finally {
     Deno.env.delete("WORKLOOP_PLATFORM_FEE_BPS");
+  }
+});
+
+Deno.test("platform setup errors never expose internal Stripe links", () => {
+  const result = publicStripeError(
+    new StripeApiError(
+      "Please review the responsibilities of managing losses at " +
+        "https://dashboard.stripe.com/settings/connect/platform-profile.",
+      400,
+    ),
+  );
+  if (result.status !== 503) throw new Error("Expected a setup outage");
+  if (result.code !== "platform_configuration_required") {
+    throw new Error("Expected a stable platform setup code");
+  }
+  if (result.message.includes("stripe.com")) {
+    throw new Error("Internal Stripe links must not reach the app");
+  }
+});
+
+Deno.test("Stripe v2 requests use pinned JSON without exposing the key", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestUrl = "";
+  let requestHeaders = new Headers();
+  let requestBody = "";
+  globalThis.fetch = (input, init) => {
+    requestUrl = String(input);
+    requestHeaders = new Headers(init?.headers);
+    requestBody = typeof init?.body === "string" ? init.body : "";
+    return Promise.resolve(
+      new Response('{"id":"acct_v2_test"}', {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  };
+  try {
+    await stripeRequest("sk_test_private", "/v2/core/accounts", {
+      idempotencyKey: "workloop-connect-v2-test",
+      json: { dashboard: "full" },
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  if (requestUrl !== "https://api.stripe.com/v2/core/accounts") {
+    throw new Error("Expected the Accounts v2 endpoint");
+  }
+  if (requestHeaders.get("Content-Type") !== "application/json") {
+    throw new Error("Expected a JSON request");
+  }
+  if (requestHeaders.get("Stripe-Version") !== "2026-07-29.dahlia") {
+    throw new Error("Expected the pinned Stripe API version");
+  }
+  if (requestBody !== '{"dashboard":"full"}') {
+    throw new Error("Unexpected Stripe JSON body");
+  }
+  if (requestBody.includes("sk_test_private")) {
+    throw new Error("Stripe keys must remain in authorization headers");
   }
 });
 

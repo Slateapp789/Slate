@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://workloop.app/sitemap.xml
+Sitemap: https://workloop.uk/sitemap.xml

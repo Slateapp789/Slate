@@ -53,10 +53,10 @@ class AppointmentHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      child: SlateGlassSurface(
-        blur: 18,
+      child: WorkloopSurface(
         radius: AppRadius.lg,
         color: AppColors.bgCard.withValues(alpha: 0.72),
+        borderColor: AppColors.border,
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: editing ? _buildEditMode() : _buildViewMode(context),
       ),
@@ -64,6 +64,49 @@ class AppointmentHeroCard extends StatelessWidget {
   }
 
   Widget _buildViewMode(BuildContext context) {
+    final serviceLabel = Text(
+      serviceName,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(
+        fontSize: 13,
+        color: AppColors.t3,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+    Widget clientAction({bool compact = false, bool iconOnly = false}) {
+      if (iconOnly && !openingClient) {
+        return const Icon(
+          LucideIcons.chevronRight,
+          size: 16,
+          color: AppColors.modClients,
+        );
+      }
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            openingClient
+                ? 'Opening…'
+                : compact
+                ? 'Client'
+                : 'View client',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.modClients,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xxs),
+          const Icon(
+            LucideIcons.chevronRight,
+            size: 12,
+            color: AppColors.modClients,
+          ),
+        ],
+      );
+    }
+
     final clientDetails = ConstrainedBox(
       constraints: const BoxConstraints(minHeight: AppSpacing.minTouch),
       child: Column(
@@ -82,38 +125,37 @@ class AppointmentHeroCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Row(
-            children: [
-              Flexible(
-                child: Text(
-                  serviceName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.t3,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              if (contactId != null) ...[
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  openingClient ? 'Opening…' : 'View client',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.modClients,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xxs),
-                const Icon(
-                  LucideIcons.chevronRight,
-                  size: 12,
-                  color: AppColors.modClients,
-                ),
-              ],
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stackAction =
+                  contactId != null &&
+                  (constraints.maxWidth < 160 ||
+                      MediaQuery.textScalerOf(context).scale(11) > 14);
+              if (stackAction) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    serviceLabel,
+                    const SizedBox(height: AppSpacing.xxs),
+                    clientAction(
+                      compact: constraints.maxWidth < 145,
+                      iconOnly:
+                          constraints.maxWidth < 100 ||
+                          MediaQuery.textScalerOf(context).scale(11) > 14,
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: serviceLabel),
+                  if (contactId != null) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    clientAction(),
+                  ],
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -347,7 +389,7 @@ class AppointmentDateTimeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppColors.bgCard.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(16),
@@ -468,21 +510,52 @@ class AppointmentDateTimeCard extends StatelessWidget {
   }
 
   Widget _row(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.t3, size: 16),
-        const SizedBox(width: 12),
-        Text(label, style: const TextStyle(fontSize: 13, color: AppColors.t3)),
-        const Spacer(),
-        Text(
+    return Builder(
+      builder: (context) {
+        final stacked = MediaQuery.textScalerOf(context).scale(13) > 18;
+        final labelRow = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: AppColors.t3, size: 16),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                label,
+                style: const TextStyle(fontSize: 13, color: AppColors.t3),
+              ),
+            ),
+          ],
+        );
+        final valueText = Text(
           value,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: stacked ? TextAlign.start : TextAlign.end,
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
             color: AppColors.t1,
           ),
-        ),
-      ],
+        );
+        if (stacked) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              labelRow,
+              const SizedBox(height: AppSpacing.xs),
+              valueText,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: labelRow),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: valueText),
+          ],
+        );
+      },
     );
   }
 
@@ -586,14 +659,6 @@ class AppointmentActionSection extends StatelessWidget {
             height: 52,
             child: ElevatedButton.icon(
               onPressed: loading ? null : onComplete,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.brandAccent,
-                foregroundColor: AppColors.onBrandAccent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 0,
-              ),
               icon: loading
                   ? const SizedBox(
                       width: 16,

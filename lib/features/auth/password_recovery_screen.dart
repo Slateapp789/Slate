@@ -101,14 +101,14 @@ class _PasswordRecoveryScreenState
                           'Choose a new password.',
                           style: TextStyle(
                             color: AppColors.t1,
-                            fontSize: 30,
+                            fontSize: 27,
                             fontWeight: FontWeight.w600,
                             height: 1.05,
                           ),
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         const Text(
-                          'Use a strong password you have not used elsewhere.',
+                          'Use $minimumWorkloopPasswordLength+ characters with uppercase, lowercase, a number, and a symbol you have not used elsewhere.',
                           style: TextStyle(
                             color: AppColors.t3,
                             fontSize: 15,

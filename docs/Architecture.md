@@ -11,7 +11,7 @@ Workloop is a Flutter application using:
 - Supabase for Auth, Postgres, RLS, RPC workflows, and Edge Functions
 - GoRouter for top-level routes
 - Material navigation for many nested flows
-- Bundled Instrument Sans variable font
+- Bundled Manrope variable font
 - `lucide_flutter` icons
 - url_launcher for phone/email/external actions
 - shared_preferences for non-critical, device-specific choices such as the default maps app
@@ -115,15 +115,19 @@ Top-level routes use GoRouter:
 
 Main app tabs are controlled by `MainShell` local state:
 
-- Home
+- Today
 - Clients
-- Bookings
-- Tools
+- Work
+- Money
+- Business
 
-Money, Tasks, and Notes are routed from Tools. Profile and Settings are opened
-from the Home header or direct feature links. Many detail and creation flows
-still use `Navigator.push`; this should migrate gradually when deeper
-restoration or linking requires it.
+Work retains Schedule, Tasks, and Notes as peer views inside one operating
+workspace. Business leads with the public Booking page and links to Services,
+Working hours, and Business profile; Settings is a secondary header utility.
+Today keeps Notifications as its sole utility so the daily command surface is
+not also an account menu. Many detail and creation flows still use
+`Navigator.push`; this should migrate gradually when deeper restoration or
+linking requires it.
 
 ## State Management
 

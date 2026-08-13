@@ -1,6 +1,6 @@
 # Workloop Known Quality and Launch Gaps
 
-Last updated: 2026-07-26
+Last updated: 2026-08-13
 
 ## How to use this register
 
@@ -17,14 +17,14 @@ absence because several critical dynamic suites are blocked.
 
 | ID | Gap | Evidence and impact | Exit evidence | Suggested owner |
 | --- | --- | --- | --- | --- |
-| H-01 | Clean database replay and pgTAP were not executed locally | Docker was unavailable. The schema/RLS suites are implemented, but the reconstructed clean baseline and all later migrations have not been proven from an empty database on this candidate. A migration or policy error can block a new environment or expose data. | `supabase db reset --local` and `supabase test db` pass on the release SHA; CI run URL retained; no skipped assertions. | Backend / QA |
-| H-02 | No isolated authenticated core-business E2E | The current integration harness is signed-out only. Registration, onboarding, client, booking, money, task, note, dashboard refresh, restart, token expiry, and retry are not proven together. | Automated authenticated journey passes on iOS and Android against disposable Supabase staging, including restart and failure recovery. | Mobile / QA |
-| H-03 | Two-account isolation is authored but not dynamically proven | pgTAP User A/User B tests are unexecuted, and no client-SDK cross-tenant select/insert/update/delete/export run exists. A failure would be critical. | Local pgTAP plus SDK-level two-user suite rejects every cross-tenant operation and validates unchanged victim data. | Backend security |
-| H-04 | Public booking-request workflow lacks production-like end-to-end proof | Static validation, rate-limit, retry, conversion, and UI tests exist, but signed-out submit, owner notification/triage, decline, and atomic conversion have not run in an isolated deployed environment. This is a core public acquisition path. | Disposable staging run covers valid request, honeypot, invalid service, source/phone rate limits, stable duplicate token, parallel submit, recovery, preferences, owner triage, decline, and conversion. | Product / Backend / QA |
+| H-01 | Clean database replay was not executed locally | Docker was unavailable. The live transaction-wrapped 47-assertion schema and 14-assertion isolation scripts reached their final successful checks, but the reconstructed baseline and all migrations have not been proven from an empty database. | `supabase db reset --local` and `supabase test db` pass on the release SHA; CI run URL retained; no skipped assertions. | Backend / QA |
+| H-02 | Isolated authenticated core-business E2E is authored but not executed | A guarded staging harness now creates a client, booking, task, unpaid payment and note; completes the work/payment; verifies export; and cleans up. It compiles but has not run because no disposable staging branch/accounts are approved. Onboarding, restart, token expiry and recovery remain outside it. | Automated authenticated journey passes on iOS and Android against disposable Supabase staging, including onboarding, restart and failure recovery. | Mobile / QA |
+| H-03 | SDK-level two-account isolation is authored but not dynamically proven | A guarded two-user SDK harness attempts cross-tenant select/insert/update/delete across 13 practical disposable tables: contacts, services, appointments, invoices/line items, expenses, tasks/checklists, notes, notifications, booking requests, push tokens and calendar-sync accounts. It verifies each victim marker remains unchanged and safely skips without two disposable staging accounts; no passing dynamic result exists yet. | Clean-replay pgTAP plus SDK-level two-user suite rejects every cross-tenant operation and validates unchanged victim data. | Backend security |
+| H-04 | Public booking-request staging E2E is authored but not executed | A guarded harness now covers signed-out profile load, valid/honeypot/invalid-service requests, stable duplicate token, owner visibility and atomic booking/payment conversion. It compiles but has not run on an isolated deployment; concurrency, rate-limit recovery, decline and preferences remain open. | Disposable staging run covers valid request, honeypot, invalid service, source/phone rate limits, stable duplicate token, parallel submit, recovery, preferences, owner triage, decline, and conversion. | Product / Backend / QA |
 | H-05 | Account deletion is not verified end to end | Completion is destructive and was correctly not run against production. Sole-owner completion, multi-member rejection, cascade/orphan behaviour, audit access, retry, and operational follow-through remain unknown. | Disposable production-like accounts prove request, export, sole-owner completion, multi-member denial, cleanup, audit protection, retry, and user communication. | Backend / Operations |
-| H-06 | Production Auth controls and delivery are incomplete | Leaked-password protection is disabled. SMTP sender identity, confirmation, password recovery, redirect allow-list, expiry/revocation, and external delivery are not verified. Users could fail to onboard or recover access. | Enable leaked-password protection; verify confirmation and recovery with external addresses on both platforms; record rate limits and redirect behaviour. | Backend / Operations |
-| H-07 | Public legal, deletion, and support endpoints are not operational | The observed apex HTTPS checks timed out and `www` resolved to a parking destination. Store-required privacy, terms, deletion, and monitored support cannot be considered available. | Public HTTPS pages return successful responses without Auth, apex/`www` redirect consistently, support mailbox is monitored, and legal/operator wording is approved. | Operations / Legal |
-| H-08 | Distribution signing and store operation are incomplete | Android release bundle is guarded until an upload keystore exists. iOS Distribution certificate/App Store profile are absent. Store accounts, declarations, review credentials, agreements, tax, and banking are external gates. | Signed AAB and IPA build from the release tag; signatures verified; both console submissions and declarations complete. | Release manager |
+| H-06 | Production Auth lifecycle evidence is incomplete | Strong passwords, leaked-password checks, bounded sessions, recovery SMTP, Apple/Google entry and opt-in MFA controls are configured. A fresh external confirmation/recovery/password-change journey, existing-email identity linking and candidate restart/expiry behaviour remain unproven. | External test accounts pass confirmation, recovery, password change, identity linking, token expiry/revocation and restart on both platforms; rate-limit/redirect behaviour is recorded. | Backend / Operations |
+| H-07 | Support and legal approval remain incomplete | Canonical `workloop.uk` legal routes are public, but the deployed pages still contain the previous `workloop.app` support identity and navigation wording. Corrected local app/web copy includes Stripe and receipt-email processing, while mailbox monitoring, controller/address/company wording and launch-market legal review remain external. | Add the real operator details, retain launch-market legal approval, publish the reviewed local artifact, verify both hosts and redirects, and actively monitor support. | Operations / Legal |
+| H-08 | Current-candidate signing and store operation are incomplete | iOS distribution signing and local IPA export work, but build 3 was not accepted and predates current source/backend changes. Android has no production upload keystore/AAB. The current worktree is dirty and cannot provide candidate provenance. | Clean tagged SHA passes preflight; signed AAB/IPA and signatures/provenance are retained; both console submissions, declarations and review access are complete. | Release manager |
 | H-09 | Physical Android and full accessibility/device matrix are incomplete | Automated viewports cannot prove TalkBack/VoiceOver order, permissions, notification delivery, deep links, lifecycle, reinstall/upgrade, keyboard, and OS behaviour. The latest candidate has not completed the full iOS/Android manual matrix. | Signed manual results for a small and current Android device, supported iPhone/simulator set, VoiceOver, TalkBack, large text, reduced motion, permissions, notifications, deep links, offline, reinstall, and upgrade. | Mobile QA |
 | H-11 | Brand and store-title clearance is unresolved | Other products use similar Workloop/WorkLoop names. This is not a code defect, but it can block or force a late launch change. | Professional target-market clearance and reservation of both store listing names, with explicit product decision. | Founder / Legal |
 
@@ -38,7 +38,6 @@ absence because several critical dynamic suites are blocked.
 | M-05 | Production crash/error reporting is absent | Post-launch crashes, Edge failures, and degraded journeys may be invisible until users report them. This increases incident time and weakens launch confidence. | Adopt a privacy-reviewed crash/error service or explicitly accept the risk with support/monitoring and rollback procedures. | Product / Engineering |
 | M-06 | Repository fakes and network-failure coverage remain thin | Many widget tests exercise UI logic, but real repository failures, timeouts, stale responses, cancellation, and partial payloads are not consistently injectable across modules. | Standard repository fakes cover loading/error/retry/offline/token-expiry for every critical module. | Flutter |
 | M-07 | Storage isolation is untested | No launch attachment workflow or bucket policy was identified. Generated file metadata does not prove Supabase Storage security. Risk becomes high if attachments are enabled or marketed. | Keep attachments out of launch claims, or add buckets, least-privilege policies, two-user tests, signed URL expiry, size/type limits, malware/privacy operations. | Product / Backend |
-| M-08 | Private workflow tables rely on schema/grant isolation without RLS | The inspected `app_private` counter/idempotency tables had no client grants and were outside exposed schemas, but Supabase surfaces a generic RLS warning. A future grant/config drift could weaken defence in depth. | Reviewed decision plus automated schema exposure/grant assertions; preferably validate an RLS-compatible hardening migration locally. | Backend security |
 | M-09 | Public booking and Places operational controls are not verified | Server key restriction, quotas, billing alerts, booking salt/limits, timeout behaviour, and external dependency degradation are operational rather than source-only controls. | Staging/production configuration review and monitored smoke tests, without exposing keys. | Backend / Operations |
 | M-10 | Reminder behaviour is not proven across device lifecycle | Logic tests cannot prove OS permission denial, reboot, app update, DST/time-zone changes, background limits, reschedule/cancel, and tap routing. | iOS/Android device matrix with controlled clocks and restart/reboot cases. | Mobile QA |
 | M-11 | Import and export platform edges remain manual | Retry logic has regressions, but contact/calendar/file picker denial, revocation, malformed files, huge datasets, interruption, encoding, and share-sheet outcomes need device tests. | Permission and failure matrix on both platforms, including duplicate-free partial retry and complete workspace export. | Mobile QA |
@@ -51,6 +50,7 @@ absence because several critical dynamic suites are blocked.
 | --- | --- | --- |
 | H-10 | Final candidate safe verification was incomplete. | [TEST_RESULTS.md](TEST_RESULTS.md) now records the final 249-test Flutter run, 19-test Deno run, goldens, integration smoke, dependency evidence, generator guards, and supported platform builds. |
 | M-03 | Launch goldens were not final or human-reviewed. | Eleven tests produced 13 expected images; every image was reviewed after the final UI change and the non-update suite passed. |
+| M-08 | Private workflow tables lacked defence-in-depth RLS. | Live migrations enable RLS, remove client DML, add explicit false client policies, preserve trusted service access, and return the security advisor to only the paid leaked-password warning. |
 
 ## Low-severity and follow-up gaps
 
@@ -60,7 +60,7 @@ absence because several critical dynamic suites are blocked.
 | L-02 | Edge Deno tests cover selected helpers/functions, not every deployed error path. | Add contract tests for each response code, CORS/auth boundary, malformed payload, timeout, and safe error body. |
 | L-03 | Notification history is bounded rather than user-paginated. | Add cursor pagination when real usage shows the owner needs older history; preserve bounded dashboard/provider reads. |
 | L-04 | Domain email authentication was not fully verified. | Configure and verify SPF, DKIM, and DMARC for the production sender/support operation. |
-| L-05 | App version is still the initial `1.0.0+1`. | Assign monotonically increasing store build numbers during signed release preparation. |
+| L-05 | Source is prepared as `1.0.0+4`; no clean signed Build 4 artifact exists. | Preserve monotonic build numbers and bind the next signed candidate to its reviewed full commit SHA. |
 | L-06 | No automated upgrade/migration compatibility suite exists. | Preserve representative previous-version local data and add upgrade tests before the first update release. |
 
 ## Deliberately absent or limited launch capabilities
@@ -69,7 +69,12 @@ These are not defects if product copy remains accurate:
 
 - remote APNs/FCM push delivery;
 - live or two-way calendar sync;
-- card payment processing, deposits, Stripe, or bank feeds;
+- operational card-payment collection, deposits, or bank feeds; the default
+  beta build hides Stripe collection behind
+  `PAYMENT_COLLECTION_ENABLED=false`, while merchant onboarding,
+  payment/refund evidence, Apple entitlement, device and release gates remain;
+- recurring-series creation or series editing; existing recurrence data remains
+  readable, but V1 exposes only single-booking creation;
 - subscription entitlement or paid-plan gating;
 - file attachments or Supabase Storage-backed user files;
 - AI-first workflows or an enabled AI assistant;
@@ -80,6 +85,21 @@ If any store listing, onboarding screen, support response, or marketing page
 claims one of these capabilities, the gap becomes a launch-blocking copy defect.
 
 ## Release position
+
+The 2026-08-08 refresh passes 346/346 Flutter tests, 25/25 Deno tests,
+25/25 protected goldens covering 29 image files, the signed-out iOS simulator journey, all supported
+profile/web builds, APK alignment/signature checks, and exact iPhone
+install/launch with a CoreDevice-confirmed process. Live read-only inspection
+confirms the project is healthy with RLS on all inspected application tables
+and only the leaked-password protection security warning.
+These results improve source confidence but do not close the isolated backend,
+authenticated E2E, destructive, physical Android/accessibility, signing, legal
+or operational gaps below.
+
+The three highest-value staging journeys now exist as production-refusing,
+write-opt-in integration tests. Their implementation reduces setup work but
+does not close H-02, H-03 or H-04 until a disposable branch is approved and the
+recorded runs pass.
 
 The current evidence supports continued controlled internal testing. It does not
 yet support “technically ready for public release” because H-01 through H-09
@@ -106,3 +126,27 @@ every applicable high-severity exit condition.
 8. Configure signing, stores, declarations, review access, and brand clearance.
 9. Run and retain hosted CI evidence for the candidate.
 10. Tag the exact reviewed candidate and retain all evidence.
+
+## 2026-08-12 superseding release position
+
+The latest safe local evidence is 360/360 Flutter unit/widget tests and clean
+analysis, but the signed-out iOS integration journey is red. The current pgTAP
+inventory is 82 authored assertions with no clean execution, and all three
+write-capable staging journeys remain unexecuted. The present dirty worktree
+also correctly fails the new candidate-provenance boundary. These facts
+supersede the older “final safe local suite passes” wording above: external beta
+invitations are not yet approved.
+
+## 2026-08-12 remediation update
+
+H-12 is closed in local source: the first-run Create account action is visible
+above the fold and the signed-out journey passes on the same 402 x 874 iPhone
+17 Pro simulator. The full Flutter suite now passes 371/371 and the Deno suite
+passes 30/30.
+
+H-01 through H-09 and H-11 retain their evidence boundaries where applicable.
+In particular, the MFA/payment/retention fixes are unapplied until a clean
+82-assertion migration replay and disposable staging run succeed; the current
+dirty owner worktree is not a release candidate; and operational support,
+external Auth, physical accessibility, Stripe onboarding/live refund, store,
+brand, performance/load, and crash-observability work remain external gates.

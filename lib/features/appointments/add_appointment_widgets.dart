@@ -36,7 +36,10 @@ Future<_PickedAppointmentTime?> _showAppointmentTimePicker({
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.pageX,
+                vertical: AppSpacing.md,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -98,7 +101,7 @@ Future<_PickedAppointmentTime?> _showAppointmentTimePicker({
                   const Text(
                     ':',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 24,
                       fontWeight: FontWeight.w600,
                       color: AppColors.t1,
                     ),
@@ -210,10 +213,10 @@ class _BookingSaveAction extends StatelessWidget {
       color: enabled
           ? AppColors.modCalendar.withValues(alpha: 0.12)
           : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadius.pill),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         onTap: enabled && !loading ? onTap : null,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: ConstrainedBox(
           constraints: const BoxConstraints(
             minWidth: 58,

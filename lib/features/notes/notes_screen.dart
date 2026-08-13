@@ -10,6 +10,7 @@ import '../../shared/repositories/notes_repository.dart';
 import '../../shared/widgets/slate_ui.dart';
 import 'note_logic.dart';
 import '../imports/text_import_screen.dart';
+import '../work/work_workspace_switcher.dart';
 
 const _uncheckedChecklistMarker = '○  ';
 const _checkedChecklistMarker = '✓  ';
@@ -39,11 +40,19 @@ class _ChecklistMarkerInfo {
 class NotesScreen extends ConsumerStatefulWidget {
   final bool showBackButton;
   final int createRequest;
+  final DateTime? referenceDate;
+  final VoidCallback? onOpenSchedule;
+  final VoidCallback? onOpenTasks;
+  final bool embedded;
 
   const NotesScreen({
     super.key,
     this.showBackButton = true,
     this.createRequest = 0,
+    this.referenceDate,
+    this.onOpenSchedule,
+    this.onOpenTasks,
+    this.embedded = false,
   });
 
   @override
@@ -81,98 +90,119 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   Widget build(BuildContext context) {
     final notes = ref.watch(allNotesProvider);
 
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!widget.embedded) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pageX,
+              AppSpacing.screenTop,
+              AppSpacing.pageX,
+              0,
+            ),
+            child: widget.showBackButton
+                ? WorkloopRouteHeader(
+                    title: 'Notes',
+                    trailing: WorkloopTopAction(
+                      label: 'New note',
+                      semanticLabel: 'New note',
+                      onTap: () => _openEditor(),
+                    ),
+                  )
+                : WorkloopPageHeader(
+                    title: widget.onOpenSchedule == null ? 'Notes' : 'Work',
+                    subtitle: widget.onOpenSchedule == null
+                        ? 'Keep the context you will need later.'
+                        : 'Plan the day, do the work, keep the context.',
+                    color: AppColors.accentPrimary,
+                    trailing: WorkloopTopAction(
+                      label: 'New note',
+                      semanticLabel: 'New note',
+                      onTap: () => _openEditor(),
+                    ),
+                  ),
+          ),
+          if (!widget.showBackButton &&
+              widget.onOpenSchedule != null &&
+              widget.onOpenTasks != null) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
+              child: WorkWorkspaceSwitcher(
+                selected: WorkWorkspaceSection.notes,
+                onChanged: (section) {
+                  switch (section) {
+                    case WorkWorkspaceSection.schedule:
+                      widget.onOpenSchedule!();
+                    case WorkWorkspaceSection.tasks:
+                      widget.onOpenTasks!();
+                    case WorkWorkspaceSection.notes:
+                      break;
+                  }
+                },
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.lg),
+        ],
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
+          child: WorkloopSearchField(
+            onChanged: (value) => setState(() => _query = value),
+            hintText: 'Search notes',
+            semanticLabel: 'Search notes',
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        notes.maybeWhen(
+          data: (_) => _NoteFilterRail(
+            selected: _filter,
+            onChanged: (value) => setState(() => _filter = value),
+          ),
+          orElse: () => const SizedBox.shrink(),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Expanded(
+          child: notes.when(
+            loading: () => _loadingList(),
+            error: (_, _) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
+              child: SlateErrorState(
+                message: 'Could not load notes. Check your connection.',
+                onRetry: () => ref.invalidate(allNotesProvider),
+              ),
+            ),
+            data: (data) => _NotesList(
+              notes: _filteredNotes(data),
+              referenceDate: widget.referenceDate,
+              hasSearch: _query.trim().isNotEmpty,
+              onRefresh: () async => ref.invalidate(allNotesProvider),
+              onOpen: (note) => _openEditor(note: note),
+              onCreate: _openEditor,
+              onImport: () async {
+                await Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const TextImportScreen(type: TextImportType.notes),
+                  ),
+                );
+                ref.invalidate(allNotesProvider);
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+    if (widget.embedded) return content;
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
-          SafeArea(
-            bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.pageX,
-                    AppSpacing.screenTop,
-                    AppSpacing.pageX,
-                    0,
-                  ),
-                  child: widget.showBackButton
-                      ? WorkloopRouteHeader(
-                          title: 'Notes',
-                          trailing: WorkloopTopAction(
-                            label: 'New note',
-                            semanticLabel: 'New note',
-                            onTap: () => _openEditor(),
-                          ),
-                        )
-                      : WorkloopPageHeader(
-                          title: 'Notes',
-                          subtitle: 'Keep the context you will need later.',
-                          color: AppColors.modNotes,
-                          trailing: WorkloopTopAction(
-                            label: 'New note',
-                            semanticLabel: 'New note',
-                            onTap: () => _openEditor(),
-                          ),
-                        ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.pageX,
-                  ),
-                  child: WorkloopSearchField(
-                    onChanged: (value) => setState(() => _query = value),
-                    hintText: 'Search notes',
-                    semanticLabel: 'Search notes',
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                notes.maybeWhen(
-                  data: (_) => _NoteFilterRail(
-                    selected: _filter,
-                    onChanged: (value) => setState(() => _filter = value),
-                  ),
-                  orElse: () => const SizedBox.shrink(),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Expanded(
-                  child: notes.when(
-                    loading: () => _loadingList(),
-                    error: (_, _) => Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.pageX,
-                      ),
-                      child: SlateErrorState(
-                        message: 'Could not load notes. Check your connection.',
-                        onRetry: () => ref.invalidate(allNotesProvider),
-                      ),
-                    ),
-                    data: (data) => _NotesList(
-                      notes: _filteredNotes(data),
-                      hasSearch: _query.trim().isNotEmpty,
-                      onRefresh: () async => ref.invalidate(allNotesProvider),
-                      onOpen: (note) => _openEditor(note: note),
-                      onCreate: _openEditor,
-                      onImport: () async {
-                        await Navigator.push<void>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const TextImportScreen(
-                              type: TextImportType.notes,
-                            ),
-                          ),
-                        );
-                        ref.invalidate(allNotesProvider);
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          SafeArea(bottom: false, child: content),
         ],
       ),
     );
@@ -244,6 +274,7 @@ class _NoteFilterRail extends StatelessWidget {
 
 class _NotesList extends StatelessWidget {
   final List<SlateNote> notes;
+  final DateTime? referenceDate;
   final bool hasSearch;
   final RefreshCallback onRefresh;
   final ValueChanged<SlateNote> onOpen;
@@ -252,6 +283,7 @@ class _NotesList extends StatelessWidget {
 
   const _NotesList({
     required this.notes,
+    this.referenceDate,
     required this.hasSearch,
     required this.onRefresh,
     required this.onOpen,
@@ -263,17 +295,20 @@ class _NotesList extends StatelessWidget {
   Widget build(BuildContext context) {
     final pinned = notes.where((note) => note.pinned).toList();
     final unpinned = notes.where((note) => !note.pinned).toList();
-    final groups = _groupNotesByDate(unpinned);
+    final groups = _groupNotesByDate(
+      unpinned,
+      now: referenceDate ?? DateTime.now(),
+    );
 
     return RefreshIndicator(
       color: AppColors.accentPrimary,
       onRefresh: onRefresh,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(
+        padding: EdgeInsets.fromLTRB(
           AppSpacing.pageX,
           0,
           AppSpacing.pageX,
-          AppSpacing.bottomNavClearance,
+          AppSpacing.shellBottomClearance(context),
         ),
         children: [
           if (notes.isEmpty)
@@ -301,12 +336,12 @@ class _NotesList extends StatelessWidget {
           else ...[
             if (pinned.isNotEmpty) ...[
               const _NoteDateHeader(label: 'Pinned'),
-              _NoteGroupCard(notes: pinned, onOpen: onOpen),
+              _NoteGroupList(notes: pinned, onOpen: onOpen),
               const SizedBox(height: AppSpacing.lg),
             ],
             for (final group in groups) ...[
               _NoteDateHeader(label: group.label),
-              _NoteGroupCard(notes: group.notes, onOpen: onOpen),
+              _NoteGroupList(notes: group.notes, onOpen: onOpen),
               const SizedBox(height: AppSpacing.lg),
             ],
           ],
@@ -330,18 +365,22 @@ class _NoteDateHeader extends StatelessWidget {
   }
 }
 
-class _NoteGroupCard extends StatelessWidget {
+class _NoteGroupList extends StatelessWidget {
   final List<SlateNote> notes;
   final ValueChanged<SlateNote> onOpen;
 
-  const _NoteGroupCard({required this.notes, required this.onOpen});
+  const _NoteGroupList({required this.notes, required this.onOpen});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         for (var index = 0; index < notes.length; index++) ...[
-          _NoteListRow(note: notes[index], onOpen: onOpen),
+          _NoteListRow(
+            note: notes[index],
+            showDivider: index != notes.length - 1,
+            onOpen: onOpen,
+          ),
         ],
       ],
     );
@@ -350,9 +389,14 @@ class _NoteGroupCard extends StatelessWidget {
 
 class _NoteListRow extends StatelessWidget {
   final SlateNote note;
+  final bool showDivider;
   final ValueChanged<SlateNote> onOpen;
 
-  const _NoteListRow({required this.note, required this.onOpen});
+  const _NoteListRow({
+    required this.note,
+    required this.showDivider,
+    required this.onOpen,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -364,8 +408,14 @@ class _NoteListRow extends StatelessWidget {
         : _oneLine(note.body);
 
     return WorkloopListRow(
+      key: ValueKey('note-row-${note.id}'),
       onTap: () => onOpen(note),
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      flat: true,
+      showDivider: showDivider,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.md,
+      ),
       leading: SizedBox(
         width: 28,
         height: 28,
@@ -603,7 +653,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
           ],
         ),
         bottomNavigationBar: AnimatedPadding(
-          duration: AppMotion.standard,
+          duration: AppMotion.responsive(context, AppMotion.standard),
           curve: AppMotion.curve,
           padding: EdgeInsets.fromLTRB(
             AppSpacing.pageX,
@@ -1223,10 +1273,10 @@ class _NoteDoneAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: AppColors.modNotes.withValues(alpha: 0.14),
-      borderRadius: BorderRadius.circular(AppRadius.pill),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         onTap: loading ? null : onTap,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: ConstrainedBox(
           constraints: const BoxConstraints(
             minWidth: 62,
@@ -1283,7 +1333,7 @@ class _FormatButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.md),
           child: AnimatedContainer(
             key: ValueKey(Theme.of(context).brightness),
-            duration: AppMotion.fast,
+            duration: AppMotion.responsive(context, AppMotion.fast),
             curve: AppMotion.curve,
             height: 44,
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
@@ -1334,7 +1384,7 @@ class _NoteTextController extends TextEditingController {
   }) {
     final baseStyle = style ?? DefaultTextStyle.of(context).style;
     final headingStyle = baseStyle.copyWith(
-      fontSize: 24,
+      fontSize: 22,
       height: 1.24,
       fontWeight: FontWeight.w600,
       color: AppColors.t1,
@@ -1433,8 +1483,10 @@ class _NoteDateGroup {
   const _NoteDateGroup({required this.label, required this.notes});
 }
 
-List<_NoteDateGroup> _groupNotesByDate(List<SlateNote> notes) {
-  final now = DateTime.now();
+List<_NoteDateGroup> _groupNotesByDate(
+  List<SlateNote> notes, {
+  required DateTime now,
+}) {
   final groups = <_NoteDateGroup>[];
 
   for (final note in notes) {

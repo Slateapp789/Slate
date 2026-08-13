@@ -31,11 +31,11 @@ class _AppointmentListView extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
+              padding: EdgeInsets.fromLTRB(
                 AppSpacing.pageX,
                 0,
                 AppSpacing.pageX,
-                AppSpacing.bottomNavClearance,
+                AppSpacing.shellBottomClearance(context),
               ),
               sliver: SliverFillRemaining(
                 hasScrollBody: false,
@@ -63,18 +63,20 @@ class _AppointmentListView extends StatelessWidget {
         onRefresh: () async => onRefresh(),
         color: AppColors.accentPrimary,
         child: ListView.separated(
-          padding: const EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
             AppSpacing.pageX,
             0,
             AppSpacing.pageX,
-            AppSpacing.bottomNavClearance,
+            AppSpacing.shellBottomClearance(context),
           ),
           itemCount: appointments.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 2),
-          itemBuilder: (_, i) => _AppointmentCard(
-            appt: appointments[i],
+          separatorBuilder: (_, _) => const SizedBox.shrink(),
+          itemBuilder: (_, i) => _BookingRecordRow(
+            rowKey: ValueKey('list-booking-row-${appointments[i]['id']}'),
+            appointment: appointments[i],
             onTap: () => onTap(appointments[i]),
             showStatusBadge: showStatusBadge,
+            showDivider: i != appointments.length - 1,
           ),
         ),
       );
@@ -95,11 +97,11 @@ class _AppointmentListView extends StatelessWidget {
       onRefresh: () async => onRefresh(),
       color: AppColors.accentPrimary,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(
+        padding: EdgeInsets.fromLTRB(
           AppSpacing.pageX,
           0,
           AppSpacing.pageX,
-          AppSpacing.bottomNavClearance,
+          AppSpacing.shellBottomClearance(context),
         ),
         itemCount: keys.length,
         itemBuilder: (_, i) {
@@ -120,14 +122,13 @@ class _AppointmentListView extends StatelessWidget {
                   ),
                 ),
               ),
-              ...group.map(
-                (appt) => Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: _AppointmentCard(
-                    appt: appt,
-                    onTap: () => onTap(appt),
-                    showStatusBadge: showStatusBadge,
-                  ),
+              ...group.indexed.map(
+                (entry) => _BookingRecordRow(
+                  rowKey: ValueKey('list-booking-row-${entry.$2['id']}'),
+                  appointment: entry.$2,
+                  onTap: () => onTap(entry.$2),
+                  showStatusBadge: showStatusBadge,
+                  showDivider: entry.$1 != group.length - 1,
                 ),
               ),
               const SizedBox(height: 8),
@@ -172,6 +173,7 @@ class _AppointmentListView extends StatelessWidget {
 class _BookingCalendarView extends StatelessWidget {
   final List<Map<String, dynamic>> appointments;
   final DateTime selectedDate;
+  final DateTime today;
   final List<Map<String, dynamic>> selectedDayAppointments;
   final ValueChanged<DateTime> onDateSelected;
   final Function(Map<String, dynamic>) onTap;
@@ -181,6 +183,7 @@ class _BookingCalendarView extends StatelessWidget {
   const _BookingCalendarView({
     required this.appointments,
     required this.selectedDate,
+    required this.today,
     required this.selectedDayAppointments,
     required this.onDateSelected,
     required this.onTap,
@@ -190,42 +193,75 @@ class _BookingCalendarView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final agenda = [...selectedDayAppointments]
+      ..sort((a, b) {
+        final aStart = _start(a);
+        final bStart = _start(b);
+        if (aStart == null || bStart == null) return 0;
+        return aStart.compareTo(bStart);
+      });
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
       color: AppColors.accentPrimary,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.pageX,
+        padding: EdgeInsets.fromLTRB(
           0,
-          AppSpacing.pageX,
-          AppSpacing.bottomNavClearance,
+          0,
+          0,
+          AppSpacing.shellBottomClearance(context),
         ),
         children: [
-          _MonthCalendar(
-            selectedDate: selectedDate,
-            countForDay: _countForDay,
-            onDateSelected: onDateSelected,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
+            child: _MonthCalendar(
+              selectedDate: selectedDate,
+              today: today,
+              countForDay: _countForDay,
+              onDateSelected: onDateSelected,
+            ),
           ),
-          const SizedBox(height: 16),
-          _DayPlanHeader(
-            date: selectedDate,
-            appointments: selectedDayAppointments,
-            onAddBooking: onEmptyAction,
+          Divider(
+            key: const ValueKey('calendar-agenda-divider'),
+            height: 1,
+            color: AppColors.border.withValues(alpha: 0.9),
           ),
-          const SizedBox(height: 12),
-          if (selectedDayAppointments.isEmpty)
-            const WorkloopEmptyState(
-              icon: LucideIcons.calendarPlus,
-              title: 'No bookings this day',
-              subtitle:
-                  'Use the gap for admin or choose Add in the day heading.',
+          Padding(
+            key: const ValueKey('calendar-agenda-header'),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pageX,
+              AppSpacing.md,
+              AppSpacing.pageX,
+              AppSpacing.sm,
+            ),
+            child: _DayAgendaHeader(
+              date: selectedDate,
+              today: today,
+              appointments: agenda,
+              onAddBooking: onEmptyAction,
+            ),
+          ),
+          if (agenda.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
+              child: _CalendarOpenDay(),
             )
           else
-            ...selectedDayAppointments.map(
-              (appt) => _AppointmentCard(
-                appt: appt,
-                onTap: () => onTap(appt),
-                showStatusBadge: true,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
+              child: Column(
+                children: [
+                  for (var index = 0; index < agenda.length; index++) ...[
+                    _BookingRecordRow(
+                      rowKey: ValueKey(
+                        'calendar-booking-row-${agenda[index]['id']}',
+                      ),
+                      appointment: agenda[index],
+                      showTimelineRail: true,
+                      showDivider: index != agenda.length - 1,
+                      onTap: () => onTap(agenda[index]),
+                    ),
+                  ],
+                ],
               ),
             ),
         ],
@@ -248,212 +284,256 @@ class _BookingCalendarView extends StatelessWidget {
 
 class _MonthCalendar extends StatelessWidget {
   final DateTime selectedDate;
+  final DateTime today;
   final int Function(DateTime day) countForDay;
   final ValueChanged<DateTime> onDateSelected;
 
   const _MonthCalendar({
     required this.selectedDate,
+    required this.today,
     required this.countForDay,
     required this.onDateSelected,
   });
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     final month = DateTime(selectedDate.year, selectedDate.month);
     final firstGridDay = month.subtract(Duration(days: month.weekday - 1));
     final days = List.generate(42, (index) {
       return firstGridDay.add(Duration(days: index));
     });
     const weekdayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    final effectiveToday = _dateOnly(today);
 
-    return SlateSurface(
-      radius: AppRadius.lg,
-      color: AppColors.t1.withValues(alpha: 0.022),
-      borderColor: AppColors.border.withValues(alpha: 0.54),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Semantics(
-                button: true,
-                label: 'Previous month',
-                child: ExcludeSemantics(
-                  child: IconButton(
-                    tooltip: 'Previous month',
-                    constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouch,
-                      minHeight: AppSpacing.minTouch,
-                    ),
-                    onPressed: () => onDateSelected(
-                      DateTime(selectedDate.year, selectedDate.month - 1, 1),
-                    ),
-                    icon: const Icon(LucideIcons.chevronLeft, size: 18),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  _monthLabel(month),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              TextButton(
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(
-                    AppSpacing.minTouch,
-                    AppSpacing.minTouch,
-                  ),
-                ),
-                onPressed: () => onDateSelected(_dateOnly(DateTime.now())),
-                child: const Text(
-                  'Today',
-                  style: TextStyle(
-                    color: AppColors.modCalendar,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Semantics(
-                button: true,
-                label: 'Next month',
-                child: ExcludeSemantics(
-                  child: IconButton(
-                    tooltip: 'Next month',
-                    constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouch,
-                      minHeight: AppSpacing.minTouch,
-                    ),
-                    onPressed: () => onDateSelected(
-                      DateTime(selectedDate.year, selectedDate.month + 1, 1),
-                    ),
-                    icon: const Icon(LucideIcons.chevronRight, size: 18),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: weekdayLabels
-                .map(
-                  (label) => Expanded(
-                    child: Center(
-                      child: Text(
-                        label,
-                        style: const TextStyle(
-                          color: AppColors.t3,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 6),
-          GridView.builder(
-            itemCount: days.length,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              mainAxisSpacing: 6,
-              crossAxisSpacing: 6,
-              childAspectRatio: 1.08,
+    void moveMonth(int delta) {
+      final target = DateTime(selectedDate.year, selectedDate.month + delta, 1);
+      final lastDay = DateTime(target.year, target.month + 1, 0).day;
+      onDateSelected(
+        DateTime(target.year, target.month, selectedDate.day.clamp(1, lastDay)),
+      );
+    }
+
+    Widget monthButton({
+      required String label,
+      required IconData icon,
+      required VoidCallback onPressed,
+    }) {
+      return Semantics(
+        button: true,
+        label: label,
+        child: ExcludeSemantics(
+          child: IconButton(
+            tooltip: label,
+            constraints: const BoxConstraints.tightFor(
+              width: AppSpacing.minTouch,
+              height: AppSpacing.minTouch,
             ),
-            itemBuilder: (context, index) {
-              final date = days[index];
-              final selected = _dateOnly(date) == _dateOnly(selectedDate);
-              final inMonth = date.month == month.month;
-              final count = countForDay(date);
-              void handleTap() {
-                SlateHaptics.tap();
-                onDateSelected(_dateOnly(date));
-              }
+            style: IconButton.styleFrom(
+              backgroundColor: tokens.surface,
+              foregroundColor: tokens.textPrimary,
+              side: BorderSide(color: tokens.divider),
+              shape: const CircleBorder(),
+            ),
+            onPressed: onPressed,
+            icon: Icon(icon, size: 18),
+          ),
+        ),
+      );
+    }
 
-              return Semantics(
-                button: true,
-                selected: selected,
-                label: '${date.day}/${date.month}/${date.year}',
-                value: '$count booking${count == 1 ? '' : 's'}',
-                onTap: handleTap,
-                child: ExcludeSemantics(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: handleTap,
-                    child: AnimatedContainer(
-                      key: ValueKey(Theme.of(context).brightness),
-                      duration: AppMotion.fast,
-                      curve: AppMotion.curve,
-                      padding: const EdgeInsets.symmetric(vertical: 5),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.accentPrimaryStrong.withValues(
-                                alpha: 0.72,
-                              )
-                            : count > 0
-                            ? AppColors.accentPrimaryStrong.withValues(
-                                alpha: 0.20,
-                              )
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        border: Border.all(
-                          color: selected
-                              ? AppColors.accentPrimaryStrong.withValues(
-                                  alpha: 0.74,
-                                )
-                              : AppColors.t1.withValues(alpha: 0.05),
-                        ),
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _monthName(month),
+                    style: const TextStyle(
+                      color: AppColors.t1,
+                      fontSize: 25,
+                      height: 1.05,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${month.year}',
+                    style: const TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.modCalendar,
+                minimumSize: const Size(58, AppSpacing.minTouch),
+              ),
+              onPressed: () => onDateSelected(effectiveToday),
+              child: const Text('Today'),
+            ),
+            const SizedBox(width: AppSpacing.xxs),
+            monthButton(
+              label: 'Previous month',
+              icon: LucideIcons.chevronLeft,
+              onPressed: () => moveMonth(-1),
+            ),
+            const SizedBox(width: AppSpacing.xxs),
+            monthButton(
+              label: 'Next month',
+              icon: LucideIcons.chevronRight,
+              onPressed: () => moveMonth(1),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: weekdayLabels
+              .map(
+                (label) => Expanded(
+                  child: Center(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        color: AppColors.t3,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragEnd: (details) {
+            final velocity = details.primaryVelocity ?? 0;
+            if (velocity.abs() < 180) return;
+            SlateHaptics.tap();
+            moveMonth(velocity < 0 ? 1 : -1);
+          },
+          child: AnimatedSwitcher(
+            duration: AppMotion.responsive(context, AppMotion.standard),
+            switchInCurve: AppMotion.curve,
+            switchOutCurve: AppMotion.curve,
+            child: GridView.builder(
+              key: ValueKey('${month.year}-${month.month}'),
+              itemCount: days.length,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                mainAxisSpacing: 2,
+                crossAxisSpacing: 4,
+                mainAxisExtent: 44,
+              ),
+              itemBuilder: (context, index) {
+                final date = days[index];
+                final selected = _dateOnly(date) == _dateOnly(selectedDate);
+                final isToday = _dateOnly(date) == effectiveToday;
+                final inMonth = date.month == month.month;
+                final count = countForDay(date);
+                final selectedInk = tokens.onAccent;
+                void handleTap() {
+                  SlateHaptics.tap();
+                  onDateSelected(_dateOnly(date));
+                }
+
+                return Semantics(
+                  button: true,
+                  selected: selected,
+                  label:
+                      '${isToday ? 'Today, ' : ''}${date.day}/${date.month}/${date.year}',
+                  value: '$count booking${count == 1 ? '' : 's'}',
+                  onTap: handleTap,
+                  child: ExcludeSemantics(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: handleTap,
                       child: Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
                         children: [
-                          Text(
-                            '${date.day}',
-                            style: TextStyle(
+                          AnimatedContainer(
+                            duration: AppMotion.responsive(
+                              context,
+                              AppMotion.fast,
+                            ),
+                            curve: AppMotion.curve,
+                            width: 34,
+                            height: 34,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
                               color: selected
-                                  ? AppColors.panelInk
-                                  : inMonth
-                                  ? AppColors.t1
-                                  : AppColors.t3.withValues(alpha: 0.42),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                                  ? AppColors.modCalendar
+                                  : Colors.transparent,
+                              shape: BoxShape.circle,
+                              border: isToday && !selected
+                                  ? Border.all(
+                                      color: AppColors.modCalendar,
+                                      width: 1.5,
+                                    )
+                                  : null,
+                            ),
+                            child: Text(
+                              '${date.day}',
+                              style: TextStyle(
+                                color: selected
+                                    ? selectedInk
+                                    : inMonth
+                                    ? AppColors.t1
+                                    : AppColors.t3.withValues(alpha: 0.45),
+                                fontSize: 14,
+                                fontWeight: selected || isToday
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(height: 4),
                           if (count > 0)
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: selected
-                                    ? AppColors.panelInk
-                                    : AppColors.accentPrimary,
-                                shape: BoxShape.circle,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(
+                                count.clamp(1, 3),
+                                (dotIndex) => Container(
+                                  width: 4,
+                                  height: 4,
+                                  margin: EdgeInsets.only(
+                                    left: dotIndex == 0 ? 0 : 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: selected
+                                        ? selectedInk
+                                        : AppColors.modCalendar,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
                               ),
                             ),
                         ],
                       ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-String _monthLabel(DateTime month) {
+String _monthName(DateTime month) {
   const months = [
     'January',
     'February',
@@ -468,48 +548,69 @@ String _monthLabel(DateTime month) {
     'November',
     'December',
   ];
-  return '${months[month.month - 1]} ${month.year}';
+  return months[month.month - 1];
 }
 
-class _DayPlanHeader extends StatelessWidget {
+class _DayAgendaHeader extends StatelessWidget {
   final DateTime date;
+  final DateTime today;
   final List<Map<String, dynamic>> appointments;
   final VoidCallback onAddBooking;
 
-  const _DayPlanHeader({
+  const _DayAgendaHeader({
     required this.date,
+    required this.today,
     required this.appointments,
     required this.onAddBooking,
   });
 
   @override
   Widget build(BuildContext context) {
-    final scheduled = appointments
-        .where((appt) => appt['status'] == 'scheduled')
-        .length;
-    final completed = appointments
-        .where((appt) => appt['status'] == 'completed')
-        .length;
+    final day = _dateOnly(date);
+    final effectiveToday = _dateOnly(today);
+    final tomorrow = nextBookingCalendarDay(effectiveToday);
+    final relativeLabel = day == effectiveToday
+        ? 'Today'
+        : day == tomorrow
+        ? 'Tomorrow'
+        : _weekdayName(date);
+    final count = appointments.length;
 
     return Row(
       children: [
+        Container(
+          width: 48,
+          height: 48,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: AppColors.violetDim,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            '${date.day}',
+            style: const TextStyle(
+              color: AppColors.modCalendar,
+              fontSize: 19,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _friendlyDate(date),
+                relativeLabel,
                 style: const TextStyle(
                   color: AppColors.t1,
-                  fontSize: 18,
+                  fontSize: 17,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 3),
               Text(
-                appointments.isEmpty
-                    ? 'No scheduled work'
-                    : '$scheduled to go, $completed done',
+                '${_fullDate(date)} · $count booking${count == 1 ? '' : 's'}',
                 style: const TextStyle(color: AppColors.t3, fontSize: 12),
               ),
             ],
@@ -518,220 +619,303 @@ class _DayPlanHeader extends StatelessWidget {
         TextButton.icon(
           onPressed: onAddBooking,
           icon: const Icon(LucideIcons.plus, size: 15),
-          label: const Text('Add'),
+          label: const Text('Add booking'),
         ),
       ],
     );
   }
 }
 
-class _AppointmentCard extends StatelessWidget {
-  final Map<String, dynamic> appt;
-  final VoidCallback onTap;
-  final bool showStatusBadge;
+class _CalendarOpenDay extends StatelessWidget {
+  const _CalendarOpenDay();
 
-  const _AppointmentCard({
-    required this.appt,
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(
+          width: 54,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Text(
+              'OPEN',
+              style: TextStyle(
+                color: AppColors.t3,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ),
+        ),
+        Container(width: 1, height: 78, color: tokens.divider),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: tokens.surface.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: tokens.divider),
+            ),
+            child: const Row(
+              children: [
+                Icon(
+                  LucideIcons.calendarPlus,
+                  color: AppColors.modCalendar,
+                  size: 19,
+                ),
+                SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'This day is open',
+                        style: TextStyle(
+                          color: AppColors.t1,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Use Add booking to schedule work here.',
+                        style: TextStyle(color: AppColors.t3, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BookingRecordRow extends StatelessWidget {
+  final Key? rowKey;
+  final Map<String, dynamic> appointment;
+  final bool showDivider;
+  final bool showTimelineRail;
+  final bool showStatusBadge;
+  final VoidCallback onTap;
+
+  const _BookingRecordRow({
+    this.rowKey,
+    required this.appointment,
     required this.onTap,
+    this.showDivider = true,
+    this.showTimelineRail = false,
     this.showStatusBadge = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final status = appt['status'] as String? ?? 'scheduled';
-    final clientName = appt['contacts']?['name'] as String? ?? 'Walk-in';
-    final serviceName =
-        appt['services']?['name'] as String? ??
-        appt['title'] as String? ??
+    final tokens = SlateTheme.of(context);
+    final status = appointment['status'] as String? ?? 'scheduled';
+    final start = _start(appointment);
+    final end = DateTime.tryParse(
+      appointment['end_time'] as String? ?? '',
+    )?.toLocal();
+    final client = appointment['contacts']?['name'] as String? ?? 'Walk-in';
+    final service =
+        appointment['services']?['name'] as String? ??
+        appointment['title'] as String? ??
         'Booking';
-    final startDt = DateTime.tryParse(
-      appt['start_time'] as String? ?? '',
-    )?.toLocal();
-    final endDt = DateTime.tryParse(
-      appt['end_time'] as String? ?? '',
-    )?.toLocal();
-    final price = appt['price'];
-    final notes = appt['notes'] as String? ?? '';
-    final recurrenceRule = appt['recurrence_rule'] as String?;
+    final location = (appointment['location'] as String? ?? '').trim();
+    final price = appointment['price'] as num?;
+    final notes = appointment['notes'] as String? ?? '';
+    final recurrenceRule = appointment['recurrence_rule'] as String?;
+    final color = switch (status) {
+      'completed' => AppColors.success,
+      'cancelled' => AppColors.error,
+      'no_show' => AppColors.warning,
+      _ => AppColors.modCalendar,
+    };
+    final exceptionalStatusLabel = switch (status) {
+      'completed' => 'Completed',
+      'cancelled' => 'Cancelled',
+      'no_show' => 'No show',
+      _ => null,
+    };
+    final statusLabel = showStatusBadge
+        ? switch (status) {
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+            'no_show' => 'No show',
+            _ => 'Scheduled',
+          }
+        : exceptionalStatusLabel;
 
-    final isCompleted = status == 'completed';
-    final isCancelled = status == 'cancelled';
-    final isNoShow = status == 'no_show';
-
-    final statusColor = isCompleted
-        ? AppColors.success
-        : isCancelled
-        ? AppColors.error
-        : isNoShow
-        ? AppColors.warning
-        : AppColors.green;
-
-    final startStr = startDt != null ? _time(startDt) : '--:--';
-    final endStr = endDt != null ? _time(endDt) : null;
-
-    final location = (appt['location'] as String? ?? '').trim();
-    final timing = endStr == null ? startStr : '$startStr–$endStr';
-
-    return WorkloopListRow(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-      leading: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: statusColor.withValues(alpha: 0.08),
-          shape: BoxShape.circle,
-        ),
-        child: Center(
-          child: Icon(
-            isCompleted
-                ? LucideIcons.checkCircle2
-                : isCancelled
-                ? LucideIcons.xCircle
-                : isNoShow
-                ? LucideIcons.alertCircle
-                : LucideIcons.calendarClock,
-            size: 18,
-            color: statusColor,
-          ),
-        ),
-      ),
-      title: Text(
-        clientName,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: AppColors.t1,
-        ),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            [
-              timing,
-              serviceName,
-              if (location.isNotEmpty) location,
-            ].join(' · '),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.t2,
-              fontWeight: FontWeight.w500,
+    return Semantics(
+      button: true,
+      label:
+          '${start == null ? 'Booking' : _calendarTime(start)}, $client, $service${statusLabel == null ? '' : ', $statusLabel'}',
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: 54,
+              child: Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      start == null ? '--:--' : _calendarTime(start),
+                      style: const TextStyle(
+                        color: AppColors.t1,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    if (end != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        _calendarTime(end),
+                        style: const TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 10,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
-          ),
-          if (showStatusBadge ||
-              (recurrenceRule != null && recurrenceRule.isNotEmpty)) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              children: [
-                if (showStatusBadge)
-                  _AppointmentPill(
-                    label: status.replaceAll('_', ' '),
-                    icon: isCompleted
-                        ? LucideIcons.checkCircle
-                        : isCancelled
-                        ? LucideIcons.xCircle
-                        : isNoShow
-                        ? LucideIcons.alertCircle
-                        : LucideIcons.clock,
-                    color: statusColor,
-                  ),
-                if (recurrenceRule != null && recurrenceRule.isNotEmpty)
-                  const _AppointmentPill(
-                    label: 'Repeats',
-                    icon: LucideIcons.repeat,
-                    color: AppColors.t3,
-                  ),
-              ],
+            Container(
+              width: 1,
+              color: showTimelineRail ? tokens.divider : Colors.transparent,
             ),
-          ],
-          if ((isCancelled || isNoShow) && notes.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              isCancelled ? 'Cancelled: $notes' : 'No show: $notes',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.error.withValues(alpha: 0.78),
+            Expanded(
+              child: WorkloopListRow(
+                key: rowKey,
+                onTap: onTap,
+                flat: true,
+                showDivider: showDivider,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.md,
+                ),
+                leading: Container(
+                  width: 3,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(AppRadius.capsule),
+                  ),
+                ),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        client,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.t1,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (price != null) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        formatPounds(price),
+                        style: const TextStyle(
+                          color: AppColors.t1,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      [service, if (location.isNotEmpty) location].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppColors.t2, fontSize: 12),
+                    ),
+                    if (statusLabel != null) ...[
+                      const SizedBox(height: 5),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.xs,
+                        children: [
+                          _BookingMetaLabel(
+                            label: statusLabel,
+                            icon: status == 'completed'
+                                ? LucideIcons.checkCircle
+                                : status == 'cancelled'
+                                ? LucideIcons.xCircle
+                                : status == 'no_show'
+                                ? LucideIcons.alertCircle
+                                : LucideIcons.clock,
+                            color: color,
+                          ),
+                          if (recurrenceRule != null &&
+                              recurrenceRule.isNotEmpty)
+                            const _BookingMetaLabel(
+                              label: 'Repeats',
+                              icon: LucideIcons.repeat,
+                              color: AppColors.t3,
+                            ),
+                        ],
+                      ),
+                    ] else if (recurrenceRule != null &&
+                        recurrenceRule.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      const _BookingMetaLabel(
+                        label: 'Repeats',
+                        icon: LucideIcons.repeat,
+                        color: AppColors.t3,
+                      ),
+                    ],
+                    if ((status == 'cancelled' || status == 'no_show') &&
+                        notes.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        status == 'cancelled'
+                            ? 'Cancelled: $notes'
+                            : 'No show: $notes',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.error.withValues(alpha: 0.78),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                trailing: const Icon(
+                  LucideIcons.chevronRight,
+                  color: AppColors.t3,
+                  size: 15,
+                ),
               ),
             ),
           ],
-        ],
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (price != null) ...[
-            Text(
-              formatPounds(price as num),
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.t1,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-          ],
-          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
-        ],
-      ),
-    );
-  }
-
-  static String _time(DateTime dt) =>
-      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-}
-
-class _AppointmentPill extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-
-  const _AppointmentPill({
-    required this.label,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-String _friendlyDate(DateTime date) {
-  final today = _dateOnly(DateTime.now());
-  final day = _dateOnly(date);
-  if (day == today) return 'Today';
-  if (day == nextBookingCalendarDay(today)) return 'Tomorrow';
+String _weekdayName(DateTime date) {
   const weekdays = [
     'Monday',
     'Tuesday',
@@ -741,19 +925,42 @@ String _friendlyDate(DateTime date) {
     'Saturday',
     'Sunday',
   ];
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
+  return weekdays[date.weekday - 1];
+}
+
+String _fullDate(DateTime date) =>
+    '${date.day} ${_monthName(date)} ${date.year}';
+
+String _calendarTime(DateTime date) =>
+    '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+
+class _BookingMetaLabel extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  const _BookingMetaLabel({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: color),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
 }

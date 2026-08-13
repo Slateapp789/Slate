@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/workloop_capabilities.dart';
 import '../../shared/providers/appointments_provider.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
@@ -76,10 +77,10 @@ class _BookingDetailAction extends StatelessWidget {
       color: primary
           ? AppColors.accentPrimary.withValues(alpha: 0.14)
           : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadius.pill),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         onTap: loading ? null : onTap,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: ConstrainedBox(
           constraints: const BoxConstraints(
             minWidth: 58,
@@ -477,6 +478,7 @@ class _AppointmentDetailScreenState
   }
 
   void _showCompletionSheet(List<Payment> payments) {
+    final paymentCollectionEnabled = ref.read(paymentCollectionEnabledProvider);
     final amount = (_appt['price'] as num?)?.toDouble() ?? 0;
     final hasLinkedPayment = payments.isNotEmpty;
     final unpaidLinkedPayments = payments
@@ -518,13 +520,15 @@ class _AppointmentDetailScreenState
             ),
             const SizedBox(height: 18),
             if (unpaidLinkedPayment != null) ...[
-              SlateButton(
-                label: 'Take Card Payment',
-                icon: LucideIcons.smartphoneNfc,
-                onPressed: () =>
-                    _completeAndCollectPayment(unpaidLinkedPayment),
-              ),
-              const SizedBox(height: 10),
+              if (paymentCollectionEnabled) ...[
+                SlateButton(
+                  label: 'Take Card Payment',
+                  icon: LucideIcons.smartphoneNfc,
+                  onPressed: () =>
+                      _completeAndCollectPayment(unpaidLinkedPayment),
+                ),
+                const SizedBox(height: 10),
+              ],
               SlateButton(
                 label: 'Mark Linked Payment Paid',
                 icon: LucideIcons.checkCircle,
@@ -544,12 +548,14 @@ class _AppointmentDetailScreenState
               ),
               const SizedBox(height: 10),
             ] else if (!hasLinkedPayment && amount > 0) ...[
-              SlateButton(
-                label: 'Take Card Payment',
-                icon: LucideIcons.smartphoneNfc,
-                onPressed: () => _completeAndCollectPayment(null),
-              ),
-              const SizedBox(height: 10),
+              if (paymentCollectionEnabled) ...[
+                SlateButton(
+                  label: 'Take Card Payment',
+                  icon: LucideIcons.smartphoneNfc,
+                  onPressed: () => _completeAndCollectPayment(null),
+                ),
+                const SizedBox(height: 10),
+              ],
               SlateButton(
                 label: 'Mark Paid',
                 icon: LucideIcons.checkCircle,
@@ -955,7 +961,7 @@ class _AppointmentDetailScreenState
                             color: active
                                 ? AppColors.errorDim
                                 : AppColors.bgInteract,
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                             border: Border.all(
                               color: active
                                   ? AppColors.error
@@ -1136,7 +1142,9 @@ class _AppointmentDetailScreenState
                               ),
                               decoration: BoxDecoration(
                                 color: statusColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(999),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.capsule,
+                                ),
                                 border: Border.all(
                                   color: statusColor.withValues(alpha: 0.3),
                                 ),
@@ -1324,40 +1332,76 @@ class _AppointmentDetailScreenState
                           : InkWell(
                               onTap: _openDirections,
                               borderRadius: BorderRadius.circular(AppRadius.md),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    LucideIcons.mapPin,
-                                    color: AppColors.t3,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  const Text(
-                                    'Location',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: AppColors.t3,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Flexible(
-                                    child: Text(
-                                      _locationDisplayValue,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.t1,
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final stacked =
+                                      constraints.maxWidth < 280 ||
+                                      MediaQuery.textScalerOf(
+                                            context,
+                                          ).scale(13) >
+                                          18;
+                                  const label = Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        LucideIcons.mapPin,
+                                        color: AppColors.t3,
+                                        size: 16,
                                       ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.sm),
-                                  const Icon(
-                                    LucideIcons.navigation,
-                                    color: AppColors.modCalendar,
-                                    size: 16,
-                                  ),
-                                ],
+                                      SizedBox(width: 12),
+                                      Text(
+                                        'Location',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: AppColors.t3,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                  final value = Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          _locationDisplayValue,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: stacked
+                                              ? TextAlign.start
+                                              : TextAlign.end,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.t1,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: AppSpacing.sm),
+                                      const Icon(
+                                        LucideIcons.navigation,
+                                        color: AppColors.modCalendar,
+                                        size: 16,
+                                      ),
+                                    ],
+                                  );
+                                  if (stacked) {
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        label,
+                                        const SizedBox(height: AppSpacing.xs),
+                                        value,
+                                      ],
+                                    );
+                                  }
+                                  return Row(
+                                    children: [
+                                      label,
+                                      const SizedBox(width: AppSpacing.sm),
+                                      Expanded(child: value),
+                                    ],
+                                  );
+                                },
                               ),
                             ),
                     ),

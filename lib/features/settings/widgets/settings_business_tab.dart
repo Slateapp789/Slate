@@ -4,6 +4,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/workspace_provider.dart';
 import '../../../shared/repositories/slate_repositories.dart';
 import '../../../shared/utils/currency_format.dart';
+import '../../../shared/utils/public_booking_url.dart';
 import '../../../shared/utils/public_profile_routes.dart';
 import '../../../shared/utils/working_hours.dart';
 import '../../../shared/widgets/slate_ui.dart';
@@ -54,7 +55,9 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   Future<void> _scrollToSection() async {
     if (widget.showOnlySelected) return;
     if (widget.initialSection == SettingsBusinessSection.business) return;
-    await Future<void>.delayed(const Duration(milliseconds: 280));
+    await Future<void>.delayed(
+      AppMotion.responsive(context, const Duration(milliseconds: 280)),
+    );
     if (!mounted) return;
     final key = switch (widget.initialSection) {
       SettingsBusinessSection.business => _businessKey,
@@ -67,7 +70,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     if (!target.mounted) return;
     await Scrollable.ensureVisible(
       target,
-      duration: AppMotion.deliberate,
+      duration: AppMotion.responsive(context, AppMotion.deliberate),
       curve: AppMotion.curve,
       alignment: 0.04,
     );
@@ -78,23 +81,12 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   }
 
   String _bookingMode = 'manual';
-  bool _reviewsEnabled = false;
-  bool _galleryEnabled = false;
   late TextEditingController _ownerNameController;
   late TextEditingController _nameController;
   late TextEditingController _industryController;
   late TextEditingController _handleController;
   late TextEditingController _bioController;
-  late TextEditingController _coverPhotoController;
-  late TextEditingController _galleryController;
-  late TextEditingController _reviewsController;
   late TextEditingController _noticeController;
-
-  List<String> _linesFrom(String value) => value
-      .split('\n')
-      .map((line) => line.trim())
-      .where((line) => line.isNotEmpty)
-      .toList();
 
   @override
   void initState() {
@@ -104,9 +96,6 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     _industryController = TextEditingController();
     _handleController = TextEditingController();
     _bioController = TextEditingController();
-    _coverPhotoController = TextEditingController();
-    _galleryController = TextEditingController();
-    _reviewsController = TextEditingController();
     _noticeController = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSection());
   }
@@ -119,9 +108,6 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     _industryController.dispose();
     _handleController.dispose();
     _bioController.dispose();
-    _coverPhotoController.dispose();
-    _galleryController.dispose();
-    _reviewsController.dispose();
     _noticeController.dispose();
     super.dispose();
   }
@@ -243,17 +229,10 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
               'bio': _bioController.text.trim().isEmpty
                   ? null
                   : _bioController.text.trim(),
-              'cover_photo_url': _coverPhotoController.text.trim().isEmpty
-                  ? null
-                  : _coverPhotoController.text.trim(),
-              'gallery_image_urls': _linesFrom(_galleryController.text),
-              'review_quotes': _linesFrom(_reviewsController.text),
               'notice_text': _noticeController.text.trim().isEmpty
                   ? null
                   : _noticeController.text.trim(),
               'booking_mode': _bookingMode,
-              'reviews_enabled': _reviewsEnabled,
-              'gallery_enabled': _galleryEnabled,
             },
           );
       if (!mounted) return;
@@ -263,11 +242,11 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
         _profileHydrated = false;
         _saving = false;
       });
-      if (mounted) _snack('Profile updated', AppColors.green);
+      if (mounted) _snack('Booking page updated', AppColors.green);
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      _snack('The public profile could not be saved.', AppColors.error);
+      _snack('The booking page could not be saved.', AppColors.error);
     }
   }
 
@@ -320,7 +299,12 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
           maxChildSize: 0.92,
           builder: (ctx, scrollController) => ListView(
             controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pageX,
+              AppSpacing.md,
+              AppSpacing.pageX,
+              AppSpacing.xl,
+            ),
             children: [
               settingsHandle(),
               const SizedBox(height: 20),
@@ -933,7 +917,12 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
           canPop: !deleting,
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pageX,
+                AppSpacing.sm,
+                AppSpacing.pageX,
+                AppSpacing.xl,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1045,7 +1034,12 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
       color: AppColors.green,
       child: ListView(
         controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.pageX,
+          0,
+          AppSpacing.pageX,
+          40,
+        ),
         children: [
           if (_shows(SettingsBusinessSection.business)) ...[
             // ── Business info ────────────────────────────────────────────────
@@ -1063,7 +1057,10 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
             const SizedBox(height: AppSpacing.md),
             workspace.when(
               loading: () => skeletonBox(80),
-              error: (_, _) => errorBox('Could not load workspace'),
+              error: (_, _) => SlateErrorState(
+                message: 'Could not load workspace',
+                onRetry: () => ref.invalidate(workspaceProvider),
+              ),
               data: (ws) {
                 if (!_businessInfoHydrated) {
                   _ownerNameController.text =
@@ -1228,7 +1225,11 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
             const SizedBox(height: 10),
             workspaceSettings.when(
               loading: () => skeletonBox(80),
-              error: (_, _) => errorBox('Could not load working hours'),
+              error: (_, _) => SlateErrorState(
+                message: 'Could not load working hours',
+                onRetry: () =>
+                    ref.invalidate(settingsWorkspaceSettingsProvider),
+              ),
               data: (settings) {
                 final hours = Map<String, dynamic>.from(
                   settings?['working_hours'] as Map? ?? {},
@@ -1262,28 +1263,29 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
           if (_shows(SettingsBusinessSection.publicProfile)) ...[
             KeyedSubtree(
               key: _publicProfileKey,
-              child: sectionLabel('Public Profile'),
+              child: sectionLabel('Booking page'),
             ),
             const SizedBox(height: 10),
             workspace.when(
               loading: () => skeletonBox(140),
-              error: (_, _) => errorBox('Could not load profile controls'),
+              error: (_, _) => SlateErrorState(
+                message: 'Could not load profile controls',
+                onRetry: () => ref.invalidate(workspaceProvider),
+              ),
               data: (ws) => profile.when(
                 loading: () => skeletonBox(140),
-                error: (_, _) => errorBox('Could not load public profile'),
+                error: (_, _) => SlateErrorState(
+                  message: 'Could not load booking page',
+                  onRetry: () =>
+                      ref.invalidate(settingsBusinessProfileProvider),
+                ),
                 data: (bp) {
                   if (!_profileHydrated) {
                     _handleController.text = bp?.handle ?? '';
                     _savedHandle = bp?.handle.trim().toLowerCase() ?? '';
                     _bioController.text = bp?.bio ?? '';
-                    _coverPhotoController.text = bp?.coverPhotoUrl ?? '';
-                    _galleryController.text =
-                        bp?.galleryImageUrls.join('\n') ?? '';
-                    _reviewsController.text = bp?.reviewQuotes.join('\n') ?? '';
                     _noticeController.text = bp?.noticeText ?? '';
                     _bookingMode = bp?.bookingMode ?? 'manual';
-                    _reviewsEnabled = bp?.reviewsEnabled ?? false;
-                    _galleryEnabled = bp?.galleryEnabled ?? false;
                     _profileHydrated = true;
                   }
                   return Container(
@@ -1300,6 +1302,15 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const Text(
+                          'Customers can view your services and send a preferred time. You confirm every booking yourself.',
+                          style: TextStyle(
+                            color: AppColors.t3,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
                         settingsField(
                           label: 'HANDLE',
                           controller: _handleController,
@@ -1328,7 +1339,11 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'workloop.app/${_handleController.text.isEmpty ? 'your-handle' : _handleController.text}',
+                          publicBookingPageDisplayUrl(
+                            _handleController.text.isEmpty
+                                ? 'your-handle'
+                                : _handleController.text,
+                          ),
                           style: const TextStyle(
                             color: AppColors.t3,
                             fontSize: 13,
@@ -1337,7 +1352,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                         ),
                         const SizedBox(height: 16),
                         saveBtn(
-                          label: 'Save public profile',
+                          label: 'Save booking page',
                           loading: _saving,
                           onTap: () => _saveProfile(ws?['id'] as String),
                         ),

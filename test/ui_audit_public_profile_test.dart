@@ -31,7 +31,7 @@ const _profile = PublicProfile(
 
 void main() {
   testWidgets(
-    'public profile keeps exact prices and renders hours Monday to Sunday',
+    'public profile keeps exact prices and shows only published opening days',
     (tester) async {
       tester.view.physicalSize = const Size(390, 900);
       tester.view.devicePixelRatio = 1;
@@ -53,16 +53,10 @@ void main() {
       expect(find.text('£49.99'), findsOneWidget);
       expect(find.text('£50'), findsNothing);
 
+      expect(find.text('Wednesday'), findsNothing);
+      expect(find.text('Closed on other days'), findsOneWidget);
       final dayPositions = [
-        for (final day in const [
-          'Monday',
-          'Tuesday',
-          'Wednesday',
-          'Thursday',
-          'Friday',
-          'Saturday',
-          'Sunday',
-        ])
+        for (final day in const ['Monday', 'Tuesday'])
           tester.getTopLeft(find.text(day)).dy,
       ];
       expect(dayPositions, orderedEquals([...dayPositions]..sort()));
@@ -105,7 +99,7 @@ void main() {
       final preferredField = find.byWidgetPredicate(
         (widget) =>
             widget is TextField &&
-            widget.decoration?.hintText == 'Preferred day or time',
+            widget.decoration?.labelText == 'Preferred day or time',
       );
       expect(
         tester.widget<TextField>(preferredField).controller!.text,

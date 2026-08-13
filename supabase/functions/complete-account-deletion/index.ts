@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { closeWorkloopStripeAccount } from "../_shared/stripe_account_offboarding.ts";
 import { isSoleWorkspaceOwner } from "../_shared/sole_workspace_owner.ts";
 
 const corsHeaders = {
@@ -164,6 +165,58 @@ Deno.serve(async (req: Request) => {
   }
   if (!claim) {
     return response(409, { error: "Deletion request was claimed elsewhere" });
+  }
+
+  async function releaseClaim(note: string) {
+    const { error } = await supabase.from("account_deletion_requests").update({
+      status: "requested",
+      processing_started_at: null,
+      notes: note,
+    }).eq("id", requestId).eq("status", "processing");
+    return error == null;
+  }
+
+  // Workloop creates Accounts v2 merchant accounts. Provider offboarding must
+  // be confirmed before local account/payment mappings are deleted; otherwise
+  // Workloop could retain access to an account that the user believed removed.
+  // The helper first reads the account and treats `closed: true` as an
+  // idempotent success, so a retry is safe if the later DB delete fails.
+  if (request.workspace_id) {
+    const { data: paymentAccount, error: paymentAccountError } = await supabase
+      .from("workspace_payment_accounts")
+      .select("stripe_account_id, mode")
+      .eq("workspace_id", request.workspace_id)
+      .maybeSingle();
+    if (paymentAccountError) {
+      await releaseClaim("Stripe offboarding could not be prepared; retry.");
+      return response(500, {
+        error: "Could not prepare payment account offboarding",
+      });
+    }
+
+    if (paymentAccount) {
+      const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+      try {
+        await closeWorkloopStripeAccount(
+          stripeSecretKey,
+          stringValue(paymentAccount.stripe_account_id, 100),
+          stringValue(paymentAccount.mode, 8),
+        );
+      } catch (_) {
+        console.error("account_deletion_stripe_offboarding_failed", {
+          requestId: request.id,
+        });
+        const released = await releaseClaim(
+          "Stripe offboarding was not confirmed; no local account data was deleted.",
+        );
+        return response(released ? 409 : 500, {
+          error: released
+            ? "Payment account offboarding must complete before deletion"
+            : "Payment account offboarding failed and the request needs review",
+          code: "stripe_offboarding_required",
+        });
+      }
+    }
   }
 
   let workspaceDeleted = false;

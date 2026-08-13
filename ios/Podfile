@@ -30,7 +30,7 @@ target 'Runner' do
   use_frameworks!
 
   # First-party SDK used by Workloop's native Tap to Pay bridge.
-  pod 'StripeTerminal', '~> 5.0'
+  pod 'StripeTerminal', '~> 5.7'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do

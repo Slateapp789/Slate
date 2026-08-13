@@ -74,6 +74,22 @@ Deno.serve(async (req: Request) => {
     return response(401, { error: "Unauthorized" });
   }
 
+  const { data: meetsMfaPolicy, error: mfaPolicyError } = await userClient.rpc(
+    "current_user_meets_mfa_policy",
+  );
+  if (mfaPolicyError) {
+    console.error("account_deletion_mfa_policy_check_failed", {
+      code: mfaPolicyError.code,
+    });
+    return response(503, { error: "Could not verify account security" });
+  }
+  if (meetsMfaPolicy !== true) {
+    return response(403, {
+      error: "Complete two-factor verification to delete this account",
+      code: "mfa_required",
+    });
+  }
+
   const { data: memberships, error: membershipError } = await serviceClient
     .from("workspace_members")
     .select("user_id")

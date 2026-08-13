@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:workloop/shared/models/business_feed_item.dart';
 import 'package:workloop/shared/models/slate_models.dart';
-import 'package:workloop/shared/providers/appointments_provider.dart';
 import 'package:workloop/shared/providers/business_feed_provider.dart';
-import 'package:workloop/shared/providers/clients_provider.dart';
 import 'package:workloop/shared/providers/finance_provider.dart';
-import 'package:workloop/shared/providers/notes_provider.dart';
-import 'package:workloop/shared/providers/tasks_provider.dart';
 import 'package:workloop/shared/providers/workspace_provider.dart';
+import 'package:workloop/shared/providers/workspace_settings_provider.dart';
+import 'package:workloop/shared/repositories/appointments_repository.dart';
+import 'package:workloop/shared/repositories/clients_repository.dart';
+import 'package:workloop/shared/repositories/expenses_repository.dart';
+import 'package:workloop/shared/repositories/notes_repository.dart';
+import 'package:workloop/shared/repositories/payments_repository.dart';
+import 'package:workloop/shared/repositories/profile_repository.dart';
+import 'package:workloop/shared/repositories/tasks_repository.dart';
 import 'package:workloop/shared/widgets/business_feed_list.dart';
 
 void main() {
@@ -278,6 +283,39 @@ void main() {
       );
     });
 
+    test('does not surface inactive clients as follow-up work', () {
+      final now = DateTime(2026, 7, 6, 9);
+      final items = buildBusinessFeedItems(
+        now: now,
+        appointments: const [],
+        payments: const [],
+        expenses: const [],
+        tasks: const [],
+        notes: const [],
+        clients: [
+          Client.fromMap({
+            'id': 'inactive-client',
+            'workspace_id': 'workspace-1',
+            'name': 'Archived client',
+            'status': 'inactive',
+            'last_activity_at': '2026-01-01T09:00:00',
+          }),
+        ],
+        bookingRequests: const [],
+        finance: FinanceSummary.from(
+          payments: const [],
+          expenses: const [],
+          monthlyTarget: 0,
+          now: now,
+        ),
+      );
+
+      expect(
+        items.where((item) => item.sourceId == 'inactive-client'),
+        isEmpty,
+      );
+    });
+
     test('uses safe business-date wording for paid payments and expenses', () {
       final now = DateTime(2026, 7, 6, 9);
       final items = buildBusinessFeedItems(
@@ -330,36 +368,41 @@ void main() {
       expect(expenseItem.subtitle, contains('Business date yesterday'));
     });
 
-    test('provider surfaces a source failure instead of an all-clear feed', () {
-      final sourceError = StateError('payments unavailable');
-      final container = ProviderContainer(
-        overrides: [
-          workspaceIdProvider.overrideWith((ref) async => null),
-          appointmentsProvider.overrideWith(
-            (ref) async => const <Map<String, dynamic>>[],
-          ),
-          invoicesProvider.overrideWith((ref) async => throw sourceError),
-          expensesProvider.overrideWith((ref) async => const <Expense>[]),
-          allTasksProvider.overrideWith((ref) async => const <SlateTask>[]),
-          allNotesProvider.overrideWith((ref) async => const <SlateNote>[]),
-          clientsProvider.overrideWith((ref) async => const <Client>[]),
-          financeSummaryProvider.overrideWith(
-            (ref) async => FinanceSummary.from(
-              payments: const <Payment>[],
-              expenses: const <Expense>[],
-              monthlyTarget: 0,
-              now: DateTime(2026, 7, 6),
+    test(
+      'provider surfaces a source failure instead of an all-clear feed',
+      () async {
+        final sourceError = StateError('payments unavailable');
+        final container = ProviderContainer(
+          overrides: [
+            workspaceIdProvider.overrideWith((ref) async => 'workspace-1'),
+            workspaceSettingsProvider.overrideWith((ref) async => null),
+            appointmentsRepositoryProvider.overrideWithValue(
+              _FeedAppointmentsRepository(),
             ),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
+            paymentsRepositoryProvider.overrideWithValue(
+              _FailingFeedPaymentsRepository(sourceError),
+            ),
+            expensesRepositoryProvider.overrideWithValue(
+              _FeedExpensesRepository(),
+            ),
+            tasksRepositoryProvider.overrideWithValue(_FeedTasksRepository()),
+            notesRepositoryProvider.overrideWithValue(_FeedNotesRepository()),
+            clientsRepositoryProvider.overrideWithValue(
+              _FeedClientsRepository(),
+            ),
+            profileRepositoryProvider.overrideWithValue(
+              _FeedProfileRepository(),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
 
-      expect(
-        container.read(businessFeedProvider.future),
-        throwsA(same(sourceError)),
-      );
-    });
+        await expectLater(
+          container.read(businessFeedProvider.future),
+          throwsA(same(sourceError)),
+        );
+      },
+    );
   });
 
   testWidgets('BusinessFeedList supports source-specific empty copy', (
@@ -384,4 +427,93 @@ void main() {
       findsOneWidget,
     );
   });
+}
+
+SupabaseClient _testSupabaseClient() {
+  return SupabaseClient(
+    'https://example.supabase.co',
+    'test-anon-key',
+    authOptions: const AuthClientOptions(autoRefreshToken: false),
+  );
+}
+
+class _FeedAppointmentsRepository extends AppointmentsRepository {
+  _FeedAppointmentsRepository() : super(_testSupabaseClient());
+
+  @override
+  Future<List<Map<String, dynamic>>> listRowsForBusinessFeed(
+    String workspaceId, {
+    required DateTime from,
+    required DateTime to,
+    int limit = 80,
+  }) async => const [];
+}
+
+class _FailingFeedPaymentsRepository extends PaymentsRepository {
+  final Object error;
+
+  _FailingFeedPaymentsRepository(this.error) : super(_testSupabaseClient());
+
+  @override
+  Future<List<Payment>> listForBusinessFeed(
+    String workspaceId, {
+    required DateTime recentPaidFrom,
+    required DateTime openDueThrough,
+    int limitPerGroup = 80,
+  }) async => throw error;
+}
+
+class _FeedExpensesRepository extends ExpensesRepository {
+  _FeedExpensesRepository() : super(_testSupabaseClient());
+
+  @override
+  Future<List<Expense>> listForBusinessFeed(
+    String workspaceId, {
+    required DateTime from,
+    int limit = 12,
+  }) async => const [];
+}
+
+class _FeedTasksRepository extends TasksRepository {
+  _FeedTasksRepository() : super(_testSupabaseClient());
+
+  @override
+  Future<List<SlateTask>> dueOpenForBusinessFeed(
+    String workspaceId, {
+    required DateTime through,
+    int limit = 80,
+  }) async => const [];
+}
+
+class _FeedNotesRepository extends NotesRepository {
+  _FeedNotesRepository() : super(_testSupabaseClient());
+
+  @override
+  Future<List<SlateNote>> recentForBusinessFeed(
+    String workspaceId, {
+    required DateTime from,
+    int limit = 10,
+  }) async => const [];
+}
+
+class _FeedClientsRepository extends ClientsRepository {
+  _FeedClientsRepository() : super(_testSupabaseClient());
+
+  @override
+  Future<List<Client>> followUpsForBusinessFeed(
+    String workspaceId, {
+    required DateTime leadBefore,
+    required DateTime inactiveBefore,
+    int limitPerGroup = 80,
+  }) async => const [];
+}
+
+class _FeedProfileRepository extends ProfileRepository {
+  _FeedProfileRepository() : super(_testSupabaseClient());
+
+  @override
+  Future<List<BookingRequest>> pendingBookingRequestsForBusinessFeed(
+    String workspaceId, {
+    int limit = 8,
+  }) async => const [];
 }

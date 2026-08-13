@@ -70,9 +70,10 @@ Current code scope includes:
 
 - Email/password authentication through Supabase.
 - Workspace onboarding with services, working hours, profile handle, revenue target, and first booking.
-- Main shell with four-item bottom pill navigation: Home, Clients, Bookings,
-  Tools. Tools contains Money, Tasks, and Notes; Profile and Settings are
-  available from compact account controls in the Home header.
+- Main shell with five clear operating destinations: Today, Clients, Work,
+  Money, and Business. Work contains Schedule, Tasks, and Notes; Business owns
+  the customer-facing booking page, services, working hours, and business
+  profile. Settings remains a secondary utility rather than a product module.
 - Dashboard with revenue, pulse, schedule, tasks, notification access, and booking requests.
 - CRM with client records, contact actions, notes, follow-ups, timeline, booking history, payment history, and tasks.
 - Bookings with today/upcoming/past views, calendar view, next booking, date selection, location type, custom services, inline client creation, edit flow, status control, linked tasks, and calendar export.

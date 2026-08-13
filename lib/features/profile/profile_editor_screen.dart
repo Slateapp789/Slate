@@ -12,7 +12,7 @@ class ProfileEditorScreen extends StatelessWidget {
   String get _title => switch (section) {
     SettingsBusinessSection.business => 'Business details',
     SettingsBusinessSection.workingHours => 'Working hours',
-    SettingsBusinessSection.publicProfile => 'Public profile',
+    SettingsBusinessSection.publicProfile => 'Booking page',
     SettingsBusinessSection.services => 'Services',
   };
 
@@ -36,7 +36,10 @@ class ProfileEditorScreen extends StatelessWidget {
                   ),
                   child: WorkloopRouteHeader(
                     title: _title,
-                    backSemanticLabel: 'Back to profile',
+                    backSemanticLabel:
+                        section == SettingsBusinessSection.publicProfile
+                        ? 'Back to Booking page'
+                        : 'Back to Business profile',
                   ),
                 ),
                 Expanded(

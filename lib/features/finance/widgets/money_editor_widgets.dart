@@ -64,7 +64,7 @@ class MoneyAmountField extends StatelessWidget {
       onChanged: onChanged,
       style: const TextStyle(
         color: AppColors.t1,
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: FontWeight.w600,
         height: 1.1,
       ),
@@ -72,13 +72,13 @@ class MoneyAmountField extends StatelessWidget {
         prefixText: '£ ',
         prefixStyle: const TextStyle(
           color: AppColors.t3,
-          fontSize: 28,
+          fontSize: 25,
           fontWeight: FontWeight.w600,
         ),
         hintText: '0.00',
         hintStyle: TextStyle(
           color: AppColors.t3,
-          fontSize: 32,
+          fontSize: 28,
           fontWeight: FontWeight.w600,
         ),
         filled: true,

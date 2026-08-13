@@ -19,26 +19,33 @@ dart format --output=none --set-exit-if-changed \
 flutter analyze
 flutter test --coverage "${dart_defines[@]}"
 
-if command -v deno >/dev/null 2>&1; then
-  deno fmt --check supabase/functions quality/load
-  deno lint supabase/functions
-  deno check \
+deno_bin="${DENO_BIN:-deno}"
+if command -v "$deno_bin" >/dev/null 2>&1; then
+  "$deno_bin" fmt --check supabase/functions quality/load
+  "$deno_bin" lint supabase/functions
+  "$deno_bin" check \
     --config supabase/functions/complete-account-deletion/deno.json \
     supabase/functions/complete-account-deletion/index.ts
-  deno check \
+  "$deno_bin" check \
     --config supabase/functions/create-booking-request/deno.json \
     supabase/functions/create-booking-request/index.ts
-  deno check \
+  "$deno_bin" check \
     --config supabase/functions/get-public-profile/deno.json \
     supabase/functions/get-public-profile/index.ts
-  deno check \
+  "$deno_bin" check \
     --config supabase/functions/places-address-search/deno.json \
     supabase/functions/places-address-search/index.ts
-  deno check \
+  "$deno_bin" check \
     --config supabase/functions/request-account-deletion/deno.json \
     supabase/functions/request-account-deletion/index.ts
-  deno check supabase/functions/workloop-ai-assistant/index.ts
-  deno test supabase/functions
+  "$deno_bin" check \
+    --config supabase/functions/stripe-payments/deno.json \
+    supabase/functions/stripe-payments/index.ts
+  "$deno_bin" check \
+    --config supabase/functions/stripe-webhook/deno.json \
+    supabase/functions/stripe-webhook/index.ts
+  "$deno_bin" check supabase/functions/workloop-ai-assistant/index.ts
+  "$deno_bin" test --allow-env supabase/functions
 else
   echo "Deno is unavailable; Edge Function checks were not run." >&2
   exit 69
@@ -72,8 +79,14 @@ fi
 # Store artifacts intentionally stay separate: these commands must fail rather
 # than fall back to debug signing when protected release credentials are absent.
 if [[ "${RUN_SIGNED_BUILDS:-false}" == "true" ]]; then
+  candidate_artifacts=(build/app/outputs/bundle/release/app-release.aab)
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    candidate_artifacts+=(build/ios/ipa/Workloop.ipa)
+  fi
+  scripts/qa_release_candidate.sh --prepare "${candidate_artifacts[@]}"
   flutter build appbundle --release "${dart_defines[@]}"
   if [[ "$(uname -s)" == "Darwin" ]]; then
     flutter build ipa --release "${dart_defines[@]}"
   fi
+  scripts/qa_release_candidate.sh --record-artifacts "${candidate_artifacts[@]}"
 fi

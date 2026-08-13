@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="workloop_launch">#C1FF72</color>
-    <color name="workloop_background">#EEEDE8</color>
+    <color name="workloop_launch">#6362EB</color>
+    <color name="workloop_background">#F6F4EF</color>
 </resources>

@@ -97,9 +97,9 @@ kotlin {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    implementation("com.stripe:stripeterminal-taptopay:5.5.0")
-    implementation("com.stripe:stripeterminal-core:5.5.0")
-    implementation("com.stripe:stripeterminal-ktx:5.5.0")
+    implementation("com.stripe:stripeterminal-taptopay:5.7.0")
+    implementation("com.stripe:stripeterminal-core:5.7.0")
+    implementation("com.stripe:stripeterminal-ktx:5.7.0")
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 }

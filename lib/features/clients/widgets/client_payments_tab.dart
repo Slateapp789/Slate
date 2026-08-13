@@ -76,7 +76,12 @@ class ClientPaymentsTab extends ConsumerWidget {
                 onRefresh: () async =>
                     ref.invalidate(clientPaymentsProvider(clientId)),
                 child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    0,
+                    AppSpacing.pageX,
+                    40,
+                  ),
                   itemCount: items.length,
                   separatorBuilder: (_, _) => const SizedBox.shrink(),
                   itemBuilder: (context, index) {

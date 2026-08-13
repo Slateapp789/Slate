@@ -275,6 +275,7 @@ class Payment {
   final double stripeAmountPaid;
   final String? notes;
   final String? clientName;
+  final String? clientEmail;
 
   const Payment({
     required this.id,
@@ -291,6 +292,7 @@ class Payment {
     this.stripeAmountPaid = 0,
     this.notes,
     this.clientName,
+    this.clientEmail,
   });
 
   double get collectedAmount {
@@ -331,6 +333,7 @@ class Payment {
       stripeAmountPaid: _doubleFrom(map['stripe_amount_paid']),
       notes: _cleanDisplayText(map['notes']),
       clientName: contact?['name'] as String?,
+      clientEmail: contact?['email'] as String?,
     );
   }
 

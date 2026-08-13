@@ -35,6 +35,32 @@ class ExpensesRepository {
     }
   }
 
+  Future<List<Expense>> listForBusinessFeed(
+    String workspaceId, {
+    required DateTime from,
+    int limit = 12,
+  }) async {
+    try {
+      final rows = await _client
+          .from('expenses')
+          .select()
+          .eq('workspace_id', workspaceId)
+          .gte('expense_date', from.toIso8601String().split('T').first)
+          .order('expense_date', ascending: false)
+          .order('created_at', ascending: false)
+          .order('id', ascending: true)
+          .limit(limit);
+      return rows
+          .map<Expense>(
+            (row) => Expense.fromMap(Map<String, dynamic>.from(row)),
+          )
+          .toList();
+    } on PostgrestException catch (error) {
+      if (_tableMissing(error)) return [];
+      rethrow;
+    }
+  }
+
   Future<void> create({
     required String workspaceId,
     required double amount,

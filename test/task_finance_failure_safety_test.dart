@@ -410,7 +410,9 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Close'));
+    final close = find.text('Close');
+    await tester.ensureVisible(close);
+    await tester.tap(close);
     await tester.pumpAndSettle();
   });
 
@@ -473,6 +475,8 @@ void main() {
 
     await tester.tap(find.text('Spent'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Materials').last);
+    await tester.pumpAndSettle();
     await tester.longPress(find.text('Materials').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete Expense'));
@@ -522,8 +526,11 @@ void main() {
     final incomeCard = find.text('Launch Client');
     await tester.ensureVisible(incomeCard);
     await tester.pumpAndSettle();
-    await tester.longPress(incomeCard);
+    await tester.tap(find.byTooltip('More payment actions'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete income').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Delete income entry?'), findsOneWidget);
     await tester.tap(find.text('Delete income'));
     await tester.pump();
 

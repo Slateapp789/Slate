@@ -19,6 +19,7 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = SlateTheme.of(context);
     final auth = ref.watch(authRepositoryProvider);
     final name = auth.currentFirstName?.trim();
     final email = auth.currentEmail;
@@ -33,7 +34,7 @@ class SettingsScreen extends ConsumerWidget {
         : '${appearance.label} appearance';
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: tokens.background,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -48,7 +49,7 @@ class SettingsScreen extends ConsumerWidget {
               children: [
                 WorkloopRouteHeader(
                   title: 'Settings',
-                  backSemanticLabel: 'Back to Home',
+                  backSemanticLabel: 'Back to Business',
                   onBack: () => Navigator.pop(context),
                 ),
                 const SizedBox(height: AppSpacing.xl),
@@ -77,8 +78,19 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ),
                 _SettingsRow(
+                  icon: LucideIcons.inbox,
+                  title: 'Notification centre',
+                  subtitle: 'Review unread business activity and updates',
+                  onTap: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen(),
+                    ),
+                  ),
+                ),
+                _SettingsRow(
                   icon: LucideIcons.bell,
-                  title: 'Notifications',
+                  title: 'Notification preferences',
                   subtitle: 'Choose the alerts and summaries you receive',
                   onTap: () => _open(
                     context,
@@ -141,7 +153,7 @@ class SettingsScreen extends ConsumerWidget {
                   'Workloop ${WorkloopAppInfo.version}',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: AppColors.t4,
+                    color: tokens.textDisabled,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -178,8 +190,9 @@ class _SettingsDestinationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: tokens.background,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -222,59 +235,55 @@ class _AccountIdentity extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     final label = name?.isNotEmpty == true ? name! : 'Your account';
     final initial = label[0].toUpperCase();
-    return WorkloopSurface(
+    return WorkloopListRow(
       onTap: onTap,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: AppColors.modBg,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              initial,
-              style: const TextStyle(
-                color: AppColors.t1,
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
+      leading: Container(
+        key: const ValueKey('settings-account-avatar'),
+        width: 48,
+        height: 48,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: tokens.surfaceRaised,
+          shape: BoxShape.circle,
+        ),
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: tokens.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: AppColors.t1,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  email,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.t3,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 18),
-        ],
+        ),
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: tokens.textPrimary,
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      subtitle: Text(
+        email,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: tokens.textTertiary,
+          fontSize: 13,
+          fontWeight: FontWeight.w400,
+        ),
+      ),
+      trailing: Icon(
+        LucideIcons.chevronRight,
+        color: tokens.textTertiary,
+        size: 18,
       ),
     );
   }
@@ -297,38 +306,43 @@ class _SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return WorkloopListRow(
       onTap: onTap,
       showDivider: showDivider,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
       leading: Container(
+        key: ValueKey('settings-row-icon-${icon.codePoint}'),
         width: 40,
         height: 40,
-        decoration: const BoxDecoration(
-          color: AppColors.modBg,
+        decoration: BoxDecoration(
+          color: tokens.surfaceRaised,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: AppColors.t2, size: 18),
+        child: Icon(icon, color: tokens.textSecondary, size: 18),
       ),
       title: Text(
         title,
-        style: const TextStyle(
-          color: AppColors.t1,
+        style: TextStyle(
+          color: tokens.textPrimary,
           fontSize: 15,
           fontWeight: FontWeight.w600,
         ),
       ),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(
-          color: AppColors.t3,
+        style: TextStyle(
+          color: tokens.textTertiary,
           fontSize: 13,
           fontWeight: FontWeight.w400,
         ),
       ),
-      trailing: const Icon(
+      trailing: Icon(
         LucideIcons.chevronRight,
-        color: AppColors.t3,
+        color: tokens.textTertiary,
         size: 16,
       ),
     );

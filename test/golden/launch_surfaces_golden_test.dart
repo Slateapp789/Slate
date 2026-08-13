@@ -3,21 +3,28 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:workloop/core/theme/app_theme.dart';
 import 'package:workloop/features/appointments/appointments_screen.dart';
 import 'package:workloop/features/auth/auth_screen.dart';
 import 'package:workloop/features/business_feed/business_feed_screen.dart';
+import 'package:workloop/features/business/business_screen.dart';
 import 'package:workloop/features/clients/add_client_screen.dart';
 import 'package:workloop/features/clients/clients_screen.dart';
 import 'package:workloop/features/dashboard/dashboard_screen.dart';
 import 'package:workloop/features/finance/finance_screen.dart';
-import 'package:workloop/features/more/more_screen.dart';
 import 'package:workloop/features/notes/notes_screen.dart';
+import 'package:workloop/features/notifications/notifications_screen.dart';
+import 'package:workloop/features/onboarding/screens/ob_welcome.dart';
+import 'package:workloop/features/profile/profile_screen.dart';
+import 'package:workloop/features/profile/booking_page_screen.dart';
 import 'package:workloop/features/public_profile/booking_requests_screen.dart';
 import 'package:workloop/features/public_profile/public_profile_screen.dart';
+import 'package:workloop/features/settings/providers/settings_providers.dart';
 import 'package:workloop/features/settings/settings_screen.dart';
 import 'package:workloop/features/tasks/tasks_screen.dart';
+import 'package:workloop/features/work/work_screen.dart';
 import 'package:workloop/shared/models/slate_models.dart';
 import 'package:workloop/shared/providers/appointments_provider.dart';
 import 'package:workloop/shared/providers/business_feed_provider.dart';
@@ -25,12 +32,14 @@ import 'package:workloop/shared/providers/clients_provider.dart';
 import 'package:workloop/shared/providers/dashboard_provider.dart';
 import 'package:workloop/shared/providers/finance_provider.dart';
 import 'package:workloop/shared/providers/notes_provider.dart';
+import 'package:workloop/shared/providers/notifications_provider.dart';
 import 'package:workloop/shared/providers/setup_checklist_provider.dart';
 import 'package:workloop/shared/providers/tasks_provider.dart';
 import 'package:workloop/shared/providers/workspace_provider.dart';
 import 'package:workloop/shared/providers/workspace_settings_provider.dart';
 import 'package:workloop/shared/repositories/auth_repository.dart';
 import 'package:workloop/shared/repositories/profile_repository.dart';
+import 'package:workloop/shared/widgets/slate_ui.dart';
 
 void main() {
   setUpAll(_loadDeterministicFonts);
@@ -46,12 +55,92 @@ void main() {
 
   testWidgets('authentication registration surface', (tester) async {
     await _pumpSurface(tester, const AuthScreen());
-    await tester.tap(find.byKey(const ValueKey('auth-mode-toggle')));
+    final modeToggle = find.byKey(const ValueKey('auth-mode-toggle'));
+    await tester.ensureVisible(modeToggle);
+    await tester.tap(modeToggle);
     await tester.pumpAndSettle();
 
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/auth-register.png'),
+    );
+  });
+
+  testWidgets('onboarding operating loop light surface', (tester) async {
+    await _pumpSurface(
+      tester,
+      Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: WorkloopTexturedBackdrop()),
+            SafeArea(child: ObWelcome(onNext: () {})),
+          ],
+        ),
+      ),
+      theme: AppTheme.light,
+    );
+
+    expect(
+      find.bySemanticsLabel(
+        'Workloop operating loop: client, booking, work, payment, repeat.',
+      ),
+      findsOneWidget,
+    );
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/onboarding-operating-loop-light.png'),
+    );
+  });
+
+  testWidgets('shell navigation stays quiet in both appearances', (
+    tester,
+  ) async {
+    final screen = Scaffold(
+      body: const WorkloopTexturedBackdrop(),
+      bottomNavigationBar: WorkloopBottomNav(
+        currentIndex: 1,
+        items: const [
+          WorkloopNavItem(
+            label: 'Today',
+            icon: LucideIcons.home,
+            color: AppColors.accentPrimary,
+          ),
+          WorkloopNavItem(
+            label: 'Clients',
+            icon: LucideIcons.users,
+            color: AppColors.accentPrimary,
+          ),
+          WorkloopNavItem(
+            label: 'Work',
+            icon: LucideIcons.briefcase,
+            color: AppColors.accentPrimary,
+          ),
+          WorkloopNavItem(
+            label: 'Money',
+            icon: LucideIcons.circlePoundSterling,
+            color: AppColors.accentPrimary,
+          ),
+          WorkloopNavItem(
+            label: 'Business',
+            icon: LucideIcons.store,
+            color: AppColors.accentPrimary,
+          ),
+        ],
+        onTap: (_) {},
+      ),
+    );
+
+    await _pumpSurface(tester, screen, theme: AppTheme.light);
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/shell-navigation-light.png'),
+    );
+
+    await _pumpSurface(tester, screen, theme: AppTheme.dark);
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/shell-navigation-dark.png'),
     );
   });
 
@@ -86,6 +175,44 @@ void main() {
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/clients-populated.png'),
+    );
+  });
+
+  testWidgets('notification list light surface', (tester) async {
+    final now = DateTime.now();
+    await _pumpSurface(
+      tester,
+      const NotificationsScreen(),
+      theme: AppTheme.light,
+      overrides: [
+        notificationsProvider.overrideWith(
+          (ref) async => [
+            SlateNotification(
+              id: 'notification-1',
+              workspaceId: 'workspace-1',
+              type: 'booking',
+              title: 'New booking request',
+              body: 'Maya wants a signature appointment on Friday.',
+              deepLink: '/booking-requests',
+              createdAt: now,
+            ),
+            SlateNotification(
+              id: 'notification-2',
+              workspaceId: 'workspace-1',
+              type: 'payment_received',
+              title: 'Payment received',
+              body: '£85 was recorded for Samira Khan.',
+              read: true,
+              createdAt: now.subtract(const Duration(days: 2)),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/notifications-list-light.png'),
     );
   });
 
@@ -129,6 +256,7 @@ void main() {
       invoicesProvider.overrideWith((ref) async => const []),
       financeSummaryProvider.overrideWith((ref) async => summary),
       dashboardAttentionProvider.overrideWith((ref) async => const []),
+      unreadNotificationsProvider.overrideWith((ref) async => 0),
       allTasksProvider.overrideWith((ref) async => const []),
       allNotesProvider.overrideWith((ref) async => const []),
       businessFeedProvider.overrideWith((ref) async => const []),
@@ -140,8 +268,9 @@ void main() {
 
     await _pumpSurface(tester, screen, overrides: overrides);
 
-    expect(find.semantics.byLabel('Open profile'), findsOneWidget);
-    expect(find.semantics.byLabel('Open settings'), findsOneWidget);
+    expect(find.semantics.byLabel('Open profile'), findsNothing);
+    expect(find.semantics.byLabel('Open settings'), findsNothing);
+    expect(find.byIcon(LucideIcons.bell), findsOneWidget);
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/dashboard-focus.png'),
@@ -185,14 +314,160 @@ void main() {
             },
           ],
         ),
-        bookingRequestsProvider.overrideWith((ref) async => const []),
+        bookingRequestsProvider.overrideWith(
+          (ref) async => const [
+            BookingRequest(
+              id: 'request-1',
+              workspaceId: 'workspace-1',
+              name: 'Aisha Morgan',
+              phone: '+44 7700 900123',
+            ),
+            BookingRequest(
+              id: 'request-2',
+              workspaceId: 'workspace-1',
+              name: 'Daniel Hughes',
+              phone: '+44 7700 900124',
+            ),
+            BookingRequest(
+              id: 'request-3',
+              workspaceId: 'workspace-1',
+              name: 'Maya Lewis',
+              phone: '+44 7700 900125',
+            ),
+            BookingRequest(
+              id: 'request-4',
+              workspaceId: 'workspace-1',
+              name: 'Theo Walsh',
+              phone: '+44 7700 900126',
+            ),
+            BookingRequest(
+              id: 'request-5',
+              workspaceId: 'workspace-1',
+              name: 'Yusuf Khan',
+              phone: '+44 7700 900127',
+            ),
+          ],
+        ),
       ],
     );
 
     expect(find.textContaining('£149.99'), findsOneWidget);
+    expect(find.text('10:00'), findsOneWidget);
+    expect(find.text('11:15'), findsOneWidget);
+    final listRow = tester.widget<WorkloopListRow>(
+      find.byKey(const ValueKey('list-booking-row-appointment-1')),
+    );
+    expect(listRow.flat, isTrue);
+    expect(
+      listRow.padding,
+      const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.md,
+      ),
+    );
+    expect(
+      tester
+          .getTopLeft(
+            find.byKey(const ValueKey('list-booking-row-appointment-1')),
+          )
+          .dy,
+      lessThan(320),
+    );
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/bookings-populated.png'),
+    );
+  });
+
+  testWidgets('Work workspace schedule surface', (tester) async {
+    await _pumpSurface(
+      tester,
+      const WorkScreen(),
+      theme: AppTheme.light,
+      overrides: [
+        appointmentsProvider.overrideWith((ref) async => const []),
+        bookingRequestsProvider.overrideWith((ref) async => const []),
+        allTasksProvider.overrideWith((ref) async => const []),
+        allNotesProvider.overrideWith((ref) async => const []),
+      ],
+    );
+
+    expect(find.text('Work'), findsOneWidget);
+    expect(find.text('Schedule'), findsOneWidget);
+    expect(find.text('Tasks'), findsOneWidget);
+    expect(find.text('Notes'), findsOneWidget);
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/work-schedule-light.png'),
+    );
+  });
+
+  testWidgets('booking calendar light surface', (tester) async {
+    final selected = DateTime(2026, 8, 8);
+    await _pumpSurface(
+      tester,
+      AppointmentsScreen(
+        key: const ValueKey('booking-calendar-light'),
+        initialCalendarDate: selected,
+        calendarReferenceDate: selected,
+      ),
+      theme: AppTheme.light,
+      overrides: _bookingCalendarOverrides(),
+    );
+    await tester.tap(find.bySemanticsLabel('Calendar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('August'), findsOneWidget);
+    expect(find.text('Samira Khan'), findsOneWidget);
+    final calendarGrid = find.byKey(const ValueKey('2026-8'));
+    final agendaDivider = find.byKey(const ValueKey('calendar-agenda-divider'));
+    expect(
+      tester.getTopLeft(agendaDivider).dy -
+          tester.getBottomLeft(calendarGrid).dy,
+      lessThanOrEqualTo(1.5),
+    );
+    final bookingRow = tester.widget<WorkloopListRow>(
+      find.byKey(const ValueKey('calendar-booking-row-appointment-1')),
+    );
+    expect(bookingRow.flat, isTrue);
+    expect(
+      bookingRow.padding,
+      const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.md,
+      ),
+    );
+    expect(
+      tester
+          .getTopLeft(
+            find.byKey(const ValueKey('calendar-booking-row-appointment-1')),
+          )
+          .dy,
+      lessThan(710),
+    );
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/bookings-calendar-light.png'),
+    );
+  });
+
+  testWidgets('booking calendar dark surface', (tester) async {
+    final selected = DateTime(2026, 8, 8);
+    await _pumpSurface(
+      tester,
+      AppointmentsScreen(
+        key: const ValueKey('booking-calendar-dark'),
+        initialCalendarDate: selected,
+        calendarReferenceDate: selected,
+      ),
+      overrides: _bookingCalendarOverrides(),
+    );
+    await tester.tap(find.bySemanticsLabel('Calendar'));
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/bookings-calendar-dark.png'),
     );
   });
 
@@ -222,36 +497,109 @@ void main() {
     );
   });
 
-  testWidgets('Tools workspace hierarchy surface', (tester) async {
+  testWidgets('populated money surface', (tester) async {
+    final now = DateTime(2026, 8, 10, 12);
+    final payments = [
+      Payment(
+        id: 'payment-1',
+        workspaceId: 'workspace-1',
+        contactId: 'client-1',
+        number: 'PAY-001',
+        status: 'paid',
+        issueDate: now,
+        incomeRecordedAt: now,
+        total: 185,
+        amountPaid: 185,
+        clientName: 'Aisha Morgan',
+      ),
+      Payment(
+        id: 'payment-2',
+        workspaceId: 'workspace-1',
+        contactId: 'client-2',
+        number: 'PAY-002',
+        status: 'pending',
+        issueDate: now,
+        dueDate: now.add(const Duration(days: 2)),
+        total: 85,
+        clientName: 'Omar Rahman',
+      ),
+    ];
+    final expenses = [
+      Expense(
+        id: 'expense-1',
+        workspaceId: 'workspace-1',
+        amount: 32.5,
+        category: 'Supplies',
+        expenseDate: now,
+        notes: 'Studio supplies',
+      ),
+    ];
+    final summary = FinanceSummary.from(
+      payments: payments,
+      expenses: expenses,
+      monthlyTarget: 5000,
+      now: now,
+    );
     await _pumpSurface(
       tester,
-      MoreScreen(onOpenMoney: () {}, onOpenTasks: () {}, onOpenNotes: () {}),
+      FinanceScreen(referenceDate: now),
+      theme: AppTheme.light,
       overrides: [
-        invoicesProvider.overrideWith((ref) async => const []),
-        allTasksProvider.overrideWith((ref) async => const []),
-        allNotesProvider.overrideWith((ref) async => const []),
+        invoicesProvider.overrideWith((ref) async => payments),
+        expensesProvider.overrideWith((ref) async => expenses),
+        financeSummaryProvider.overrideWith((ref) async => summary),
+        workspaceSettingsProvider.overrideWith(
+          (ref) async => const {'revenue_target': 5000},
+        ),
       ],
     );
 
-    expect(find.text('Quick capture'), findsOneWidget);
-    expect(find.text('Business tools'), findsOneWidget);
-    expect(find.text('Profile'), findsNothing);
-    expect(find.text('Settings'), findsNothing);
+    expect(find.textContaining('£185'), findsWidgets);
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/money-populated-light.png'),
+    );
+  });
+
+  testWidgets('Business workspace hierarchy surface', (tester) async {
+    await _pumpSurface(
+      tester,
+      const BusinessScreen(),
+      overrides: [
+        workspaceProvider.overrideWith(
+          (ref) async => const {'id': 'workspace-1', 'name': 'Workloop Studio'},
+        ),
+        settingsBusinessProfileProvider.overrideWith((ref) async => null),
+        settingsWorkspaceSettingsProvider.overrideWith((ref) async => const {}),
+        settingsServicesProvider.overrideWith((ref) async => const []),
+        bookingRequestsProvider.overrideWith((ref) async => const []),
+      ],
+    );
+
+    expect(find.text('Your booking page'), findsOneWidget);
+    expect(find.text('Run your business'), findsOneWidget);
+    expect(find.text('Services'), findsOneWidget);
+    expect(find.text('Working hours'), findsOneWidget);
+    expect(find.text('Business profile'), findsOneWidget);
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/more-workspaces.png'),
     );
   });
 
-  testWidgets('Tools light appearance surface', (tester) async {
+  testWidgets('Business light appearance surface', (tester) async {
     await _pumpSurface(
       tester,
-      MoreScreen(onOpenMoney: () {}, onOpenTasks: () {}, onOpenNotes: () {}),
+      const BusinessScreen(),
       theme: AppTheme.light,
       overrides: [
-        invoicesProvider.overrideWith((ref) async => const []),
-        allTasksProvider.overrideWith((ref) async => const []),
-        allNotesProvider.overrideWith((ref) async => const []),
+        workspaceProvider.overrideWith(
+          (ref) async => const {'id': 'workspace-1', 'name': 'Workloop Studio'},
+        ),
+        settingsBusinessProfileProvider.overrideWith((ref) async => null),
+        settingsWorkspaceSettingsProvider.overrideWith((ref) async => const {}),
+        settingsServicesProvider.overrideWith((ref) async => const []),
+        bookingRequestsProvider.overrideWith((ref) async => const []),
       ],
     );
 
@@ -285,6 +633,90 @@ void main() {
     }
   });
 
+  testWidgets('populated task surface', (tester) async {
+    final now = DateTime.now();
+    await _pumpSurface(
+      tester,
+      const TasksScreen(),
+      theme: AppTheme.light,
+      overrides: [
+        allTasksProvider.overrideWith(
+          (ref) async => [
+            SlateTask(
+              id: 'task-1',
+              workspaceId: 'workspace-1',
+              title: 'Confirm Friday appointment details',
+              priority: 'high',
+              dueDate: now,
+              contactId: 'client-1',
+              clientName: 'Aisha Morgan',
+            ),
+            SlateTask(
+              id: 'task-2',
+              workspaceId: 'workspace-1',
+              title: 'Send payment reminder',
+              priority: 'medium',
+              dueDate: now.add(const Duration(days: 1)),
+              contactId: 'client-2',
+              clientName: 'Omar Rahman',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    expect(find.text('Confirm Friday appointment details'), findsOneWidget);
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/tasks-populated-light.png'),
+    );
+  });
+
+  testWidgets('populated notes surface', (tester) async {
+    final now = DateTime(2026, 8, 10, 12);
+    await _pumpSurface(
+      tester,
+      NotesScreen(showBackButton: false, referenceDate: now),
+      theme: AppTheme.light,
+      overrides: [
+        allNotesProvider.overrideWith(
+          (ref) async => [
+            SlateNote(
+              id: 'note-1',
+              workspaceId: 'workspace-1',
+              title: 'Aisha appointment preferences',
+              body: 'Prefers Friday afternoons and a quiet appointment.',
+              contactId: 'client-1',
+              clientName: 'Aisha Morgan',
+              pinned: true,
+              createdAt: now,
+              updatedAt: now,
+            ),
+            SlateNote(
+              id: 'note-2',
+              workspaceId: 'workspace-1',
+              title: 'August supply order',
+              body: 'Order fresh consultation packs before Monday.',
+              createdAt: now.subtract(const Duration(days: 1)),
+              updatedAt: now.subtract(const Duration(days: 1)),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    expect(find.text('Aisha appointment preferences'), findsOneWidget);
+    final noteRows = tester.widgetList<WorkloopListRow>(
+      find.byType(WorkloopListRow),
+    );
+    expect(noteRows, hasLength(2));
+    expect(noteRows.every((row) => row.flat), isTrue);
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/notes-populated-light.png'),
+    );
+  });
+
   testWidgets('booking request inbox empty surface', (tester) async {
     await _pumpSurface(
       tester,
@@ -297,6 +729,221 @@ void main() {
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/booking-requests-empty.png'),
+    );
+  });
+
+  testWidgets('booking request inbox populated surface', (tester) async {
+    await _pumpSurface(
+      tester,
+      const BookingRequestsScreen(),
+      theme: AppTheme.light,
+      overrides: [
+        bookingRequestsProvider.overrideWith(
+          (ref) async => [
+            BookingRequest(
+              id: 'request-1',
+              workspaceId: 'workspace-1',
+              name: 'Aisha Morgan',
+              phone: '+44 7700 900123',
+              serviceId: 'service-1',
+              serviceName: 'Signature consultation',
+              serviceDurationMins: 60,
+              servicePrice: 85,
+              preferredTimeText: 'Friday afternoon',
+              message: 'I am flexible after 2pm.',
+              createdAt: DateTime(2026, 8, 8, 10),
+            ),
+            BookingRequest(
+              id: 'request-2',
+              workspaceId: 'workspace-1',
+              name: 'Omar Rahman',
+              phone: '+44 7700 900456',
+              serviceId: 'service-2',
+              serviceName: 'Follow-up appointment',
+              serviceDurationMins: 45,
+              servicePrice: 65,
+              preferredTimeText: 'Next Tuesday morning',
+              status: 'contacted',
+              createdAt: DateTime(2026, 8, 7, 16),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    expect(find.text('Aisha Morgan'), findsOneWidget);
+    expect(find.text('Omar Rahman'), findsOneWidget);
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/booking-requests-populated-light.png'),
+    );
+  });
+
+  testWidgets('booking request detail surface', (tester) async {
+    await _pumpSurface(
+      tester,
+      BookingRequestDetailScreen(
+        request: BookingRequest(
+          id: 'request-1',
+          workspaceId: 'workspace-1',
+          name: 'Aisha Morgan',
+          phone: '+44 7700 900123',
+          serviceId: 'service-1',
+          serviceName: 'Signature consultation',
+          serviceDurationMins: 60,
+          servicePrice: 85,
+          preferredTimeText: 'Friday afternoon',
+          message:
+              'I am flexible after 2pm and would prefer a quiet appointment.',
+          createdAt: DateTime(2026, 8, 8, 10),
+        ),
+      ),
+      theme: AppTheme.light,
+    );
+
+    expect(find.text('Mark contacted'), findsOneWidget);
+    expect(find.text('Book'), findsOneWidget);
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/booking-request-detail-light.png'),
+    );
+  });
+
+  testWidgets('business profile overview surface', (tester) async {
+    final authRepository = AuthRepository(
+      SupabaseClient(
+        'https://example.supabase.co',
+        'test-anon-key',
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      ),
+    );
+    const profile = BusinessProfile(
+      id: 'profile-1',
+      workspaceId: 'workspace-1',
+      handle: 'quality-studio',
+      bio: 'Calm, expert help for your next project.',
+      bookingMode: 'manual',
+    );
+    await _pumpSurface(
+      tester,
+      const ProfileScreen(),
+      theme: AppTheme.light,
+      overrides: [
+        authRepositoryProvider.overrideWithValue(authRepository),
+        workspaceProvider.overrideWith(
+          (ref) async => const {
+            'id': 'workspace-1',
+            'name': 'Quality Studio',
+            'industry': 'Business consulting',
+          },
+        ),
+        settingsBusinessProfileProvider.overrideWith((ref) async => profile),
+        settingsWorkspaceSettingsProvider.overrideWith(
+          (ref) async => const {
+            'working_hours': {
+              'monday': {'enabled': true},
+              'tuesday': {'enabled': true},
+              'wednesday': {'enabled': true},
+              'thursday': {'enabled': true},
+              'friday': {'enabled': true},
+            },
+          },
+        ),
+        settingsServicesProvider.overrideWith(
+          (ref) async => const [
+            {
+              'id': 'service-1',
+              'workspace_id': 'workspace-1',
+              'name': 'Signature consultation',
+              'duration_mins': 60,
+              'price': 85.0,
+              'active': true,
+              'show_on_profile': true,
+            },
+          ],
+        ),
+        bookingRequestsProvider.overrideWith(
+          (ref) async => const [
+            BookingRequest(
+              id: 'request-1',
+              workspaceId: 'workspace-1',
+              name: 'Aisha Morgan',
+              phone: '+44 7700 900123',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    expect(find.text('Quality Studio'), findsOneWidget);
+    expect(find.text('Business details'), findsOneWidget);
+    expect(find.text('1 service available'), findsOneWidget);
+    expect(find.text('5 working days'), findsOneWidget);
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/profile-overview-light.png'),
+    );
+  });
+
+  testWidgets('booking page owner hub surface', (tester) async {
+    await _pumpSurface(
+      tester,
+      const BookingPageScreen(),
+      theme: AppTheme.light,
+      overrides: [
+        workspaceProvider.overrideWith(
+          (ref) async => const {
+            'id': 'workspace-1',
+            'name': 'Quality Studio',
+            'industry': 'Business consulting',
+          },
+        ),
+        settingsBusinessProfileProvider.overrideWith(
+          (ref) async => const BusinessProfile(
+            id: 'profile-1',
+            workspaceId: 'workspace-1',
+            handle: 'quality-studio',
+            bookingMode: 'manual',
+          ),
+        ),
+        settingsWorkspaceSettingsProvider.overrideWith(
+          (ref) async => const {
+            'working_hours': {
+              'monday': {'enabled': true, 'open': '09:00', 'close': '17:00'},
+            },
+          },
+        ),
+        settingsServicesProvider.overrideWith(
+          (ref) async => const [
+            {
+              'id': 'service-1',
+              'workspace_id': 'workspace-1',
+              'name': 'Signature consultation',
+              'duration_mins': 60,
+              'price': 85.0,
+              'active': true,
+              'show_on_profile': true,
+            },
+          ],
+        ),
+        bookingRequestsProvider.overrideWith(
+          (ref) async => const [
+            BookingRequest(
+              id: 'request-1',
+              workspaceId: 'workspace-1',
+              name: 'Aisha Morgan',
+              phone: '+44 7700 900123',
+            ),
+          ],
+        ),
+      ],
+    );
+
+    expect(find.text('Accepting requests'), findsOneWidget);
+    expect(find.text('workloop.uk/quality-studio'), findsWidgets);
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/booking-page-owner-hub-light.png'),
     );
   });
 
@@ -394,6 +1041,44 @@ void main() {
   });
 }
 
+List<Override> _bookingCalendarOverrides() {
+  final firstStart = DateTime(2026, 8, 8, 10);
+  final secondStart = DateTime(2026, 8, 11, 14, 30);
+  return [
+    appointmentsProvider.overrideWith(
+      (ref) async => [
+        {
+          'id': 'appointment-1',
+          'workspace_id': 'workspace-1',
+          'title': 'Signature consultation',
+          'start_time': firstStart.toIso8601String(),
+          'end_time': firstStart
+              .add(const Duration(minutes: 75))
+              .toIso8601String(),
+          'status': 'scheduled',
+          'price': 149.99,
+          'contacts': {'name': 'Samira Khan'},
+          'services': {'name': 'Signature consultation'},
+        },
+        {
+          'id': 'appointment-2',
+          'workspace_id': 'workspace-1',
+          'title': 'Follow-up session',
+          'start_time': secondStart.toIso8601String(),
+          'end_time': secondStart
+              .add(const Duration(minutes: 60))
+              .toIso8601String(),
+          'status': 'scheduled',
+          'price': 80,
+          'contacts': {'name': 'Maya Johnson'},
+          'services': {'name': 'Follow-up session'},
+        },
+      ],
+    ),
+    bookingRequestsProvider.overrideWith((ref) async => const []),
+  ];
+}
+
 Future<void> _pumpSurface(
   WidgetTester tester,
   Widget screen, {
@@ -434,18 +1119,14 @@ Future<void> _pumpSurface(
 }
 
 Future<void> _loadDeterministicFonts() async {
-  final instrumentSans = FontLoader('Instrument Sans')
-    ..addFont(rootBundle.load('assets/fonts/InstrumentSans-Variable.ttf'));
+  final manrope = FontLoader('Manrope')
+    ..addFont(rootBundle.load('assets/fonts/Manrope-Variable.ttf'));
   // Flutter's test binding uses the block-glyph Ahem font for any style that
   // relies on a platform fallback. Map that fallback to Workloop's bundled
   // typeface so golden images represent the shipped UI rather than test boxes.
   final platformFallback = FontLoader('Ahem')
-    ..addFont(rootBundle.load('assets/fonts/InstrumentSans-Variable.ttf'));
+    ..addFont(rootBundle.load('assets/fonts/Manrope-Variable.ttf'));
   final lucide = FontLoader('packages/lucide_flutter/LucideIcons')
     ..addFont(rootBundle.load('packages/lucide_flutter/assets/lucide.ttf'));
-  await Future.wait([
-    instrumentSans.load(),
-    platformFallback.load(),
-    lucide.load(),
-  ]);
+  await Future.wait([manrope.load(), platformFallback.load(), lucide.load()]);
 }

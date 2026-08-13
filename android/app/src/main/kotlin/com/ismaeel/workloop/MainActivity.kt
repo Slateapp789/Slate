@@ -17,6 +17,7 @@ import com.stripe.stripeterminal.external.models.ConnectionConfiguration
 import com.stripe.stripeterminal.external.models.ConnectionStatus
 import com.stripe.stripeterminal.external.models.DisconnectReason
 import com.stripe.stripeterminal.external.models.DiscoveryConfiguration
+import com.stripe.stripeterminal.external.models.LocaleConfig
 import com.stripe.stripeterminal.external.models.PaymentStatus
 import com.stripe.stripeterminal.external.models.Reader
 import com.stripe.stripeterminal.external.models.TapUseCase
@@ -93,6 +94,7 @@ class MainActivity : FlutterActivity(), TapToPayReaderListener {
                 override fun onPaymentStatusChange(status: PaymentStatus) = Unit
             },
             null,
+            LocaleConfig.CardLanguagePreferenceIfAvailable,
         )
     }
 

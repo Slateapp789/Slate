@@ -1,16 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../shared/models/slate_models.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/widgets/slate_ui.dart';
-import '../public_profile/booking_requests_screen.dart';
-import '../public_profile/public_profile_screen.dart';
 import '../settings/providers/settings_providers.dart';
 import '../settings/widgets/settings_business_tab.dart';
 import 'profile_editor_screen.dart';
@@ -51,24 +46,14 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final workspace = ref.watch(workspaceProvider);
-    final profile = ref.watch(settingsBusinessProfileProvider);
     final settings = ref.watch(settingsWorkspaceSettingsProvider);
     final services = ref.watch(settingsServicesProvider);
-    final requests = ref.watch(bookingRequestsProvider);
     final auth = ref.watch(authRepositoryProvider);
 
     final profileDataReady =
-        workspace.hasValue &&
-        profile.hasValue &&
-        settings.hasValue &&
-        services.hasValue &&
-        requests.hasValue;
+        workspace.hasValue && settings.hasValue && services.hasValue;
     final profileHasFailure =
-        workspace.hasError ||
-        profile.hasError ||
-        settings.hasError ||
-        services.hasError ||
-        requests.hasError;
+        workspace.hasError || settings.hasError || services.hasError;
     if (!profileDataReady) {
       return _ProfileInitialState(
         failed: profileHasFailure,
@@ -77,26 +62,17 @@ class ProfileScreen extends ConsumerWidget {
     }
 
     final workspaceData = workspace.value;
-    final profileData = profile.value;
     final settingsData = settings.value;
     final servicesData = services.value ?? const <Map<String, dynamic>>[];
-    final requestsData = requests.value ?? const [];
     final businessName = workspaceData?['name']?.toString().trim();
     final displayName = businessName?.isNotEmpty == true
         ? businessName!
         : 'Your business';
     final industry = workspaceData?['industry']?.toString().trim();
     final ownerName = auth.currentFirstName?.trim();
-    final handle = profileData?.handle.trim() ?? '';
     final workingHours = settingsData?['working_hours'] is Map
         ? Map<String, dynamic>.from(settingsData!['working_hours'] as Map)
         : <String, dynamic>{};
-    final pendingRequests = requestsData
-        .where(
-          (request) =>
-              request.status == 'pending' || request.status == 'contacted',
-        )
-        .length;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -171,54 +147,6 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                     showDivider: false,
                   ),
-                  const SizedBox(height: AppSpacing.xxl),
-                  const WorkloopSectionHeader(label: 'Online'),
-                  const SizedBox(height: AppSpacing.xs),
-                  _ProfileRow(
-                    icon: LucideIcons.globe,
-                    title: 'Public profile',
-                    subtitle: handle.isEmpty
-                        ? 'Set up your public booking page'
-                        : 'workloop.app/$handle',
-                    trailingLabel: handle.isEmpty ? 'Set up' : 'Edit',
-                    onTap: () => _openProfileEditor(
-                      context,
-                      ref,
-                      SettingsBusinessSection.publicProfile,
-                    ),
-                  ),
-                  if (handle.isNotEmpty)
-                    _ProfileRow(
-                      icon: LucideIcons.globe,
-                      title: 'Preview public profile',
-                      subtitle: 'See the page your clients will open',
-                      onTap: () => _openPublicPreview(
-                        context,
-                        handle: handle,
-                        businessName: displayName,
-                        industry: industry,
-                        profile: profileData!,
-                        workingHours: workingHours,
-                        services: servicesData,
-                      ),
-                    ),
-                  if (handle.isNotEmpty)
-                    _ProfileRow(
-                      icon: LucideIcons.copy,
-                      title: 'Copy profile link',
-                      subtitle: 'Share your booking page with clients',
-                      onTap: () => _copyProfileLink(context, handle),
-                    ),
-                  _ProfileRow(
-                    icon: LucideIcons.inbox,
-                    title: 'Booking requests',
-                    subtitle: profileRequestSummary(pendingRequests),
-                    trailingLabel: pendingRequests == 0
-                        ? null
-                        : pendingRequests.toString(),
-                    onTap: () => context.push('/booking-requests'),
-                    showDivider: false,
-                  ),
                   if (profileHasFailure) ...[
                     const SizedBox(height: AppSpacing.xl),
                     SlateErrorState(
@@ -228,10 +156,8 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ],
                   if (workspace.isLoading ||
-                      profile.isLoading ||
                       settings.isLoading ||
-                      services.isLoading ||
-                      requests.isLoading) ...[
+                      services.isLoading) ...[
                     const SizedBox(height: AppSpacing.xl),
                     const Center(
                       child: SizedBox(
@@ -255,16 +181,12 @@ class ProfileScreen extends ConsumerWidget {
 
   Future<void> _refresh(WidgetRef ref) async {
     ref.invalidate(workspaceProvider);
-    ref.invalidate(settingsBusinessProfileProvider);
     ref.invalidate(settingsWorkspaceSettingsProvider);
     ref.invalidate(settingsServicesProvider);
-    ref.invalidate(bookingRequestsProvider);
     await Future.wait([
       ref.read(workspaceProvider.future),
-      ref.read(settingsBusinessProfileProvider.future),
       ref.read(settingsWorkspaceSettingsProvider.future),
       ref.read(settingsServicesProvider.future),
-      ref.read(bookingRequestsProvider.future),
     ]);
   }
 
@@ -279,52 +201,8 @@ class ProfileScreen extends ConsumerWidget {
     );
     if (!context.mounted) return;
     ref.invalidate(workspaceProvider);
-    ref.invalidate(settingsBusinessProfileProvider);
     ref.invalidate(settingsWorkspaceSettingsProvider);
     ref.invalidate(settingsServicesProvider);
-  }
-
-  Future<void> _copyProfileLink(BuildContext context, String handle) async {
-    await Clipboard.setData(
-      ClipboardData(text: 'https://workloop.app/$handle'),
-    );
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Profile link copied')));
-  }
-
-  Future<void> _openPublicPreview(
-    BuildContext context, {
-    required String handle,
-    required String businessName,
-    required String? industry,
-    required BusinessProfile profile,
-    required Map<String, dynamic> workingHours,
-    required List<Map<String, dynamic>> services,
-  }) {
-    final publicServices = services
-        .where(
-          (service) =>
-              service['active'] != false && service['show_on_profile'] != false,
-        )
-        .map(Service.fromMap)
-        .toList();
-    return Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PublicProfileScreen(
-          handle: handle,
-          previewProfile: PublicProfile(
-            profile: profile,
-            businessName: businessName,
-            industry: industry,
-            workingHours: workingHours,
-            services: publicServices,
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -387,8 +265,8 @@ class _ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return WorkloopRouteHeader(
-      title: 'Profile',
-      backSemanticLabel: 'Back to Home',
+      title: 'Business profile',
+      backSemanticLabel: 'Back to Business',
       trailing: WorkloopTextButton(label: 'Edit', onPressed: onEdit),
     );
   }
@@ -433,7 +311,7 @@ class _ProfileIdentity extends StatelessWidget {
                     initial,
                     style: const TextStyle(
                       color: AppColors.onBrandAccent,
-                      fontSize: 25,
+                      fontSize: 22,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -500,7 +378,6 @@ class _ProfileRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final String? trailingLabel;
   final bool showDivider;
 
   const _ProfileRow({
@@ -508,7 +385,6 @@ class _ProfileRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.trailingLabel,
     this.showDivider = true,
   });
 
@@ -517,7 +393,10 @@ class _ProfileRow extends StatelessWidget {
     return WorkloopListRow(
       onTap: onTap,
       showDivider: showDivider,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
       leading: Container(
         width: 40,
         height: 40,
@@ -549,17 +428,6 @@ class _ProfileRow extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (trailingLabel != null) ...[
-            Text(
-              trailingLabel!,
-              style: const TextStyle(
-                color: AppColors.accentPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-          ],
           const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.t3),
         ],
       ),

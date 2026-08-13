@@ -1,8 +1,38 @@
 # Workloop Decisions Log
 
-Last updated: 2026-08-03
+Last updated: 2026-08-06
 
 This log consolidates Notion decisions, Git history, and codebase reality.
+
+## August 2026 - Studio Composition Uses One Shell-Clearance Contract
+
+Decision:
+
+Keep the approved Workloop Studio identity and floating four-tab dock, while
+making page, section and component spacing ownership explicit. Shell content
+clearance is calculated from the 72-point dock, its 12-point offset, the real
+device bottom safe area and 22 points of visual breathing room. Pushed routes
+without the shell do not inherit that clearance.
+
+The supplied purple `W` artwork is the mobile launcher icon and the supplied
+purple `workloop` wordmark is the native launch artwork. Native launch canvases
+use the artwork's exact `#6362EB` background.
+
+Reasoning:
+
+Fixed padding allowed the dock to cover resting content on gesture-safe-area
+devices, while nested page, section and child spacing made the approved Studio
+composition feel swollen. Explicit ownership preserves the visual direction
+without changing routes, retained state or workflows.
+
+Consequences:
+
+- Home, Clients, Bookings, Tools and retained Money, Tasks and Notes share the
+  calculated shell inset.
+- Home hero text uses explicit on-hero semantic roles in Light and Dark.
+- Schedule/Requests remains the primary Bookings mode; Today/Upcoming/Past is
+  a quieter secondary filter.
+- App-icon and splash changes require native profile builds on both platforms.
 
 ## July 2026 - Brand Lime Is A Highlight, Not Light-Theme Ink
 
@@ -1285,3 +1315,697 @@ Consequences:
 - Production Tap to Pay on iPhone remains gated by Apple's development and
   distribution proximity-reader entitlements and App Review.
 - Live mode remains disabled until a separate explicit go-live approval.
+
+## 2026-08-05 - Payment Retries Are Logical Operations, Not Button Taps
+
+Decision:
+
+Retain one idempotency key for each payment-link, Terminal-payment, or refund
+operation across user retries. Permit a failed or abandoned webhook claim to be
+reclaimed after a bounded lease, while keeping processed and ignored events
+final. Private counters, workflow keys, and webhook state use RLS plus explicit
+false client policies even though the schema and grants already exclude clients.
+
+Reasoning:
+
+A network retry is the same business operation. Generating a new provider key
+for every tap can create duplicate Checkout Sessions or refunds, while a failed
+webhook row that can never be reclaimed can permanently block reconciliation.
+The private-ledger policies make a deliberate backend-only boundary visible to
+reviewers and security tooling.
+
+Consequences:
+
+- The Flutter sheet owns operation keys; repository methods require them.
+- Stripe calls and local transaction upserts use the same stable key and reject
+  reuse with different invoice, amount, or collection parameters.
+- Refund totals are recomputed from succeeded refund rows.
+- Failed events can retry immediately; stale `processing` work can retry after
+  five minutes; completed work stays deduplicated.
+- Live mode, Apple entitlement work, and platform fees remain unchanged.
+
+## 2026-08-05 - Editorial Utility Replaces Warm Card-Heavy Presentation
+
+Decision:
+
+Supersede the warm Light palette with crisp soft-white and neutral-grey roles,
+and make the shared interface denser through smaller type, spacing, radii, and
+visual control geometry. Keep accessible touch targets. Prefer divider-led lists
+over repeated cards and allow restrained native graphics only when real data
+improves orientation.
+
+Reasoning:
+
+The product was functionally clear but felt visually heavy: large typography,
+generous containers, and warm layered surfaces made routine information appear
+more complex than it was. Workloop should feel like a calm mobile operating
+system, not a generic admin dashboard or analytics product.
+
+Consequences:
+
+- Light uses `#F7F7F4` background, pure-white surfaces, and neutral interaction
+  and divider roles; the exact brand lime remains reserved for primary action
+  and selected state.
+- Dark retains its established graphite and lime colour personality while
+  sharing the denser typography and geometry.
+- Notifications use one chronological list; unread state is communicated by a
+  small lime marker and text weight rather than a separate filter.
+- Home's schedule path is drawn natively from the current time and real booking
+  positions. No invented analytics or raster decoration is introduced.
+- Navigation, workflows, state, repositories, schema, and data contracts remain
+  unchanged.
+
+## 2026-08-05 - Page Grid and Reduced Motion Are Product-Wide Contracts
+
+Decision:
+
+Lock user-facing page content to the canonical 18-point horizontal grid and
+require every presentation animation to use `AppMotion.responsive` or an
+explicit immediate stable-state path. Explain the Workloop operating loop once
+in onboarding with a semantic Flutter-native visual; do not add decorative
+analytics to routine workspaces.
+
+Reasoning:
+
+The shared palette and typography were already coherent, but secondary routes
+still contained 20- and 24-point outer insets and several local animations did
+not honour the platform's reduced-motion preference. These small exceptions
+made the app feel assembled screen by screen and created avoidable
+accessibility drift.
+
+Consequences:
+
+- Authentication-adjacent, onboarding, notification, calendar, client-detail,
+  booking, settings, public-profile, and Money/task supporting surfaces align
+  to the same page grid.
+- Selection, progress, keyboard-inset, calendar, workspace, and
+  expand/collapse motion becomes immediate when animations are disabled.
+- Static UI contracts reject feature-local raw colour literals, interface
+  weights above 600, and unguarded canonical animation durations.
+- Compact large-text coverage now includes secondary routes as well as primary
+  launch surfaces.
+- Workflows, navigation, Riverpod/Supabase contracts, and durable data remain
+  unchanged.
+
+## 2026-08-05 - Graphite Frame And Lime Signal Define The New Interface
+
+Decision:
+
+Replace the visually incremental editorial pass with a recognisable app-wide
+composition system: a graphite structural frame in both appearances, lime as
+the active signal, a compact two-line operating-loop mark, editorial header
+rules, squared action geometry, and bold real-data focus panels.
+
+Reasoning:
+
+The previous palette and density work improved correctness but retained the
+same header, navigation, surface, and control compositions. On-device, the
+result read as the previous interface with different spacing. Workloop needs a
+distinctive identity that remains calm and useful rather than a decorative
+reskin or data-heavy dashboard.
+
+Consequences:
+
+- Root and pushed headers, the floating four-destination dock, peer navigation,
+  segmented controls, search, empty states, and section anchors share one
+  central primitive system.
+- Home, Money, Tools, Auth, onboarding, and the public profile receive one bold
+  graphic or operational anchor based on real state or product orientation.
+- Light moves to cool chalk and neutral layers while retaining the existing
+  Dark graphite personality; both appearances now share graphite structural
+  controls and the exact `#C1FF72` active signal.
+- Routes, workflows, providers, repositories, Supabase contracts, draft
+  protection, retained tab state, and native back behaviour are unchanged.
+- No new package, analytics surface, invented business data, gradient, stock
+  illustration, or schema change is introduced.
+
+## 2026-08-06 - Soft Editorial Surfaces Supersede The Graphite Frame
+
+Decision:
+
+Retire the 2026-08-05 graphite-frame composition after visual review. Use open
+typographic headers, soft neutral semantic layers, a white Light-mode focus
+surface, quiet selection rails, and small lime markers. Keep Dark lifted and
+graphite-based without repeating near-black panels inside every workspace.
+
+Reasoning:
+
+The graphite direction was technically consistent but visually overbearing.
+Large dark panels, boxed marks, repeated lime bars, and heavily framed controls
+made Workloop feel closer to a concept dashboard than the minimal, clean and
+useful mobile product shown in the approved references.
+
+Consequences:
+
+- Light returns to `#F7F7F4`, white content surfaces, neutral raised layers,
+  crisp ink typography, and restrained lime.
+- Headers, route controls, section titles, segmented controls, floating
+  navigation, empty states, and search use shared neutral treatments.
+- Home's real schedule path and onboarding's operating-loop graphic remain;
+  decorative background geometry and the boxed signal mark are removed.
+- The four-destination shell, routes, drafts, state retention, providers,
+  repositories, Supabase contracts, and working business flows are unchanged.
+
+## 2026-08-06 - Loopline Replaces Mixed Pill And Rectangle Geometry
+
+Decision:
+
+Adopt one Loopline interface language across the whole application. Functional
+controls use a restrained soft-square scale, icon-only utilities are circular,
+true status markers alone may be capsules, and navigation uses stable text/icon
+rows with a two-pixel lime position line. The main navigation is docked to the
+bottom edge instead of floating as a rounded glass container.
+
+Reasoning:
+
+Repeated visual reviews showed that switching palettes and card treatments did
+not solve the deeper inconsistency: floating pill navigation, rounded segmented
+rails, rectangular buttons, circular utilities and local one-off controls all
+competed on the same screen. The interface needed one clear geometry rule and
+a visibly different composition, while the product's working operating loop
+and architecture did not need rebuilding.
+
+Consequences:
+
+- Light moves to a mineral `#F4F5F2` canvas with white surfaces and ink primary
+  actions. Dark preserves its graphite surfaces and lime primary actions.
+- Root navigation is an opaque edge-to-edge system bar. Client, booking, Money,
+  task, note and request navigation use the shared line system.
+- Auth loses its framed brand card; Tools loses its nested focus card; Settings
+  becomes list-led; public-profile content uses open sections and dividers.
+- `AppRadius.pill`, `StadiumBorder`, and literal `999` control radii are removed.
+  `AppRadius.capsule` is restricted to status and progress, with a source test
+  preventing the retired system from returning.
+- Home's real schedule path, Money progress and the onboarding operating-loop
+  graphic remain because they explain real state. No decorative analytics,
+  package, provider, repository, route, schema or workflow is introduced.
+
+## 2026-08-06 - Workloop Studio Supersedes Loopline
+
+Decision:
+
+Replace the complete application presentation layer with Workloop Studio: a
+porcelain/midnight adaptive palette, Manrope typography, indigo action system,
+relationship teal, selective module colour, contained navigation rails, a
+floating four-destination dock and purposeful native-drawn graphics.
+
+Reasoning:
+
+The Loopline reset standardised geometry but still felt visually incremental,
+heavy and generic on the physical phone. Workloop needs a recognisable mobile
+business-operating-system identity with calm hierarchy, meaningful graphic
+moments and enough operational data to be useful without resembling an admin
+dashboard.
+
+Consequences:
+
+- Home, Clients, Bookings, Money and Tools now use different compositions that
+  match their jobs while sharing one theme, type, spacing, shape and motion
+  system.
+- Notifications stays as one chronological list. Auth, onboarding, Settings,
+  forms, sheets, empty states and public surfaces inherit the same Studio
+  primitives.
+- The operating-loop mark, daily schedule path and Money target arc are native
+  Flutter graphics tied to product meaning or real state. No decorative or
+  invented analytics are allowed.
+- The retired lime launch artwork is removed from native startup; the existing
+  app icon remains a separate release asset until deliberately replaced.
+- Existing routes, Riverpod state, repositories, Supabase contracts, retained
+  workspaces, draft protection, native back behavior and business workflows
+  are unchanged.
+
+## 2026-08-08 - Calendar Becomes A Native-Feeling Month And Day Workspace
+
+Decision:
+
+Replace the boxed booking calendar and stacked next-booking/list composition
+with one time-led calendar workspace. Use an open month grid, circular date
+selection, restrained booking dots, swipe and explicit month navigation, and a
+selected-day agenda built around a vertical time rail and compact event blocks.
+
+Reasoning:
+
+The prior Calendar mode repeated several unrelated layers before the selected
+day: a section label, display control, next-booking row, boxed grid and generic
+booking list. This made the calendar feel denser and less direct than the
+familiar mobile-calendar behaviour users already understand. The useful
+principle from Apple Calendar is spatial orientation around month, date and
+time—not its exact visual styling.
+
+Consequences:
+
+- The month and selected date become the primary hierarchy in Calendar mode.
+- Month changes work through 44-point previous/next controls or horizontal
+  swipes, while Today remains an explicit shortcut.
+- Up to three dots communicate booking density without turning every date into
+  a filled tile.
+- The selected-day agenda sorts bookings chronologically and shows start/end
+  time, client, service, location, price and non-scheduled status in context.
+- Add booking still passes the selected date into the existing form; booking
+  detail, List mode, Requests, providers, routes and data contracts are
+  unchanged.
+- Deterministic Light and Dark calendar goldens and interaction tests protect
+  the new hierarchy.
+
+## 2026-08-08 - Recurring Series Stay Outside V1 Creation
+
+Decision:
+
+Remove the recurring-series selector from New booking while preserving the
+existing recurrence columns, repository payload support, validation utilities
+and read-only recurrence labels for historic records.
+
+Reasoning:
+
+The exposed creation control could create a fixed batch, but Workloop did not
+provide an honest series-edit scope, per-occurrence exceptions or complete
+series-level conflict recovery. Completing those semantics safely would expand
+the final V1 sweep into a calendar-series engine. A single-booking V1 is clearer
+and safer than a partially supported recurring promise.
+
+Consequences:
+
+- New booking always creates one atomic, idempotent booking.
+- Existing recurring records continue to render their repeat state and remain
+  data-compatible; no migration or destructive rewrite is introduced.
+- Recurrence can return only with explicit edit-scope, exception, conflict,
+  retry and end-to-end coverage.
+
+## 2026-08-08 - Write-Capable E2E Uses Disposable Staging Only
+
+Decision:
+
+Authenticated workflow, two-account isolation and public booking conversion
+tests must require an explicit write opt-in, disposable credentials and a
+non-production Supabase URL. The shared runner must reject the production
+project reference before Flutter starts.
+
+Reasoning:
+
+These tests deliberately create, update and delete business records. Running
+them against the live project would turn release verification into a data and
+security risk. A compiled harness is useful implementation evidence, but only a
+passing isolated run can close the corresponding launch blockers.
+
+Consequences:
+
+- `scripts/qa_staging_e2e.sh` is the canonical entry point for the three
+  staging journeys.
+- Missing configuration causes a safe skip in ordinary simulator QA; explicit
+  staging execution fails early when required values are absent.
+- Production data is never used to prove deletion or cross-tenant denial.
+- The quoted branch cost and creation require explicit founder approval.
+
+## 2026-08-08 - Money Context Supports Home But Does Not Enter Today
+
+Decision:
+
+Keep the purple Today panel focused on the owner's immediate day. Add a compact
+monthly-target dial to Money inside Home's At a glance group, using real
+paid-this-month and configured-target values.
+
+Reasoning:
+
+Revenue progress is useful command-centre context, but placing it inside Today
+would mix a monthly business-health signal with the daily next-action hierarchy.
+The supporting group makes the metric discoverable without crowding the panel
+the owner must understand first.
+
+Consequences:
+
+- The dial is not decorative and does not invent a forecast.
+- A missing target falls back to ordinary Money navigation rather than an empty
+  progress claim.
+- Business feed is promoted above Coming up, while Today remains the strongest
+  visual and action hierarchy on Home.
+- Future metrics must earn a place in At a glance and must not turn Home into a
+  generic analytics dashboard.
+
+## 2026-08-10 - Dark Mode Is Graphite With Controlled Periwinkle
+
+Decision:
+
+Use neutral graphite and slate for Dark-mode canvas, surfaces, dividers and
+backdrop fields. Keep periwinkle for interaction and selection. Render Home's
+Dark hero as a deep desaturated indigo field rather than the bright interactive
+accent, and let the selected schedule node move with the browsed booking.
+
+Reasoning:
+
+The previous midnight palette repeated violet through the background, cards,
+hero and navigation, reducing depth and making the app feel uniformly purple.
+The schedule path also displayed every booking as an equal small dot, so it did
+not reinforce which booking the carousel was showing.
+
+Consequences:
+
+- Dark surfaces are differentiated by neutral luminance and dividers rather
+  than violet hue.
+- White hero copy meets contrast across both hero gradient endpoints.
+- The current-time tick stays subordinate; the active booking uses a larger
+  ring and halo.
+- Browsing jobs animates the active node for 280 ms with a single settling
+  bounce and haptic tap. Reduced Motion skips the travel and bounce.
+- Light mode keeps its saturated Home hero and existing canvas palette.
+
+## 2026-08-10 - Booking Records Use One Visual Language
+
+Decision:
+
+Render Schedule and Calendar bookings through one shared flat booking-record
+row. Preserve Calendar's selected-date header and continuous time rail, and
+preserve Schedule's Today/Upcoming/Past filters and date grouping.
+
+Reasoning:
+
+The two views answer different navigation questions, but each row represents
+the same booking and opens the same detail flow. Separate dot-and-line and
+time-rail row designs made the module feel inconsistent and forced owners to
+relearn the same record. A common start/end time, status marker, typography,
+price position and divider rhythm improves recognition without erasing useful
+calendar context.
+
+Consequences:
+
+- Both views show start and end times and the same booking information order.
+- Calendar alone draws the continuous rail because it is a selected-day agenda.
+- Schedule alone owns time filters and multi-day grouping.
+- Booking data, providers, repositories, routes and tap behaviour are unchanged.
+
+## 2026-08-10 - Bookings Prioritises Work Over View Controls
+
+Status: Superseded in part by `Booking Requests Move To A Counted Inbox` below.
+
+Decision:
+
+Keep Schedule/Requests as the only full-width workspace decision. On standard
+phones, place Today/Upcoming/Past and List/Calendar in one compact toolbar.
+Stack them on narrow or accessibility-text layouts. Present the real seven-day
+booking load as an inline divider-led strip and tighten Calendar spacing without
+reducing the 44-point date targets.
+
+Reasoning:
+
+The previous hierarchy made users pass four control layers and a large chart
+card before reaching the work they needed to run. The controls were individually
+clear but collectively behaved like a settings panel. Workloop is a business
+operating system: the daily schedule must arrive sooner, while Calendar must
+retain enough month context for planning.
+
+Consequences:
+
+- The first populated Schedule row appears materially earlier on a standard
+  phone.
+- The weekly graphic remains real operational data but no longer reads as a
+  dashboard card.
+- Calendar keeps full month navigation, booking-density dots, selected-date
+  handoff and its time rail.
+- Large text expands the weekly strip and stacks the toolbar rather than
+  clipping labels.
+- Providers, repositories, routes, Requests and booking mutations are unchanged.
+
+## 2026-08-10 - Booking Requests Move To A Counted Inbox
+
+Decision:
+
+Make the main Bookings workspace schedule-first. Remove the seven-day workload
+graphic and the full-width Schedule/Requests switch. Keep requests visibly
+owned by Bookings through a compact inbox action beside New booking, show the
+active count when non-zero, and open the existing dedicated Active/New/Closed
+request workspace.
+
+Reasoning:
+
+List and Calendar both serve the owner's daily scheduling workflow, while
+requests are an exception inbox that must be triaged into accepted work. Giving
+both equal full-width navigation weight delayed the schedule and duplicated a
+less capable requests list. The seven-day count summarised data already visible
+in List and Calendar but did not enable a distinct action. The new hierarchy
+keeps incoming demand discoverable without making it a prerequisite decision
+for every visit to Bookings.
+
+Consequences:
+
+- Bookings opens immediately into Today, Upcoming or Past schedule content.
+- The active request count remains visible in the header and requests remain
+  one tap away, including when the count is zero.
+- Request triage has one canonical UI with Active, New and Closed views.
+- List/Calendar, selected-date handoff, repositories, providers, mutations,
+  routes and booking-request conversion behaviour remain unchanged.
+- A request-provider failure no longer blocks the main booking schedule.
+
+## 2026-08-10 - Feature Creation Uses A Compact Plus
+
+Decision:
+
+Render the feature-header create action for Clients, Bookings, Money, Tasks and
+Notes as one circular `+` control. Preserve the specific action name as its
+semantic label. In Bookings, replace the separate time-filter and List/Calendar
+controls with one Today/Upcoming/Past/Calendar navigation rail.
+
+Reasoning:
+
+The labelled create capsules competed with page titles and request utilities,
+especially on smaller phones. In a clearly named feature workspace, `+` is a
+conventional and unambiguous creation affordance. Bookings also duplicated the
+same choice across two adjacent segmented controls: Today, Upcoming and Past
+already implied list presentation, so a separate List label added width without
+adding meaning.
+
+Consequences:
+
+- Root feature headers gain more breathing room and use one shared 46-point
+  create target.
+- VoiceOver continues to announce New client, New booking, Add money, New task
+  or New note rather than a generic plus.
+- Form save, confirmation, conversion and destructive actions remain visibly
+  labelled.
+- Calendar remains explicit and one tap away; selecting Today, Upcoming or Past
+  returns to the corresponding schedule list.
+- Booking requests retain their counted inbox and dedicated triage workspace.
+- Providers, repositories, routes, retained state and creation flows are
+  unchanged.
+
+## 2026-08-10 - Tools Owns Business Setup And The Booking Page Is A Workflow
+
+Decision:
+
+Remove Profile and Settings from the Home command panel. Put Booking page,
+Business profile, and Settings in Tools, while Home retains Notifications as
+its one utility. Split the owner-facing Booking page workflow from the business
+identity screen. Publish customer pages at `/:handle` through the existing
+Workloop website and secured public Edge Functions.
+
+Reasoning:
+
+Home should answer what is happening and what to do next; account and business
+configuration are tools, not daily status. The previous Profile mixed owner
+identity, public publishing controls, requests, preview and settings links, so
+the feature lacked a clear job. A dedicated Booking page hub gives the owner a
+single place to understand whether requests are open, complete setup, preview,
+copy/share the link and open the canonical request inbox.
+
+Consequences:
+
+- Tools owns all secondary operating and setup destinations without adding a
+  fifth bottom tab.
+- Business profile contains only business details, services and working hours.
+- Booking page shows a computed readiness state and reuses the existing editor,
+  preview, request provider and request inbox rather than duplicating logic.
+- The public website renders real profile data and proxies request submission
+  to the existing bounded Edge Function; database writes remain server-owned.
+- Public copy consistently states that a request is not confirmed work.
+- `workloop.app` remains the canonical share origin; launch remains blocked
+  until its DNS validation and SSL status are active.
+
+## 2026-08-10 - Navigation Follows The Operating Loop, Not A Tools Drawer
+
+Decision:
+
+Replace the four-destination Home / Clients / Bookings / Tools shell with five
+explicit operating destinations: Today, Clients, Work, Money, and Business.
+Group Schedule, Tasks, and Notes as peer views inside Work. Make the customer-
+facing Booking page the lead feature in Business, followed by Services,
+Working hours, and Business profile. Keep Settings as a compact secondary
+header action and remove Quick capture from the primary information
+architecture.
+
+Reasoning:
+
+Tools mixed daily modules, capture shortcuts, customer acquisition, business
+setup, and account administration at one level. That made valuable features
+feel like overflow and added a navigation step to Money, Tasks, and Notes.
+Solo service owners think in a smaller operating loop: understand today,
+manage customers, deliver work, collect money, and shape how the business is
+presented. The new shell makes that mental model visible without adding new
+business logic or duplicating data.
+
+Consequences:
+
+- Money becomes one tap away from every primary screen.
+- Schedule, Tasks, and Notes retain their existing providers, editors, drafts,
+  routes, scroll state, and repository contracts while sharing one Work
+  selector.
+- Business exposes booking-page readiness, active request count, services,
+  hours, and identity before account settings.
+- Booking requests remain available from both the Schedule inbox and the
+  Booking page workflow; they are not promoted to a permanent bottom tab.
+- Existing deep links and internal destination indices remain compatible.
+- No Supabase schema, RLS, repository, or persisted-data change is introduced.
+
+## 2026-08-11 - Work Is A Retained Command Surface
+
+Decision:
+
+Keep the Work title, purpose, booking-request inbox and create action mounted
+while Schedule, Tasks and Notes change inside a retained content region. Use one
+line-led selection language for root navigation and peer navigation, and one
+semantic indigo accent for operational modules.
+
+Reasoning:
+
+Rebuilding the whole screen on every Work selection made a local context change
+feel like navigation and visually reset the user's orientation. Filled purple
+selection blocks and unrelated module colours also competed with the content.
+The retained shell clarifies that Schedule, Tasks and Notes are three views of
+one workday, while neutral surfaces and a small active line preserve hierarchy.
+
+Consequences:
+
+- Existing Schedule, Tasks and Notes providers, repositories, editors and routes
+  remain intact inside retained child surfaces.
+- Each child keeps its own scroll and filter state when another child is shown.
+- Feature creation remains local and uses the same circular 46-point control.
+- Money and Business setup use semantic tokens rather than feature-specific
+  decorative palettes.
+- No Supabase schema, RLS, repository or persisted-data contract changes.
+
+## 2026-08-11 - Stripe Live Cutover Is An Explicit Operational Boundary
+
+Decision:
+
+Keep the current app and Edge Functions in Stripe test mode until the Stripe
+platform is fully verified, Apple grants Tap to Pay, distribution signing is
+healthy, and the complete test-mode payment matrix passes. Do not silently turn
+the existing test workspace into a live workspace or reuse test account IDs.
+
+Reasoning:
+
+The schema intentionally gives each workspace one connected Stripe account and
+the server rejects a connected account whose mode differs from its secret key.
+This prevents accidental test/live mixing, but it also means replacing secrets
+alone is not a valid production migration. Payment and refund reliability is
+more important than a fast flag flip.
+
+Consequences:
+
+- Live money remains disabled by both test secrets and the server kill switch.
+- A dedicated staging environment is preferred. Any production cutover needs a
+  reviewed cleanup/migration plan for test-only payment state.
+- Apple entitlement approval and Stripe account verification remain separate
+  external gates from TestFlight build readiness.
+- The app may ship to internal beta with payment links in test mode, but no
+  public launch claim may imply that live collection is ready.
+
+## 2026-08-11 - V1 Authentication Uses Email, Apple, Google and Optional TOTP
+
+Decision:
+
+Ship V1 account access with confirmed email/password, native Sign in with Apple,
+Google OAuth and optional TOTP authenticator security. Do not add phone/SMS,
+Facebook, Microsoft or passwordless experiments to the beta surface.
+
+Reasoning:
+
+These three sign-in paths cover the credible iOS beta needs without multiplying
+identity-provider configuration, recovery cases or privacy surface. TOTP provides
+standards-based second-factor protection without depending on SMS delivery or
+phone-number collection. Requiring AAL2 only after a user enrolls prevents a
+security rollout from locking out existing accounts.
+
+Consequences:
+
+- Passwords use a 12-character, four-character-class baseline and Supabase's
+  leaked-password check.
+- Apple is native-only for V1, so there is no Apple web OAuth secret to rotate
+  every six months.
+- Google remains disabled until its production OAuth client is created and
+  tested; the UI implementation alone is not treated as provider readiness.
+- Verified MFA users are denied authenticated Data API access from AAL1 sessions.
+- Recovery codes, passkeys and a native CAPTCHA flow remain future security work,
+  not implied beta capabilities.
+
+## 2026-08-11 - Workloop.uk Is The Canonical Owned Domain
+
+Decision:
+
+Use `workloop.uk` for the public website, booking links, legal URLs, Auth email
+and support identity. Retire the planned `workloop.app` origin because it is
+registered to an unrelated third party.
+
+Reasoning:
+
+Store submission, OAuth trust, email authentication and customer booking links
+must use a domain controlled by Workloop. The exact `.uk` name is short,
+credible for the initial UK market and avoids adding a qualifier to the product
+name.
+
+Consequences:
+
+- App constants, public booking defaults, legal pages, tests and local Auth
+  redirect configuration use `workloop.uk`.
+- Resend and Supabase Auth send from the owned domain with DKIM, SPF and an
+  enforced DMARC rejection policy.
+- The public Sites deployment owns both the apex and `www` hostnames.
+- Historic records that described the unowned `.app` plan remain as history;
+  this decision supersedes them for current and future work.
+
+## 2026-08-12 - Privileged Workflows Share One Opt-In MFA Boundary
+
+Decision:
+
+Every authenticated workflow that can bypass table RLS must evaluate the same
+opt-in MFA policy before using security-definer or service-role access. A user
+without a verified factor may continue at AAL1; a user with a verified factor
+must hold an AAL2 session. Authenticated clients cannot call private workflow
+implementations directly.
+
+Reasoning:
+
+An app-only challenge and restrictive table policies do not protect privileged
+RPC or Edge Function paths. One bounded server-side policy prevents an AAL1
+token from bypassing the protection the user enabled while preserving Workloop's
+optional-MFA product decision.
+
+Consequences:
+
+- Onboarding, task creation, booking creation/completion, Stripe actions and
+  account-deletion requests use the same policy.
+- New privileged workflows must enter through the guarded public/Edge boundary.
+- The forward migration and Edge sources require clean replay and disposable
+  staging evidence before production promotion.
+
+## 2026-08-12 - Payment Deletion Fails Closed And Provider Payloads Expire
+
+Decision:
+
+Close a Workloop-created Stripe Accounts v2 merchant account before deleting
+its local workspace. If Stripe cannot confirm closure, release the deletion
+claim and keep local data intact for retry/review. Retain full known-account
+webhook payloads for no longer than 30 days; scrub unknown-account payloads
+immediately and workspace payloads during deletion.
+
+Reasoning:
+
+Deleting Workloop rows while leaving a connected provider account or indefinite
+provider payloads would make the user-facing deletion promise incomplete.
+Failing closed preserves recoverability and bounded retention reduces privacy
+risk without discarding the short retry/support window.
+
+Consequences:
+
+- Deletion depends on Stripe availability when a connected account exists.
+- Offboarding is idempotent and rejects test/live key mismatches.
+- Payment exports include account, transaction and refund records.
+- Stripe test-mode offboarding/deletion E2E and legal review remain mandatory
+  before the source is promoted.

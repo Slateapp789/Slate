@@ -20,6 +20,9 @@ void main() {
     var moneyCreates = 0;
     var taskCreates = 0;
     var noteCreates = 0;
+    var bookingPageOpens = 0;
+    var profileOpens = 0;
+    var settingsOpens = 0;
 
     await _pumpMoreScreen(
       tester,
@@ -29,12 +32,13 @@ void main() {
       onCreateMoney: () => moneyCreates++,
       onCreateTask: () => taskCreates++,
       onCreateNote: () => noteCreates++,
+      onOpenBookingPage: () => bookingPageOpens++,
+      onOpenProfile: () => profileOpens++,
+      onOpenSettings: () => settingsOpens++,
     );
 
     expect(find.text('Quick capture'), findsOneWidget);
     expect(find.text('Business tools'), findsOneWidget);
-    expect(find.text('Profile'), findsNothing);
-    expect(find.text('Settings'), findsNothing);
     final moneySemantics = find.semantics.byLabel('Open Money workspace');
     final tasksSemantics = find.semantics.byLabel('Open Tasks workspace');
     final notesSemantics = find.semantics.byLabel('Open Notes workspace');
@@ -86,14 +90,37 @@ void main() {
     expect(taskOpens, 1);
     expect(noteOpens, 1);
 
-    await tester.tap(find.byKey(const ValueKey('tools-quick-money')));
-    await tester.tap(find.byKey(const ValueKey('tools-quick-task')));
-    await tester.tap(find.byKey(const ValueKey('tools-quick-note')));
+    final quickMoney = find.byKey(const ValueKey('tools-quick-money'));
+    final quickTask = find.byKey(const ValueKey('tools-quick-task'));
+    final quickNote = find.byKey(const ValueKey('tools-quick-note'));
+    await tester.drag(find.byType(ListView).first, const Offset(0, -240));
+    await tester.pumpAndSettle();
+    await tester.tap(quickMoney);
+    await tester.tap(quickTask);
+    await tester.tap(quickNote);
     await tester.pump();
 
     expect(moneyCreates, 1);
     expect(taskCreates, 1);
     expect(noteCreates, 1);
+
+    await tester.scrollUntilVisible(find.text('Business setup'), 220);
+    expect(find.text('Business setup'), findsOneWidget);
+    expect(find.text('Booking page'), findsOneWidget);
+    expect(find.text('Business profile'), findsOneWidget);
+    await tester.tap(find.text('Booking page'));
+    await tester.tap(find.text('Business profile'));
+    await tester.scrollUntilVisible(find.text('Settings'), 220);
+    await tester.ensureVisible(find.text('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Account & app'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+    await tester.tap(find.text('Settings'));
+    await tester.pump();
+
+    expect(bookingPageOpens, 1);
+    expect(profileOpens, 1);
+    expect(settingsOpens, 1);
 
     semantics.dispose();
   });
@@ -134,6 +161,9 @@ Future<void> _pumpMoreScreen(
   VoidCallback? onCreateMoney,
   VoidCallback? onCreateTask,
   VoidCallback? onCreateNote,
+  VoidCallback? onOpenBookingPage,
+  VoidCallback? onOpenProfile,
+  VoidCallback? onOpenSettings,
   TextScaler textScaler = TextScaler.noScaling,
 }) async {
   await tester.pumpWidget(
@@ -160,6 +190,9 @@ Future<void> _pumpMoreScreen(
             onCreateMoney: onCreateMoney,
             onCreateTask: onCreateTask,
             onCreateNote: onCreateNote,
+            onOpenBookingPage: onOpenBookingPage,
+            onOpenProfile: onOpenProfile,
+            onOpenSettings: onOpenSettings,
           ),
         ),
       ),

@@ -14,7 +14,7 @@ extension WorkloopAppearancePresentation on WorkloopAppearance {
   String get description => switch (this) {
     WorkloopAppearance.system => 'Follow your phone automatically',
     WorkloopAppearance.light => 'Use the calm low-glare light appearance',
-    WorkloopAppearance.dark => 'Use the lifted graphite appearance',
+    WorkloopAppearance.dark => 'Use the midnight Studio appearance',
   };
 
   ThemeMode get themeMode => switch (this) {

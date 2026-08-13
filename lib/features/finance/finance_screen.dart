@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/workloop_capabilities.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/finance_provider.dart';
@@ -12,6 +15,7 @@ import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/currency_format.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../../shared/widgets/workloop_studio_graphics.dart';
 import 'add_payment_screen.dart';
 import 'expense_editor_screen.dart';
 import 'payment_collection_sheet.dart';
@@ -27,11 +31,13 @@ enum MoneySection { made, spent, owed }
 class FinanceScreen extends ConsumerStatefulWidget {
   final FinanceInitialFocus initialFocus;
   final int createRequest;
+  final DateTime? referenceDate;
 
   const FinanceScreen({
     super.key,
     this.initialFocus = FinanceInitialFocus.top,
     this.createRequest = 0,
+    this.referenceDate,
   });
 
   @override
@@ -46,6 +52,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   final _scrollController = ScrollController();
   final _followUpsKey = GlobalKey();
   bool _didApplyInitialFocus = false;
+
+  DateTime get _now => widget.referenceDate ?? DateTime.now();
 
   @override
   void initState() {
@@ -128,12 +136,16 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    final paymentCollectionEnabled = ref.watch(
+      paymentCollectionEnabledProvider,
+    );
     final invoices = ref.watch(invoicesProvider);
     final expenses = ref.watch(expensesProvider);
     final settings = ref.watch(workspaceSettingsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: tokens.background,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -144,42 +156,53 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 SlateHaptics.action();
                 _refreshMoney();
               },
-              color: AppColors.accentPrimary,
+              color: tokens.accent,
               child: ListView(
                 controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(
+                padding: EdgeInsets.fromLTRB(
                   AppSpacing.pageX,
                   AppSpacing.screenTop,
                   AppSpacing.pageX,
-                  AppSpacing.bottomNavClearance,
+                  AppSpacing.shellBottomClearance(context),
                 ),
                 children: [
-                  WorkloopPageHeader(
-                    title: 'Money',
-                    subtitle:
-                        'Know what came in, went out, and needs following up.',
-                    color: AppColors.modFinance,
-                    trailing: WorkloopTopAction(
-                      label: 'Record',
-                      semanticLabel: 'Add money',
-                      onTap: () => _showMoneyCreateSheet(context),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  WorkloopNavigationControl<MoneySection>(
-                    selected: _section,
-                    segments: const [
-                      WorkloopSegment(value: MoneySection.made, label: 'Made'),
-                      WorkloopSegment(
-                        value: MoneySection.spent,
-                        label: 'Spent',
+                  Column(
+                    children: [
+                      WorkloopPageHeader(
+                        title: 'Money',
+                        subtitle:
+                            'Know what came in, went out, and needs following up.',
+                        color: tokens.accent,
+                        trailing: WorkloopTopAction(
+                          label: 'Record',
+                          semanticLabel: 'Add money',
+                          onTap: () => _showMoneyCreateSheet(context),
+                        ),
                       ),
-                      WorkloopSegment(value: MoneySection.owed, label: 'Owed'),
+                      const SizedBox(height: AppSpacing.lg),
+                      WorkloopNavigationControl<MoneySection>(
+                        selected: _section,
+                        segments: const [
+                          WorkloopSegment(
+                            value: MoneySection.made,
+                            label: 'Made',
+                          ),
+                          WorkloopSegment(
+                            value: MoneySection.spent,
+                            label: 'Spent',
+                          ),
+                          WorkloopSegment(
+                            value: MoneySection.owed,
+                            label: 'Owed',
+                          ),
+                        ],
+                        color: tokens.accent,
+                        onChanged: (section) =>
+                            setState(() => _section = section),
+                      ),
                     ],
-                    color: AppColors.accentPrimary,
-                    onChanged: (section) => setState(() => _section = section),
                   ),
-                  const SizedBox(height: AppSpacing.xl),
+                  const SizedBox(height: AppSpacing.lg),
                   AnimatedSwitcher(
                     duration: AppMotion.responsive(context, AppMotion.standard),
                     switchInCurve: AppMotion.curve,
@@ -190,6 +213,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                         invoices: invoices,
                         expenses: expenses,
                         settings: settings,
+                        paymentCollectionEnabled: paymentCollectionEnabled,
                       ),
                     ),
                   ),
@@ -206,6 +230,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     required AsyncValue<List<Payment>> invoices,
     required AsyncValue<List<Expense>> expenses,
     required AsyncValue<Map<String, dynamic>?> settings,
+    required bool paymentCollectionEnabled,
   }) {
     final range = _selectedRange();
     return switch (_section) {
@@ -219,6 +244,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           payments: payments,
           settings: settings,
           range: range,
+          paymentCollectionEnabled: paymentCollectionEnabled,
           periodSummary: PeriodMoneySummary.from(
             payments: payments,
             expenses: const [],
@@ -272,13 +298,15 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     required AsyncValue<Map<String, dynamic>?> settings,
     required MoneyPeriodRange range,
     required PeriodMoneySummary periodSummary,
+    required bool paymentCollectionEnabled,
   }) {
     final income =
         payments
             .where((payment) => moneyStatusFor(payment) == MoneyStatus.paid)
-            .where((payment) => _inRange(payment.issueDate, range))
+            .where((payment) => _inRange(payment.receivedDate, range))
             .toList()
-          ..sort((a, b) => b.issueDate.compareTo(a.issueDate));
+          ..sort((a, b) => b.receivedDate.compareTo(a.receivedDate));
+    final cashMovement = _cashMovementData(income, range);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -290,6 +318,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           detail:
               '${income.length} payment${income.length == 1 ? '' : 's'} received',
         ),
+        const SizedBox(height: AppSpacing.md),
+        _CashMovementGraphic(data: cashMovement, periodLabel: range.label),
         if (_period != FinancePeriod.custom) ...[
           const SizedBox(height: AppSpacing.xxl),
           settings.when(
@@ -316,7 +346,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     onEditTarget: () =>
                         _showTargetSheet(context, monthlyTarget),
                   ),
-                  if (workspaceId != null) ...[
+                  if (paymentCollectionEnabled && workspaceId != null) ...[
                     const SizedBox(height: AppSpacing.md),
                     PaymentSetupCard(
                       onTap: () => _showPaymentSetup(workspaceId),
@@ -350,6 +380,42 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           ),
       ],
     );
+  }
+
+  List<WorkloopStudioBarDatum> _cashMovementData(
+    List<Payment> payments,
+    MoneyPeriodRange range,
+  ) {
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final totalDays = math.max(1, range.end.difference(range.start).inDays);
+    final bucketCount = math.min(7, totalDays);
+    final bucketDays = (totalDays / bucketCount).ceil();
+
+    return List.generate(bucketCount, (index) {
+      final start = range.start.add(Duration(days: index * bucketDays));
+      final end = index == bucketCount - 1
+          ? range.end
+          : range.start.add(Duration(days: (index + 1) * bucketDays));
+      final amount = payments
+          .where((payment) {
+            final date = payment.receivedDate;
+            return !date.isBefore(start) && date.isBefore(end);
+          })
+          .fold<double>(
+            0,
+            (total, payment) => total + receivedAmountFor(payment),
+          );
+      final label = totalDays <= 7
+          ? weekdays[start.weekday - 1]
+          : totalDays <= 31
+          ? '${start.day}'
+          : '${start.day}/${start.month}';
+      return WorkloopStudioBarDatum(
+        label: label,
+        value: amount,
+        valueLabel: amount <= 0 ? '—' : formatPounds(amount),
+      );
+    });
   }
 
   Widget _outgoingSection({
@@ -526,7 +592,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   }
 
   MoneyPeriodRange _selectedRange() {
-    final now = DateTime.now();
+    final now = _now;
     switch (_period) {
       case FinancePeriod.week:
         final start = startOfWeek(now);
@@ -558,9 +624,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   }
 
   Future<void> _showCustomPeriodSheet(BuildContext context) async {
-    var start =
-        _customStart ?? DateTime.now().subtract(const Duration(days: 29));
-    var end = _customEnd ?? DateTime.now();
+    var start = _customStart ?? _now.subtract(const Duration(days: 29));
+    var end = _customEnd ?? _now;
 
     await showModalBottomSheet(
       context: context,
@@ -572,7 +637,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             final picked = await showWorkloopDatePicker(
               context: context,
               initialDate: start,
-              firstDate: DateTime.now().subtract(const Duration(days: 730)),
+              firstDate: _now.subtract(const Duration(days: 730)),
               lastDate: end,
             );
             if (picked != null) setSheetState(() => start = picked);
@@ -583,7 +648,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               context: context,
               initialDate: end,
               firstDate: start,
-              lastDate: DateTime.now().add(const Duration(days: 365)),
+              lastDate: _now.add(const Duration(days: 365)),
             );
             if (picked != null) setSheetState(() => end = picked);
           }
@@ -727,7 +792,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     ),
                     style: const TextStyle(
                       color: AppColors.t1,
-                      fontSize: 28,
+                      fontSize: 25,
                       fontWeight: FontWeight.w600,
                     ),
                     decoration: InputDecoration(
@@ -912,7 +977,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                         Text(
                           formatPounds(amount),
                           style: const TextStyle(
-                            fontSize: 32,
+                            fontSize: 28,
                             fontWeight: FontWeight.w600,
                             color: AppColors.t1,
                             letterSpacing: 0,
@@ -985,35 +1050,37 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                       const SizedBox(height: AppSpacing.md),
                     ],
                     if (canMarkPaid) ...[
-                      SlateButton(
-                        label: 'Get paid with Stripe',
-                        icon: LucideIcons.creditCard,
-                        onPressed: updating
-                            ? null
-                            : () {
-                                Navigator.pop(ctx);
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) async {
-                                  if (!context.mounted) return;
-                                  final completed =
-                                      await showPaymentCollectionSheet(
-                                        context: context,
-                                        payment: payment,
-                                      );
-                                  if (!completed || !context.mounted) return;
-                                  _refreshPayment(payment);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        '${formatPounds(payment.outstandingAmount)} payment accepted',
+                      if (ref.read(paymentCollectionEnabledProvider)) ...[
+                        SlateButton(
+                          label: 'Get paid with Stripe',
+                          icon: LucideIcons.creditCard,
+                          onPressed: updating
+                              ? null
+                              : () {
+                                  Navigator.pop(ctx);
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) async {
+                                    if (!context.mounted) return;
+                                    final completed =
+                                        await showPaymentCollectionSheet(
+                                          context: context,
+                                          payment: payment,
+                                        );
+                                    if (!completed || !context.mounted) return;
+                                    _refreshPayment(payment);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '${formatPounds(payment.outstandingAmount)} payment accepted',
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                });
-                              },
-                      ),
-                      const SizedBox(height: 10),
+                                    );
+                                  });
+                                },
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       SlateButton(
                         label: updating ? 'Updating...' : 'Mark as Received',
                         icon: LucideIcons.checkCircle,
@@ -1040,7 +1107,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                       ),
                       const SizedBox(height: 10),
                     ],
-                    if (payment.stripeAmountPaid > 0) ...[
+                    if (payment.stripeAmountPaid > 0 &&
+                        ref.read(paymentCollectionEnabledProvider)) ...[
                       SlateButton(
                         label: 'Card payment details',
                         icon: LucideIcons.creditCard,
@@ -1063,7 +1131,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                               },
                       ),
                       const SizedBox(height: 10),
-                    ] else ...[
+                    ] else if (payment.stripeAmountPaid <= 0) ...[
                       SlateButton(
                         label: 'Edit income',
                         icon: LucideIcons.pencil,
@@ -1257,7 +1325,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     if (dueDate == null || dueDate.millisecondsSinceEpoch == 0) {
       return 'Created ${_formatDate(payment.issueDate)}';
     }
-    final now = DateTime.now();
+    final now = _now;
     final today = DateTime(now.year, now.month, now.day);
     final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
     final diff = due.difference(today).inDays;
@@ -1307,6 +1375,10 @@ class _MoneyCreateChoice extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = SlateTheme.of(context);
     return WorkloopListRow(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: 12,
+      ),
       leading: Container(
         width: AppSpacing.minTouch,
         height: AppSpacing.minTouch,

@@ -5,6 +5,12 @@ import {
   safePlatformFeeMinor,
   stripeRequest,
 } from "../_shared/stripe_api.ts";
+import {
+  requireMatchingPaymentOperation,
+  requireRefundWithinBalance,
+  requireStripeIdempotencyKey,
+} from "../_shared/stripe_idempotency.ts";
+import { paymentsBetaEnabled } from "../_shared/payments_beta_gate.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,6 +30,24 @@ function response(status: number, body: Json) {
 
 function stringValue(value: unknown, maxLength = 160) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function objectValue(value: unknown): Json {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Json
+    : {};
+}
+
+function optionalReceiptEmail(value: unknown) {
+  const email = stringValue(value, 255).toLowerCase();
+  if (!email) return "";
+  if (
+    email.length > 254 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  ) {
+    throw new Error("Enter a valid receipt email or leave it blank");
+  }
+  return email;
 }
 
 function isUuid(value: string) {
@@ -51,7 +75,7 @@ function accountStatus(account: Json) {
     payoutsEnabled,
     onboardingStatus: disabledReason
       ? "restricted"
-      : chargesEnabled && detailsSubmitted
+      : chargesEnabled && payoutsEnabled && detailsSubmitted
       ? "ready"
       : "pending",
     requirementsDue: Array.isArray(requirements?.currently_due)
@@ -66,6 +90,12 @@ Deno.serve(async (req: Request) => {
   }
   if (req.method !== "POST") {
     return response(405, { error: "Method not allowed" });
+  }
+  if (!paymentsBetaEnabled()) {
+    return response(503, {
+      error: "Payments are not available during this beta",
+      code: "payments_beta_disabled",
+    });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -107,6 +137,22 @@ Deno.serve(async (req: Request) => {
   const user = authData.user;
   if (authError || !user) return response(401, { error: "Unauthorized" });
 
+  const { data: meetsMfaPolicy, error: mfaPolicyError } = await userClient.rpc(
+    "current_user_meets_mfa_policy",
+  );
+  if (mfaPolicyError) {
+    console.error("stripe_mfa_policy_check_failed", {
+      code: mfaPolicyError.code,
+    });
+    return response(503, { error: "Could not verify account security" });
+  }
+  if (meetsMfaPolicy !== true) {
+    return response(403, {
+      error: "Complete two-factor verification to continue",
+      code: "mfa_required",
+    });
+  }
+
   const { data: member } = await serviceClient
     .from("workspace_members")
     .select("workspace_id")
@@ -136,17 +182,35 @@ Deno.serve(async (req: Request) => {
       }
       return existing;
     }
-    const account = await stripeRequest<Json>(stripeSecretKey, "/v1/accounts", {
-      form: [
-        ["type", "express"],
-        ["country", "GB"],
-        ["capabilities[card_payments][requested]", "true"],
-        ["capabilities[transfers][requested]", "true"],
-        ["business_profile[product_description]", "Appointment-based services"],
-        ["metadata[workloop_workspace_id]", workspaceId],
-      ],
-      idempotencyKey: `workloop-connect-${mode}-${workspaceId}`,
-    });
+    const account = await stripeRequest<Json>(
+      stripeSecretKey,
+      "/v2/core/accounts",
+      {
+        json: {
+          dashboard: "full",
+          identity: { country: "gb" },
+          configuration: {
+            merchant: {
+              capabilities: { card_payments: { requested: true } },
+            },
+          },
+          defaults: {
+            currency: "gbp",
+            responsibilities: {
+              fees_collector: "stripe",
+              losses_collector: "stripe",
+            },
+          },
+          metadata: { workloop_workspace_id: workspaceId },
+          include: [
+            "configuration.merchant",
+            "defaults",
+            "requirements",
+          ],
+        },
+        idempotencyKey: `workloop-connect-v2-${mode}-${workspaceId}`,
+      },
+    );
     const accountId = stringValue(account.id, 80);
     if (!accountId.startsWith("acct_")) {
       throw new Error("Stripe account was not created");
@@ -242,10 +306,40 @@ Deno.serve(async (req: Request) => {
 
   async function requireReadyAccount() {
     const refreshed = await refreshPaymentAccount(await ensurePaymentAccount());
-    if (refreshed.charges_enabled !== true) {
+    if (
+      refreshed.charges_enabled !== true ||
+      refreshed.payouts_enabled !== true ||
+      refreshed.onboarding_status !== "ready"
+    ) {
       throw new Error("Finish Stripe setup before taking a payment");
     }
     return refreshed;
+  }
+
+  async function succeededRefundAmount(transactionId: string) {
+    const { data: refunds, error: refundsError } = await serviceClient
+      .from("payment_refunds")
+      .select("amount_minor")
+      .eq("transaction_id", transactionId)
+      .eq("status", "succeeded");
+    if (refundsError) throw refundsError;
+    const refunded = (refunds ?? []).reduce(
+      (sum, row) => sum + Number(row.amount_minor),
+      0,
+    );
+    return Math.max(0, refunded);
+  }
+
+  async function syncSucceededRefunds(transactionId: string, amount: number) {
+    const refunded = await succeededRefundAmount(transactionId);
+    const boundedRefunded = Math.min(amount, Math.max(0, refunded));
+    const { error } = await serviceClient.from("payment_transactions")
+      .update({
+        amount_refunded_minor: boundedRefunded,
+        status: boundedRefunded >= amount ? "refunded" : "partially_refunded",
+        updated_at: new Date().toISOString(),
+      }).eq("id", transactionId);
+    if (error) throw error;
   }
 
   async function loadInvoice() {
@@ -299,31 +393,30 @@ Deno.serve(async (req: Request) => {
         const accountRow = await ensurePaymentAccount();
         const link = await stripeRequest<Json>(
           stripeSecretKey,
-          "/v1/account_links",
+          "/v2/core/account_links",
           {
-            form: [
-              ["account", stringValue(accountRow.stripe_account_id, 80)],
-              [
-                "refresh_url",
-                requireConfiguredUrl("STRIPE_CONNECT_REFRESH_URL"),
-              ],
-              ["return_url", requireConfiguredUrl("STRIPE_CONNECT_RETURN_URL")],
-              ["type", "account_onboarding"],
-            ],
+            json: {
+              account: stringValue(accountRow.stripe_account_id, 80),
+              use_case: {
+                type: "account_onboarding",
+                account_onboarding: {
+                  configurations: ["merchant"],
+                  refresh_url: requireConfiguredUrl(
+                    "STRIPE_CONNECT_REFRESH_URL",
+                  ),
+                  return_url: requireConfiguredUrl(
+                    "STRIPE_CONNECT_RETURN_URL",
+                  ),
+                },
+              },
+            },
           },
         );
         return response(200, { url: link.url, mode });
       }
       case "createDashboardLink": {
-        const accountRow = await requireReadyAccount();
-        const link = await stripeRequest<Json>(
-          stripeSecretKey,
-          `/v1/accounts/${
-            stringValue(accountRow.stripe_account_id, 80)
-          }/login_links`,
-          { method: "POST" },
-        );
-        return response(200, { url: link.url });
+        await requireReadyAccount();
+        return response(200, { url: "https://dashboard.stripe.com/" });
       }
       case "createConnectionToken": {
         const accountRow = await requireReadyAccount();
@@ -342,17 +435,34 @@ Deno.serve(async (req: Request) => {
         const accountRow = await requireReadyAccount();
         const invoice = await loadInvoice();
         const amountMinor = requestedAmountMinor(invoice);
-        const idempotencyKey = stringValue(payload.idempotencyKey, 128);
-        if (idempotencyKey.length < 16) {
-          throw new Error("Invalid payment request");
-        }
-        const { data: existing } = await serviceClient
+        const receiptEmail = optionalReceiptEmail(payload.receiptEmail);
+        const idempotencyKey = requireStripeIdempotencyKey(
+          payload,
+          "Invalid payment request",
+        );
+        const { data: existing, error: existingError } = await serviceClient
           .from("payment_transactions")
-          .select("id, stripe_payment_intent_id, status")
+          .select(
+            "id, invoice_id, stripe_payment_intent_id, collection_method, status, amount_minor, metadata",
+          )
           .eq("workspace_id", workspaceId)
           .eq("idempotency_key", idempotencyKey)
           .maybeSingle();
+        if (existingError) throw existingError;
         if (existing) {
+          requireMatchingPaymentOperation(
+            existing,
+            stringValue(invoice.id, 64),
+            amountMinor,
+            "tap_to_pay",
+          );
+          const existingReceiptEmail = stringValue(
+            objectValue(existing.metadata).receipt_email,
+            254,
+          );
+          if (existingReceiptEmail !== receiptEmail) {
+            throw new Error("Payment request key was already used");
+          }
           const existingIntentId = stringValue(
             existing.stripe_payment_intent_id,
             100,
@@ -383,6 +493,9 @@ Deno.serve(async (req: Request) => {
           ["metadata[workloop_invoice_id]", stringValue(invoice.id, 64)],
           ["metadata[workloop_collection_method]", "tap_to_pay"],
         ];
+        if (receiptEmail) {
+          form.push(["receipt_email", receiptEmail]);
+        }
         if (feeMinor > 0) {
           form.push(["application_fee_amount", String(feeMinor)]);
         }
@@ -397,7 +510,7 @@ Deno.serve(async (req: Request) => {
         );
         const { data: transaction, error } = await serviceClient
           .from("payment_transactions")
-          .insert({
+          .upsert({
             workspace_id: workspaceId,
             invoice_id: invoice.id,
             stripe_account_id: accountRow.stripe_account_id,
@@ -409,7 +522,8 @@ Deno.serve(async (req: Request) => {
             platform_fee_minor: feeMinor,
             created_by_user_id: user.id,
             idempotency_key: idempotencyKey,
-          })
+            metadata: receiptEmail ? { receipt_email: receiptEmail } : {},
+          }, { onConflict: "workspace_id,idempotency_key" })
           .select()
           .single();
         if (error) throw error;
@@ -423,17 +537,26 @@ Deno.serve(async (req: Request) => {
         const accountRow = await requireReadyAccount();
         const invoice = await loadInvoice();
         const amountMinor = requestedAmountMinor(invoice);
-        const idempotencyKey = stringValue(payload.idempotencyKey, 128);
-        if (idempotencyKey.length < 16) {
-          throw new Error("Invalid payment request");
-        }
-        const { data: existing } = await serviceClient
+        const idempotencyKey = requireStripeIdempotencyKey(
+          payload,
+          "Invalid payment request",
+        );
+        const { data: existing, error: existingError } = await serviceClient
           .from("payment_transactions")
-          .select("id, stripe_checkout_session_id, status, metadata")
+          .select(
+            "id, invoice_id, stripe_checkout_session_id, collection_method, status, amount_minor, metadata",
+          )
           .eq("workspace_id", workspaceId)
           .eq("idempotency_key", idempotencyKey)
           .maybeSingle();
+        if (existingError) throw existingError;
         if (existing) {
+          requireMatchingPaymentOperation(
+            existing,
+            stringValue(invoice.id, 64),
+            amountMinor,
+            "payment_link",
+          );
           return response(200, {
             transaction: existing,
             url: (existing.metadata as Json | null)?.checkout_url,
@@ -482,7 +605,7 @@ Deno.serve(async (req: Request) => {
         );
         const { data: transaction, error } = await serviceClient
           .from("payment_transactions")
-          .insert({
+          .upsert({
             workspace_id: workspaceId,
             invoice_id: invoice.id,
             stripe_account_id: accountRow.stripe_account_id,
@@ -495,7 +618,7 @@ Deno.serve(async (req: Request) => {
             created_by_user_id: user.id,
             idempotency_key: idempotencyKey,
             metadata: { checkout_url: session.url },
-          })
+          }, { onConflict: "workspace_id,idempotency_key" })
           .select()
           .single();
         if (error) throw error;
@@ -515,14 +638,11 @@ Deno.serve(async (req: Request) => {
         if (transactionError || !transaction) {
           throw new Error("Transaction was not found");
         }
-        const remaining = Number(transaction.amount_minor) -
-          Number(transaction.amount_refunded_minor);
-        const requested = payload.amountMinor == null
-          ? remaining
-          : Number(payload.amountMinor);
+        const amount = Number(transaction.amount_minor);
+        const requested = Number(payload.amountMinor);
         if (
           !Number.isSafeInteger(requested) || requested <= 0 ||
-          requested > remaining
+          requested > amount
         ) {
           throw new Error("Refund amount is outside the refundable balance");
         }
@@ -530,10 +650,33 @@ Deno.serve(async (req: Request) => {
         if (!intentId.startsWith("pi_")) {
           throw new Error("Payment is not ready to refund");
         }
-        const idempotencyKey = stringValue(payload.idempotencyKey, 128);
-        if (idempotencyKey.length < 16) {
-          throw new Error("Invalid refund request");
+        const idempotencyKey = requireStripeIdempotencyKey(
+          payload,
+          "Invalid refund request",
+        );
+        const { data: existingRefund, error: existingRefundError } =
+          await serviceClient
+            .from("payment_refunds")
+            .select("stripe_refund_id, transaction_id, amount_minor, status")
+            .eq("workspace_id", workspaceId)
+            .eq("idempotency_key", idempotencyKey)
+            .maybeSingle();
+        if (existingRefundError) throw existingRefundError;
+        if (existingRefund) {
+          if (
+            existingRefund.transaction_id !== transactionId ||
+            Number(existingRefund.amount_minor) !== requested
+          ) {
+            throw new Error("Refund request key was already used");
+          }
+          return response(200, {
+            refundId: existingRefund.stripe_refund_id,
+            status: existingRefund.status,
+            reused: true,
+          });
         }
+        const alreadyRefunded = await succeededRefundAmount(transactionId);
+        requireRefundWithinBalance(requested, amount, alreadyRefunded);
         const refund = await stripeRequest<Json>(
           stripeSecretKey,
           "/v1/refunds",
@@ -545,6 +688,7 @@ Deno.serve(async (req: Request) => {
               ["amount", String(requested)],
               ["metadata[workloop_workspace_id]", workspaceId],
               ["metadata[workloop_transaction_id]", transactionId],
+              ["metadata[workloop_idempotency_key]", idempotencyKey],
             ],
           },
         );
@@ -560,21 +704,12 @@ Deno.serve(async (req: Request) => {
           amount_minor: requested,
           status: refundStatus,
           created_by_user_id: user.id,
+          idempotency_key: idempotencyKey,
           updated_at: new Date().toISOString(),
         }, { onConflict: "stripe_refund_id" });
         if (refundError) throw refundError;
         if (refundStatus === "succeeded") {
-          const refunded = Number(transaction.amount_refunded_minor) +
-            requested;
-          const { error } = await serviceClient.from("payment_transactions")
-            .update({
-              amount_refunded_minor: refunded,
-              status: refunded >= Number(transaction.amount_minor)
-                ? "refunded"
-                : "partially_refunded",
-              updated_at: new Date().toISOString(),
-            }).eq("id", transactionId);
-          if (error) throw error;
+          await syncSucceededRefunds(transactionId, amount);
         }
         return response(200, { refundId: refund.id, status: refundStatus });
       }

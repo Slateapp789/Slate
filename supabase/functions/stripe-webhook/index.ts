@@ -77,6 +77,31 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  async function syncSucceededRefunds(
+    transactionId: string,
+    amount: number,
+  ) {
+    const { data: refunds, error: refundsError } = await supabase
+      .from("payment_refunds")
+      .select("amount_minor")
+      .eq("transaction_id", transactionId)
+      .eq("status", "succeeded");
+    if (refundsError) throw refundsError;
+    const refunded = (refunds ?? []).reduce(
+      (sum, row) => sum + Number(row.amount_minor),
+      0,
+    );
+    const boundedRefunded = Math.min(amount, Math.max(0, refunded));
+    if (boundedRefunded === 0) return;
+    const { error } = await supabase.from("payment_transactions").update({
+      amount_refunded_minor: boundedRefunded,
+      status: boundedRefunded >= amount ? "refunded" : "partially_refunded",
+      updated_at: new Date().toISOString(),
+    }).eq("id", transactionId);
+    if (error) throw error;
+  }
+
   const { data: claimed, error: claimError } = await supabase.rpc(
     "claim_stripe_webhook_event",
     {
@@ -102,11 +127,12 @@ Deno.serve(async (req: Request) => {
     status: "processed" | "ignored" | "failed",
     message?: string,
   ) {
-    await supabase.rpc("finish_stripe_webhook_event", {
+    const { error } = await supabase.rpc("finish_stripe_webhook_event", {
       p_event_id: eventId,
       p_status: status,
       p_error_message: message?.slice(0, 1000) ?? null,
     });
+    if (error) throw error;
   }
 
   const object = objectValue(objectValue(event.data).object);
@@ -121,6 +147,7 @@ Deno.serve(async (req: Request) => {
         : [];
       const disabled = stringValue(requirements.disabled_reason);
       const ready = object.charges_enabled === true &&
+        object.payouts_enabled === true &&
         object.details_submitted === true;
       const { error } = await supabase.from("workspace_payment_accounts")
         .update({
@@ -214,6 +241,11 @@ Deno.serve(async (req: Request) => {
           : object.status === "canceled"
           ? "cancelled"
           : "pending";
+        const metadata = objectValue(object.metadata);
+        const idempotencyKey = stringValue(
+          metadata.workloop_idempotency_key,
+          128,
+        );
         const { error } = await supabase.from("payment_refunds").upsert({
           workspace_id: transaction.workspace_id,
           transaction_id: transaction.id,
@@ -222,9 +254,22 @@ Deno.serve(async (req: Request) => {
           status,
           reason: stringValue(object.reason) || null,
           failure_reason: stringValue(object.failure_reason) || null,
+          idempotency_key: idempotencyKey.length >= 16 ? idempotencyKey : null,
           updated_at: new Date().toISOString(),
         }, { onConflict: "stripe_refund_id" });
         if (error) throw error;
+        if (status === "succeeded") {
+          const { data: fullTransaction, error: transactionError } =
+            await supabase.from("payment_transactions")
+              .select("amount_minor")
+              .eq("id", transaction.id)
+              .single();
+          if (transactionError) throw transactionError;
+          await syncSucceededRefunds(
+            transaction.id,
+            Number(fullTransaction.amount_minor),
+          );
+        }
       }
     } else if (
       eventType === "checkout.session.completed" ||
@@ -281,7 +326,14 @@ Deno.serve(async (req: Request) => {
       eventType,
       message,
     });
-    await finish("failed", message);
+    try {
+      await finish("failed", message);
+    } catch (finishError) {
+      console.error("stripe_webhook_failure_record_failed", {
+        eventId,
+        message: finishError instanceof Error ? finishError.message : "unknown",
+      });
+    }
     return jsonResponse(500, { error: "Webhook processing failed" });
   }
 });

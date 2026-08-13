@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../auth/auth_validation.dart';
 import '../../../shared/providers/workspace_provider.dart';
 import '../../../shared/repositories/slate_repositories.dart';
 import '../../../shared/widgets/slate_ui.dart';
@@ -25,6 +26,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
   bool _exporting = false;
   final _newPasswordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
+  final _reauthCodeCtrl = TextEditingController();
   final _firstNameCtrl = TextEditingController();
   final _deleteConfirmCtrl = TextEditingController();
   bool _obscureNew = true;
@@ -34,6 +36,7 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
   void dispose() {
     _newPasswordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
+    _reauthCodeCtrl.dispose();
     _firstNameCtrl.dispose();
     _deleteConfirmCtrl.dispose();
     super.dispose();
@@ -54,22 +57,30 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
     final newPass = _newPasswordCtrl.text;
     final confirm = _confirmPasswordCtrl.text;
     if (newPass.isEmpty) return;
-    if (newPass != confirm) {
-      _snack("Passwords don't match", AppColors.error);
+    final reauthCode = _reauthCodeCtrl.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(reauthCode)) {
+      _snack(
+        'Enter the 6-digit security code from your email.',
+        AppColors.error,
+      );
       return;
     }
-    if (newPass.length < 8) {
-      _snack('Password must be at least 8 characters', AppColors.error);
+    final validationError = validateNewPasswordPair(newPass, confirm);
+    if (validationError != null) {
+      _snack(validationError, AppColors.error);
       return;
     }
     setState(() => _savingPassword = true);
     try {
-      await ref.read(authRepositoryProvider).updatePassword(newPass);
+      await ref
+          .read(authRepositoryProvider)
+          .updatePassword(newPass, nonce: reauthCode);
       setState(() {
         _changingPassword = false;
         _savingPassword = false;
         _newPasswordCtrl.clear();
         _confirmPasswordCtrl.clear();
+        _reauthCodeCtrl.clear();
       });
       if (mounted) _snack('Password updated', AppColors.green);
     } catch (_) {
@@ -80,6 +91,23 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
           AppColors.error,
         );
       }
+    }
+  }
+
+  Future<void> _startPasswordChange() async {
+    setState(() => _savingPassword = true);
+    try {
+      await ref.read(authRepositoryProvider).requestPasswordReauthentication();
+      if (!mounted) return;
+      setState(() {
+        _changingPassword = true;
+        _savingPassword = false;
+      });
+      _snack('Security code sent to your email', AppColors.green);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _savingPassword = false);
+      _snack('A security code could not be sent. Try again.', AppColors.error);
     }
   }
 
@@ -174,7 +202,12 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.pageX,
+            AppSpacing.sm,
+            AppSpacing.pageX,
+            AppSpacing.xl,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -415,6 +448,20 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             child: Column(
               children: [
+                TextField(
+                  controller: _reauthCodeCtrl,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.oneTimeCode],
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                  decoration: const InputDecoration(
+                    labelText: 'Email security code',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
                 _passwordField(
                   label: 'NEW PASSWORD',
                   controller: _newPasswordCtrl,
@@ -446,10 +493,18 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
           _AccountActionRow(
             icon: LucideIcons.lock,
             label: 'Change password',
-            value: '••••••••',
-            onTap: () => setState(() => _changingPassword = true),
+            value: _savingPassword ? 'Sending code' : 'Verify first',
+            onTap: _savingPassword ? () {} : _startPasswordChange,
             valueColor: AppColors.t3,
           ),
+        const WorkloopDivider(margin: EdgeInsets.zero),
+        _AccountActionRow(
+          icon: LucideIcons.shieldCheck,
+          label: 'Two-factor security',
+          value: 'Authenticator',
+          onTap: () => context.push('/security/2fa'),
+          valueColor: AppColors.accentPrimary,
+        ),
         const SizedBox(height: AppSpacing.xxl),
         const WorkloopSectionHeader(label: 'Your data'),
         const SizedBox(height: AppSpacing.xs),
@@ -474,7 +529,10 @@ class _SettingsAccountTabState extends ConsumerState<SettingsAccountTab> {
         WorkloopListRow(
           onTap: _showSignOutSheet,
           showDivider: false,
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.md,
+          ),
           leading: const Icon(
             LucideIcons.logOut,
             color: AppColors.error,
@@ -582,7 +640,10 @@ class _AccountActionRow extends StatelessWidget {
     return WorkloopListRow(
       onTap: onTap,
       showDivider: false,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
       leading: Container(
         width: 40,
         height: 40,

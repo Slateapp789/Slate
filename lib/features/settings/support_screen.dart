@@ -60,6 +60,7 @@ class SupportScreen extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => const LegalDocumentScreen(
                         document: WorkloopLegalDocument.privacy,
+                        backSemanticLabel: 'Back to help and support',
                       ),
                     ),
                   ),
@@ -74,6 +75,7 @@ class SupportScreen extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => const LegalDocumentScreen(
                         document: WorkloopLegalDocument.terms,
+                        backSemanticLabel: 'Back to help and support',
                       ),
                     ),
                   ),
@@ -156,7 +158,10 @@ class _SupportRow extends StatelessWidget {
     return WorkloopListRow(
       onTap: onTap,
       showDivider: showDivider,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
       leading: Container(
         width: 40,
         height: 40,

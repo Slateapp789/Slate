@@ -93,7 +93,7 @@ class _ObServicesState extends ConsumerState<ObServices> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpacing.pageX),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -101,7 +101,7 @@ class _ObServicesState extends ConsumerState<ObServices> {
           Text(
             'Your services.',
             style: TextStyle(
-              fontSize: 32,
+              fontSize: 28,
               fontWeight: FontWeight.w600,
               color: AppColors.t1,
               letterSpacing: 0,
@@ -183,16 +183,6 @@ class _ObServicesState extends ConsumerState<ObServices> {
             height: 54,
             child: ElevatedButton(
               onPressed: _services.isNotEmpty ? _continue : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.brandAccent,
-                disabledBackgroundColor: AppColors.bgInteract,
-                foregroundColor: AppColors.onBrandAccent,
-                disabledForegroundColor: AppColors.t3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 0,
-              ),
               child: const Text(
                 'Continue',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),

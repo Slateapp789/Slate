@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(36);
+select plan(51);
 
 select has_table('public', table_name, table_name || ' exists')
 from unnest(array[
@@ -185,6 +185,57 @@ select ok(
   'service-only Stripe webhook completion function exists'
 );
 
+select ok(
+  to_regprocedure('app_private.current_user_meets_mfa_policy()') is not null,
+  'opt-in MFA enforcement helper exists'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from pg_policies
+    where schemaname = 'public'
+      and policyname = 'Verified MFA users require AAL2'
+      and permissive = 'RESTRICTIVE'
+      and roles @> array['authenticated'::name]
+  ),
+  22::bigint,
+  'every authenticated application table has the restrictive MFA policy'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'app_private.current_user_meets_mfa_policy()',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'anon',
+    'app_private.current_user_meets_mfa_policy()',
+    'EXECUTE'
+  ),
+  'only authenticated clients can call the current-user MFA helper'
+);
+
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'app_private.assign_invoice_number()',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.clear_inactive_task_notification()',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.set_task_completion_timestamp()',
+    'EXECUTE'
+  ),
+  'trigger-only functions are not callable client RPCs'
+);
+
 select is(
   (
     select count(*)::bigint
@@ -218,6 +269,163 @@ select is(
   ),
   12::bigint,
   'tenant-aware relationship foreign keys are present'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from pg_class relation
+    join pg_namespace namespace on namespace.oid = relation.relnamespace
+    where namespace.nspname = 'app_private'
+      and relation.relname = any(array[
+        'payment_counters',
+        'workflow_idempotency',
+        'stripe_webhook_events'
+      ])
+      and not relation.relrowsecurity
+  ),
+  0::bigint,
+  'private payment and workflow ledgers have defence-in-depth RLS'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from information_schema.table_privileges
+    where table_schema = 'app_private'
+      and table_name = any(array[
+        'payment_counters',
+        'workflow_idempotency',
+        'stripe_webhook_events'
+      ])
+      and lower(grantee) in ('anon', 'authenticated', 'public')
+      and privilege_type in ('SELECT', 'INSERT', 'UPDATE', 'DELETE')
+  ),
+  0::bigint,
+  'client roles have no private ledger DML grants'
+);
+
+select is(
+  (
+    select count(*)::bigint
+    from pg_policies
+    where schemaname = 'app_private'
+      and policyname = any(array[
+        'payment_counters_deny_client_access',
+        'workflow_idempotency_deny_client_access',
+        'stripe_webhook_events_deny_client_access'
+      ])
+      and cmd = 'ALL'
+      and roles @> array['anon'::name, 'authenticated'::name]
+      and qual = 'false'
+      and with_check = 'false'
+  ),
+  3::bigint,
+  'private ledgers explicitly deny all client-role access'
+);
+
+select ok(
+  has_table_privilege(
+    'service_role',
+    'app_private.payment_counters',
+    'SELECT'
+  )
+  and has_table_privilege(
+    'service_role',
+    'app_private.payment_counters',
+    'INSERT'
+  )
+  and has_table_privilege(
+    'service_role',
+    'app_private.payment_counters',
+    'UPDATE'
+  )
+  and has_table_privilege(
+    'service_role',
+    'app_private.stripe_webhook_events',
+    'SELECT'
+  )
+  and has_table_privilege(
+    'service_role',
+    'app_private.stripe_webhook_events',
+    'INSERT'
+  )
+  and has_table_privilege(
+    'service_role',
+    'app_private.stripe_webhook_events',
+    'UPDATE'
+  ),
+  'service role retains the private ledger grants used by Edge Functions'
+);
+
+select ok(
+  public.claim_stripe_webhook_event(
+    'evt_retry_contract',
+    'acct_contract',
+    'payment_intent.succeeded',
+    false,
+    '{"id":"evt_retry_contract"}'::jsonb
+  ),
+  'a new Stripe event is claimed'
+);
+
+select isnt(
+  public.claim_stripe_webhook_event(
+    'evt_retry_contract',
+    'acct_contract',
+    'payment_intent.succeeded',
+    false,
+    '{"id":"evt_retry_contract"}'::jsonb
+  ),
+  true,
+  'a concurrently processing Stripe event is not double-claimed'
+);
+
+select lives_ok(
+  $$select public.finish_stripe_webhook_event(
+    'evt_retry_contract', 'failed', 'contract failure'
+  )$$,
+  'a failed Stripe attempt is recorded'
+);
+
+select ok(
+  public.claim_stripe_webhook_event(
+    'evt_retry_contract',
+    'acct_contract',
+    'payment_intent.succeeded',
+    false,
+    '{"id":"evt_retry_contract"}'::jsonb
+  ),
+  'a failed Stripe event can be reclaimed for retry'
+);
+
+select is(
+  (
+    select attempt_count
+    from app_private.stripe_webhook_events
+    where stripe_event_id = 'evt_retry_contract'
+  ),
+  2,
+  'Stripe webhook attempts are counted'
+);
+
+select lives_ok(
+  $$select public.finish_stripe_webhook_event(
+    'evt_retry_contract', 'processed', null
+  )$$,
+  'a retried Stripe event can finish successfully'
+);
+
+select isnt(
+  public.claim_stripe_webhook_event(
+    'evt_retry_contract',
+    'acct_contract',
+    'payment_intent.succeeded',
+    false,
+    '{"id":"evt_retry_contract"}'::jsonb
+  ),
+  true,
+  'a processed Stripe event remains deduplicated'
 );
 
 select * from finish();

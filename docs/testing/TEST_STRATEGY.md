@@ -1,6 +1,6 @@
 # Workloop Test Strategy
 
-Last updated: 2026-07-26
+Last updated: 2026-08-12
 
 ## Purpose
 
@@ -72,7 +72,7 @@ The candidate is a Flutter 3.44.8 / Dart 3.12.2 application using:
 - feature-first UI modules and shared Workloop design primitives;
 - on-device notifications for task and booking reminders.
 
-The application version is `1.0.0+1`. The primary source inventory is
+The application version is `1.0.0+4`. The primary source inventory is
 [`docs/CurrentState.md`](../CurrentState.md), while release and external
 operational gates are tracked in
 [`docs/LaunchReadiness.md`](../LaunchReadiness.md).
@@ -212,7 +212,9 @@ The current tests are:
   boundaries;
 - [`002_rls_isolation.test.sql`](../../supabase/tests/database/002_rls_isolation.test.sql)
   for User A, User B, anonymous, cross-tenant mutation, and service-role
-  boundaries.
+  boundaries;
+- [`003_privileged_boundaries_and_payment_retention.test.sql`](../../supabase/tests/database/003_privileged_boundaries_and_payment_retention.test.sql)
+  for MFA-aware workflow wrappers and Stripe webhook retention/scrubbing.
 
 See [SECURITY_TESTING.md](SECURITY_TESTING.md) for the threat model and
 unexecuted areas.
@@ -269,6 +271,8 @@ The detailed manual matrix remains in
 
 [`mobile-ci.yml`](../../.github/workflows/mobile-ci.yml) is intended to gate:
 
+- clean tracked/untracked candidate state plus exact commit/version/toolchain
+  provenance;
 - format, analysis, Flutter tests, and coverage;
 - deterministic data-profile validation;
 - Deno formatting, type checks, and tests;
@@ -313,7 +317,15 @@ Source can advance to a technical release verdict only when:
 - VoiceOver, TalkBack, permission, offline, lifecycle, and physical-device
   matrices are signed off;
 - iOS and Android release signing succeeds;
-- production Auth delivery, leaked-password protection, legal URLs, support
-  operation, and store declarations are complete.
+- production Auth controls remain enabled and the external lifecycle passes;
+  legal URLs, support operation and store declarations are complete.
 
 Until then, [KNOWN_GAPS.md](KNOWN_GAPS.md) remains part of the release decision.
+
+Before any signed AAB or IPA, run
+`RUN_SIGNED_BUILDS=true RELEASE_EXPECTED_SHA=<full-sha> scripts/qa_all.sh`. It
+must fail if the tracked/untracked worktree is not empty, Android signing
+material is tracked, or a target AAB/IPA already exists. Retain
+`build/release/release-provenance.txt`, including the new artifact sizes and
+SHA-256 hashes, with the upload record. A passing CI checkout records useful
+source provenance but does not replace the signed local build boundary.

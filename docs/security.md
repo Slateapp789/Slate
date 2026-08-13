@@ -14,7 +14,7 @@ Required values:
 
 ```bash
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-supabase-anon-or-publishable-key
+SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 ```
 
 Google Places is called only by the authenticated `places-address-search` Edge
@@ -24,7 +24,7 @@ code, or a mobile application bundle. See `docs/GooglePlacesSetup.md`.
 
 The Supabase anon/publishable key is not a server secret. It is expected to be present in client apps, but database safety depends on correct Supabase Row Level Security policies. Never put a `service_role` key or any other privileged backend secret in Flutter code, `.env`, or mobile app bundles.
 
-The public booking/profile Edge Functions are deployed with JWT verification enabled, so the current mobile `.env` uses the legacy anon JWT rather than the newer publishable key. Both are public client keys; the service role key only lives in Supabase Edge Function secrets.
+The public booking/profile Edge Functions remain deployed with JWT verification enabled. The managed Supabase gateway was verified on 2026-08-11 to accept the project's publishable key for the public profile boundary. The legacy anon key remains supported only as a temporary client fallback while existing installations are migrated; the service role key only lives in Supabase Edge Function secrets.
 
 ## Current Public Boundary
 
@@ -48,7 +48,54 @@ The public booking/profile Edge Functions are deployed with JWT verification ena
 
 ## Immediate Security Priorities
 
-- Enable Supabase Auth leaked password protection before beta.
+- Keep the verified `auth@workloop.uk` Resend/Supabase SMTP path monitored and
+  complete one fresh external signup before inviting the wider beta cohort.
+- Google OAuth and native Apple sign-in are enabled. Keep Google in testing
+  mode until the consent-screen domain, policies and external cohort are ready,
+  and record an existing-email identity-linking test before public launch.
+- Re-check that the next scheduled Pro database backup is created. Point-in-time
+  recovery is a separately billed add-on and has not been enabled.
 - Keep all workspace-scoped queries filtered by the active workspace.
 - Set `ACCOUNT_DELETION_ADMIN_TOKEN` in Supabase Edge Function secrets before using account deletion completion.
-- Add biometric lock and 2FA preference support after the main V1 loop is stable.
+- Consider CAPTCHA only with a native flow that preserves accessibility and does
+  not leak a provider secret into the app.
+
+## 2026-08-11 Auth and Database Hardening
+
+- Email confirmation is required. Passwords require at least 12 characters with
+  uppercase, lowercase, number and symbol classes, and breached passwords are
+  rejected by Supabase Auth.
+- TOTP authenticator enrollment is available in Account settings. Users who
+  enroll a verified factor must present an AAL2 session before any authenticated
+  Data API table access; unenrolled accounts retain AAL1 during rollout.
+- Session lifetime is capped at 30 days with a 7-day inactivity timeout. Refresh
+  token replay detection remains enabled and access tokens retain the recommended
+  one-hour lifetime.
+- All 22 authenticated public tables have a restrictive MFA policy. Trigger-only
+  functions are no longer executable as client RPCs, and default function execute
+  privileges are revoked until a migration grants them deliberately.
+- Direct Postgres connections require SSL. The live Supabase security advisor
+  reported no findings after migration and configuration verification.
+
+## 2026-08-12 Release Security Evidence Boundary
+
+- Android `key.properties`, `.jks` and `.keystore` files are ignored at the
+  expected Android project/app paths. `scripts/qa_release_candidate.sh` also
+  refuses any matching file already tracked by Git.
+- The signed-build boundary fails on any tracked or untracked worktree entry,
+  tracked Android signing material, or stale target AAB/IPA. It optionally
+  verifies `RELEASE_EXPECTED_SHA`, records the resolved commit, app and Flutter
+  versions before building, then records each new artifact's size and SHA-256.
+- The repository authors 51 schema/security, 16 RLS-isolation and 15
+  privileged-MFA/payment-retention pgTAP checks, but no clean replay/pass was
+  produced in this audit because Docker and the Supabase CLI are unavailable.
+  Treat 82 as an authored count, not a pass.
+- The guarded two-user SDK harness covers cross-tenant read/insert/update/delete
+  attempts for contacts, services, appointments, invoices and line items,
+  expenses, tasks and checklists, notes, notifications, booking requests, push
+  tokens and calendar-sync accounts. It refuses writes without explicit
+  staging credentials and has not yet passed against disposable staging.
+- Leaked-password protection, strong password rules, bounded sessions and
+  opt-in MFA enforcement are configured. External fresh signup/confirmation,
+  recovery/password-change, identity linking, deletion completion and deployed
+  abuse controls remain dynamic release evidence, not configuration claims.

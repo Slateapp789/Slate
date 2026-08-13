@@ -282,10 +282,10 @@ class _SaveAction extends StatelessWidget {
       color: enabled
           ? AppColors.accentPrimary.withValues(alpha: 0.14)
           : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadius.pill),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         onTap: enabled && !loading ? onTap : null,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: ConstrainedBox(
           constraints: const BoxConstraints(
             minWidth: 58,

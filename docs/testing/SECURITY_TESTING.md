@@ -1,6 +1,6 @@
 # Workloop Security Testing
 
-Last updated: 2026-07-26
+Last updated: 2026-08-12
 
 ## Security position
 
@@ -13,7 +13,8 @@ read-only metadata review. That statement is intentionally narrower than
 - Storage isolation has not been tested;
 - destructive account deletion and public booking abuse controls have not been
   exercised against a disposable production-like environment;
-- production Auth leaked-password protection is disabled.
+- production Auth controls are configured, but the full external lifecycle has
+  not been rerun on the exact candidate.
 
 Any cross-workspace read, insert, update, delete, export, file access, or
 workflow execution is a critical release stop.
@@ -67,7 +68,7 @@ release commit:
 | Authenticated access | Application grants and policies were workspace-scoped in the inspected metadata/source. | User A/User B SDK tests are still required. |
 | Private workflow tables | `app_private.payment_counters` and `app_private.workflow_idempotency` had RLS disabled, no `anon`/`authenticated` table grants, and were outside the exposed Data API schema. | This relies on schema/grant boundaries; enabling RLS with explicit deny/service policies remains a defence-in-depth decision. |
 | Edge deployments | Public profile, booking request, Places search, deletion request, and deletion completion functions were active with JWT verification enabled. | Deployment presence is not behavioural proof. Exact versions are tracked in [`LaunchReadiness.md`](../LaunchReadiness.md). |
-| Auth password protection | Leaked-password protection was disabled. | Must be enabled and regression-tested before public launch. |
+| Auth password protection | The 2026-08-11 hardening enabled leaked-password checks, a strong password policy, bounded sessions and opt-in MFA enforcement. | Fresh external confirmation/recovery/password-change and identity-linking still need candidate E2E. |
 
 The generic Supabase advisor warning for the two non-RLS private tables must not
 be silently dismissed. Their current protection is that clients have no table
@@ -116,7 +117,7 @@ The script requires Docker, an active Docker daemon, and Supabase CLI. It:
 ### Schema and grant contract
 
 [`001_schema_security.test.sql`](../../supabase/tests/database/001_schema_security.test.sql)
-contains 31 assertions covering:
+contains 51 assertions covering:
 
 - existence of 20 launch data tables;
 - RLS enabled for those named tables;
@@ -130,7 +131,7 @@ contains 31 assertions covering:
 ### User isolation contract
 
 [`002_rls_isolation.test.sql`](../../supabase/tests/database/002_rls_isolation.test.sql)
-contains 12 assertions using two synthetic Auth users and two workspaces in a
+contains 16 assertions using two synthetic Auth users and two workspaces in a
 rolled-back transaction. It covers:
 
 - User A seeing only Workspace A contacts;
@@ -142,6 +143,14 @@ rolled-back transaction. It covers:
 - anonymous table reads being rejected for lack of privilege;
 - anonymous/authenticated booking-workflow function grants;
 - explicit service-role RLS bypass boundary.
+
+### Privileged workflow and payment-retention contract
+
+[`003_privileged_boundaries_and_payment_retention.test.sql`](../../supabase/tests/database/003_privileged_boundaries_and_payment_retention.test.sql)
+contains 15 assertions covering authenticated-only MFA checks, guarded workflow
+and onboarding wrappers, client denial for private implementations, bounded
+Stripe webhook payload retention, workspace-deletion scrubbing and
+service-role-only cleanup.
 
 ### Execution status
 
@@ -218,8 +227,9 @@ uploaded in logs/artifacts.
 
 Before public launch:
 
-- enable Supabase leaked-password protection;
-- configure and test production SMTP/sender identity;
+- keep Supabase leaked-password protection and the strong password policy
+  enabled;
+- monitor the configured production SMTP/sender identity;
 - test sign-up confirmation and password recovery outside the development team;
 - allow and verify the `workloop://reset-password` redirect;
 - review sign-up and reset rate limits;
@@ -245,8 +255,8 @@ Official guidance:
   retry and timeout.
 - Disposable account deletion proves correct sole-owner completion,
   multi-member rejection, cascade behaviour, and audit protection.
-- Auth leaked-password protection and production email/recovery are enabled and
-  tested.
+- Auth controls remain enabled and confirmation/recovery/password-change plus
+  identity linking pass with an external account on the candidate.
 - No secrets appear in source, commit history under review, logs, artifacts, or
   mobile bundles.
 - Any private-table RLS exception has a reviewed rationale and automated
@@ -256,3 +266,20 @@ Official guidance:
 
 Until these pass, security evidence supports controlled testing only; it does
 not support an unconditional public-release claim.
+
+## 2026-08-12 evidence refresh
+
+The current database plan count is 82 (51 + 16 + 15), still unexecuted in a
+clean local replay. The staging SDK isolation test now exercises victim reads,
+updates, deletes and attacker inserts across 13 practical disposable tables:
+contacts, services, appointments, invoices/line items, expenses,
+tasks/checklists, notes, notifications, booking requests, push tokens and
+calendar-sync accounts, then re-reads the
+victim marker and performs owner-side best-effort cleanup in reverse dependency
+order. This is materially broader authored coverage, not dynamic proof; a
+disposable-staging pass on the release SHA remains mandatory.
+
+Signing secrets are separately protected by ignore rules and the clean-tree
+candidate preflight. Neither control replaces history scanning, encrypted key
+backup, store-console access review or signature verification of the final AAB
+and IPA.

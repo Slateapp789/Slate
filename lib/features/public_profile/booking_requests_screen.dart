@@ -150,7 +150,12 @@ class _BookingRequestsScreenState extends ConsumerState<BookingRequestsScreen> {
                         onRefresh: () async =>
                             ref.invalidate(bookingRequestsProvider),
                         child: ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.pageX,
+                            0,
+                            AppSpacing.pageX,
+                            40,
+                          ),
                           itemBuilder: (context, index) => _RequestRow(
                             request: filtered[index],
                             onTap: () => Navigator.push<void>(
@@ -227,7 +232,10 @@ class _RequestRow extends StatelessWidget {
         : request.name.trim()[0].toUpperCase();
     return WorkloopListRow(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
       showDivider: false,
       leading: Container(
         width: 44,
@@ -458,6 +466,10 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
     var createPaymentDue = (widget.request.servicePrice ?? 0) > 0;
     var submitting = false;
     String? submissionError;
+    final sheetCloseDuration = AppMotion.responsive(
+      context,
+      AppMotion.deliberate,
+    );
 
     final created = await showModalBottomSheet<bool>(
       context: context,
@@ -789,7 +801,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
 
     // The modal future completes when pop begins; keep controllers alive for
     // the closing transition so its text fields cannot rebuild after disposal.
-    Future<void>.delayed(AppMotion.deliberate, () {
+    Future<void>.delayed(sheetCloseDuration, () {
       clientNameController.dispose();
       phoneController.dispose();
       serviceController.dispose();
@@ -881,7 +893,9 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                       minimumSize: const Size(0, AppSpacing.minTouch),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       side: const BorderSide(color: AppColors.border),
-                      shape: const StadiumBorder(),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
                     ),
                     icon: const Icon(LucideIcons.phone, size: 14),
                     label: const Text(
@@ -1263,7 +1277,7 @@ class _InfoChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: AppColors.bgInteract,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
@@ -1306,19 +1320,20 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     final isPrimary = variant == _RequestActionVariant.primary;
     final isDestructive = variant == _RequestActionVariant.destructiveQuiet;
     final color = isPrimary
-        ? AppColors.accentPrimaryStrong
+        ? tokens.primaryAction
         : isDestructive
         ? AppColors.error
         : AppColors.t2;
     final background = isPrimary
-        ? AppColors.accentPrimaryStrong
+        ? tokens.primaryAction
         : isDestructive
         ? Colors.transparent
         : AppColors.t1.withValues(alpha: 0.06);
-    final foreground = isPrimary ? AppColors.onBrandAccent : color;
+    final foreground = isPrimary ? tokens.onPrimaryAction : color;
     final border = isPrimary
         ? Colors.transparent
         : isDestructive
@@ -1379,7 +1394,7 @@ class _StatusBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.capsule),
       ),
       child: Text(
         label,

@@ -36,7 +36,15 @@ void main() {
           password: 'short',
           intent: AuthFormIntent.signUp,
         ),
-        'Password must be at least 8 characters.',
+        workloopPasswordLengthMessage,
+      );
+      expect(
+        validateAuthForm(
+          email: 'owner@example.com',
+          password: 'long password only',
+          intent: AuthFormIntent.signUp,
+        ),
+        workloopPasswordStrengthMessage,
       );
       expect(
         validateAuthForm(
@@ -49,9 +57,12 @@ void main() {
     });
 
     test('new password comparison preserves significant whitespace', () {
-      expect(validateNewPasswordPair(' password ', ' password '), isNull);
       expect(
-        validateNewPasswordPair(' password ', 'password'),
+        validateNewPasswordPair(' Long password 2! ', ' Long password 2! '),
+        isNull,
+      );
+      expect(
+        validateNewPasswordPair(' Long password 2! ', 'Long password 2!'),
         'The passwords do not match.',
       );
     });

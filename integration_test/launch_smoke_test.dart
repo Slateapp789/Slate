@@ -17,7 +17,9 @@ void main() {
     expect(find.text('Sign in to your workspace.'), findsOneWidget);
     expect(find.widgetWithText(TextButton, 'Forgot password?'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('auth-mode-toggle')));
+    final firstRunCta = find.byKey(const ValueKey('auth-first-run-cta'));
+    expect(firstRunCta, findsOneWidget);
+    await tester.tap(firstRunCta);
     await tester.pumpAndSettle();
     expect(find.text('Create your account.'), findsOneWidget);
     expect(
@@ -25,7 +27,9 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const ValueKey('auth-mode-toggle')));
+    final modeToggle = find.byKey(const ValueKey('auth-mode-toggle'));
+    await tester.ensureVisible(modeToggle);
+    await tester.tap(modeToggle);
     await tester.pumpAndSettle();
     expect(find.text('Welcome back.'), findsOneWidget);
 

@@ -39,6 +39,7 @@ migrate_working_dir/
 /coverage/
 ui_screenshots/
 supabase/.temp/
+/supabase/.branches/
 
 # Symbolication related
 app.*.symbols
@@ -50,3 +51,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android release signing material is machine-owned and must never be staged.
+/android/key.properties
+/android/*.jks
+/android/*.keystore
+/android/app/*.jks
+/android/app/*.keystore
+
+# Flutter golden mismatches are local review evidence, not source fixtures.
+/test/golden/failures/

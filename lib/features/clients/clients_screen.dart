@@ -83,7 +83,19 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                               AppSpacing.pageX,
                               0,
                             ),
-                            child: _Header(onAdd: _openAddClient),
+                            child: Column(
+                              children: [
+                                _Header(onAdd: _openAddClient),
+                                if (data.isNotEmpty) ...[
+                                  const SizedBox(height: AppSpacing.lg),
+                                  _SearchAndSort(
+                                    controller: _searchController,
+                                    onQueryChanged: (value) =>
+                                        setState(() => _query = value.trim()),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         ),
                         if (data.isNotEmpty) ...[
@@ -91,21 +103,9 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                             child: Padding(
                               padding: const EdgeInsets.fromLTRB(
                                 AppSpacing.pageX,
-                                AppSpacing.xl,
+                                AppSpacing.lg,
                                 AppSpacing.pageX,
                                 0,
-                              ),
-                              child: _SearchAndSort(
-                                controller: _searchController,
-                                onQueryChanged: (value) =>
-                                    setState(() => _query = value.trim()),
-                              ),
-                            ),
-                          ),
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.only(
-                                top: AppSpacing.sm,
                               ),
                               child: _ViewRail(
                                 selected: _view,
@@ -155,7 +155,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                                   index == 0 ? AppSpacing.xs : 0,
                                   AppSpacing.pageX,
                                   index == filtered.length - 1
-                                      ? AppSpacing.bottomNavClearance
+                                      ? AppSpacing.shellBottomClearance(context)
                                       : 0,
                                 ),
                                 child: _ClientRow(
@@ -211,6 +211,10 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _scrollController.jumpTo(0);
+        return;
+      }
       _scrollController.animateTo(
         0,
         duration: AppMotion.standard,
@@ -229,6 +233,10 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
     }
     final topExtent = MediaQuery.paddingOf(context).top + 72;
     if (position.dy > topExtent) return false;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _scrollController.jumpTo(_scrollController.position.minScrollExtent);
+      return true;
+    }
     _scrollController.animateTo(
       _scrollController.position.minScrollExtent,
       duration: AppMotion.standard,
@@ -288,7 +296,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return WorkloopPageHeader(
       title: 'Clients',
-      subtitle: 'Build relationships and know who needs attention.',
+      subtitle: 'Know who needs attention next.',
       color: AppColors.modClients,
       trailing: WorkloopTopAction(
         label: 'New client',
@@ -353,7 +361,7 @@ class _SortToolbar extends StatelessWidget {
               SlateHaptics.tap();
               onSort();
             },
-            borderRadius: BorderRadius.circular(AppRadius.pill),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             child: Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.sm,
@@ -361,7 +369,7 @@ class _SortToolbar extends StatelessWidget {
               ),
               decoration: BoxDecoration(
                 color: tokens.surfaceRaised.withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(AppRadius.pill),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 border: Border.all(
                   color: tokens.dividerStrong.withValues(alpha: 0.82),
                 ),
@@ -493,7 +501,7 @@ class _ClientSortOption extends StatelessWidget {
                         ),
                       ),
                       AnimatedOpacity(
-                        duration: AppMotion.fast,
+                        duration: AppMotion.responsive(context, AppMotion.fast),
                         opacity: selected ? 1 : 0,
                         child: const Icon(
                           LucideIcons.check,
@@ -534,150 +542,31 @@ class _ViewRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = SlateTheme.of(context);
-    final items = <({ClientView value, String label, int count})>[
-      (value: ClientView.all, label: 'All', count: records.length),
-      (
-        value: ClientView.active,
-        label: 'Active',
-        count: records.where((item) => item.isActive).length,
-      ),
-      (
-        value: ClientView.leads,
-        label: 'Leads',
-        count: records.where((item) => item.isLead).length,
-      ),
-      (
-        value: ClientView.inactive,
-        label: 'Inactive',
-        count: records.where((item) => item.isInactive).length,
-      ),
-    ];
-    final selectedIndex = items.indexWhere((item) => item.value == selected);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
-      child: SlateGlassSurface(
-        blur: 22,
-        color: tokens.surface,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-        child: SizedBox(
-          height: 54,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final itemWidth = constraints.maxWidth / items.length;
-              void selectView(ClientView value) {
-                if (value == selected) return;
-                SlateHaptics.tap();
-                onChanged(value);
-              }
-
-              void handleDrag(double dx) {
-                selectView(
-                  clientViewAtHorizontalPosition(
-                    position: dx,
-                    width: constraints.maxWidth,
-                  ),
-                );
-              }
-
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onHorizontalDragStart: (details) {
-                  handleDrag(details.localPosition.dx);
-                },
-                onHorizontalDragUpdate: (details) {
-                  handleDrag(details.localPosition.dx);
-                },
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    AnimatedPositioned(
-                      duration: AppMotion.responsive(
-                        context,
-                        AppMotion.deliberate,
-                      ),
-                      curve: AppMotion.emphasized,
-                      left: selectedIndex * itemWidth,
-                      top: 6,
-                      width: itemWidth,
-                      height: 42,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: tokens.surfaceRaised,
-                            borderRadius: BorderRadius.circular(AppRadius.pill),
-                            border: Border.all(color: tokens.dividerStrong),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        for (final item in items)
-                          Expanded(
-                            child: _ClientViewButton(
-                              label: item.label,
-                              count: item.count,
-                              selected: item.value == selected,
-                              onTap: () => selectView(item.value),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ClientViewButton extends StatelessWidget {
-  final String label;
-  final int count;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ClientViewButton({
-    required this.label,
-    required this.count,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = SlateTheme.of(context);
-    return Semantics(
-      button: true,
+    return WorkloopNavigationControl<ClientView>(
       selected: selected,
-      label: '$label, $count clients',
-      onTap: onTap,
-      child: ExcludeSemantics(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          child: Center(
-            child: AnimatedDefaultTextStyle(
-              key: ValueKey(Theme.of(context).brightness),
-              duration: AppMotion.standard,
-              curve: AppMotion.curve,
-              style: TextStyle(
-                fontFamily: 'Instrument Sans',
-                color: selected ? tokens.accentInk : tokens.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-              child: Text('$label $count'),
-            ),
-          ),
+      onChanged: onChanged,
+      segments: [
+        WorkloopSegment(
+          value: ClientView.all,
+          label: 'All',
+          badge: '${records.length}',
         ),
-      ),
+        WorkloopSegment(
+          value: ClientView.active,
+          label: 'Active',
+          badge: '${records.where((item) => item.isActive).length}',
+        ),
+        WorkloopSegment(
+          value: ClientView.leads,
+          label: 'Leads',
+          badge: '${records.where((item) => item.isLead).length}',
+        ),
+        WorkloopSegment(
+          value: ClientView.inactive,
+          label: 'Inactive',
+          badge: '${records.where((item) => item.isInactive).length}',
+        ),
+      ],
     );
   }
 }
@@ -707,6 +596,11 @@ class _ClientRow extends StatelessWidget {
 
     return WorkloopListRow(
       onTap: onTap,
+      flat: true,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.md,
+      ),
       leading: Container(
         width: 38,
         height: 38,
@@ -787,11 +681,11 @@ class _ClientsLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.pageX,
         AppSpacing.screenTop,
         AppSpacing.pageX,
-        AppSpacing.bottomNavClearance,
+        AppSpacing.shellBottomClearance(context),
       ),
       itemCount: 7,
       separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
@@ -874,11 +768,11 @@ class _NoMatches extends StatelessWidget {
     return Align(
       alignment: Alignment.topCenter,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
+        padding: EdgeInsets.fromLTRB(
           AppSpacing.pageX,
           AppSpacing.xl,
           AppSpacing.pageX,
-          AppSpacing.bottomNavClearance,
+          AppSpacing.shellBottomClearance(context),
         ),
         child: WorkloopEmptyState(icon: icon, title: title, subtitle: subtitle),
       ),

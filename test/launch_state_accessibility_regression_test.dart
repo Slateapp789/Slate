@@ -168,10 +168,16 @@ void main() {
         child: MaterialApp(theme: AppTheme.dark, home: const AuthScreen()),
       ),
     );
-    await tester.tap(find.text('Forgot password?'));
+    final forgotPassword = find.text('Forgot password?');
+    await tester.ensureVisible(forgotPassword);
+    await tester.tap(forgotPassword);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'owner@example.com');
-    await tester.tap(find.text('Send reset email'));
+    final emailField = find.byType(TextField);
+    await tester.ensureVisible(emailField);
+    await tester.enterText(emailField, 'owner@example.com');
+    final sendReset = find.text('Send reset email');
+    await tester.ensureVisible(sendReset);
+    await tester.tap(sendReset);
     await tester.pumpAndSettle();
 
     expect(repository.resetCalls, 1);

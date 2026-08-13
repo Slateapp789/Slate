@@ -18,7 +18,7 @@ class PaymentsRepository {
       loadPage: (from, to) async {
         final page = await _client
             .from('invoices')
-            .select('*, contacts(name)')
+            .select('*, contacts(name,email)')
             .eq('workspace_id', workspaceId)
             .order('created_at', ascending: false)
             .order('id', ascending: true)
@@ -34,7 +34,7 @@ class PaymentsRepository {
       loadPage: (from, to) async {
         final page = await _client
             .from('invoices')
-            .select('*, contacts(name)')
+            .select('*, contacts(name,email)')
             .eq('workspace_id', workspaceId)
             .inFilter('status', ['sent', 'overdue', 'pending'])
             .order('due_date', ascending: true)
@@ -46,12 +46,61 @@ class PaymentsRepository {
     return rows.map<Payment>(Payment.fromMap).toList();
   }
 
+  Future<List<Payment>> listForBusinessFeed(
+    String workspaceId, {
+    required DateTime recentPaidFrom,
+    required DateTime openDueThrough,
+    int limitPerGroup = 80,
+  }) async {
+    final paidFromUtc = recentPaidFrom.toUtc().toIso8601String();
+    final paidFromDate = recentPaidFrom.toIso8601String().split('T').first;
+    final dueThroughDate = openDueThrough.toIso8601String().split('T').first;
+
+    final results = await Future.wait([
+      _client
+          .from('invoices')
+          .select('*, contacts(name,email)')
+          .eq('workspace_id', workspaceId)
+          .eq('status', 'paid')
+          .or(
+            'income_recorded_at.gte.$paidFromUtc,'
+            'and(income_recorded_at.is.null,issue_date.gte.$paidFromDate)',
+          )
+          .order('income_recorded_at', ascending: false)
+          .order('id', ascending: true)
+          .limit(limitPerGroup),
+      _client
+          .from('invoices')
+          .select('*, contacts(name,email)')
+          .eq('workspace_id', workspaceId)
+          .neq('status', 'paid')
+          .neq('status', 'cancelled')
+          .neq('status', 'declined')
+          .or(
+            'due_date.lte.$dueThroughDate,'
+            'and(due_date.is.null,issue_date.lte.$dueThroughDate)',
+          )
+          .order('due_date', ascending: true)
+          .order('id', ascending: true)
+          .limit(limitPerGroup),
+    ]);
+
+    final byId = <String, Payment>{};
+    for (final result in results) {
+      for (final row in result) {
+        final payment = Payment.fromMap(Map<String, dynamic>.from(row));
+        byId[payment.id] = payment;
+      }
+    }
+    return byId.values.toList();
+  }
+
   Future<List<Map<String, dynamic>>> forClientRows(String clientId) async {
     return fetchAllRepositoryPages<Map<String, dynamic>>(
       loadPage: (from, to) async {
         final page = await _client
             .from('invoices')
-            .select('*, contacts(name)')
+            .select('*, contacts(name,email)')
             .eq('contact_id', clientId)
             .order('issue_date', ascending: false)
             .order('id', ascending: true)
@@ -71,7 +120,7 @@ class PaymentsRepository {
       loadPage: (from, to) async {
         final page = await _client
             .from('invoices')
-            .select('*, contacts(name)')
+            .select('*, contacts(name,email)')
             .eq('appointment_id', appointmentId)
             .order('created_at', ascending: false)
             .order('id', ascending: true)

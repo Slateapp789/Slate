@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,12 +7,14 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/business_feed_item.dart';
+import '../../shared/models/slate_models.dart';
 import '../../shared/providers/appointments_provider.dart';
 import '../../shared/providers/business_feed_provider.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/finance_provider.dart';
 import '../../shared/providers/notes_provider.dart';
+import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/setup_checklist_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
@@ -19,8 +23,7 @@ import '../../shared/utils/currency_format.dart';
 import '../../shared/utils/date_format.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../appointments/appointment_detail_screen.dart';
-import '../profile/profile_screen.dart';
-import '../settings/settings_screen.dart';
+import '../clients/client_detail_screen.dart';
 
 final dashboardClockProvider = StreamProvider.autoDispose<DateTime>((
   ref,
@@ -71,6 +74,7 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = SlateTheme.of(context);
     final workspace = ref.watch(workspaceProvider);
     final appointments = ref.watch(appointmentsProvider);
     final clients = ref.watch(clientsProvider);
@@ -80,6 +84,7 @@ class DashboardScreen extends ConsumerWidget {
     final attention = ref.watch(dashboardAttentionProvider);
     final tasks = ref.watch(allTasksProvider);
     final notes = ref.watch(allNotesProvider);
+    final unreadNotifications = ref.watch(unreadNotificationsProvider);
     final displayName = ref.watch(authRepositoryProvider).currentFirstName;
     final now = ref
         .watch(dashboardClockProvider)
@@ -104,9 +109,16 @@ class DashboardScreen extends ConsumerWidget {
     void retryAttention() {
       ref.invalidate(invoicesProvider);
       ref.invalidate(allTasksProvider);
-      ref.invalidate(todayAppointmentsProvider);
+      ref.invalidate(appointmentsProvider);
       ref.invalidate(clientsProvider);
+      ref.invalidate(dashboardFocusProvider);
       ref.invalidate(dashboardAttentionProvider);
+    }
+
+    void retryFinance() {
+      ref.invalidate(invoicesProvider);
+      ref.invalidate(expensesProvider);
+      ref.invalidate(financeSummaryProvider);
     }
 
     return Scaffold(
@@ -131,31 +143,68 @@ class DashboardScreen extends ConsumerWidget {
                 ref.invalidate(tasksProvider);
                 ref.invalidate(allNotesProvider);
                 ref.invalidate(businessFeedProvider);
+                ref.invalidate(dashboardFocusProvider);
                 ref.invalidate(dashboardAttentionProvider);
+                ref.invalidate(unreadNotificationsProvider);
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(
+                padding: EdgeInsets.fromLTRB(
                   AppSpacing.pageX,
                   AppSpacing.screenTop,
                   AppSpacing.pageX,
-                  AppSpacing.bottomNavClearance,
+                  AppSpacing.shellBottomClearance(context),
                 ),
                 children: [
-                  _DashboardGreeting(
-                    greeting: displayName == null
-                        ? greeting
-                        : '$greeting $displayName',
-                    subtitle: dashboardDateLabel(now),
-                    onOpenProfile: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const ProfileScreen(),
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          tokens.heroGradientStart,
+                          tokens.heroGradientEnd,
+                        ],
                       ),
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.black.withValues(alpha: 0.34)
+                              : tokens.accentStrong.withValues(alpha: 0.3),
+                          blurRadius: 22,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
-                    onOpenSettings: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const SettingsScreen(),
-                      ),
+                    child: Column(
+                      children: [
+                        _DashboardGreeting(
+                          inverse: true,
+                          greeting: displayName == null
+                              ? greeting
+                              : '$greeting $displayName',
+                          subtitle: dashboardDateLabel(now),
+                          unreadNotifications: unreadNotifications.maybeWhen(
+                            data: (value) => value,
+                            orElse: () => 0,
+                          ),
+                          onOpenNotifications: () async {
+                            await context.push('/notifications');
+                            ref.invalidate(unreadNotificationsProvider);
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        _TodaySection(
+                          inverse: true,
+                          appointments: appointments,
+                          now: now,
+                          onOpenJob: (appointment) =>
+                              _openAppointment(context, ref, appointment),
+                          onViewBookings: () => onNavigate(2),
+                        ),
+                      ],
                     ),
                   ),
                   if (overviewHasFailure) ...[
@@ -166,19 +215,13 @@ class DashboardScreen extends ConsumerWidget {
                       onRetry: retryOverview,
                     ),
                   ],
-                  const SizedBox(height: AppSpacing.xxl),
-                  _TodaySection(
-                    appointments: appointments,
-                    now: now,
-                    onOpenJob: (appointment) =>
-                        _openAppointment(context, ref, appointment),
-                    onViewBookings: () => onNavigate(2),
-                  ),
                   attention.when(
                     data: (items) => items.isEmpty
                         ? const SizedBox.shrink()
                         : Padding(
-                            padding: const EdgeInsets.only(top: AppSpacing.xxl),
+                            padding: const EdgeInsets.only(
+                              top: AppSpacing.section,
+                            ),
                             child: _WorthALookSection(
                               items: items.take(2).toList(),
                               onOpen: (item) =>
@@ -187,7 +230,7 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                     loading: () => const SizedBox.shrink(),
                     error: (_, _) => Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.xxl),
+                      padding: const EdgeInsets.only(top: AppSpacing.section),
                       child: SlateErrorState(
                         message: 'Could not check what needs your attention.',
                         onRetry: retryAttention,
@@ -206,41 +249,61 @@ class DashboardScreen extends ConsumerWidget {
                       onImport: () => context.push('/import-data'),
                       onDismiss: () => dismissSetupChecklist(ref),
                     ),
-                  const SizedBox(height: AppSpacing.xxl),
-                  _MoneyPulse(finance: finance, onOpen: () => onNavigate(3)),
-                  const SizedBox(height: AppSpacing.xl),
-                  _QuickAccessRow(
-                    taskSummary: tasks.maybeWhen(
-                      data: (items) {
-                        final open = items
-                            .where((item) => item.status != 'done')
-                            .length;
-                        return open == 1 ? '1 open task' : '$open open tasks';
-                      },
-                      orElse: () => 'Plan and follow up',
+                  const SizedBox(height: AppSpacing.section),
+                  _DashboardSection(
+                    title: 'At a glance',
+                    child: WorkloopSurface(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xxs,
+                      ),
+                      borderColor: Colors.transparent,
+                      child: Column(
+                        children: [
+                          _MoneyPulse(
+                            finance: finance,
+                            onOpen: () => onNavigate(3),
+                            onRetry: retryFinance,
+                          ),
+                          _QuickAccessRow(
+                            taskSummary: tasks.maybeWhen(
+                              data: (items) {
+                                final open = items
+                                    .where((item) => item.status != 'done')
+                                    .length;
+                                return open == 1
+                                    ? '1 open task'
+                                    : '$open open tasks';
+                              },
+                              orElse: () => 'Plan and follow up',
+                            ),
+                            noteSummary: notes.maybeWhen(
+                              data: (items) => items.length == 1
+                                  ? '1 saved note'
+                                  : '${items.length} saved notes',
+                              orElse: () => 'Capture useful context',
+                            ),
+                            onOpenTasks: () => onNavigate(4),
+                            onOpenNotes: () => onNavigate(5),
+                          ),
+                        ],
+                      ),
                     ),
-                    noteSummary: notes.maybeWhen(
-                      data: (items) => items.length == 1
-                          ? '1 saved note'
-                          : '${items.length} saved notes',
-                      orElse: () => 'Capture useful context',
-                    ),
-                    onOpenTasks: () => onNavigate(4),
-                    onOpenNotes: () => onNavigate(5),
                   ),
-                  const SizedBox(height: AppSpacing.xxl),
+                  const SizedBox(height: AppSpacing.section),
+                  _CalmFeedSection(
+                    feed: feed,
+                    onOpenFeedItem: (item) => _openFeedItem(context, item),
+                    onViewAllFeed: () => context.push('/business-feed'),
+                    onRetry: () => ref.invalidate(businessFeedProvider),
+                  ),
+                  const SizedBox(height: AppSpacing.section),
                   _UpcomingJobsSection(
                     appointments: appointments,
                     now: now,
                     onOpenJob: (appointment) =>
                         _openAppointment(context, ref, appointment),
                     onViewBookings: () => onNavigate(2),
-                  ),
-                  const SizedBox(height: AppSpacing.xxl),
-                  _CalmFeedSection(
-                    feed: feed,
-                    onOpenFeedItem: (item) => _openFeedItem(context, item),
-                    onViewAllFeed: () => context.push('/business-feed'),
+                    onRetry: () => ref.invalidate(appointmentsProvider),
                   ),
                 ],
               ),
@@ -302,17 +365,26 @@ class DashboardScreen extends ConsumerWidget {
     switch (item.type) {
       case DashboardAttentionType.unpaid:
         onOpenMoneyFollowUps();
-      case DashboardAttentionType.unconfirmedAppointment:
-        final appointment = item.source;
-        if (appointment is Map<String, dynamic>) {
-          _openAppointment(context, ref, appointment);
-        } else {
-          onNavigate(2);
-        }
+      case DashboardAttentionType.bookingRequest:
+        context.push('/booking-requests');
       case DashboardAttentionType.overdueTask:
         onNavigate(4);
-      case DashboardAttentionType.uncontactedLead:
-        onNavigate(1);
+      case DashboardAttentionType.clientFollowUp:
+        final client = item.source;
+        if (client is Client) {
+          Navigator.push<void>(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ClientDetailScreen(client: client.toMap()),
+            ),
+          ).then((_) {
+            ref.invalidate(clientsProvider);
+            ref.invalidate(dashboardAttentionProvider);
+            ref.invalidate(businessFeedProvider);
+          });
+        } else {
+          onNavigate(1);
+        }
     }
   }
 }
@@ -477,59 +549,122 @@ class _SetupStep extends StatelessWidget {
 class _DashboardGreeting extends StatelessWidget {
   final String greeting;
   final String subtitle;
-  final VoidCallback onOpenProfile;
-  final VoidCallback onOpenSettings;
+  final int unreadNotifications;
+  final VoidCallback onOpenNotifications;
+  final bool inverse;
 
   const _DashboardGreeting({
     required this.greeting,
     required this.subtitle,
-    required this.onOpenProfile,
-    required this.onOpenSettings,
+    required this.unreadNotifications,
+    required this.onOpenNotifications,
+    this.inverse = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final tokens = SlateTheme.of(context);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    final title = Text(
+      greeting,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+        color: inverse ? tokens.onHeroPrimary : tokens.textPrimary,
+        fontSize: 27,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+    final date = Text(
+      subtitle,
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        color: inverse ? tokens.onHeroMuted : tokens.textSecondary,
+        fontSize: 14,
+        height: 1.25,
+      ),
+    );
+    final utilities = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                greeting,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.headlineLarge?.copyWith(color: tokens.textPrimary),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: tokens.textSecondary,
-                  fontSize: 15,
-                  height: 1.32,
+        WorkloopIconButton(
+          icon: unreadNotifications > 0
+              ? LucideIcons.bellRing
+              : LucideIcons.bell,
+          semanticLabel: unreadNotifications == 0
+              ? 'Open notifications'
+              : 'Open notifications, $unreadNotifications unread',
+          badge: unreadNotifications == 0
+              ? null
+              : Positioned(
+                  right: -3,
+                  top: -3,
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 18),
+                    height: 18,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: tokens.onHeroPrimary,
+                      borderRadius: BorderRadius.circular(AppRadius.capsule),
+                      border: Border.all(color: tokens.accentStrong, width: 2),
+                    ),
+                    child: Text(
+                      unreadNotifications > 99 ? '99+' : '$unreadNotifications',
+                      style: TextStyle(
+                        color: tokens.heroActionForeground,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        height: 1,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
+          onTap: onOpenNotifications,
+          color: inverse ? tokens.onHeroPrimary : null,
+          backgroundColor: inverse ? tokens.heroControlSurface : null,
+          borderColor: inverse ? tokens.heroBorder : null,
         ),
-        const SizedBox(width: AppSpacing.sm),
-        WorkloopIconButton(
-          icon: LucideIcons.userCircle,
-          semanticLabel: 'Open profile',
-          backgroundColor: tokens.surfaceSubtle,
-          onTap: onOpenProfile,
+      ],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final stackUtilities =
+                constraints.maxWidth < 290 ||
+                MediaQuery.textScalerOf(context).scale(1) > 1.25;
+            if (stackUtilities) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  title,
+                  const SizedBox(height: AppSpacing.xxs),
+                  date,
+                  const SizedBox(height: AppSpacing.sm),
+                  Align(alignment: Alignment.centerRight, child: utilities),
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                title,
+                const SizedBox(height: AppSpacing.xxs),
+                Row(
+                  children: [
+                    Expanded(child: date),
+                    const SizedBox(width: AppSpacing.sm),
+                    utilities,
+                  ],
+                ),
+              ],
+            );
+          },
         ),
-        const SizedBox(width: AppSpacing.xxs),
-        WorkloopIconButton(
-          icon: LucideIcons.settings,
-          semanticLabel: 'Open settings',
-          backgroundColor: tokens.surfaceSubtle,
-          onTap: onOpenSettings,
+        const SizedBox(height: AppSpacing.xs),
+        Container(
+          height: 1,
+          color: inverse ? tokens.heroBorder : tokens.divider,
         ),
       ],
     );
@@ -551,88 +686,24 @@ class _QuickAccessRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _QuickAccessItem(
-            icon: LucideIcons.listChecks,
-            label: 'Tasks',
-            summary: taskSummary,
-            onTap: onOpenTasks,
-          ),
+        WorkloopModuleRow(
+          icon: LucideIcons.listChecks,
+          title: 'Tasks',
+          subtitle: taskSummary,
+          color: AppColors.accentPrimary,
+          onTap: onOpenTasks,
         ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: _QuickAccessItem(
-            icon: LucideIcons.stickyNote,
-            label: 'Notes',
-            summary: noteSummary,
-            onTap: onOpenNotes,
-          ),
+        WorkloopModuleRow(
+          icon: LucideIcons.stickyNote,
+          title: 'Notes',
+          subtitle: noteSummary,
+          color: AppColors.accentPrimary,
+          showDivider: false,
+          onTap: onOpenNotes,
         ),
       ],
-    );
-  }
-}
-
-class _QuickAccessItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String summary;
-  final VoidCallback onTap;
-
-  const _QuickAccessItem({
-    required this.icon,
-    required this.label,
-    required this.summary,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: '$label, $summary',
-      child: WorkloopSurface(
-        onTap: onTap,
-        radius: AppRadius.md,
-        padding: const EdgeInsets.all(AppSpacing.sm),
-        color: AppColors.t1.withValues(alpha: 0.028),
-        borderColor: AppColors.border.withValues(alpha: 0.52),
-        child: Row(
-          children: [
-            Icon(icon, size: 17, color: AppColors.t3),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: AppColors.t1,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    summary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.t3,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(LucideIcons.chevronRight, size: 14, color: AppColors.t3),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -642,12 +713,14 @@ class _TodaySection extends StatelessWidget {
   final DateTime now;
   final ValueChanged<Map<String, dynamic>> onOpenJob;
   final VoidCallback onViewBookings;
+  final bool inverse;
 
   const _TodaySection({
     required this.appointments,
     required this.now,
     required this.onOpenJob,
     required this.onViewBookings,
+    this.inverse = false,
   });
 
   @override
@@ -655,6 +728,7 @@ class _TodaySection extends StatelessWidget {
     return _DashboardSection(
       title: 'Today',
       prominent: true,
+      inverse: inverse,
       child: appointments.when(
         loading: () =>
             const SlateLoadingBlock(height: 220, radius: AppRadius.lg),
@@ -665,6 +739,7 @@ class _TodaySection extends StatelessWidget {
           icon: LucideIcons.calendarDays,
           actionLabel: 'Open Bookings',
           onAction: onViewBookings,
+          dayProgress: _dayProgress(now),
         ),
         data: (rows) {
           final jobs = selectDashboardTodayBookings(rows, now: now);
@@ -676,35 +751,172 @@ class _TodaySection extends StatelessWidget {
               icon: LucideIcons.sun,
               actionLabel: 'Open Bookings',
               onAction: onViewBookings,
+              dayProgress: _dayProgress(now),
             );
           }
 
-          final job = jobs.first;
-          final start = _startTime(job);
-          final end = _endTime(job);
-          final happeningNow =
-              start != null &&
-              end != null &&
-              !now.isBefore(start) &&
-              now.isBefore(end);
-          final time = start == null
-              ? null
-              : slateTimeRange(start, end).split('–').first.trim();
-          final remaining = jobs.length - 1;
-          return _DailyFocusHero(
-            label: happeningNow ? 'HAPPENING NOW' : 'NEXT TODAY',
-            value: time,
-            title: _clientName(job),
-            detail: [
-              _serviceName(job),
-              if (remaining == 1) '1 more booking today',
-              if (remaining > 1) '$remaining more bookings today',
-            ].join(' · '),
-            icon: happeningNow ? LucideIcons.radio : LucideIcons.calendarClock,
-            actionLabel: 'Open booking',
-            onAction: () => onOpenJob(job),
+          final bookingPositions = jobs
+              .map(_startTime)
+              .whereType<DateTime>()
+              .map(_dayProgress)
+              .toList(growable: false);
+          return _TodayBookingCarousel(
+            jobs: jobs,
+            now: now,
+            bookingPositions: bookingPositions,
+            onOpenJob: onOpenJob,
           );
         },
+      ),
+    );
+  }
+}
+
+class _TodayBookingCarousel extends StatefulWidget {
+  final List<Map<String, dynamic>> jobs;
+  final DateTime now;
+  final List<double> bookingPositions;
+  final ValueChanged<Map<String, dynamic>> onOpenJob;
+
+  const _TodayBookingCarousel({
+    required this.jobs,
+    required this.now,
+    required this.bookingPositions,
+    required this.onOpenJob,
+  });
+
+  @override
+  State<_TodayBookingCarousel> createState() => _TodayBookingCarouselState();
+}
+
+class _TodayBookingCarouselState extends State<_TodayBookingCarousel> {
+  late final PageController _controller;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController(
+      viewportFraction: widget.jobs.length > 1 ? 0.97 : 1,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _TodayBookingCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_index < widget.jobs.length) return;
+    _index = math.max(0, widget.jobs.length - 1);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_controller.hasClients) return;
+      _controller.jumpToPage(_index);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final baseHeight = widget.jobs.length > 1 ? 264 : 220;
+    final carouselHeight = (baseHeight + ((textScale - 1) * 90).clamp(0, 90))
+        .toDouble();
+
+    return Semantics(
+      container: true,
+      label:
+          '${widget.jobs.length} remaining booking${widget.jobs.length == 1 ? '' : 's'} today. Swipe horizontally to browse.',
+      child: Column(
+        children: [
+          SizedBox(
+            height: carouselHeight,
+            child: PageView.builder(
+              key: const ValueKey('today-booking-carousel'),
+              controller: _controller,
+              padEnds: false,
+              physics: widget.jobs.length > 1
+                  ? const PageScrollPhysics()
+                  : const NeverScrollableScrollPhysics(),
+              itemCount: widget.jobs.length,
+              onPageChanged: (index) {
+                if (index == _index) return;
+                SlateHaptics.tap();
+                setState(() => _index = index);
+              },
+              itemBuilder: (context, index) {
+                final job = widget.jobs[index];
+                final start = _startTime(job);
+                final end = _endTime(job);
+                final happeningNow =
+                    start != null &&
+                    end != null &&
+                    !widget.now.isBefore(start) &&
+                    widget.now.isBefore(end);
+                final time = start == null
+                    ? null
+                    : slateTimeRange(start, end).split('–').first.trim();
+                final later = widget.jobs.length - index - 1;
+
+                return Padding(
+                  padding: EdgeInsets.only(
+                    right: widget.jobs.length > 1 ? AppSpacing.xs : 0,
+                  ),
+                  child: Semantics(
+                    label:
+                        'Booking ${index + 1} of ${widget.jobs.length}, ${_clientName(job)}',
+                    child: _DailyFocusHero(
+                      label: happeningNow
+                          ? 'HAPPENING NOW · ${index + 1} OF ${widget.jobs.length}'
+                          : 'NEXT TODAY · ${index + 1} OF ${widget.jobs.length}',
+                      value: time,
+                      title: _clientName(job),
+                      detail: [
+                        _serviceName(job),
+                        if (later == 1) '1 later today',
+                        if (later > 1) '$later later today',
+                      ].join(' · '),
+                      icon: happeningNow
+                          ? LucideIcons.radio
+                          : LucideIcons.calendarClock,
+                      actionLabel: 'Open booking',
+                      onAction: () => widget.onOpenJob(job),
+                      dayProgress: _dayProgress(widget.now),
+                      bookingPositions: widget.bookingPositions,
+                      activeBookingIndex: _index,
+                      fillHeight: true,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (widget.jobs.length > 1) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (var index = 0; index < widget.jobs.length; index++)
+                  AnimatedContainer(
+                    duration: AppMotion.responsive(context, AppMotion.standard),
+                    curve: AppMotion.curve,
+                    width: index == _index ? 18 : 5,
+                    height: 5,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: index == _index
+                          ? tokens.onHeroPrimary
+                          : tokens.onHeroSecondary.withValues(alpha: 0.42),
+                      borderRadius: BorderRadius.circular(AppRadius.capsule),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -718,6 +930,10 @@ class _DailyFocusHero extends StatelessWidget {
   final IconData icon;
   final String actionLabel;
   final VoidCallback onAction;
+  final double dayProgress;
+  final List<double> bookingPositions;
+  final int? activeBookingIndex;
+  final bool fillHeight;
 
   const _DailyFocusHero({
     required this.label,
@@ -727,87 +943,383 @@ class _DailyFocusHero extends StatelessWidget {
     required this.icon,
     required this.actionLabel,
     required this.onAction,
+    required this.dayProgress,
+    this.bookingPositions = const [],
+    this.activeBookingIndex,
+    this.fillHeight = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final tokens = SlateTheme.of(context);
     return WorkloopSurface(
-      color: tokens.surfaceRaised,
-      borderColor: Theme.of(context).brightness == Brightness.light
-          ? tokens.divider
-          : tokens.accent.withValues(alpha: 0.28),
-      radius: AppRadius.xl,
-      elevated: true,
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      color: tokens.heroSurface,
+      borderColor: tokens.heroBorder,
+      radius: AppRadius.lg,
+      padding: const EdgeInsets.all(AppSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                width: 34,
-                height: 34,
+                width: 24,
+                height: 24,
                 decoration: BoxDecoration(
-                  color: tokens.accent.withValues(alpha: 0.1),
+                  color: tokens.heroControlSurface,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Theme.of(context).brightness == Brightness.light
-                        ? tokens.accentBorder
-                        : Colors.transparent,
-                    width: 1,
+                  border: Border.all(color: tokens.heroBorder),
+                ),
+                child: Icon(icon, color: tokens.onHeroPrimary, size: 13),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: tokens.onHeroMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.8,
                   ),
                 ),
-                child: Icon(icon, color: tokens.accentInk, size: 17),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                label,
-                style: TextStyle(
-                  color: tokens.accentInk,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8,
-                ),
-              ),
+              Container(width: 22, height: 2, color: tokens.accentStrong),
             ],
           ),
+          const SizedBox(height: AppSpacing.xxs),
+          Semantics(
+            label: bookingPositions.isEmpty
+                ? 'Today is ${(dayProgress * 100).round()} percent complete'
+                : '${bookingPositions.length} booking${bookingPositions.length == 1 ? '' : 's'} remain today',
+            child: ExcludeSemantics(
+              child: SizedBox(
+                key: ValueKey(
+                  'active-job-marker-${activeBookingIndex ?? 'none'}',
+                ),
+                height: 20,
+                width: double.infinity,
+                child: _AnimatedDayPath(
+                  progress: dayProgress,
+                  bookingPositions: bookingPositions,
+                  activeBookingIndex: activeBookingIndex,
+                  track: tokens.onHeroSecondary,
+                  accent: tokens.accentStrong,
+                  ink: tokens.onHeroPrimary,
+                ),
+              ),
+            ),
+          ),
           if (value != null) ...[
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.xxs),
             Text(
               value!,
               style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                color: tokens.textPrimary,
-                fontSize: 38,
+                color: tokens.onHeroPrimary,
+                fontSize: 27,
+                height: 1.05,
               ),
             ),
           ] else
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.xxs),
           Text(
             title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(color: tokens.textPrimary),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: tokens.onHeroPrimary,
+              fontSize: 20,
+              height: 1.15,
+            ),
           ),
           const SizedBox(height: AppSpacing.xxs),
           Text(
             detail,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(
               context,
-            ).textTheme.bodyMedium?.copyWith(color: tokens.textSecondary),
+            ).textTheme.bodyMedium?.copyWith(color: tokens.onHeroSecondary),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          WorkloopPrimaryButton(
-            label: actionLabel,
-            icon: LucideIcons.arrowRight,
-            onPressed: onAction,
+          if (fillHeight)
+            const Spacer()
+          else
+            const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: tokens.onHeroPrimary,
+                foregroundColor: tokens.heroActionForeground,
+              ),
+              onPressed: onAction,
+              icon: const Icon(LucideIcons.arrowRight, size: 18),
+              label: Text(actionLabel),
+            ),
           ),
         ],
       ),
+    );
+  }
+}
+
+double _dayProgress(DateTime value) {
+  final minutes = value.hour * 60 + value.minute;
+  return (minutes / (24 * 60)).clamp(0.0, 1.0);
+}
+
+class _DayPathPainter extends CustomPainter {
+  final double progress;
+  final List<double> bookingPositions;
+  final int? activeBookingIndex;
+  final double? activeBookingPosition;
+  final double activeMarkerScale;
+  final Color track;
+  final Color accent;
+  final Color ink;
+
+  const _DayPathPainter({
+    required this.progress,
+    required this.bookingPositions,
+    required this.activeBookingIndex,
+    required this.activeBookingPosition,
+    required this.activeMarkerScale,
+    required this.track,
+    required this.accent,
+    required this.ink,
+  });
+
+  double _y(double x, Size size) {
+    return size.height * 0.52 + math.sin(x * math.pi * 2.1) * 4;
+  }
+
+  Path _path(Size size, double end) {
+    final path = Path();
+    const steps = 48;
+    for (var index = 0; index <= steps; index++) {
+      final fraction = (index / steps) * end;
+      final point = Offset(fraction * size.width, _y(fraction, size));
+      if (index == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
+    }
+    return path;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const inset = 4.0;
+    final contentSize = Size(size.width - inset * 2, size.height);
+    canvas.save();
+    canvas.translate(inset, 0);
+
+    canvas.drawPath(
+      _path(contentSize, 1),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.25
+        ..strokeCap = StrokeCap.round
+        ..color = track.withValues(alpha: 0.42),
+    );
+    canvas.drawPath(
+      _path(contentSize, progress),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.25
+        ..strokeCap = StrokeCap.round
+        ..color = ink.withValues(alpha: 0.78),
+    );
+
+    final current = Offset(
+      progress * contentSize.width,
+      _y(progress, contentSize),
+    );
+    canvas.drawCircle(
+      current,
+      3.25,
+      Paint()
+        ..style = PaintingStyle.fill
+        ..color = ink.withValues(alpha: 0.55),
+    );
+    canvas.drawCircle(
+      current,
+      3.25,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8
+        ..color = accent.withValues(alpha: 0.72),
+    );
+
+    final visiblePositions = bookingPositions.take(6).toList(growable: false);
+    for (var index = 0; index < visiblePositions.length; index++) {
+      if (index == activeBookingIndex) continue;
+      final position = visiblePositions[index];
+      final clamped = position.clamp(0.0, 1.0);
+      final point = Offset(
+        clamped * contentSize.width,
+        _y(clamped, contentSize),
+      );
+      canvas.drawCircle(
+        point,
+        3,
+        Paint()
+          ..style = PaintingStyle.fill
+          ..color = clamped <= progress
+              ? ink.withValues(alpha: 0.62)
+              : accent.withValues(alpha: 0.82),
+      );
+    }
+
+    if (activeBookingPosition case final position?) {
+      final clamped = position.clamp(0.0, 1.0);
+      final point = Offset(
+        clamped * contentSize.width,
+        _y(clamped, contentSize),
+      );
+      canvas.drawCircle(
+        point,
+        9 * activeMarkerScale,
+        Paint()..color = accent.withValues(alpha: 0.20),
+      );
+      canvas.drawCircle(point, 6.25 * activeMarkerScale, Paint()..color = ink);
+      canvas.drawCircle(
+        point,
+        6.25 * activeMarkerScale,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = accent,
+      );
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _DayPathPainter oldDelegate) {
+    return progress != oldDelegate.progress ||
+        bookingPositions != oldDelegate.bookingPositions ||
+        activeBookingIndex != oldDelegate.activeBookingIndex ||
+        activeBookingPosition != oldDelegate.activeBookingPosition ||
+        activeMarkerScale != oldDelegate.activeMarkerScale ||
+        track != oldDelegate.track ||
+        accent != oldDelegate.accent ||
+        ink != oldDelegate.ink;
+  }
+}
+
+class _AnimatedDayPath extends StatefulWidget {
+  final double progress;
+  final List<double> bookingPositions;
+  final int? activeBookingIndex;
+  final Color track;
+  final Color accent;
+  final Color ink;
+
+  const _AnimatedDayPath({
+    required this.progress,
+    required this.bookingPositions,
+    required this.activeBookingIndex,
+    required this.track,
+    required this.accent,
+    required this.ink,
+  });
+
+  @override
+  State<_AnimatedDayPath> createState() => _AnimatedDayPathState();
+}
+
+class _AnimatedDayPathState extends State<_AnimatedDayPath>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  double? _fromPosition;
+  double? _targetPosition;
+
+  double? _positionFor(_AnimatedDayPath value) {
+    final index = value.activeBookingIndex;
+    if (index == null || index < 0 || index >= value.bookingPositions.length) {
+      return null;
+    }
+    return value.bookingPositions[index].clamp(0.0, 1.0);
+  }
+
+  double? get _currentPosition {
+    final from = _fromPosition;
+    final target = _targetPosition;
+    if (target == null) return null;
+    if (from == null) return target;
+    final travel = Curves.easeInOutCubic.transform(_controller.value);
+    return from + (target - from) * travel;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _targetPosition = _positionFor(widget);
+    _fromPosition = _targetPosition;
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration.zero,
+      value: 1,
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller.duration = AppMotion.responsive(context, AppMotion.deliberate);
+    if (_controller.duration == Duration.zero) {
+      _controller.value = 1;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedDayPath oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextPosition = _positionFor(widget);
+    if (nextPosition == _targetPosition &&
+        widget.activeBookingIndex == oldWidget.activeBookingIndex) {
+      return;
+    }
+    _fromPosition = _currentPosition ?? nextPosition;
+    _targetPosition = nextPosition;
+    if (_controller.duration == Duration.zero || nextPosition == null) {
+      _controller.value = 1;
+    } else {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final bounce = _controller.isAnimating
+            ? Curves.easeOutBack.transform(_controller.value)
+            : 1.0;
+        final markerScale = 0.78 + 0.22 * bounce;
+        return CustomPaint(
+          painter: _DayPathPainter(
+            progress: widget.progress,
+            bookingPositions: widget.bookingPositions,
+            activeBookingIndex: widget.activeBookingIndex,
+            activeBookingPosition: _currentPosition,
+            activeMarkerScale: markerScale,
+            track: widget.track,
+            accent: widget.accent,
+            ink: widget.ink,
+          ),
+        );
+      },
     );
   }
 }
@@ -824,13 +1336,16 @@ class _WorthALookSection extends StatelessWidget {
       title: 'Worth a look',
       child: Column(
         children: [
-          for (final item in items)
+          for (var index = 0; index < items.length; index++)
             WorkloopListRow(
-              onTap: () => onOpen(item),
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-              leading: _SoftIcon(icon: _attentionIcon(item.type)),
+              onTap: () => onOpen(items[index]),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
+              leading: _SoftIcon(icon: _attentionIcon(items[index].type)),
               title: Text(
-                _attentionTitle(item),
+                _attentionTitle(items[index]),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -840,7 +1355,7 @@ class _WorthALookSection extends StatelessWidget {
                 ),
               ),
               subtitle: Text(
-                _attentionDetail(item),
+                _attentionDetail(items[index]),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -854,6 +1369,7 @@ class _WorthALookSection extends StatelessWidget {
                 color: AppColors.t3,
                 size: 16,
               ),
+              showDivider: index != items.length - 1,
             ),
         ],
       ),
@@ -864,19 +1380,26 @@ class _WorthALookSection extends StatelessWidget {
 class _MoneyPulse extends StatelessWidget {
   final AsyncValue<FinanceSummary> finance;
   final VoidCallback onOpen;
+  final VoidCallback onRetry;
 
-  const _MoneyPulse({required this.finance, required this.onOpen});
+  const _MoneyPulse({
+    required this.finance,
+    required this.onOpen,
+    required this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return _DashboardSection(
-      title: 'Money',
-      child: finance.when(
-        loading: () =>
-            const SlateLoadingBlock(height: 68, radius: AppRadius.md),
-        error: (_, _) => _MoneyRow(onOpen: onOpen),
-        data: (summary) =>
-            _MoneyRow(onOpen: onOpen, amount: summary.thisMonthPaid),
+    return finance.when(
+      loading: () => const SlateLoadingBlock(height: 68, radius: AppRadius.md),
+      error: (_, _) => SlateErrorState(
+        message: 'Could not load your Money summary.',
+        onRetry: onRetry,
+      ),
+      data: (summary) => _MoneyRow(
+        onOpen: onOpen,
+        amount: summary.thisMonthPaid,
+        target: summary.monthlyTarget,
       ),
     );
   }
@@ -885,20 +1408,35 @@ class _MoneyPulse extends StatelessWidget {
 class _MoneyRow extends StatelessWidget {
   final VoidCallback onOpen;
   final double? amount;
+  final double target;
 
-  const _MoneyRow({required this.onOpen, this.amount});
+  const _MoneyRow({required this.onOpen, this.amount, required this.target});
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return WorkloopListRow(
       onTap: onOpen,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-      leading: const _SoftIcon(icon: LucideIcons.banknote),
-      title: Text(
-        amount == null ? 'Open Money' : '${formatPounds(amount!)} received',
+      flat: true,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.md,
+      ),
+      leading: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: tokens.surfaceRaised,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: tokens.divider),
+        ),
+        child: Icon(LucideIcons.banknote, color: tokens.accentInk, size: 20),
+      ),
+      title: const Text(
+        'Money',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
+        style: TextStyle(
           color: AppColors.t1,
           fontSize: 16,
           fontWeight: FontWeight.w600,
@@ -906,18 +1444,64 @@ class _MoneyRow extends StatelessWidget {
       ),
       subtitle: Text(
         amount == null
-            ? 'See your latest business progress.'
-            : 'So far this calendar month.',
+            ? 'See your latest business progress'
+            : target > 0
+            ? '${formatPounds(amount!)} of ${formatPounds(target)} this month'
+            : '${formatPounds(amount!)} received this month',
         style: const TextStyle(
           color: AppColors.t2,
           fontSize: 13,
           fontWeight: FontWeight.w500,
         ),
       ),
-      trailing: const Icon(
-        LucideIcons.chevronRight,
-        color: AppColors.t3,
-        size: 16,
+      trailing: target > 0 && amount != null
+          ? _MoneyTargetDial(amount: amount!, target: target)
+          : const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
+    );
+  }
+}
+
+class _MoneyTargetDial extends StatelessWidget {
+  final double amount;
+  final double target;
+
+  const _MoneyTargetDial({required this.amount, required this.target});
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    final progress = target <= 0 ? 0.0 : (amount / target).clamp(0.0, 1.0);
+    final percentage = (progress * 100).round();
+    return Semantics(
+      label: '$percentage percent of monthly Money target',
+      child: ExcludeSemantics(
+        child: SizedBox.square(
+          dimension: 46,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox.square(
+                dimension: 40,
+                child: CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 4,
+                  strokeCap: StrokeCap.round,
+                  color: tokens.accent,
+                  backgroundColor: tokens.surfaceRaised,
+                ),
+              ),
+              Text(
+                '$percentage%',
+                style: const TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -928,12 +1512,14 @@ class _UpcomingJobsSection extends StatelessWidget {
   final DateTime now;
   final ValueChanged<Map<String, dynamic>> onOpenJob;
   final VoidCallback onViewBookings;
+  final VoidCallback onRetry;
 
   const _UpcomingJobsSection({
     required this.appointments,
     required this.now,
     required this.onOpenJob,
     required this.onViewBookings,
+    required this.onRetry,
   });
 
   @override
@@ -945,14 +1531,19 @@ class _UpcomingJobsSection extends StatelessWidget {
       child: appointments.when(
         loading: () =>
             const SlateLoadingBlock(height: 150, radius: AppRadius.lg),
-        error: (_, _) =>
-            const SlateErrorState(message: 'Could not load upcoming bookings'),
+        error: (_, _) => SlateErrorState(
+          message: 'Could not load upcoming bookings',
+          onRetry: onRetry,
+        ),
         data: (rows) {
           final jobs = selectDashboardComingUpBookings(rows, now: now);
           if (jobs.isEmpty) {
             return WorkloopListRow(
               onTap: onViewBookings,
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
               leading: const _SoftIcon(icon: LucideIcons.calendarDays),
               title: const Text(
                 'Nothing else scheduled yet',
@@ -1007,7 +1598,10 @@ class _UpcomingJobRow extends StatelessWidget {
 
     return WorkloopListRow(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
       leading: _SoftIcon(icon: LucideIcons.calendarClock),
       title: Text(
         client,
@@ -1042,25 +1636,30 @@ class _CalmFeedSection extends StatelessWidget {
   final AsyncValue<List<BusinessFeedItem>> feed;
   final ValueChanged<BusinessFeedItem> onOpenFeedItem;
   final VoidCallback onViewAllFeed;
+  final VoidCallback onRetry;
 
   const _CalmFeedSection({
     required this.feed,
     required this.onOpenFeedItem,
     required this.onViewAllFeed,
+    required this.onRetry,
   });
 
   @override
   Widget build(BuildContext context) {
     return _DashboardSection(
-      title: 'Recent activity',
+      title: 'Business feed',
       actionLabel: 'View all',
       onAction: onViewAllFeed,
       child: feed.when(
         loading: () =>
             const SlateLoadingBlock(height: 190, radius: AppRadius.lg),
-        error: (_, _) => const SlateErrorState(message: 'Could not load feed'),
+        error: (_, _) => SlateErrorState(
+          message: 'Could not load recent activity',
+          onRetry: onRetry,
+        ),
         data: (items) {
-          final calmItems = items.where(_isCalmFeedItem).take(3).toList();
+          final calmItems = items.where(_isCalmFeedItem).take(2).toList();
           if (calmItems.isEmpty) {
             return const WorkloopEmptyState(
               icon: LucideIcons.activity,
@@ -1098,7 +1697,10 @@ class _CalmFeedRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return WorkloopListRow(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
       leading: _SoftIcon(icon: _iconForFeedItem(item)),
       title: Text(
         _calmFeedTitle(item),
@@ -1133,6 +1735,7 @@ class _DashboardSection extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
   final bool prominent;
+  final bool inverse;
 
   const _DashboardSection({
     required this.title,
@@ -1140,6 +1743,7 @@ class _DashboardSection extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.prominent = false,
+    this.inverse = false,
   });
 
   @override
@@ -1153,8 +1757,8 @@ class _DashboardSection extends StatelessWidget {
               child: Text(
                 title,
                 style: TextStyle(
-                  color: AppColors.t1,
-                  fontSize: prominent ? 22 : 19,
+                  color: inverse ? Colors.white : AppColors.t1,
+                  fontSize: prominent ? 20 : 18,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0,
                 ),
@@ -1164,7 +1768,7 @@ class _DashboardSection extends StatelessWidget {
               WorkloopTextButton(label: actionLabel!, onPressed: onAction),
           ],
         ),
-        const SizedBox(height: AppSpacing.sm),
+        SizedBox(height: prominent ? AppSpacing.xs : AppSpacing.sm),
         child,
       ],
     );
@@ -1240,23 +1844,20 @@ String _attentionTitle(DashboardAttentionItem item) {
 
 String _attentionDetail(DashboardAttentionItem item) {
   return switch (item.type) {
+    DashboardAttentionType.bookingRequest => item.detail,
     DashboardAttentionType.unpaid => item.detail,
-    DashboardAttentionType.unconfirmedAppointment => item.detail,
     DashboardAttentionType.overdueTask =>
       item.detail == 'Overdue task' ? 'A task ready when you are' : item.detail,
-    DashboardAttentionType.uncontactedLead => item.title.replaceFirst(
-      'Contact ',
-      '',
-    ),
+    DashboardAttentionType.clientFollowUp => item.detail,
   };
 }
 
 IconData _attentionIcon(DashboardAttentionType type) {
   return switch (type) {
+    DashboardAttentionType.bookingRequest => LucideIcons.inbox,
     DashboardAttentionType.unpaid => LucideIcons.banknote,
-    DashboardAttentionType.unconfirmedAppointment => LucideIcons.calendarCheck,
     DashboardAttentionType.overdueTask => LucideIcons.listChecks,
-    DashboardAttentionType.uncontactedLead => LucideIcons.user,
+    DashboardAttentionType.clientFollowUp => LucideIcons.userRoundCheck,
   };
 }
 

@@ -116,7 +116,7 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('root action is labelled, primary, and thumb sized', (
+  testWidgets('root create action is a labelled thumb-sized plus', (
     tester,
   ) async {
     final semantics = tester.ensureSemantics();
@@ -136,8 +136,12 @@ void main() {
 
     final action = find.bySemanticsLabel('New booking');
     expect(action, findsOneWidget);
-    expect(tester.getSize(action).height, 48);
-    expect(tester.getSize(action).width, greaterThan(48));
+    expect(find.text('New booking'), findsNothing);
+    expect(
+      tester.getSize(action).height,
+      greaterThanOrEqualTo(AppSpacing.minTouch),
+    );
+    expect(tester.getSize(action).width, greaterThan(AppSpacing.minTouch));
 
     await tester.tap(action);
     expect(taps, 1);

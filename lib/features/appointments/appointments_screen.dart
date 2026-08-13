@@ -7,12 +7,11 @@ import '../../shared/providers/appointments_provider.dart';
 import '../../shared/utils/currency_format.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../public_profile/booking_requests_screen.dart';
+import '../work/work_workspace_switcher.dart';
 import 'add_appointment_screen.dart';
 import 'appointment_detail_screen.dart';
 
 part 'appointment_list_view.dart';
-
-enum _BookingsView { schedule, requests }
 
 const inactiveUpcomingBookingStatuses = {'cancelled', 'no_show', 'completed'};
 
@@ -47,7 +46,22 @@ Map<String, dynamic>? selectNextBooking(
 }
 
 class AppointmentsScreen extends ConsumerStatefulWidget {
-  const AppointmentsScreen({super.key});
+  final DateTime? initialCalendarDate;
+  final DateTime? calendarReferenceDate;
+  final VoidCallback? onOpenTasks;
+  final VoidCallback? onOpenNotes;
+  final bool embedded;
+  final int createRequest;
+
+  const AppointmentsScreen({
+    super.key,
+    this.initialCalendarDate,
+    this.calendarReferenceDate,
+    this.onOpenTasks,
+    this.onOpenNotes,
+    this.embedded = false,
+    this.createRequest = 0,
+  });
 
   @override
   ConsumerState<AppointmentsScreen> createState() => _AppointmentsScreenState();
@@ -56,16 +70,37 @@ class AppointmentsScreen extends ConsumerStatefulWidget {
 class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  DateTime _selectedCalendarDate = _dateOnly(DateTime.now());
+  late DateTime _selectedCalendarDate;
+  late DateTime _calendarToday;
   bool _calendarMode = false;
-  _BookingsView _view = _BookingsView.schedule;
   int _selectedListTab = 0;
 
   @override
   void initState() {
     super.initState();
+    _calendarToday = _dateOnly(widget.calendarReferenceDate ?? DateTime.now());
+    _selectedCalendarDate = _dateOnly(
+      widget.initialCalendarDate ?? _calendarToday,
+    );
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabChanged);
+    if (widget.createRequest != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _addAppointment();
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AppointmentsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.createRequest == 0 ||
+        widget.createRequest == oldWidget.createRequest) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _addAppointment();
+    });
   }
 
   void _handleTabChanged() {
@@ -100,12 +135,10 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
     ref.invalidate(appointmentsProvider);
   }
 
-  Future<void> _openRequest(BookingRequest request) async {
+  Future<void> _openRequests() async {
     await Navigator.push<void>(
       context,
-      MaterialPageRoute(
-        builder: (_) => BookingRequestDetailScreen(request: request),
-      ),
+      MaterialPageRoute(builder: (_) => const BookingRequestsScreen()),
     );
     ref.invalidate(bookingRequestsProvider);
   }
@@ -118,271 +151,175 @@ class _AppointmentsScreenState extends ConsumerState<AppointmentsScreen>
       data: (items) => _activeRequests(items).length,
       orElse: () => 0,
     );
+    final content = NestedScrollView(
+      headerSliverBuilder: (context, innerBoxIsScrolled) => [
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!widget.embedded) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    AppSpacing.screenTop,
+                    AppSpacing.pageX,
+                    0,
+                  ),
+                  child: _BookingsHeader(
+                    onAdd: _addAppointment,
+                    onRequests: _openRequests,
+                    requestCount: activeRequestCount,
+                    workMode: widget.onOpenTasks != null,
+                  ),
+                ),
+                if (widget.onOpenTasks != null &&
+                    widget.onOpenNotes != null) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.pageX,
+                    ),
+                    child: WorkWorkspaceSwitcher(
+                      selected: WorkWorkspaceSection.schedule,
+                      onChanged: (section) {
+                        switch (section) {
+                          case WorkWorkspaceSection.schedule:
+                            break;
+                          case WorkWorkspaceSection.tasks:
+                            widget.onOpenTasks!();
+                          case WorkWorkspaceSection.notes:
+                            widget.onOpenNotes!();
+                        }
+                      },
+                    ),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.lg),
+              ],
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.pageX,
+                ),
+                child: _BookingScheduleToolbar(
+                  calendarMode: _calendarMode,
+                  selectedListTab: _selectedListTab,
+                  onSelected: (index) {
+                    if (index == 3) {
+                      setState(() => _calendarMode = true);
+                      return;
+                    }
+                    setState(() {
+                      _calendarMode = false;
+                      _selectedListTab = index;
+                    });
+                    _tabController.animateTo(index);
+                  },
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          ),
+        ),
+      ],
+      body: appointments.when(
+        loading: () => _skeletonList(),
+        error: (e, _) =>
+            _errorState(() => ref.invalidate(appointmentsProvider)),
+        data: (data) {
+          final now = DateTime.now();
+          final todayStart = DateTime(now.year, now.month, now.day);
+          final todayEnd = nextBookingCalendarDay(todayStart);
+
+          final today = _appointmentsForDay(data, todayStart);
+
+          final upcoming = data.where((a) {
+            final dt = DateTime.tryParse(
+              a['start_time'] as String? ?? '',
+            )?.toLocal();
+            return dt != null &&
+                !dt.isBefore(todayEnd) &&
+                isUpcomingBookingStatus(a['status']);
+          }).toList();
+
+          final past =
+              data.where((a) {
+                final dt = DateTime.tryParse(
+                  a['start_time'] as String? ?? '',
+                )?.toLocal();
+                final status = a['status'] as String? ?? '';
+                return (dt != null && dt.isBefore(todayStart)) ||
+                    status == 'cancelled' ||
+                    status == 'no_show';
+              }).toList()..sort((a, b) {
+                final dtA = DateTime.tryParse(a['start_time'] as String? ?? '');
+                final dtB = DateTime.tryParse(b['start_time'] as String? ?? '');
+                if (dtA == null || dtB == null) return 0;
+                return dtB.compareTo(dtA);
+              });
+          final selectedDayAppointments = _appointmentsForDay(
+            data,
+            _selectedCalendarDate,
+          );
+
+          if (_calendarMode) {
+            return _BookingCalendarView(
+              appointments: data,
+              selectedDate: _selectedCalendarDate,
+              today: _calendarToday,
+              selectedDayAppointments: selectedDayAppointments,
+              onDateSelected: (date) {
+                setState(() => _selectedCalendarDate = date);
+              },
+              onTap: _openDetail,
+              onRefresh: () => ref.invalidate(appointmentsProvider),
+              onEmptyAction: () => _addAppointment(date: _selectedCalendarDate),
+            );
+          }
+
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _AppointmentListView(
+                appointments: today,
+                emptyIcon: LucideIcons.calendarDays,
+                emptyTitle: 'Nothing scheduled today',
+                emptySubtitle: 'Add a booking when work is agreed.',
+                onTap: _openDetail,
+                onRefresh: () => ref.invalidate(appointmentsProvider),
+                groupByDate: false,
+              ),
+              _AppointmentListView(
+                appointments: upcoming,
+                emptyIcon: LucideIcons.calendarClock,
+                emptyTitle: 'No upcoming bookings',
+                emptySubtitle: 'Your future schedule is clear',
+                onTap: _openDetail,
+                onRefresh: () => ref.invalidate(appointmentsProvider),
+                groupByDate: true,
+              ),
+              _AppointmentListView(
+                appointments: past,
+                emptyIcon: LucideIcons.history,
+                emptyTitle: 'No past bookings',
+                emptySubtitle: 'Completed work will appear here',
+                onTap: _openDetail,
+                onRefresh: () => ref.invalidate(appointmentsProvider),
+                groupByDate: true,
+                showStatusBadge: true,
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (widget.embedded) return content;
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
-          SafeArea(
-            bottom: false,
-            child: NestedScrollView(
-              headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.pageX,
-                          AppSpacing.screenTop,
-                          AppSpacing.pageX,
-                          0,
-                        ),
-                        child: _BookingsHeader(onAdd: _addAppointment),
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.pageX,
-                        ),
-                        child: _BookingsViewSwitch(
-                          selected: _view,
-                          requestCount: activeRequestCount,
-                          onSelected: (view) => setState(() {
-                            _view = view;
-                            if (view == _BookingsView.requests) {
-                              _calendarMode = false;
-                            }
-                          }),
-                        ),
-                      ),
-                      if (_view == _BookingsView.schedule) ...[
-                        const SizedBox(height: AppSpacing.xl),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.pageX,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _calendarMode
-                                    ? const WorkloopSectionHeader(
-                                        label: 'Calendar',
-                                      )
-                                    : WorkloopSegmentedControl<int>(
-                                        selected: _selectedListTab,
-                                        onChanged: (index) =>
-                                            _tabController.animateTo(index),
-                                        segments: const [
-                                          WorkloopSegment(
-                                            value: 0,
-                                            label: 'Today',
-                                          ),
-                                          WorkloopSegment(
-                                            value: 1,
-                                            label: 'Upcoming',
-                                          ),
-                                          WorkloopSegment(
-                                            value: 2,
-                                            label: 'Past',
-                                          ),
-                                        ],
-                                      ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              _BookingDisplayModeButton(
-                                calendarMode: _calendarMode,
-                                onTap: () => setState(
-                                  () => _calendarMode = !_calendarMode,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (_calendarMode) ...[
-                          const SizedBox(height: AppSpacing.sm),
-                          appointments.when(
-                            data: (data) {
-                              final nextBooking = selectNextBooking(data);
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.pageX,
-                                ),
-                                child: _NextBookingCard(
-                                  booking: nextBooking,
-                                  onTap: nextBooking == null
-                                      ? () => _addAppointment()
-                                      : () => _openDetail(nextBooking),
-                                ),
-                              );
-                            },
-                            loading: () => const SizedBox.shrink(),
-                            error: (_, _) => const SizedBox.shrink(),
-                          ),
-                        ],
-                      ],
-                      const SizedBox(height: AppSpacing.md),
-                    ],
-                  ),
-                ),
-              ],
-              body: _view == _BookingsView.requests
-                  ? bookingRequests.when(
-                      loading: () => _skeletonList(),
-                      error: (_, _) => Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.pageX,
-                        ),
-                        child: SlateErrorState(
-                          message: 'Could not load requests',
-                          onRetry: () =>
-                              ref.invalidate(bookingRequestsProvider),
-                        ),
-                      ),
-                      data: (items) {
-                        final active = _activeRequests(items);
-                        if (active.isEmpty) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: AppSpacing.pageX,
-                            ),
-                            child: WorkloopEmptyState(
-                              icon: LucideIcons.inbox,
-                              title: 'No active requests',
-                              subtitle:
-                                  'New public profile requests will appear here',
-                            ),
-                          );
-                        }
-
-                        return RefreshIndicator(
-                          color: AppColors.accentPrimary,
-                          onRefresh: () async =>
-                              ref.invalidate(bookingRequestsProvider),
-                          child: ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.pageX,
-                              0,
-                              AppSpacing.pageX,
-                              AppSpacing.bottomNavClearance,
-                            ),
-                            itemCount: active.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, index) => _InlineRequestCard(
-                              request: active[index],
-                              onTap: () => _openRequest(active[index]),
-                            ),
-                          ),
-                        );
-                      },
-                    )
-                  : appointments.when(
-                      loading: () => _skeletonList(),
-                      error: (e, _) => _errorState(
-                        () => ref.invalidate(appointmentsProvider),
-                      ),
-                      data: (data) {
-                        final now = DateTime.now();
-                        final todayStart = DateTime(
-                          now.year,
-                          now.month,
-                          now.day,
-                        );
-                        final todayEnd = nextBookingCalendarDay(todayStart);
-
-                        final today = _appointmentsForDay(data, todayStart);
-
-                        final upcoming = data.where((a) {
-                          final dt = DateTime.tryParse(
-                            a['start_time'] as String? ?? '',
-                          )?.toLocal();
-                          return dt != null &&
-                              !dt.isBefore(todayEnd) &&
-                              isUpcomingBookingStatus(a['status']);
-                        }).toList();
-
-                        final past =
-                            data.where((a) {
-                              final dt = DateTime.tryParse(
-                                a['start_time'] as String? ?? '',
-                              )?.toLocal();
-                              final status = a['status'] as String? ?? '';
-                              return (dt != null && dt.isBefore(todayStart)) ||
-                                  status == 'cancelled' ||
-                                  status == 'no_show';
-                            }).toList()..sort((a, b) {
-                              final dtA = DateTime.tryParse(
-                                a['start_time'] as String? ?? '',
-                              );
-                              final dtB = DateTime.tryParse(
-                                b['start_time'] as String? ?? '',
-                              );
-                              if (dtA == null || dtB == null) return 0;
-                              return dtB.compareTo(dtA);
-                            });
-                        final selectedDayAppointments = _appointmentsForDay(
-                          data,
-                          _selectedCalendarDate,
-                        );
-
-                        if (_calendarMode) {
-                          return _BookingCalendarView(
-                            appointments: data,
-                            selectedDate: _selectedCalendarDate,
-                            selectedDayAppointments: selectedDayAppointments,
-                            onDateSelected: (date) {
-                              setState(() => _selectedCalendarDate = date);
-                            },
-                            onTap: _openDetail,
-                            onRefresh: () =>
-                                ref.invalidate(appointmentsProvider),
-                            onEmptyAction: () =>
-                                _addAppointment(date: _selectedCalendarDate),
-                          );
-                        }
-
-                        return TabBarView(
-                          controller: _tabController,
-                          children: [
-                            _AppointmentListView(
-                              appointments: today,
-                              emptyIcon: LucideIcons.calendarDays,
-                              emptyTitle: 'Nothing scheduled today',
-                              emptySubtitle:
-                                  'Add a booking when work is agreed.',
-                              onTap: _openDetail,
-                              onRefresh: () =>
-                                  ref.invalidate(appointmentsProvider),
-                              groupByDate: false,
-                            ),
-                            _AppointmentListView(
-                              appointments: upcoming,
-                              emptyIcon: LucideIcons.calendarClock,
-                              emptyTitle: 'No upcoming bookings',
-                              emptySubtitle: 'Your future schedule is clear',
-                              onTap: _openDetail,
-                              onRefresh: () =>
-                                  ref.invalidate(appointmentsProvider),
-                              groupByDate: true,
-                            ),
-                            _AppointmentListView(
-                              appointments: past,
-                              emptyIcon: LucideIcons.history,
-                              emptyTitle: 'No past bookings',
-                              emptySubtitle: 'Completed work will appear here',
-                              onTap: _openDetail,
-                              onRefresh: () =>
-                                  ref.invalidate(appointmentsProvider),
-                              groupByDate: true,
-                              showStatusBadge: true,
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-            ),
-          ),
+          SafeArea(bottom: false, child: content),
         ],
       ),
     );
@@ -448,253 +385,99 @@ List<BookingRequest> _activeRequests(List<BookingRequest> items) {
 
 class _BookingsHeader extends StatelessWidget {
   final VoidCallback onAdd;
-
-  const _BookingsHeader({required this.onAdd});
-
-  @override
-  Widget build(BuildContext context) {
-    return WorkloopPageHeader(
-      title: 'Bookings',
-      subtitle: 'See what is next and keep the day moving.',
-      color: AppColors.modCalendar,
-      trailing: WorkloopTopAction(
-        label: 'New booking',
-        semanticLabel: 'New booking',
-        onTap: onAdd,
-      ),
-    );
-  }
-}
-
-class _BookingsViewSwitch extends StatelessWidget {
-  final _BookingsView selected;
+  final VoidCallback onRequests;
   final int requestCount;
-  final ValueChanged<_BookingsView> onSelected;
+  final bool workMode;
 
-  const _BookingsViewSwitch({
-    required this.selected,
+  const _BookingsHeader({
+    required this.onAdd,
+    required this.onRequests,
     required this.requestCount,
-    required this.onSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return WorkloopNavigationControl<_BookingsView>(
-      selected: selected,
-      onChanged: onSelected,
-      color: AppColors.accentPrimary,
-      segments: [
-        const WorkloopSegment(value: _BookingsView.schedule, label: 'Schedule'),
-        WorkloopSegment(
-          value: _BookingsView.requests,
-          label: 'Requests',
-          badge: requestCount > 0 ? '$requestCount' : null,
-        ),
-      ],
-    );
-  }
-}
-
-class _BookingDisplayModeButton extends StatelessWidget {
-  final bool calendarMode;
-  final VoidCallback onTap;
-
-  const _BookingDisplayModeButton({
-    required this.calendarMode,
-    required this.onTap,
+    required this.workMode,
   });
 
   @override
   Widget build(BuildContext context) {
     final tokens = SlateTheme.of(context);
-    final label = calendarMode ? 'Show booking list' : 'Show calendar';
-    return Tooltip(
-      message: label,
-      child: WorkloopIconButton(
-        icon: calendarMode ? LucideIcons.list : LucideIcons.calendarDays,
-        semanticLabel: label,
-        backgroundColor: tokens.surfaceRaised,
-        color: tokens.accentInk,
-        size: 48,
-        onTap: onTap,
-      ),
-    );
-  }
-}
-
-class _InlineRequestCard extends StatelessWidget {
-  final BookingRequest request;
-  final VoidCallback onTap;
-
-  const _InlineRequestCard({required this.request, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final service = request.serviceName?.trim();
-    final preferred = request.preferredTimeText?.trim();
-    final subtitle = [
-      if (service?.isNotEmpty == true) service!,
-      if (preferred?.isNotEmpty == true) preferred!,
-      if (service?.isNotEmpty != true && preferred?.isNotEmpty != true)
-        request.phone,
-    ].join(' · ');
-    final statusColor = request.status == 'pending'
-        ? AppColors.warning
-        : AppColors.green;
-
-    return WorkloopListRow(
-      onTap: onTap,
-      leading: Icon(LucideIcons.inbox, color: statusColor, size: 18),
-      title: Row(
+    return WorkloopPageHeader(
+      title: workMode ? 'Work' : 'Bookings',
+      subtitle: workMode
+          ? 'Schedule it, do it, and keep the context.'
+          : 'Run today. Plan ahead.',
+      color: AppColors.modCalendar,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Text(
-              request.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.t1,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+          WorkloopIconButton(
+            icon: LucideIcons.inbox,
+            semanticLabel: requestCount == 0
+                ? 'Booking requests'
+                : 'Booking requests, $requestCount active',
+            onTap: onRequests,
+            size: AppSpacing.minTouch,
+            badge: requestCount == 0
+                ? null
+                : Positioned(
+                    right: -3,
+                    top: -3,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 18),
+                      height: 18,
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: tokens.accentStrong,
+                        borderRadius: BorderRadius.circular(AppRadius.capsule),
+                        border: Border.all(color: tokens.background, width: 2),
+                      ),
+                      child: Text(
+                        requestCount > 99 ? '99+' : '$requestCount',
+                        style: TextStyle(
+                          color: tokens.onAccent,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
           ),
-          const SizedBox(width: 8),
-          _RequestStatusBadge(
-            label: request.status == 'pending' ? 'New' : 'Contacted',
-            color: statusColor,
+          const SizedBox(width: AppSpacing.xs),
+          WorkloopTopAction(
+            label: 'New booking',
+            semanticLabel: 'New booking',
+            onTap: onAdd,
           ),
         ],
       ),
-      subtitle: Text(
-        subtitle,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: AppColors.t3, fontSize: 12),
-      ),
-      trailing: const Icon(
-        LucideIcons.chevronRight,
-        color: AppColors.t3,
-        size: 17,
-      ),
     );
   }
 }
 
-class _RequestStatusBadge extends StatelessWidget {
-  final String label;
-  final Color color;
+class _BookingScheduleToolbar extends StatelessWidget {
+  final bool calendarMode;
+  final int selectedListTab;
+  final ValueChanged<int> onSelected;
 
-  const _RequestStatusBadge({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-class _NextBookingCard extends StatelessWidget {
-  final Map<String, dynamic>? booking;
-  final VoidCallback onTap;
-
-  const _NextBookingCard({required this.booking, required this.onTap});
+  const _BookingScheduleToolbar({
+    required this.calendarMode,
+    required this.selectedListTab,
+    required this.onSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final start = booking == null ? null : _start(booking!);
-    final end = booking == null ? null : _end(booking!);
-    final client = booking?['contacts']?['name'] as String? ?? 'No booking set';
-    final service =
-        booking?['services']?['name'] as String? ??
-        booking?['title'] as String? ??
-        'Add a booking';
-    final location = booking?['location'] as String?;
-    final price = booking == null ? null : _price(booking!);
-
-    return WorkloopListRow(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-      leading: SizedBox(
-        width: 58,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              start == null ? '--' : _shortTime(start),
-              style: const TextStyle(
-                color: AppColors.t1,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              start == null || end == null
-                  ? 'new'
-                  : '${end.difference(start).inMinutes}m',
-              style: TextStyle(
-                color: AppColors.t2,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-      title: const Text(
-        'Next booking',
-        style: TextStyle(
-          color: AppColors.t3,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            client,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.t1,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            [
-              service,
-              if (location?.isNotEmpty == true) location!,
-              if (price != null && price > 0) formatPounds(price),
-            ].join(' · '),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: AppColors.t3, fontSize: 12),
-          ),
-        ],
-      ),
-      trailing: Icon(
-        booking == null ? LucideIcons.plus : LucideIcons.chevronRight,
-        color: AppColors.modCalendar,
-        size: 18,
-      ),
+    return WorkloopNavigationControl<int>(
+      selected: calendarMode ? 3 : selectedListTab,
+      onChanged: onSelected,
+      compact: true,
+      emphasized: false,
+      segments: const [
+        WorkloopSegment(value: 0, label: 'Today'),
+        WorkloopSegment(value: 1, label: 'Upcoming'),
+        WorkloopSegment(value: 2, label: 'Past'),
+        WorkloopSegment(value: 3, label: 'Calendar'),
+      ],
     );
   }
 }
@@ -703,12 +486,3 @@ DateTime _dateOnly(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
 
 DateTime? _start(Map<String, dynamic> appt) =>
     DateTime.tryParse(appt['start_time'] as String? ?? '')?.toLocal();
-
-DateTime? _end(Map<String, dynamic> appt) =>
-    DateTime.tryParse(appt['end_time'] as String? ?? '')?.toLocal();
-
-double _price(Map<String, dynamic> appt) =>
-    (appt['price'] as num?)?.toDouble() ?? 0;
-
-String _shortTime(DateTime dt) =>
-    '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';

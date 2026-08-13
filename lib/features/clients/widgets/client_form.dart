@@ -631,7 +631,7 @@ class _AddressPredictions extends StatelessWidget {
             child: Row(
               children: [
                 InkWell(
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   onTap: onDismiss,
                   child: const Padding(
                     padding: EdgeInsets.symmetric(
@@ -865,7 +865,7 @@ class _ChoiceField extends StatelessWidget {
                   onTap: handleTap,
                   child: AnimatedContainer(
                     key: ValueKey(Theme.of(context).brightness),
-                    duration: AppMotion.standard,
+                    duration: AppMotion.responsive(context, AppMotion.standard),
                     curve: AppMotion.curve,
                     constraints: const BoxConstraints(
                       minHeight: AppSpacing.minTouch,
@@ -878,7 +878,7 @@ class _ChoiceField extends StatelessWidget {
                       color: selected
                           ? AppColors.accentPrimary.withValues(alpha: 0.14)
                           : AppColors.bgCard.withValues(alpha: 0.56),
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       border: Border.all(
                         color: selected
                             ? AppColors.accentPrimary.withValues(alpha: 0.28)

@@ -85,7 +85,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               children: [
                 if (_currentPage > 0 && _currentPage < screens.length - 1)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.pageX,
+                      AppSpacing.screenTop,
+                      AppSpacing.pageX,
+                      0,
+                    ),
                     child: Row(
                       children: [
                         WorkloopIconButton(
@@ -97,12 +102,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         const SizedBox(width: AppSpacing.md),
                         Expanded(
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            borderRadius: BorderRadius.circular(
+                              AppRadius.capsule,
+                            ),
                             child: TweenAnimationBuilder<double>(
                               tween: Tween(
                                 end: _currentPage / (screens.length - 1),
                               ),
-                              duration: AppMotion.deliberate,
+                              duration: AppMotion.responsive(
+                                context,
+                                AppMotion.deliberate,
+                              ),
                               curve: AppMotion.curve,
                               builder: (context, value, _) {
                                 return LinearProgressIndicator(

@@ -4,39 +4,78 @@ import '../models/business_feed_item.dart';
 import '../models/slate_models.dart';
 import '../repositories/slate_repositories.dart';
 import '../utils/currency_format.dart';
-import 'appointments_provider.dart';
-import 'clients_provider.dart';
 import 'finance_provider.dart';
-import 'notes_provider.dart';
-import 'tasks_provider.dart';
 import 'workspace_provider.dart';
+import 'workspace_settings_provider.dart';
 
 final businessFeedProvider = FutureProvider<List<BusinessFeedItem>>((
   ref,
 ) async {
-  final workspaceIdFuture = ref.watch(workspaceIdProvider.future);
-  final appointmentsFuture = ref.watch(appointmentsProvider.future);
-  final paymentsFuture = ref.watch(invoicesProvider.future);
-  final expensesFuture = ref.watch(expensesProvider.future);
-  final tasksFuture = ref.watch(allTasksProvider.future);
-  final notesFuture = ref.watch(allNotesProvider.future);
-  final clientsFuture = ref.watch(clientsProvider.future);
-  final financeFuture = ref.watch(financeSummaryProvider.future);
+  final workspaceId = await ref.watch(workspaceIdProvider.future);
+  if (workspaceId == null) return const [];
 
-  final workspaceId = await workspaceIdFuture;
-  final appointments = await appointmentsFuture;
-  final payments = await paymentsFuture;
-  final expenses = await expensesFuture;
-  final tasks = await tasksFuture;
-  final notes = await notesFuture;
-  final clients = await clientsFuture;
-  final finance = await financeFuture;
-  var bookingRequests = <BookingRequest>[];
-  if (workspaceId != null && ref.mounted) {
-    bookingRequests = await ref
-        .read(profileRepositoryProvider)
-        .bookingRequests(workspaceId);
-  }
+  final current = DateTime.now().toLocal();
+  final today = startOfDay(current);
+  final weekAgo = addBusinessCalendarDays(today, -7);
+  final appointmentsFuture = ref
+      .watch(appointmentsRepositoryProvider)
+      .listRowsForBusinessFeed(
+        workspaceId,
+        from: today,
+        to: addBusinessCalendarDays(today, 91),
+      );
+  final paymentsFuture = ref
+      .watch(paymentsRepositoryProvider)
+      .listForBusinessFeed(
+        workspaceId,
+        recentPaidFrom: weekAgo,
+        openDueThrough: addBusinessCalendarDays(today, 7),
+      );
+  final expensesFuture = ref
+      .watch(expensesRepositoryProvider)
+      .listForBusinessFeed(workspaceId, from: weekAgo);
+  final tasksFuture = ref
+      .watch(tasksRepositoryProvider)
+      .dueOpenForBusinessFeed(workspaceId, through: today);
+  final notesFuture = ref
+      .watch(notesRepositoryProvider)
+      .recentForBusinessFeed(workspaceId, from: weekAgo);
+  final clientsFuture = ref
+      .watch(clientsRepositoryProvider)
+      .followUpsForBusinessFeed(
+        workspaceId,
+        leadBefore: current.subtract(const Duration(days: 7)),
+        inactiveBefore: current.subtract(const Duration(days: 42)),
+      );
+  final bookingRequestsFuture = ref
+      .watch(profileRepositoryProvider)
+      .pendingBookingRequestsForBusinessFeed(workspaceId);
+  final settingsFuture = ref.watch(workspaceSettingsProvider.future);
+
+  final results = await Future.wait<Object?>([
+    appointmentsFuture,
+    paymentsFuture,
+    expensesFuture,
+    tasksFuture,
+    notesFuture,
+    clientsFuture,
+    bookingRequestsFuture,
+    settingsFuture,
+  ]);
+  final appointments = results[0]! as List<Map<String, dynamic>>;
+  final payments = results[1]! as List<Payment>;
+  final expenses = results[2]! as List<Expense>;
+  final tasks = results[3]! as List<SlateTask>;
+  final notes = results[4]! as List<SlateNote>;
+  final clients = results[5]! as List<Client>;
+  final bookingRequests = results[6]! as List<BookingRequest>;
+  final settings = results[7] as Map<String, dynamic>?;
+  final finance = FinanceSummary.from(
+    payments: payments,
+    expenses: expenses,
+    monthlyTarget: (settings?['revenue_target'] as num?)?.toDouble() ?? 0,
+    now: current,
+  );
 
   return buildBusinessFeedItems(
     appointments: appointments,
@@ -47,6 +86,7 @@ final businessFeedProvider = FutureProvider<List<BusinessFeedItem>>((
     clients: clients,
     bookingRequests: bookingRequests,
     finance: finance,
+    now: current,
   );
 });
 
@@ -410,6 +450,7 @@ void _addClientFollowUps(
   DateTime current,
 ) {
   for (final client in clients) {
+    if (client.status != 'active' && client.status != 'lead') continue;
     final latest = client.lastActivityAt ?? client.createdAt;
     if (latest == null || upcomingContactIds.contains(client.id)) continue;
     final days = current.difference(latest).inDays;

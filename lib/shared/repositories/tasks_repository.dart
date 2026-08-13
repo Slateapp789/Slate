@@ -48,6 +48,27 @@ class TasksRepository {
     return rows.map<SlateTask>(SlateTask.fromMap).toList();
   }
 
+  Future<List<SlateTask>> dueOpenForBusinessFeed(
+    String workspaceId, {
+    required DateTime through,
+    int limit = 80,
+  }) async {
+    final rows = await _client
+        .from('tasks')
+        .select('*, contacts(name)')
+        .eq('workspace_id', workspaceId)
+        .eq('status', 'open')
+        .lte('due_date', through.toIso8601String().split('T').first)
+        .order('due_date', ascending: true)
+        .order('id', ascending: true)
+        .limit(limit);
+    return rows
+        .map<SlateTask>(
+          (row) => SlateTask.fromMap(Map<String, dynamic>.from(row)),
+        )
+        .toList();
+  }
+
   Future<List<Map<String, dynamic>>> forClientRows(String clientId) async {
     return fetchAllRepositoryPages<Map<String, dynamic>>(
       loadPage: (from, to) async {

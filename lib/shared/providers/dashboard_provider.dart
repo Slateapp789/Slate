@@ -2,14 +2,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/slate_models.dart';
 import '../repositories/slate_repositories.dart';
 import '../utils/currency_format.dart';
+import 'appointments_provider.dart';
 import 'clients_provider.dart';
 import 'finance_provider.dart';
 import 'tasks_provider.dart';
 import 'workspace_provider.dart';
 
 const dashboardUnpaidThreshold = Duration(days: 3);
-const dashboardUnconfirmedThreshold = Duration(hours: 24);
 const dashboardUncontactedThreshold = Duration(days: 7);
+const dashboardClientFollowUpThreshold = Duration(days: 42);
 
 class DashboardRevenue {
   final double weekTotal;
@@ -138,10 +139,10 @@ final dashboardFocusProvider = FutureProvider<DashboardFocus>((ref) async {
 });
 
 enum DashboardAttentionType {
+  bookingRequest,
   unpaid,
-  unconfirmedAppointment,
   overdueTask,
-  uncontactedLead,
+  clientFollowUp,
 }
 
 class DashboardAttentionItem {
@@ -164,15 +165,18 @@ final dashboardAttentionProvider = FutureProvider<List<DashboardAttentionItem>>(
   (ref) async {
     final paymentsFuture = ref.watch(invoicesProvider.future);
     final tasksFuture = ref.watch(allTasksProvider.future);
-    final appointmentsFuture = ref.watch(todayAppointmentsProvider.future);
+    final appointmentsFuture = ref.watch(appointmentsProvider.future);
     final clientsFuture = ref.watch(clientsProvider.future);
+    final focusFuture = ref.watch(dashboardFocusProvider.future);
 
     final payments = await paymentsFuture;
     final tasks = await tasksFuture;
     final appointments = await appointmentsFuture;
     final clients = await clientsFuture;
+    final focus = await focusFuture;
 
     return buildDashboardAttentionItems(
+      pendingBookingRequests: focus.pendingBookingRequests,
       payments: payments,
       tasks: tasks,
       appointments: appointments,
@@ -182,6 +186,7 @@ final dashboardAttentionProvider = FutureProvider<List<DashboardAttentionItem>>(
 );
 
 List<DashboardAttentionItem> buildDashboardAttentionItems({
+  required int pendingBookingRequests,
   required List<Payment> payments,
   required List<SlateTask> tasks,
   required List<Map<String, dynamic>> appointments,
@@ -191,6 +196,20 @@ List<DashboardAttentionItem> buildDashboardAttentionItems({
   final current = now ?? DateTime.now();
   final today = DateTime(current.year, current.month, current.day);
   final items = <DashboardAttentionItem>[];
+
+  if (pendingBookingRequests > 0) {
+    items.add(
+      DashboardAttentionItem(
+        type: DashboardAttentionType.bookingRequest,
+        title: pendingBookingRequests == 1
+            ? 'Review booking request'
+            : 'Review $pendingBookingRequests booking requests',
+        detail: 'Waiting for your response',
+        source: pendingBookingRequests,
+        sortTime: current,
+      ),
+    );
+  }
 
   for (final payment in payments) {
     if (payment.status == 'paid') continue;
@@ -206,26 +225,6 @@ List<DashboardAttentionItem> buildDashboardAttentionItems({
         detail: payment.clientName ?? payment.number,
         source: payment,
         sortTime: dueDate,
-      ),
-    );
-  }
-
-  for (final row in appointments) {
-    final appointment = Appointment.fromMap(row);
-    final status = appointment.status.toLowerCase();
-    final isUnconfirmed = status == 'unconfirmed' || status == 'pending';
-    final startsSoon =
-        appointment.startTime.isAfter(current) &&
-        appointment.startTime.difference(current) <=
-            dashboardUnconfirmedThreshold;
-    if (!isUnconfirmed || !startsSoon) continue;
-    items.add(
-      DashboardAttentionItem(
-        type: DashboardAttentionType.unconfirmedAppointment,
-        title: 'Confirm ${appointment.clientName ?? 'appointment'}',
-        detail: appointment.serviceName ?? appointment.title ?? 'Today',
-        source: row,
-        sortTime: appointment.startTime,
       ),
     );
   }
@@ -246,16 +245,43 @@ List<DashboardAttentionItem> buildDashboardAttentionItems({
     );
   }
 
+  final upcomingContactIds = appointments
+      .where((row) {
+        final appointment = Appointment.fromMap(row);
+        return !appointment.startTime.isBefore(current) &&
+            !const {
+              'cancelled',
+              'completed',
+              'no_show',
+            }.contains(appointment.status.toLowerCase());
+      })
+      .map((row) => row['contact_id'] as String?)
+      .whereType<String>()
+      .toSet();
+
   for (final client in clients) {
-    if (client.status != 'lead') continue;
+    final isLead = client.status == 'lead';
+    final isActiveClient = client.status == 'active';
+    if ((!isLead && !isActiveClient) ||
+        upcomingContactIds.contains(client.id)) {
+      continue;
+    }
     final latest = client.lastActivityAt ?? client.createdAt;
     if (latest == null) continue;
-    if (current.difference(latest) <= dashboardUncontactedThreshold) continue;
+    final age = current.difference(latest);
+    final threshold = isLead
+        ? dashboardUncontactedThreshold
+        : dashboardClientFollowUpThreshold;
+    if (age < threshold) continue;
     items.add(
       DashboardAttentionItem(
-        type: DashboardAttentionType.uncontactedLead,
-        title: 'Contact ${client.name}',
-        detail: 'Lead waiting ${current.difference(latest).inDays}d',
+        type: DashboardAttentionType.clientFollowUp,
+        title: isLead
+            ? 'Contact ${client.name}'
+            : 'Reconnect with ${client.name}',
+        detail: isLead
+            ? 'Lead waiting ${age.inDays}d'
+            : 'No booking in ${age.inDays ~/ 7}w',
         source: client,
         sortTime: latest,
       ),
@@ -274,9 +300,9 @@ List<DashboardAttentionItem> buildDashboardAttentionItems({
 
 int _dashboardAttentionPriority(DashboardAttentionType type) {
   return switch (type) {
-    DashboardAttentionType.unconfirmedAppointment => 0,
+    DashboardAttentionType.bookingRequest => 0,
     DashboardAttentionType.overdueTask => 1,
     DashboardAttentionType.unpaid => 2,
-    DashboardAttentionType.uncontactedLead => 3,
+    DashboardAttentionType.clientFollowUp => 3,
   };
 }

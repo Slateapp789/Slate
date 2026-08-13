@@ -31,6 +31,30 @@ class NotesRepository {
     return rows.map<SlateNote>(SlateNote.fromMap).toList();
   }
 
+  Future<List<SlateNote>> recentForBusinessFeed(
+    String workspaceId, {
+    required DateTime from,
+    int limit = 10,
+  }) async {
+    final fromUtc = from.toUtc().toIso8601String();
+    final rows = await _client
+        .from('notes')
+        .select('*, contacts(name)')
+        .eq('workspace_id', workspaceId)
+        .or(
+          'updated_at.gte.$fromUtc,'
+          'and(updated_at.is.null,created_at.gte.$fromUtc)',
+        )
+        .order('updated_at', ascending: false)
+        .order('id', ascending: true)
+        .limit(limit);
+    return rows
+        .map<SlateNote>(
+          (row) => SlateNote.fromMap(Map<String, dynamic>.from(row)),
+        )
+        .toList();
+  }
+
   Future<String> create({
     required String workspaceId,
     required String title,

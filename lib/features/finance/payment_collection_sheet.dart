@@ -2,30 +2,75 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/workloop_capabilities.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/payments/tap_to_pay_service.dart';
 import '../../shared/repositories/stripe_payments_repository.dart';
 import '../../shared/utils/currency_format.dart';
+import '../../shared/utils/workflow_idempotency.dart';
 import '../../shared/widgets/slate_ui.dart';
 
 String friendlyPaymentError(Object error) {
+  if (error is FunctionException) {
+    final details = error.details;
+    final payload = details is Map
+        ? Map<String, dynamic>.from(details)
+        : const <String, dynamic>{};
+    final code = payload['code']?.toString();
+    if (code == 'platform_configuration_required') {
+      return 'Payment setup is being finalised. Please try again shortly.';
+    }
+    if (error.status == 401) {
+      return 'Your session has expired. Sign in again to continue.';
+    }
+    if (error.status == 403) {
+      return 'You do not have access to manage payments for this business.';
+    }
+    final message = _safePaymentMessage(payload['error']);
+    if (message != null) return message;
+    return 'Payments are temporarily unavailable. Please try again.';
+  }
   final text = error.toString().replaceFirst(
     RegExp(r'^(?:Bad state|\w+(?:Exception)?):\s*'),
     '',
   );
-  return text.isEmpty
-      ? 'Payments are temporarily unavailable. Please try again.'
-      : text;
+  final safeText = _safePaymentMessage(text);
+  return safeText ?? 'Payments are temporarily unavailable. Please try again.';
+}
+
+String? _safePaymentMessage(Object? value) {
+  final message = value?.toString().trim() ?? '';
+  final normalized = message.toLowerCase();
+  if (message.isEmpty || message.length > 200) return null;
+  if (normalized.contains('functionexception') ||
+      normalized.contains('reasonphrase') ||
+      normalized.contains('http://') ||
+      normalized.contains('https://') ||
+      normalized.contains('dashboard.stripe.com') ||
+      normalized.contains('sk_live_') ||
+      normalized.contains('whsec_')) {
+    return null;
+  }
+  return message;
+}
+
+bool isValidReceiptEmail(String value) {
+  final email = value.trim();
+  if (email.isEmpty) return true;
+  if (email.length > 254) return false;
+  return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
 }
 
 enum PaymentSetupAction { viewOwed }
 
 String contactlessUnavailableMessage(TargetPlatform platform) {
   if (platform == TargetPlatform.iOS) {
-    return 'Available after Apple approves Workloop for Tap to Pay.';
+    return 'Requires Apple Tap to Pay approval for this app build.';
   }
   return 'Contactless payments are not available on this phone yet.';
 }
@@ -34,6 +79,7 @@ Future<bool> showPaymentCollectionSheet({
   required BuildContext context,
   required Payment payment,
 }) async {
+  if (!WorkloopCapabilities.paymentCollectionEnabled) return false;
   return await showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
@@ -48,6 +94,9 @@ Future<PaymentSetupAction?> showPaymentSetupSheet({
   required BuildContext context,
   required String workspaceId,
 }) {
+  if (!WorkloopCapabilities.paymentCollectionEnabled) {
+    return Future.value();
+  }
   return showModalBottomSheet<PaymentSetupAction>(
     context: context,
     isScrollControlled: true,
@@ -64,22 +113,19 @@ class PaymentSetupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     return SlateSurface(
       onTap: onTap,
       padding: const EdgeInsets.all(AppSpacing.md),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(
-            LucideIcons.smartphoneNfc,
-            color: AppColors.modFinance,
-            size: 22,
-          ),
+          Icon(LucideIcons.smartphoneNfc, color: tokens.accentInk, size: 22),
           SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Get paid with Workloop',
                   style: TextStyle(
                     color: AppColors.t1,
@@ -88,7 +134,7 @@ class PaymentSetupCard extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: 3),
-                Text(
+                const Text(
                   'Set up Stripe, send payment links, and manage payouts.',
                   style: TextStyle(
                     color: AppColors.t3,
@@ -100,7 +146,7 @@ class PaymentSetupCard extends StatelessWidget {
             ),
           ),
           SizedBox(width: AppSpacing.xs),
-          Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 18),
+          const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 18),
         ],
       ),
     );
@@ -126,6 +172,11 @@ class _PaymentCollectionSheetState
   bool _working = false;
   bool _linkCopied = false;
   String? _error;
+  Uri? _paymentLink;
+  late final TextEditingController _receiptEmailController;
+  String? _paymentLinkIdempotencyKey;
+  String? _terminalPaymentIdempotencyKey;
+  final Map<String, String> _refundIdempotencyKeys = {};
 
   String get _workspaceId =>
       widget.payment?.workspaceId ?? widget.workspaceId ?? '';
@@ -133,6 +184,9 @@ class _PaymentCollectionSheetState
   @override
   void initState() {
     super.initState();
+    _receiptEmailController = TextEditingController(
+      text: widget.payment?.clientEmail ?? '',
+    );
     _status = _repository.accountStatus(_workspaceId);
     _tapAvailability = tapToPayService.availability();
     if ((widget.payment?.stripeAmountPaid ?? 0) > 0) {
@@ -141,6 +195,12 @@ class _PaymentCollectionSheetState
         widget.payment!.id,
       );
     }
+  }
+
+  @override
+  void dispose() {
+    _receiptEmailController.dispose();
+    super.dispose();
   }
 
   StripePaymentsRepository get _repository =>
@@ -171,15 +231,55 @@ class _PaymentCollectionSheetState
     });
   }
 
-  Future<void> _copyPaymentLink() async {
+  Future<void> _openReceipt(Map<String, dynamic> transaction) async {
+    final receipt = Uri.tryParse(transaction['receipt_url'] as String? ?? '');
+    if (receipt == null || receipt.scheme != 'https') return;
+    await _run(() async {
+      if (!await launchUrl(receipt, mode: LaunchMode.externalApplication)) {
+        throw StateError('Could not open the Stripe receipt.');
+      }
+    });
+  }
+
+  Future<Uri> _loadPaymentLink() async {
+    final payment = widget.payment;
+    if (payment == null) {
+      throw StateError('Choose a payment to collect first.');
+    }
+    final existing = _paymentLink;
+    if (existing != null) return existing;
+    final result = await _repository.createPaymentLink(
+      workspaceId: payment.workspaceId,
+      invoiceId: payment.id,
+      idempotencyKey: _paymentLinkIdempotencyKey ??=
+          createWorkflowIdempotencyKey(),
+    );
+    _paymentLink = result.url;
+    return result.url;
+  }
+
+  Future<void> _sharePaymentLink() async {
     final payment = widget.payment;
     if (payment == null) return;
     await _run(() async {
-      final link = await _repository.createPaymentLink(
-        workspaceId: payment.workspaceId,
-        invoiceId: payment.id,
+      final link = await _loadPaymentLink();
+      if (!mounted) return;
+      final box = context.findRenderObject() as RenderBox?;
+      await SharePlus.instance.share(
+        ShareParams(
+          text: 'Payment of ${formatPounds(payment.outstandingAmount)}: $link',
+          sharePositionOrigin: box == null
+              ? null
+              : box.localToGlobal(Offset.zero) & box.size,
+        ),
       );
-      await Clipboard.setData(ClipboardData(text: link.url.toString()));
+    });
+  }
+
+  Future<void> _copyPaymentLink() async {
+    await _run(() async {
+      final link = await _loadPaymentLink();
+      await Clipboard.setData(ClipboardData(text: link.toString()));
       if (!mounted) return;
       setState(() => _linkCopied = true);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -192,6 +292,10 @@ class _PaymentCollectionSheetState
     final payment = widget.payment;
     if (payment == null) return;
     await _run(() async {
+      final receiptEmail = _receiptEmailController.text.trim();
+      if (!isValidReceiptEmail(receiptEmail)) {
+        throw StateError('Enter a valid receipt email or leave it blank.');
+      }
       final availability = await tapToPayService.availability();
       if (!availability.supported) {
         throw StateError(
@@ -202,6 +306,9 @@ class _PaymentCollectionSheetState
       final request = await _repository.createTerminalPayment(
         workspaceId: payment.workspaceId,
         invoiceId: payment.id,
+        receiptEmail: receiptEmail.isEmpty ? null : receiptEmail,
+        idempotencyKey: _terminalPaymentIdempotencyKey ??=
+            createWorkflowIdempotencyKey(),
       );
       final result = await tapToPayService.collect(
         clientSecret: request.clientSecret,
@@ -265,11 +372,17 @@ class _PaymentCollectionSheetState
     );
     controller.dispose();
     if (confirmed == null || !mounted) return;
+    final transactionId = transaction['id'] as String;
+    final refundOperation = '$transactionId:$confirmed';
     await _run(() async {
       await _repository.refund(
         workspaceId: _workspaceId,
-        transactionId: transaction['id'] as String,
+        transactionId: transactionId,
         amountMinor: confirmed,
+        idempotencyKey: _refundIdempotencyKeys.putIfAbsent(
+          refundOperation,
+          createWorkflowIdempotencyKey,
+        ),
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -295,92 +408,98 @@ class _PaymentCollectionSheetState
   @override
   Widget build(BuildContext context) {
     final payment = widget.payment;
-    return SlateSheetFrame(
-      child: SafeArea(
-        top: false,
-        child: FutureBuilder<StripeAccountStatus>(
-          future: _status,
-          builder: (context, snapshot) {
-            final status = snapshot.data;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    final media = MediaQuery.of(context);
+    final availableHeight =
+        (media.size.height -
+                media.viewInsets.bottom -
+                media.padding.top -
+                AppSpacing.xl * 3)
+            .clamp(240.0, media.size.height)
+            .toDouble();
+    return AnimatedPadding(
+      duration: AppMotion.responsive(context, AppMotion.fast),
+      curve: AppMotion.curve,
+      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+      child: SlateSheetFrame(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: availableHeight),
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: FutureBuilder<StripeAccountStatus>(
+              future: _status,
+              builder: (context, snapshot) {
+                final status = snapshot.data;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Expanded(
-                      child: Text(
-                        'Get paid',
-                        style: TextStyle(
-                          color: AppColors.t1,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w600,
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Get paid',
+                            style: TextStyle(
+                              color: AppColors.t1,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
+                        if (status != null) _ModeLabel(mode: status.mode),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    if (payment == null)
+                      const Text(
+                        'Set up once, then collect from each unpaid Money item.',
+                        style: TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      )
+                    else
+                      _PaymentSummary(payment: payment),
+                    const SizedBox(height: AppSpacing.lg),
+                    if (snapshot.connectionState == ConnectionState.waiting)
+                      const SlateLoadingBlock(height: 150, radius: AppRadius.md)
+                    else if (snapshot.hasError)
+                      SlateErrorState(
+                        message: 'Could not check payment setup',
+                        onRetry: _refreshStatus,
+                      )
+                    else if (status == null || !status.ready)
+                      _buildSetup(status)
+                    else
+                      _buildReady(status),
+                    if (status?.mode == 'test') ...[
+                      const SizedBox(height: AppSpacing.md),
+                      const _TestModeNote(),
+                    ],
+                    if (_error != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      SlateErrorState(message: _error!),
+                    ],
+                    const SizedBox(height: AppSpacing.md),
+                    const Text(
+                      'Stripe processing fees apply. Workloop adds no platform fee. Card details never pass through Workloop.',
+                      style: TextStyle(
+                        color: AppColors.t3,
+                        fontSize: 11,
+                        height: 1.4,
                       ),
                     ),
-                    if (status != null) _ModeLabel(mode: status.mode),
+                    const SizedBox(height: AppSpacing.sm),
+                    SlateButton(
+                      label: 'Close',
+                      secondary: true,
+                      onPressed: _working ? null : () => Navigator.pop(context),
+                    ),
                   ],
-                ),
-                const SizedBox(height: AppSpacing.xxs),
-                if (payment == null)
-                  const Text(
-                    'Set up once, then collect from each unpaid Money item.',
-                    style: TextStyle(
-                      color: AppColors.t3,
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
-                  )
-                else
-                  _PaymentSummary(payment: payment),
-                const SizedBox(height: AppSpacing.lg),
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  const SlateLoadingBlock(height: 150, radius: AppRadius.md)
-                else if (snapshot.hasError)
-                  SlateErrorState(
-                    message: 'Could not check payment setup',
-                    onRetry: _refreshStatus,
-                  )
-                else if (status == null || !status.ready)
-                  _buildSetup(status)
-                else
-                  _buildReady(status),
-                if (status?.mode == 'test') ...[
-                  const SizedBox(height: AppSpacing.md),
-                  const _TestModeNote(),
-                ],
-                if (_error != null) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(
-                        color: AppColors.error,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.md),
-                const Text(
-                  'Stripe processing fees apply. Workloop adds no platform fee. Card details never pass through Workloop.',
-                  style: TextStyle(
-                    color: AppColors.t3,
-                    fontSize: 11,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                SlateButton(
-                  label: 'Close',
-                  secondary: true,
-                  onPressed: _working ? null : () => Navigator.pop(context),
-                ),
-              ],
-            );
-          },
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
@@ -468,7 +587,27 @@ class _PaymentCollectionSheetState
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const SlateLoadingBlock(height: 112, radius: AppRadius.md);
           }
+          if (snapshot.hasError) {
+            return SlateErrorState(
+              message: 'Could not load Stripe payment details',
+              onRetry: () {
+                setState(() {
+                  _transactions = _repository.transactionsForInvoice(
+                    _workspaceId,
+                    payment.id,
+                  );
+                });
+              },
+            );
+          }
           final transactions = snapshot.data ?? const [];
+          final completed = transactions.where((transaction) {
+            return const [
+              'succeeded',
+              'partially_refunded',
+              'refunded',
+            ].contains(transaction['status']);
+          }).toList();
           final refundable = transactions.where((transaction) {
             final amount = (transaction['amount_minor'] as num?)?.toInt() ?? 0;
             final refunded =
@@ -479,21 +618,61 @@ class _PaymentCollectionSheetState
                   'partially_refunded',
                 ].contains(transaction['status']);
           }).toList();
-          if (refundable.isEmpty) {
-            return const SlateSurface(
-              child: Text(
-                'This card payment has been fully refunded.',
-                style: TextStyle(color: AppColors.t2, fontSize: 13),
-              ),
+          final receiptTransaction = completed
+              .cast<Map<String, dynamic>?>()
+              .firstWhere(
+                (transaction) =>
+                    Uri.tryParse(
+                      transaction?['receipt_url'] as String? ?? '',
+                    )?.scheme ==
+                    'https',
+                orElse: () => null,
+              );
+          if (completed.isEmpty) {
+            return const _PaymentStatusRow(
+              icon: LucideIcons.clock3,
+              iconColor: AppColors.t3,
+              title: 'Stripe is confirming this payment',
+              detail: 'Pull to refresh Money in a moment.',
+              status: 'Processing',
             );
           }
-          return SlateButton(
-            label: _working ? 'Refunding...' : 'Refund card payment',
-            icon: LucideIcons.undo2,
-            secondary: true,
-            onPressed: _working
-                ? null
-                : () => _refundTransaction(refundable.first),
+          return Column(
+            children: [
+              _PaymentStatusRow(
+                icon: LucideIcons.circleCheck,
+                iconColor: AppColors.success,
+                title: refundable.isEmpty
+                    ? 'Card payment refunded'
+                    : 'Card payment received',
+                detail: refundable.isEmpty
+                    ? 'Stripe has returned the full collected amount.'
+                    : 'Recorded in Money and reconciled by Stripe.',
+                status: refundable.isEmpty ? 'Refunded' : 'Paid',
+              ),
+              if (receiptTransaction != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                SlateButton(
+                  label: 'View Stripe receipt',
+                  icon: LucideIcons.receiptText,
+                  secondary: true,
+                  onPressed: _working
+                      ? null
+                      : () => _openReceipt(receiptTransaction),
+                ),
+              ],
+              if (refundable.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                SlateButton(
+                  label: _working ? 'Refunding...' : 'Refund card payment',
+                  icon: LucideIcons.undo2,
+                  secondary: true,
+                  onPressed: _working
+                      ? null
+                      : () => _refundTransaction(refundable.first),
+                ),
+              ],
+            ],
           );
         },
       );
@@ -512,15 +691,39 @@ class _PaymentCollectionSheetState
   }
 
   Widget _buildCollectionMethods({required bool contactlessAvailable}) {
-    final linkButton = SlateButton(
-      label: _linkCopied ? 'Payment link copied' : 'Copy secure payment link',
-      icon: _linkCopied ? LucideIcons.circleCheck : LucideIcons.link,
+    final sendLinkButton = SlateButton(
+      label: 'Send payment link',
+      icon: LucideIcons.send,
       secondary: contactlessAvailable,
-      onPressed: _working ? null : _copyPaymentLink,
+      onPressed: _working ? null : _sharePaymentLink,
     );
     return Column(
       children: [
         if (contactlessAvailable) ...[
+          TextField(
+            controller: _receiptEmailController,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.done,
+            autocorrect: false,
+            autofillHints: const [AutofillHints.email],
+            onChanged: (_) {
+              setState(() {
+                _terminalPaymentIdempotencyKey = null;
+                _error = null;
+              });
+            },
+            decoration: InputDecoration(
+              labelText: 'Email receipt',
+              hintText: 'customer@example.com',
+              helperText:
+                  'Optional. Leave blank if the customer declines a receipt.',
+              errorText: isValidReceiptEmail(_receiptEmailController.text)
+                  ? null
+                  : 'Enter a valid email address',
+              prefixIcon: const Icon(LucideIcons.mail, size: 18),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
           SlateButton(
             label: _working
                 ? 'Preparing reader...'
@@ -529,9 +732,9 @@ class _PaymentCollectionSheetState
             onPressed: _working ? null : _takeContactlessPayment,
           ),
           const SizedBox(height: AppSpacing.sm),
-          linkButton,
+          sendLinkButton,
         ] else ...[
-          linkButton,
+          sendLinkButton,
           const SizedBox(height: AppSpacing.xs),
           const Text(
             'Send the link by message or email. Stripe handles the card securely.',
@@ -547,6 +750,11 @@ class _PaymentCollectionSheetState
             status: 'Pending',
           ),
         ],
+        const SizedBox(height: AppSpacing.xs),
+        WorkloopTextButton(
+          label: _linkCopied ? 'Payment link copied' : 'Copy payment link',
+          onPressed: _working ? null : _copyPaymentLink,
+        ),
       ],
     );
   }
@@ -568,7 +776,7 @@ class _PaymentSummary extends StatelessWidget {
             formatPounds(payment.outstandingAmount),
             style: const TextStyle(
               color: AppColors.t1,
-              fontSize: 32,
+              fontSize: 28,
               fontWeight: FontWeight.w600,
               letterSpacing: -0.5,
             ),
@@ -695,7 +903,7 @@ class _ModeLabel extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.border),
       ),
       child: Text(

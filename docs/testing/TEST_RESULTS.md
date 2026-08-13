@@ -1,11 +1,13 @@
 # Workloop Test Results
 
-Last updated: 2026-07-28
+Last updated: 2026-08-12
 
 > **Final local evidence ledger for branch
 > `codex/comprehensive-launch-audit-2026-07-26`.** Commands below were observed
-> after the last source, migration, and golden change. Production was not
-> mutated. Passing local evidence is not a substitute for the isolated
+> after the last source, migration, and golden change. On 2026-08-05 the two
+> reviewed hardening migrations and Stripe function v2 deployments were applied
+> to the connected test-mode project. Passing evidence is not a substitute for
+> the isolated
 > staging, store, and physical-device gates recorded below.
 
 ## 1. Executive summary
@@ -14,17 +16,20 @@ The audit found a broad Flutter test inventory, targeted Deno tests, new
 responsive/golden/integration harnesses, local pgTAP security contracts,
 deterministic dataset tooling, guarded k6 scenarios, and expanded CI.
 
-The final candidate is clean for formatting and static analysis. All 249
-Flutter tests and all 19 Deno tests pass. Eleven launch goldens were generated,
-visually inspected, and then passed in non-update mode. The signed-out iOS
-simulator integration smoke passes. Android debug/profile, web release, iOS
-simulator debug, and unsigned iOS profile/release artifacts all compile.
+The 2026-08-08 historical candidate was clean for formatting/static analysis and
+passed 346 Flutter plus 25 Deno tests. That evidence is preserved below, but it
+is no longer the candidate verdict. On 2026-08-12 local analysis and 360/360
+Flutter unit/widget tests passed, while the signed-out iOS simulator integration
+failed because the Auth mode toggle was outside the tappable viewport. The
+current owner worktree is also intentionally dirty and therefore cannot pass
+the signed-artifact provenance preflight.
 
-No production data was modified. Destructive, database-reset, multi-user,
-authenticated E2E, and load tests were not pointed at production.
+No user/business row was intentionally modified. The live pgTAP scripts ran
+inside rolled-back transactions. Destructive, database-reset, client-SDK
+multi-user, authenticated E2E, and load tests were not pointed at the project.
 
-Verdict: **strong closed-beta candidate after the remaining backend/Auth gates,
-but not ready for public store launch**. Clean database/security execution,
+Verdict: **not yet ready for external beta invitations or public store launch**.
+The red Auth integration journey must be fixed and rerun. Clean database/security execution,
 authenticated staging E2E, physical Android/accessibility QA, production Auth
 operations, public legal/support URLs, distribution signing, and store
 operation remain open. No “bug-free” claim is made.
@@ -39,6 +44,8 @@ The candidate includes:
 - a multi-device/text-scale responsive harness;
 - deterministic launch-surface golden tests;
 - a signed-out Flutter integration smoke;
+- guarded staging integration journeys for the connected core loop,
+  two-account SDK isolation and public booking conversion;
 - a local-only Supabase configuration and clean-schema baseline migration;
 - pgTAP schema/grant and two-user RLS tests;
 - deterministic small, medium, large, and 50,000-account fixture profiles;
@@ -168,18 +175,18 @@ in [KNOWN_GAPS.md](KNOWN_GAPS.md); none is silently converted into a pass.
 
 | Area | Result |
 | --- | --- |
-| Production changes | None |
-| Read-only live metadata | Inspected on 2026-07-26 |
+| Test-mode project changes | Two reviewed retry/RLS migrations and Stripe function v2 deployments applied on 2026-08-05 |
+| Live metadata | Re-inspected on 2026-08-05 |
 | Public table RLS | Enabled on inspected live application tables |
 | Anonymous direct table grants | None observed on inspected application tables |
 | Private workflow table client grants | None observed |
-| Private-table RLS | Two internal tables observed without RLS; protected by private schema/no client grants, with defence-in-depth decision still open |
-| User A/User B pgTAP | Authored, not executed locally |
+| Private-table RLS | Enabled with explicit false client policies on payment counters, workflow idempotency, and Stripe webhook state |
+| User A/User B pgTAP | Live transaction-wrapped 14-assertion script reached its final successful check; clean replay and SDK E2E remain open |
 | Storage isolation | Not tested; no launch bucket/policy workflow identified |
-| Edge source tests | 19/19 final Deno tests pass; six entry points type-check |
+| Edge source tests | 25/25 Deno tests pass; both Stripe entry points type-check in addition to the existing function checks |
 | Public booking abuse/concurrency | Not executed against isolated deployment |
 | Account deletion completion | Not executed |
-| Leaked-password protection | Disabled; release blocker |
+| Leaked-password protection | Disabled paid control; app-side new-password minimum is 12 characters, not an equivalent replacement |
 
 See [SECURITY_TESTING.md](SECURITY_TESTING.md).
 
@@ -496,3 +503,474 @@ were not changed.
 The iOS build continues to warn that `device_calendar` and
 `flutter_local_notifications` do not declare Swift Package Manager support.
 The current CocoaPods build succeeds.
+
+## 25. 2026-08-05 free launch-hardening sweep
+
+This pass implemented only no-charge work. It did not enable live Stripe,
+platform fees, Apple proximity-reader entitlements, store signing, a paid
+Supabase plan, or public legal/support operations.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `flutter analyze` | No issues | Static analysis is not runtime proof |
+| Flutter suite with coverage | 324/324 passed; 47.15% lines | Authenticated E2E remains open |
+| Golden suite | 14/14 passed after reviewing five intentional updates | Deterministic fixtures only |
+| Edge formatting/lint/type checks | Passed, including both Stripe functions | Does not exercise every provider response |
+| Deno tests | 25/25 passed | Pure/helper coverage, not live money movement |
+| Live schema script | Final assertion 47 passed inside a rolled-back transaction | Current project state, not clean replay |
+| Live isolation script | Final assertion 14 passed inside a rolled-back transaction | pgTAP role simulation, not client-SDK E2E |
+| Supabase advisor | Only leaked-password protection warning remains | Paid control remains disabled |
+| Edge deployment | `stripe-payments` v2 JWT-protected; `stripe-webhook` v2 signed-body boundary | Test mode only |
+| HTTP boundary smoke | Missing JWT returned 401; unsigned webhook returned 400 | Negative-path smoke only |
+| iOS profile | 70.7 MB build passed; installed and launched on paired iPhone 15 Pro Max | Development signing, not distribution or full manual QA |
+| Android profile | 155.0 MB universal build passed; 69.9 MB arm64 split; 16 KB zip alignment and v2 signature verified | Profile size, not Play-delivery size; no physical Android run |
+
+The iOS build still warns that `device_calendar` and
+`flutter_local_notifications` do not declare Swift Package Manager support.
+The current CocoaPods build succeeds.
+
+## 26. 2026-08-05 editorial UI sweep
+
+The screenshots supplied for this pass were translated into one shared system:
+crisp Light neutrals, denser editorial type and spacing, list rhythm, restrained
+geometry, and real-data visuals rather than a screen-by-screen reskin.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `flutter analyze` | No issues | Static analysis cannot assess subjective appearance |
+| Flutter suite | 325/325 passed | Authenticated staging journeys remain open |
+| Golden suite | 15/15 passed; 18 images, including a new Light notification-list fixture | Deterministic fixtures only |
+| Responsive matrix | Passed in Light and Dark across six phone sizes and two text scales | Simulated viewports, not every physical device |
+| Visual review | Home, Clients, Bookings, Money, Tools, Settings, Auth, forms, public profile, and notifications reviewed at 390 x 844 | Desktop image inspection, not ambient-light phone review |
+| iOS profile build | Pass; 70.7 MB `Runner.app` | Development signing, not App Store distribution |
+| Physical iPhone profile | Exact artifact installed on the paired iPhone 15 Pro Max | Launch denied by device security because the development profile is not currently trusted |
+| Diff hygiene | `git diff --check` passed | Worktree also contains the preceding authorised launch-hardening sweep |
+
+The iOS build still warns that `device_calendar` and
+`flutter_local_notifications` do not declare Swift Package Manager support.
+The current CocoaPods build succeeds.
+
+## 27. 2026-08-05 final visual-system acceptance pass
+
+This pass audited the full route and feature inventory after the editorial
+system landed, then closed the remaining page-grid, reduced-motion, onboarding
+orientation, and secondary-route test gaps.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `flutter analyze` | No issues | Static analysis cannot assess subjective appearance |
+| Flutter suite | 331/331 passed | Authenticated staging journeys remain open |
+| Golden suite | 16/16 passed in protected mode; 19 images | Deterministic fixtures only |
+| Primary responsive matrix | Light and Dark passed across six phone sizes, two text scales, and 12 launch surfaces | Simulated viewports |
+| Secondary responsive matrix | Nine routes passed in Light and Dark at 320 x 700, 200% text, and reduced motion | One compact viewport rather than every device |
+| Keyboard and draft safety | Existing keyboard-visible form, native/fallback back, retained-state, and draft-guard tests passed | Automated interaction only |
+| UI source contracts | No raw feature colour literals, weights above 600, or unguarded canonical motion durations | Does not replace visual review |
+| Reviewed visuals | Onboarding operating loop, notifications, and public booking profile inspected after their intentional updates | Desktop image review |
+| iOS profile | 70.7 MB build passed; exact artifact installed and launched on paired iPhone 15 Pro Max; process confirmed running | Development signing, not App Store distribution |
+| Android profile | 129.4 MB APK build passed | No physical Android run |
+
+The iOS build still warns that `device_calendar` and
+`flutter_local_notifications` do not declare Swift Package Manager support.
+The current CocoaPods build succeeds. Manual VoiceOver, TalkBack, physical
+Android, and authenticated staging journeys remain separate release-QA gates.
+
+## 28. 2026-08-05 graphite-frame UI revamp
+
+This pass deliberately moved beyond the preceding refinement and introduced a
+new visual identity across the shared shell and product surfaces: cool chalk,
+graphite framing, lime signal geometry, editorial rules, square actions, and
+strong operational focus panels. Routes, providers, repositories, persisted
+state, and data contracts remain unchanged.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `flutter analyze` | No issues | Static analysis cannot assess subjective appearance |
+| Flutter suite | 332/332 passed | Authenticated staging journeys remain open |
+| Golden suite | 16/16 passed in protected mode; 19 reviewed images | Deterministic fixtures only |
+| Responsive coverage | Primary six-device Light/Dark matrix and compact 200%-text secondary-route matrix passed | Simulated viewports |
+| UI contracts | Graphite/on-graphite contrast, shared-token, motion, navigation, and interaction safeguards passed | Automated checks do not replace assistive-technology traversal |
+| iOS profile | 70.7 MB build passed; exact artifact installed on paired iPhone | Launch was denied because the device was locked |
+| Android profile | 155.4 MB universal APK passed | No physical Android run |
+| Diff hygiene | `git diff --check` passed | Worktree also contains the preceding authorised launch-hardening work |
+
+The iOS build still warns that `device_calendar` and
+`flutter_local_notifications` do not declare Swift Package Manager support.
+The current CocoaPods build succeeds. Manual VoiceOver, TalkBack, unlocked
+iPhone review, physical Android, authenticated staging journeys, and store
+distribution remain separate release-QA gates.
+
+## 29. 2026-08-06 soft-editorial UI replacement
+
+This pass replaced the rejected graphite-frame interface with open typographic
+headers, soft Light-mode neutrals, white focus surfaces, quiet selection rails,
+restrained lime markers, and a lighter floating shell dock. Dark remains lifted
+graphite but no longer repeats harsh near-black frames inside every workspace.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `flutter analyze` | No issues | Static analysis cannot assess subjective appearance |
+| Flutter suite | 333/333 passed | Authenticated staging journeys remain open |
+| Golden suite | 17/17 passed in protected mode; 21 reviewed images including Light/Dark shell navigation | Deterministic fixtures only |
+| Responsive coverage | Primary six-device Light/Dark matrix and compact 200%-text secondary-route matrix passed | Simulated viewports |
+| UI contracts | Semantic contrast, shared-token, reduced-motion, navigation and interaction safeguards passed | Automated checks do not replace assistive-technology traversal |
+| iOS profile | 70.7 MB build passed | No physical iPhone was connected for install or interactive launch |
+| Android profile | 155.4 MB universal APK passed | No physical Android run |
+| Diff hygiene | `git diff --check` passed | Worktree also contains the preceding authorised launch-hardening work |
+
+The iOS build still warns that `device_calendar` and
+`flutter_local_notifications` do not declare Swift Package Manager support.
+The current CocoaPods build succeeds. Manual VoiceOver, TalkBack, physical
+device review, authenticated staging journeys, and store distribution remain
+separate release-QA gates.
+
+## 30. 2026-08-06 Workloop Studio complete visual reset
+
+This pass replaced the complete application presentation layer with Workloop
+Studio while retaining every route, provider, repository, draft guard,
+retained workspace, Supabase contract and operational workflow.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `flutter analyze` | No issues | Static analysis cannot judge subjective appearance |
+| Flutter suite | 334/334 passed serially | Authenticated staging journeys remain open |
+| Golden suite | 17/17 passed in protected mode; 21 images manually reviewed | Deterministic fixtures only |
+| Responsive coverage | Primary six-device Light/Dark matrix at 100% and 200% text plus compact secondary-route coverage passed | Simulated viewports |
+| Studio contracts | Exact adaptive palette, Manrope controls, semantic contrast, named geometry and reduced-motion checks passed | Automated checks do not replace assistive-technology traversal |
+| Native startup | Android and iOS no longer reference the retired lime launch bitmap; Studio startup colours are asserted | App icon replacement is a separate release decision |
+| iOS profile | 70.7 MB `Runner.app` built, installed and interactively launched on the paired iPhone 15 Pro Max; running process confirmed | Development signing, not App Store distribution |
+| Android profile | 155.5 MB universal profile APK built | No physical Android run |
+| Diff hygiene | `git diff --check` passed | Worktree also contains the preceding authorised hardening work |
+
+The installed iOS app is signed by the configured Apple Development identity,
+passes strict local code-signature verification, embeds the correct
+`com.ismaeel.workloop` application identifier and includes the connected
+iPhone UDID. The profile is valid through 2026-08-12. Interactive launch and a
+live `Runner` process were confirmed through CoreDevice. Manual VoiceOver,
+TalkBack, authenticated staging journeys, live payment verification and store
+distribution remain separate release-QA gates.
+
+## 31. 2026-08-06 Studio composition and native-brand refinement
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `flutter analyze` | No issues | Static analysis cannot judge subjective appearance |
+| Flutter suite | 336/336 passed | Authenticated staging journeys remain open |
+| Golden suite | 17/17 passed after update, manual review and protected replay | Deterministic fixtures only |
+| Responsive coverage | Six phone sizes across iOS/Android, Light/Dark and 100%/200% text passed; keyboard form case passed | Simulated viewports |
+| Hero contrast | Primary, secondary and muted semantic roles pass 4.5:1 at both gradient endpoints in Light and Dark | Does not replace physical ambient-light review |
+| Shell clearance | 140 points asserted for a 34-point iPhone safe area; all seven shell-retained workspaces use the same calculation | Other platform insets are calculated at runtime |
+| Native branding | Full iOS/Android launcher-icon sets and iOS/Android native splash assets compile | Store-side asset review is separate |
+| iOS profile | 70.7 MB build installed and launched on the paired iPhone 15 Pro Max; final PID 69228 confirmed | Development signing, not App Store distribution |
+| Android profile | 155.6 MB universal APK built | No physical Android run |
+| Diff hygiene | `git diff --check` passed | Worktree also contains earlier authorised work |
+
+The exact installed iOS artifact uses `com.ismaeel.workloop`. Installation and
+interactive launch were confirmed separately. Manual VoiceOver, TalkBack,
+authenticated production-data journeys, live payments and store distribution
+remain separate release gates.
+
+## 32. 2026-08-08 native-feeling booking calendar
+
+This pass replaced the boxed Calendar mode and repeated next-booking/list
+layers with an open month grid and selected-day time-rail agenda. Existing
+booking data, List mode, Requests, creation, detail routes and repositories were
+preserved.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| Calendar interaction coverage | Month swipe, previous/next navigation, selected-day agenda, start/end times and selected-date creation entry passed | Widget interaction, not a physical gesture feel study |
+| Accessibility contract | Previous/next controls remain labelled and at least 44 points; date cells expose selection and booking counts | Automated semantics, not VoiceOver traversal |
+| Studio source contract | No feature-local raw colour system, unapproved geometry or unguarded motion | Static source safeguard |
+| Golden suite | 19/19 passed; 23 images including deterministic Light and Dark Calendar fixtures | Deterministic fixture data only |
+| Visual review | Light and Dark Calendar reviewed at 390 x 844 | Desktop image inspection, not ambient-light phone review |
+| `flutter analyze` | No issues | Static analysis cannot judge subjective interaction feel |
+| `flutter test --dart-define-from-file=.env` | 340/340 passed | Authenticated staging journeys remain open |
+| iOS profile | 70.7 MB `Runner.app` built and installed on the paired iPhone 15 Pro Max | Automatic launch was denied because the phone was locked |
+| Diff hygiene | `git diff --check` passed | The branch already contains extensive authorised uncommitted work outside this calendar pass |
+
+The iOS build continues to warn that `device_calendar` and
+`flutter_local_notifications` do not declare Swift Package Manager support.
+The current CocoaPods build succeeds. Manual month-swipe feel, VoiceOver,
+physical Android and authenticated schedule-data review remain separate QA
+gates.
+
+## 33. 2026-08-08 final completion and release-candidate sweep
+
+This sweep re-audited the documented routes, user-facing modules, failure-state
+contracts, settings actions, current Supabase boundaries and the complete local
+verification surface. The only locally actionable P1 found was the partially
+exposed recurring-series control; V1 now creates one booking at a time while
+preserving historic recurrence data and backend compatibility.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| Dart formatting | 205/205 files clean | Formatting only |
+| `flutter analyze` | No issues | Static analysis cannot prove service behaviour |
+| Flutter full suite with coverage | 340/340 passed; 9,650/19,424 lines, 49.68% | Authenticated staging E2E remains open |
+| Recurrence decision coverage | New-booking UI does not expose the series control; recurrence utility and payload compatibility tests pass | Historic records are not a new-series workflow |
+| Golden suite | 19/19 passed in protected mode; 23 image files | Existing reviewed fixtures; no golden was changed for this nonvisual removal |
+| iOS simulator integration | Signed-out launch/Auth journey 1/1 passed | No authenticated business workflow |
+| Edge verification | Format/lint clean, eight entry points type-check, 25/25 Deno tests pass under transient Deno 2.9.5 | Not deployed-provider E2E |
+| Data profiles | Small, medium, large and scale-50000 dry runs pass | Generator evidence only; no backend writes or load |
+| iOS profile | 70.7 MB build; strict signature verification passed | Development signing, not Distribution |
+| Android profiles | Universal 155.6 MB and arm64 129.4 MB builds pass; arm64 passes 16 KB alignment and v2 signature checks | Profile signing, no physical Android |
+| Web release | 43 MB build passes | Not a deployed legal/support operation |
+| Physical iPhone | Exact candidate installed and launched on paired iPhone 15 Pro Max; CoreDevice confirmed the process | Interactive business journey and assistive-technology traversal are not claimed |
+| Live Supabase read-only refresh | Active healthy Postgres 17.6.1; 23/23 public and 4/4 private application tables have RLS; zero anon grants; zero private client grants; only deletion audit lacks authenticated access | Read-only metadata and advisor evidence, not clean replay or SDK E2E |
+| Security advisor | Only leaked-password protection warning | Paid Auth control remains disabled |
+| Local database replay/pgTAP | Not executed | Docker engine unavailable |
+| Diff hygiene | `git diff --check` passes | Worktree includes extensive earlier authorised, uncommitted work |
+
+No schema migration, Edge deployment, commit, push or production mutation was
+performed during this sweep. Public-launch blockers remain the isolated
+database/Auth/workflow evidence, destructive deletion proof, physical Android
+and assistive-technology matrix, production email/legal/support operation,
+live-money/provider gates, distribution signing, store operation and brand
+clearance.
+
+## 34. 2026-08-08 UI completion evidence and staging harness
+
+This pass simplified the Tools workspace into one shared list composition,
+expanded reviewed populated-state coverage, and implemented the three highest
+value production-safe staging journeys without writing to the live project.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `DENO_BIN=... ./scripts/qa_all.sh` | 208 Dart files formatted, clean analysis, 346/346 Flutter tests, Edge format/lint/type-check, 25/25 Deno tests and all data profiles pass | Local deterministic evidence only |
+| Protected golden suite | 25/25 passed; 29 image files | Reviewed fixtures, not physical ambient-light/accessibility QA |
+| Visual coverage added | Populated booking requests/detail, Profile, Money, Tasks and Notes; Tools Light/Dark refreshed | Selected representative states rather than every data permutation |
+| iOS simulator integration | Signed-out launch/Auth 1/1 passed; three staging tests compiled and safely skipped | No backend write occurred without explicit staging configuration |
+| Staging safety | Runner requires explicit write opt-in and rejects project ref `imtbyrvsonzvtddswbtb` | A passing staging run still requires approved branch cost and disposable users |
+| iOS profile | 70.2 MB `Runner.app` built, installed and launched on the paired iPhone; CoreDevice confirmed PID 78555 | Wireless Dart VM discovery timed out, so install/launch is proven but interactive QA is not claimed |
+| Android profile | 156.6 MB universal APK built | Physical Android and release signing remain open |
+
+The first parallel platform-build attempt collided in Flutter-generated iOS
+files; the same builds passed when rerun sequentially. Flutter also warns that
+`device_calendar` and `flutter_local_notifications` do not yet support Swift
+Package Manager, and that warning should be resolved before Flutter makes it an
+error.
+
+## 35. 2026-08-08 command-centre UI polish
+
+This pass refined Home, Bookings, Clients, Tools and the shared control/list
+system without changing repositories, routes, schema or workflow behaviour.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `DENO_BIN=... ./scripts/qa_all.sh` | 208 Dart files formatted, clean analysis, 347/347 Flutter tests and 25/25 Deno tests pass | Local deterministic evidence only |
+| Protected golden suite | 25/25 scenarios passed; refreshed Home, Clients, Bookings and Tools images were visually reviewed in Light and Dark where declared | Representative fixtures, not every live-data combination |
+| Responsive coverage | Primary launch surfaces pass across the six-phone and text-scale matrix; a narrow-phone booking-header regression test was added | Widget geometry, not physical thumb-reach observation |
+| iOS profile | 70.3 MB no-codesign profile build passed | Build evidence only; device deployment used a separately signed build from the same source |
+| Android profile | 156.7 MB universal profile APK passed | No physical Android run |
+| Physical iPhone | Signed profile candidate installed and launched; CoreDevice confirmed `Runner` PID 78739 | Install/launch only; wireless Flutter diagnostics did not complete an interactive QA session |
+| Diff hygiene | `git diff --check` passes | The worktree contains extensive earlier authorised, uncommitted work |
+
+The iOS build continues to warn that `device_calendar` and
+`flutter_local_notifications` lack Swift Package Manager support. It is not a
+current build failure, but should be addressed before a future Flutter release
+makes the warning fatal.
+
+## 36. 2026-08-10 muted Dark mode and active-job motion
+
+This pass neutralised the Dark palette and made Home's schedule node follow the
+booking selected in the Today carousel without changing booking data or routes.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `DENO_BIN=... ./scripts/qa_all.sh` | 208 Dart files formatted, clean analysis, 347/347 Flutter tests and 25/25 Deno tests pass | Local deterministic evidence only |
+| Theme contracts | Semantic text, controls, module colours, focus indicators and both hero gradient endpoints pass declared contrast checks | Automated colour math, not every physical display condition |
+| Responsive/accessibility checks | Phone/text-scale matrix and Reduced Motion source contract pass; selected job advances with carousel state | Automated widgets cannot judge perceived bounce quality |
+| Protected goldens | 25/25 scenarios pass after refresh; Dark Home, shell, Bookings, Tools and Settings were visually reviewed | Representative fixtures only |
+| iOS profile | 70.3 MB build passes | Development profile, not Distribution |
+| Android profile | 156.7 MB universal APK passes | No physical Android run |
+| Physical iPhone | Final signed build installed and launched; CoreDevice confirmed `Runner` PID 84894 | Install/launch only; interactive motion quality still requires the owner's on-device judgement |
+| Diff hygiene | `git diff --check` passes | Worktree contains earlier authorised, uncommitted work |
+
+The existing Swift Package Manager warnings for `device_calendar` and
+`flutter_local_notifications` remain unchanged.
+
+## 37. 2026-08-10 Notes list refinement
+
+Notes now uses flat divider-led rows while preserving pinned/date grouping,
+search, filters, editor entry, imports and destructive-action protections.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `DENO_BIN=... ./scripts/qa_all.sh` | 208 Dart files formatted, clean analysis, 347/347 Flutter tests and 25/25 Deno tests pass | Local deterministic evidence only |
+| Protected goldens | 25/25 scenarios pass; populated Light Notes fixture refreshed and reviewed | Representative data only |
+| Notes row contract | Populated fixture asserts both note rows use the canonical flat list mode | Widget structure, not subjective physical density |
+| Responsive and safety checks | Phone/text-scale matrix, note checklist accessibility and failed-delete retention pass | Declared scenarios only |
+| Platform profiles | iOS 70.3 MB and universal Android 156.7 MB builds pass | Android not run on physical hardware |
+| Physical iPhone | Final signed revision installed and launched; CoreDevice confirmed `Runner` PID 84931 | Install/launch only |
+
+## 38. 2026-08-10 compact calendar agenda
+
+Calendar mode now places the selected-day agenda directly after the compact
+month grid and renders bookings as flat time-rail list rows.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `DENO_BIN=... ./scripts/qa_all.sh` | 208 Dart files formatted, clean analysis, 347/347 Flutter tests and 25/25 Deno tests pass | Local deterministic evidence only |
+| Calendar geometry contract | Test asserts the agenda divider starts within 1.5 logical pixels of the month grid | Deterministic 390 x 844 fixture |
+| Booking-row contract | Selected-day booking asserts canonical `WorkloopListRow.flat == true` | Structural presentation check |
+| Protected goldens | 25/25 pass; Light and Dark Calendar fixtures refreshed and visually reviewed | Representative selected day only |
+| Platform profiles | iOS 70.3 MB and universal Android 156.7 MB builds pass | Android not run on physical hardware |
+| Physical iPhone | Final signed revision installed and launched; CoreDevice confirmed `Runner` PID 84974 | Install/launch only |
+
+## 39. 2026-08-10 unified booking-record rows
+
+Schedule and Calendar now share one booking-record component. Calendar keeps
+its continuous selected-day time rail; Schedule keeps Today/Upcoming/Past and
+multi-day grouping.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `DENO_BIN=... ./scripts/qa_all.sh` | 208 Dart files formatted, clean analysis, 347/347 Flutter tests and 25/25 Deno tests pass | Local deterministic evidence only |
+| Shared-row contract | List and Calendar fixtures assert flat `WorkloopListRow` geometry with the same padding; Schedule also asserts visible start and end times | Representative populated booking only |
+| Protected goldens | 25/25 scenarios pass; refreshed populated Schedule and existing Light Calendar fixtures were visually compared | Representative data and viewport only |
+| Responsive coverage | Full phone and text-scale matrix passes inside the 347-test suite | Automated layout evidence, not physical accessibility review |
+| Platform profiles | iOS 70.3 MB and universal Android 156.7 MB profile builds pass | Android not run on physical hardware |
+| Physical iPhone | Signed profile revision installed and launched; CoreDevice confirmed `Runner` PID 85094 | Install/launch only; owner should judge final density on live data |
+
+The existing Swift Package Manager warnings for `device_calendar` and
+`flutter_local_notifications` remain unchanged.
+
+## 40. 2026-08-10 Bookings workflow-density pass
+
+The Bookings List now places time filters and display mode in one responsive
+toolbar, renders the seven-day load as a compact inline strip, and brings the
+first job materially higher. Calendar retains the full month and time rail but
+uses tighter surrounding rhythm so the selected-day agenda is visible sooner.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `DENO_BIN=... ./scripts/qa_all.sh` | 208 Dart files formatted, clean analysis, 347/347 Flutter tests and 25/25 Deno tests pass | Local deterministic evidence only |
+| Schedule hierarchy contract | Standard 390 x 844 fixture asserts the first populated booking begins before logical y=450; reviewed golden moves it approximately 120 points higher | One representative data set |
+| Calendar hierarchy contract | Standard fixture asserts the first selected-day booking begins before logical y=770 while the month grid keeps 44-point date cells | One six-week month and selected day |
+| Responsive/accessibility matrix | Six phone sizes, Light/Dark and 1x/2x text pass; narrow/large-text toolbar stacks and the load strip expands for large text | Automated geometry, not VoiceOver manual QA |
+| Protected goldens | 25/25 scenarios pass; refreshed Schedule plus Light/Dark Calendar fixtures were visually reviewed | Representative viewports only |
+| Platform profiles | iOS 70.3 MB and universal Android 156.7 MB profile builds pass | Android not run on physical hardware |
+| Physical iPhone | Signed profile revision installed and launched; CoreDevice confirmed `Runner` PID 85161 | Install/launch only; owner should judge live-data density and thumb flow |
+
+The existing Swift Package Manager warnings for `device_calendar` and
+`flutter_local_notifications` remain unchanged.
+
+## 41. 2026-08-10 schedule-first Bookings hierarchy
+
+The main Bookings screen now opens directly into the schedule. The redundant
+seven-day workload graphic and full-width Schedule/Requests switch are removed;
+a counted inbox action opens the existing Active/New/Closed request workspace.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `DENO_BIN=... ./scripts/qa_all.sh` | 208 Dart files formatted, clean analysis, 347/347 Flutter tests and 25/25 Deno tests pass | Local deterministic evidence only |
+| Request workflow contract | Compact header inbox exposes the active count, opens `BookingRequestsScreen`, and continues into the selected request detail | Widget navigation test, not a live public submission |
+| Schedule hierarchy contract | Standard fixture asserts the first populated List booking begins before logical y=320 after the chart and peer switch are removed | One representative populated day |
+| Calendar hierarchy contract | Standard fixture asserts the first selected-day booking begins before logical y=710 while preserving the month grid and direct agenda handoff | One six-week month and selected day |
+| Responsive/accessibility coverage | Six phone sizes, Light/Dark and 1x/2x text pass; the request action remains semantic and the compact-phone header does not overflow | Automated geometry, not manual VoiceOver QA |
+| Protected goldens | 25/25 scenarios pass; refreshed Schedule plus Light/Dark Calendar fixtures were visually reviewed | Representative viewports only |
+| Platform profiles | iOS 70.7 MB and universal Android 156.6 MB profile builds pass | Android not run on physical hardware |
+| Physical iPhone | Final signed profile candidate installed and launched; CoreDevice confirmed `Runner` PID 85201 | Install/launch only; wireless Dart VM discovery timed out |
+| Diff hygiene | `git diff --check` passes | Worktree contains earlier authorised, uncommitted work |
+
+The existing Swift Package Manager warnings for `device_calendar` and
+`flutter_local_notifications` remain unchanged.
+
+## 42. 2026-08-10 compact feature creation and unified booking navigation
+
+Clients, Bookings, Money, Tasks and Notes now use one circular feature-header
+plus action. Bookings replaces the separate time and display controls with one
+Today/Upcoming/Past/Calendar rail.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `DENO_BIN=... ./scripts/qa_all.sh` | 208 Dart files formatted, clean analysis, 347/347 Flutter tests and 25/25 Deno tests pass | Local deterministic evidence only |
+| Create-action contract | Shared `WorkloopTopAction` renders only the plus while retaining the feature-specific semantic label and a target larger than 44 points | Widget semantics and geometry, not manual VoiceOver QA |
+| Booking-navigation contract | Exactly one navigation rail exposes Today, Upcoming, Past and Calendar; Calendar still opens the month workspace and time choices retain their tab state | Widget navigation test |
+| Responsive/accessibility coverage | Six phone sizes, Light/Dark and 1x/2x text pass, plus compact large-text secondary surfaces | Automated layout evidence |
+| Protected goldens | 25/25 scenarios pass; Bookings, Calendar, Clients, Money, Tasks and Notes were refreshed and visually reviewed | Representative fixtures only |
+| Platform profiles | iOS 70.7 MB and universal Android 156.6 MB profile builds pass | Android not run on physical hardware |
+| Physical iPhone | Signed profile candidate installed and launched with an available Dart VM service; CoreDevice confirmed `Runner` PID 85495 | Launch evidence, not a completed manual workflow |
+| Diff hygiene | `git diff --check` passes | Worktree contains earlier authorised, uncommitted work |
+
+The existing Swift Package Manager warnings for `device_calendar` and
+`flutter_local_notifications` remain unchanged.
+
+## 43. 2026-08-11 atomic appearance transition
+
+Appearance changes now synchronise semantic theme state and the legacy adaptive
+palette before the app screen tree builds. Settings icon and identity surfaces
+also consume semantic tokens directly.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| First-frame appearance contract | Manual Light, Dark and System brightness resolution passes; Settings icon and avatar surfaces hold the incoming colour after one pump | Deterministic widget rendering, not camera-based frame analysis |
+| Responsive appearance matrix | Settings and the primary surface matrix pass in Light and Dark | Declared phone sizes and text scales |
+| Full Flutter verification | `flutter analyze` reports no issues and 355/355 Flutter tests pass | Local automated evidence only |
+| iOS profile build | Signed profile build passes at 71.0 MB | Development signing, not App Store distribution |
+| Physical iPhone | Exact signed profile installed and launched; CoreDevice confirmed `Runner` PID 90217 | Install/launch proof; owner should perform the final rapid-toggle visual check |
+| Diff hygiene | `git diff --check` passes | Worktree contains earlier authorised, uncommitted work |
+
+The existing Swift Package Manager warnings for `device_calendar` and
+`flutter_local_notifications` remain unchanged.
+
+## 44. 2026-08-11 beta interface uniformity sweep
+
+Work now keeps one stable command header while Schedule, Tasks and Notes swap
+inside retained child surfaces. Shared feature headers, create actions, root
+navigation, peer navigation and semantic module colours were aligned across the
+primary operating loop.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| Retained Work contract | Header geometry remains unchanged while Schedule, Tasks and Notes switch; one canonical create action remains present | Automated interaction, not a human rapid-tap session |
+| Header and action geometry | Primary feature headers align and create-capable screens use the same 46-point circular action | Canonical shell surfaces |
+| Protected visual references | 27/27 launch scenarios pass after reviewing Work, Money, Business and dark shell navigation | Representative fixtures and viewports |
+| Full Flutter verification | `flutter analyze` reports no issues and 358/358 Flutter tests pass | Local automated evidence only |
+| iOS profile build | Unsigned 70.8 MB profile compilation passes | Release signing is blocked by the profile capability mismatch |
+| Physical iPhone | Temporary QA-signed copy installed and launched; CoreDevice confirmed `Runner` PID 90668 | The QA copy omits Apple sign-in entitlement and is not the TestFlight artifact |
+| Beta signing gate | Current provisioning profile lacks `com.apple.developer.applesignin`; Xcode reports no signed-in developer account to regenerate it | Requires one Apple-account provisioning action in Xcode or the Developer portal |
+| Diff hygiene | `git diff --check` passes | Worktree contains earlier authorised, uncommitted work |
+
+The existing Swift Package Manager warnings for `device_calendar` and
+`flutter_local_notifications` remain unchanged.
+
+## 45. 2026-08-12 release-candidate QA refresh
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| `flutter analyze` | No issues after the QA/documentation remediation | Local static evidence; full candidate suite still required |
+| `flutter test --dart-define-from-file=.env` | 360/360 unit/widget tests passed before remediation | Does not include live providers or manual interaction |
+| Signed-out iOS integration | **Failed** on iPhone 17 Pro simulator: Auth mode toggle centre was below the 402 x 874 tappable viewport and Create-account state did not appear | Beta-blocking current failure; staging tests compiled/skipped |
+| Database plan inventory | 82 authored: 51 schema/security, 16 isolation, 15 privileged-MFA/payment-retention | Zero clean local execution in this audit; Docker/Supabase CLI unavailable |
+| Two-user SDK coverage | Expanded to read/insert/update/delete attempts across 13 practical disposable core/relationship/device tables with owner-side cleanup | Authored and formatted, not run against disposable staging |
+| Candidate preflight | `scripts/qa_release_candidate.sh` passed Bash syntax and refused the current dirty/untracked tree with exit 78 before writing provenance | Expected safe refusal, not candidate success |
+| Existing iOS build 3 | Local IPA signature/distribution metadata previously verified; not accepted by App Store Connect | Predates current source/backend work and is not releasable |
+
+This refresh supersedes older current-verdict/count statements while retaining
+their historical command evidence. External beta is blocked until the Auth
+integration failure, clean database/82 pgTAP run, disposable staging journeys,
+external Auth lifecycle and clean current signed-artifact provenance are green.
+
+## 46. 2026-08-12 integrated beta-remediation verification
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| Dart formatting | 220 files checked, zero changed | Local working tree |
+| Flutter analysis | No issues | Static analysis |
+| Flutter full suite | 371/371 passed | Local unit/widget/golden evidence |
+| Flutter line coverage | 10,788/20,417, 52.84% | Aggregate coverage is not workflow proof |
+| Protected visuals | 27/27 passed after reviewing Auth and Business baseline changes | Representative fixtures |
+| Deno | 30 files formatted, 22 linted, eight Edge entry points checked, 30/30 tests passed | Local source/helper evidence |
+| Data profiles | Small, medium, large, and scale-50000 dry runs pass | No backend writes |
+| Signed-out iOS integration | 1/1 passes on iPhone 17 Pro simulator, 402 x 874 | Auth/navigation journey only |
+| Staging integration | Three harnesses compile and safely skip without write opt-in/credentials | No dynamic staging result |
+| iOS profile | Signed 71.3 MB app; strict code-sign verification passes | Development-signed, not TestFlight |
+| Physical iPhone | Fresh profile installs and launches on iPhone 15 Pro Max; Runner PID 95655 confirmed | Install/launch only, not manual or VoiceOver QA |
+| Android profile | 158.7 MB APK; 16 KB alignment and v2 signature pass | Debug profile signer, not store AAB |
+| Web release | Build passes | Not deployed by this remediation |
+| Candidate preflight | Exits 78 on the dirty owner tree and writes no provenance | Expected fail-closed result |
+| Database | 82 pgTAP assertions authored | Clean replay unexecuted; required before promotion |
+
+The previous Auth failure is closed by the visible `auth-first-run-cta` and the
+passing simulator journey. Production was not migrated or redeployed.

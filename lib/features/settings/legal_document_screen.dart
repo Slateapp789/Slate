@@ -10,8 +10,13 @@ enum WorkloopLegalDocument { privacy, terms }
 
 class LegalDocumentScreen extends StatelessWidget {
   final WorkloopLegalDocument document;
+  final String backSemanticLabel;
 
-  const LegalDocumentScreen({super.key, required this.document});
+  const LegalDocumentScreen({
+    super.key,
+    required this.document,
+    this.backSemanticLabel = 'Back to app preferences',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -41,11 +46,11 @@ class LegalDocumentScreen extends StatelessWidget {
               children: [
                 WorkloopRouteHeader(
                   title: title,
-                  backSemanticLabel: 'Back to app preferences',
+                  backSemanticLabel: backSemanticLabel,
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 const Text(
-                  'Last updated 25 July 2026',
+                  'Last updated 13 August 2026',
                   style: TextStyle(
                     color: AppColors.t3,
                     fontSize: 13,
@@ -133,11 +138,11 @@ class _LegalContent {
 const _privacySections = <_LegalContent>[
   _LegalContent(
     '1. Who this policy covers',
-    'This policy explains how Workloop handles personal data when a solo service business owner uses the Workloop app, public profile, or support channels. Workloop is operated from the United Kingdom. Privacy questions can be sent to support@workloop.app.',
+    'This policy explains how Workloop handles personal data when a solo service business owner uses the Workloop app, public profile, or support channels. Workloop is operated from the United Kingdom. Privacy questions can be sent to support@workloop.uk.',
   ),
   _LegalContent(
     '2. Data you provide',
-    'We process account details, business profile and service information, working hours, client records, bookings, tasks, notes, income and expense records, and support messages. If you choose a device import, Workloop reads the relevant contacts or calendar events on your device to present a review list, then adds only the records you confirm to your workspace. File imports process only the files you select.',
+    'We process account details, business profile and service information, working hours, client records, bookings, tasks, notes, income and expense records, and support messages. If you use Stripe payment collection, Workloop also stores connected-account and transaction references, amounts, currency, status, receipt links, and refund or dispute status needed to show and reconcile payments. When a customer asks for a contactless-payment receipt, the email address you enter is sent to Stripe for receipt delivery and may be associated with the payment record. Workloop does not receive or store full card numbers or card security codes. If you choose a device import, Workloop reads the relevant contacts or calendar events on your device to present a review list, then adds only the records you confirm to your workspace. File imports process only the files you select.',
   ),
   _LegalContent(
     '3. How data is used',
@@ -149,7 +154,7 @@ const _privacySections = <_LegalContent>[
   ),
   _LegalContent(
     '5. Service providers and sharing',
-    'Supabase provides authentication, database, storage, and server functions. Google Places may process an address search query when you use address lookup, subject to Google’s privacy policy at https://policies.google.com/privacy. Apple, Google, or your chosen device app may process information when you deliberately open a contact, calendar, map, email, or file action. We disclose data when legally required or when needed to protect users and the service.',
+    'Supabase provides authentication, database, storage, and server functions. Stripe processes card payments, connected-account verification, payouts, refunds, disputes, and requested receipt delivery when you enable payment collection; Stripe receives payment, identity, and any customer receipt email you supply under its own privacy terms. Google Places may process an address search query when you use address lookup, subject to Google’s privacy policy at https://policies.google.com/privacy. Apple, Google, or your chosen device app may process information when you deliberately open a contact, calendar, map, email, or file action. We disclose data when legally required or when needed to protect users and the service.',
   ),
   _LegalContent(
     '6. Your clients’ information',
@@ -165,7 +170,7 @@ const _privacySections = <_LegalContent>[
   ),
   _LegalContent(
     '9. Your rights',
-    'Depending on where you live, you may ask to access, correct, export, restrict, object to, or erase personal data. You may also complain to your local supervisory authority; in the United Kingdom this is the Information Commissioner’s Office. Contact support@workloop.app to exercise a right.',
+    'Depending on where you live, you may ask to access, correct, export, restrict, object to, or erase personal data. You may also complain to your local supervisory authority; in the United Kingdom this is the Information Commissioner’s Office. Contact support@workloop.uk to exercise a right.',
   ),
   _LegalContent(
     '10. International processing',
@@ -207,27 +212,31 @@ const _termsSections = <_LegalContent>[
     'You are responsible for services, prices, availability, claims, and contact information you publish. A booking request is not automatically a confirmed contract with your client; you remain responsible for confirming the booking and your own customer terms.',
   ),
   _LegalContent(
-    '7. Availability and exports',
+    '7. Card payments',
+    'Card collection is provided through Stripe and requires an eligible, verified connected account. You remain responsible for the services you sell, accurate prices and descriptions, customer communications, receipts, taxes, lawful refunds, and responding to disputes with appropriate evidence. Stripe controls payment acceptance, account verification, payout timing and availability, and may apply reserves, reversals, restrictions, or fees under its own agreement. Workloop is not a bank or payment institution and cannot guarantee that a payment, refund, dispute outcome, or payout will complete by a particular time.',
+  ),
+  _LegalContent(
+    '8. Availability and exports',
     'We work to keep Workloop reliable but cannot guarantee uninterrupted availability. Maintain any records your business is legally required to keep and use the workspace export provided in Account settings as part of your own continuity process.',
   ),
   _LegalContent(
-    '8. Third-party services',
-    'Features may open or depend on services such as Supabase, Google Places, maps, contacts, calendars, files, and email. Workloop includes Google Maps features and content; their use is subject to the Google Maps/Google Earth Additional Terms at https://maps.google.com/help/terms_maps/ and Google Privacy Policy at https://policies.google.com/privacy. Other third-party services have their own terms and availability.',
+    '9. Third-party services',
+    'Features may open or depend on services such as Supabase, Stripe, Google Places, maps, contacts, calendars, files, and email. Workloop includes Google Maps features and content; their use is subject to the Google Maps/Google Earth Additional Terms at https://maps.google.com/help/terms_maps/ and Google Privacy Policy at https://policies.google.com/privacy. Stripe payment services are subject to the connected-account and payment terms you accept with Stripe. Other third-party services have their own terms and availability.',
   ),
   _LegalContent(
-    '9. Intellectual property',
+    '10. Intellectual property',
     'Workloop’s software, visual identity, text, and service design are protected by intellectual-property law. These terms give you a personal, limited, revocable, non-transferable right to use the app for your business; they do not transfer ownership of Workloop.',
   ),
   _LegalContent(
-    '10. Suspension and termination',
+    '11. Suspension and termination',
     'You may stop using Workloop and request account deletion. We may restrict or end access where reasonably necessary for security, illegal use, material breach, or protection of the service or others. Where practical, we will give notice and an opportunity to export data.',
   ),
   _LegalContent(
-    '11. Liability',
+    '12. Liability',
     'Nothing in these terms excludes liability that cannot legally be excluded. To the extent permitted by law, Workloop is not responsible for indirect or consequential loss, lost profit, or business decisions made from records entered by a user. Consumer rights that apply to you remain unaffected.',
   ),
   _LegalContent(
-    '12. Law, changes, and contact',
-    'These terms are governed by the laws of England and Wales, subject to any mandatory rights in your home country. We may update them as the service changes and will communicate material changes where appropriate. Questions can be sent to support@workloop.app.',
+    '13. Law, changes, and contact',
+    'These terms are governed by the laws of England and Wales, subject to any mandatory rights in your home country. We may update them as the service changes and will communicate material changes where appropriate. Questions can be sent to support@workloop.uk.',
   ),
 ];

@@ -13,40 +13,126 @@ class _MoneySectionHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.t3,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+    final tokens = SlateTheme.of(context);
+    return WorkloopSurface(
+      radius: AppRadius.xl,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      elevated: true,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: tokens.accentInk,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  formatPounds(value),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: tokens.textPrimary,
+                    fontSize: 34,
+                    height: 1,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.6,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  detail,
+                  style: TextStyle(
+                    color: tokens.textSecondary,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.xxs),
-        Text(
-          formatPounds(value),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppColors.t1,
-            fontSize: 40,
-            height: 1,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0,
+          const SizedBox(width: AppSpacing.md),
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: tokens.surfaceRaised,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: tokens.divider),
+            ),
+            child: Icon(
+              LucideIcons.walletCards,
+              color: tokens.accentInk,
+              size: 25,
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          detail,
-          style: const TextStyle(
-            color: AppColors.t3,
-            fontSize: 12,
-            height: 1.35,
+        ],
+      ),
+    );
+  }
+}
+
+class _CashMovementGraphic extends StatelessWidget {
+  final List<WorkloopStudioBarDatum> data;
+  final String periodLabel;
+
+  const _CashMovementGraphic({required this.data, required this.periodLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
+    final total = data.fold<double>(0, (sum, item) => sum + item.value);
+    final spokenData = data
+        .map((item) => '${item.label} ${formatPounds(item.value)}')
+        .join(', ');
+    return WorkloopSurface(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Cash movement',
+                  style: TextStyle(
+                    color: tokens.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                formatPounds(total),
+                style: TextStyle(
+                  color: tokens.textTertiary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: AppSpacing.xs),
+          WorkloopStudioBarChart(
+            data: data,
+            color: tokens.accent,
+            height: 80,
+            semanticsLabel: 'Cash movement for $periodLabel: $spokenData',
+          ),
+        ],
+      ),
     );
   }
 }
@@ -66,53 +152,55 @@ class _IncomeTargetProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = SlateTheme.of(context);
     final hasTarget = target > 0;
     final progress = hasTarget ? (made / target).clamp(0.0, 1.0) : 0.0;
     final left = (target - made).clamp(0, double.infinity);
     final percentage = hasTarget ? ((made / target) * 100).round() : 0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        WorkloopSectionHeader(
-          label: label,
-          actionLabel: hasTarget ? 'Edit' : 'Set target',
-          onAction: onEditTarget,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          hasTarget ? '$percentage% complete' : 'No target set',
-          style: const TextStyle(
-            color: AppColors.t1,
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          child: LinearProgressIndicator(
-            minHeight: 8,
-            value: hasTarget ? progress : 0,
-            backgroundColor: AppColors.t1.withValues(alpha: 0.06),
-            valueColor: const AlwaysStoppedAnimation(
-              AppColors.accentPrimaryStrong,
+    return WorkloopSurface(
+      child: Row(
+        children: [
+          WorkloopStudioProgressArc(
+            progress: progress,
+            color: tokens.accent,
+            size: 78,
+            child: Text(
+              hasTarget ? '$percentage%' : '—',
+              style: TextStyle(
+                color: tokens.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          hasTarget
-              ? left > 0
-                    ? '${formatPounds(made)} of ${formatPounds(target)} · ${formatPounds(left)} left'
-                    : '${formatPounds(made)} of ${formatPounds(target)} · Target reached'
-              : 'Set an income target to track your progress here.',
-          style: const TextStyle(
-            color: AppColors.t3,
-            fontSize: 12,
-            height: 1.35,
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                WorkloopSectionHeader(
+                  label: label,
+                  actionLabel: hasTarget ? 'Edit' : 'Set target',
+                  onAction: onEditTarget,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  hasTarget
+                      ? left > 0
+                            ? '${formatPounds(left)} left to reach ${formatPounds(target)}'
+                            : 'Target reached'
+                      : 'Set a target to track progress.',
+                  style: TextStyle(
+                    color: tokens.textSecondary,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

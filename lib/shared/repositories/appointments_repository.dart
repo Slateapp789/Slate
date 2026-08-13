@@ -98,6 +98,26 @@ class AppointmentsRepository {
     );
   }
 
+  Future<List<Map<String, dynamic>>> listRowsForBusinessFeed(
+    String workspaceId, {
+    required DateTime from,
+    required DateTime to,
+    int limit = 80,
+  }) async {
+    final rows = await _client
+        .from('appointments')
+        .select('*, contacts(name), services(name)')
+        .eq('workspace_id', workspaceId)
+        .gte('start_time', from.toUtc().toIso8601String())
+        .lt('start_time', to.toUtc().toIso8601String())
+        .neq('status', 'cancelled')
+        .neq('status', 'no_show')
+        .order('start_time', ascending: true)
+        .order('id', ascending: true)
+        .limit(limit);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
   Future<List<Map<String, dynamic>>> conflicts({
     required String workspaceId,
     required DateTime startTime,

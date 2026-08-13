@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:workloop/core/theme/app_theme.dart';
+import 'package:workloop/core/workloop_capabilities.dart';
 import 'package:workloop/features/finance/add_payment_screen.dart';
 import 'package:workloop/features/finance/expense_editor_screen.dart';
 import 'package:workloop/features/finance/finance_screen.dart';
@@ -34,7 +35,10 @@ void main() {
             expensesProvider.overrideWith((ref) async => const []),
             financeSummaryProvider.overrideWith((ref) async => summary),
             workspaceSettingsProvider.overrideWith(
-              (ref) async => const {'revenue_target': 5000},
+              (ref) async => const {
+                'workspace_id': 'workspace-1',
+                'revenue_target': 5000,
+              },
             ),
             clientsProvider.overrideWith((ref) async => const []),
           ],
@@ -49,11 +53,14 @@ void main() {
       );
 
       expect(addMoneyAction, findsOneWidget);
+      expect(WorkloopCapabilities.paymentCollectionEnabled, isFalse);
+      expect(find.text('Get paid with Workloop'), findsNothing);
       expect(find.byIcon(LucideIcons.minus), findsNothing);
       final addRect = tester.getRect(addMoneyAction);
-      expect(addRect.height, 48);
-      expect(addRect.width, greaterThan(48));
-      expect(addRect.right, closeTo(370, 0.1));
+      expect(addRect.height, greaterThanOrEqualTo(AppSpacing.minTouch));
+      expect(addRect.width, greaterThan(AppSpacing.minTouch));
+      expect(addRect.right, lessThanOrEqualTo(390 - AppSpacing.pageX));
+      expect(addRect.right, greaterThan(320));
       expect(addRect.top, greaterThanOrEqualTo(0));
 
       await tester.tap(addMoneyAction);

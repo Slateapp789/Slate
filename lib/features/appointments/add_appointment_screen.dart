@@ -49,7 +49,6 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   int _selectedDuration = 60;
   bool _customDuration = false;
   String _locationMode = 'business';
-  String _repeatMode = 'none';
   bool _createPaymentDue = false;
   final _newClientNameController = TextEditingController();
   final _newClientPhoneController = TextEditingController();
@@ -170,7 +169,6 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         _taskControllers.any(
           (controller) => controller.text.trim().isNotEmpty,
         ) ||
-        _repeatMode != 'none' ||
         _createPaymentDue;
   }
 
@@ -237,8 +235,11 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
           int.tryParse(_durationController.text.trim()) ?? _selectedDuration;
       final price = double.tryParse(_priceController.text.trim()) ?? 0;
       final endTime = startTime.add(Duration(minutes: duration));
-      final recurrenceRule = _recurrenceRuleFor(_repeatMode);
-      final repeatOccurrences = _repeatOccurrencesFor(_repeatMode);
+      // Recurring series remain readable and compatible in the data layer, but
+      // new series creation is intentionally outside the V1 UI until edit
+      // scope, exception handling, and series-level conflict recovery exist.
+      const String? recurrenceRule = null;
+      const repeatOccurrences = 1;
       final serviceName = _customService
           ? _customServiceController.text.trim()
           : _selectedServiceName;
@@ -514,9 +515,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                       backSemanticLabel: 'Back to bookings',
                       onBack: _handleBack,
                       trailing: _BookingSaveAction(
-                        label: _repeatOccurrencesFor(_repeatMode) > 1
-                            ? 'Add ${_repeatOccurrencesFor(_repeatMode)}'
-                            : 'Add',
+                        label: 'Add',
                         loading: _saving,
                         enabled: _canSave,
                         onTap: _save,
@@ -1041,55 +1040,6 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                             const SizedBox(height: 20),
                           ],
 
-                          // ── Repeat ───────────────────────────────────────
-                          const _AppointmentSectionLabel(
-                            'REPEAT',
-                            subtitle: 'Create future bookings automatically.',
-                          ),
-                          const SizedBox(height: 8),
-                          WorkloopPickerField<String>(
-                            value: _repeatMode,
-                            title: 'Repeat booking',
-                            hint: 'Choose repeat schedule',
-                            leadingIcon: LucideIcons.repeat,
-                            options: const [
-                              WorkloopPickerOption(
-                                value: 'none',
-                                label: "Doesn't repeat",
-                                subtitle: 'One booking only',
-                              ),
-                              WorkloopPickerOption(
-                                value: 'weekly',
-                                label: 'Weekly',
-                                subtitle: 'Next 12 weeks',
-                              ),
-                              WorkloopPickerOption(
-                                value: 'fortnightly',
-                                label: 'Fortnightly',
-                                subtitle: 'Next 12 weeks',
-                              ),
-                              WorkloopPickerOption(
-                                value: 'monthly',
-                                label: 'Monthly',
-                                subtitle: 'Next 3 months',
-                              ),
-                            ],
-                            onChanged: (value) =>
-                                setState(() => _repeatMode = value),
-                          ),
-                          if (_repeatMode != 'none') ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              _repeatSummary,
-                              style: const TextStyle(
-                                color: AppColors.t3,
-                                fontSize: 12,
-                                height: 1.35,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 20),
-
                           // ── Tasks ───────────────────────────────────────
                           const _AppointmentSectionLabel(
                             'BOOKING TASKS',
@@ -1232,16 +1182,5 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         ),
       ),
     );
-  }
-
-  String get _repeatSummary {
-    final count = _repeatOccurrencesFor(_repeatMode);
-    final label = switch (_repeatMode) {
-      'weekly' => 'weekly',
-      'fortnightly' => 'every 2 weeks',
-      'monthly' => 'monthly',
-      _ => '',
-    };
-    return 'Creates $count bookings $label from the selected date.';
   }
 }

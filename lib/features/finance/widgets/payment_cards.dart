@@ -7,6 +7,8 @@ import '../../../shared/providers/finance_provider.dart';
 import '../../../shared/utils/currency_format.dart';
 import '../../../shared/utils/date_format.dart';
 
+enum _PaymentCardAction { delete }
+
 class PaymentCard extends StatelessWidget {
   final Payment payment;
   final VoidCallback? onTap;
@@ -43,110 +45,161 @@ class PaymentCard extends StatelessWidget {
         : isPending
         ? 'Pending'
         : payment.status;
+    final displayedAmount = formatPounds(
+      isPaid ? receivedAmountFor(payment) : outstandingAmountFor(payment),
+    );
 
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onDelete,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: AppColors.t1.withValues(alpha: 0.06)),
-          ),
+    return Container(
+      constraints: const BoxConstraints(minHeight: AppSpacing.minTouch),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppColors.t1.withValues(alpha: 0.06)),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: AppColors.t1.withValues(alpha: 0.045),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Icon(
-                  isPaid
-                      ? LucideIcons.check
-                      : isOverdue
-                      ? LucideIcons.clock3
-                      : LucideIcons.clock3,
-                  size: 15,
-                  color: statusColor,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Semantics(
+              button: onTap != null,
+              label: '$clientName payment, $displayedAmount, $statusLabel',
+              hint: onTap == null ? null : 'Open payment actions',
+              onTap: onTap,
+              child: ExcludeSemantics(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    excludeFromSemantics: true,
+                    onTap: onTap,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: AppColors.t1.withValues(alpha: 0.045),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Icon(
+                                isPaid ? LucideIcons.check : LucideIcons.clock3,
+                                size: 15,
+                                color: statusColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  clientName,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.t1,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (description.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    description,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.t3,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                                if (payment.issueDate.millisecondsSinceEpoch >
+                                    0) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _dateSubtitle(payment),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.t3,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                displayedAmount,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.t1,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                statusLabel,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (onTap != null) ...[
+                            const SizedBox(width: 8),
+                            const Icon(
+                              LucideIcons.chevronRight,
+                              color: AppColors.t3,
+                              size: 16,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    clientName,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.t1,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (description.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      description,
-                      style: const TextStyle(fontSize: 12, color: AppColors.t3),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+          ),
+          PopupMenuButton<_PaymentCardAction>(
+            tooltip: 'More payment actions',
+            style: IconButton.styleFrom(
+              minimumSize: const Size.square(AppSpacing.minTouch),
+            ),
+            icon: const Icon(
+              LucideIcons.ellipsisVertical,
+              color: AppColors.t3,
+              size: 18,
+            ),
+            onSelected: (action) {
+              if (action == _PaymentCardAction.delete) {
+                WidgetsBinding.instance.addPostFrameCallback((_) => onDelete());
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem<_PaymentCardAction>(
+                value: _PaymentCardAction.delete,
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.trash2, size: 17, color: AppColors.error),
+                    SizedBox(width: AppSpacing.sm),
+                    Text('Delete income'),
                   ],
-                  if (payment.issueDate.millisecondsSinceEpoch > 0) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      _dateSubtitle(payment),
-                      style: const TextStyle(fontSize: 12, color: AppColors.t3),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  formatPounds(
-                    isPaid
-                        ? receivedAmountFor(payment)
-                        : outstandingAmountFor(payment),
-                  ),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.t1,
-                  ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  statusLabel,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: statusColor,
-                  ),
-                ),
-              ],
-            ),
-            if (onTap != null) ...[
-              const SizedBox(width: 8),
-              const Icon(
-                LucideIcons.chevronRight,
-                color: AppColors.t3,
-                size: 16,
               ),
             ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

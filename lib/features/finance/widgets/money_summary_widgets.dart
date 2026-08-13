@@ -92,38 +92,51 @@ class DatePickTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      label: '$label, $value',
+      hint: 'Choose date',
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
+      child: ExcludeSemantics(
+        child: Material(
           color: AppColors.bgInteract,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                color: AppColors.t3,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            side: const BorderSide(color: AppColors.border),
+          ),
+          child: InkWell(
+            excludeFromSemantics: true,
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: AppSpacing.minTouch),
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.t3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.t1,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.t1,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -144,63 +157,15 @@ class ModePills extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final entries = options.entries.toList();
-    return Row(
-      children: [
-        for (var i = 0; i < entries.length; i++) ...[
-          Expanded(
-            child: _ModePill(
-              entry: entries[i],
-              selected: selected,
-              onSelected: onSelected,
-            ),
-          ),
-          if (i != entries.length - 1) const SizedBox(width: 8),
-        ],
-      ],
-    );
-  }
-}
-
-class _ModePill extends StatelessWidget {
-  final MapEntry<String, String> entry;
-  final String selected;
-  final ValueChanged<String> onSelected;
-
-  const _ModePill({
-    required this.entry,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final active = selected == entry.key;
-    return GestureDetector(
-      onTap: () => onSelected(entry.key),
-      child: Container(
-        height: 38,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: active
-              ? AppColors.t1.withValues(alpha: 0.10)
-              : AppColors.bgInteract,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: active
-                ? AppColors.t1.withValues(alpha: 0.16)
-                : AppColors.border,
-          ),
-        ),
-        child: Text(
-          entry.value,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: active ? AppColors.t1 : AppColors.t3,
-          ),
-        ),
-      ),
+    return WorkloopSegmentedControl<String>(
+      selected: selected,
+      segments: options.entries
+          .map(
+            (entry) =>
+                WorkloopSegment<String>(value: entry.key, label: entry.value),
+          )
+          .toList(growable: false),
+      onChanged: onSelected,
     );
   }
 }
@@ -245,7 +210,7 @@ class _CategoryBar extends StatelessWidget {
         ),
         const SizedBox(height: 7),
         ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderRadius: BorderRadius.circular(AppRadius.capsule),
           child: LinearProgressIndicator(
             minHeight: 6,
             value: progress,

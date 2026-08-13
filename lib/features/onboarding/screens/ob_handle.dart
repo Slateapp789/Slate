@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/onboarding_provider.dart';
 import '../../../shared/repositories/profile_repository.dart';
+import '../../../shared/utils/public_booking_url.dart';
 import '../../../shared/utils/public_profile_routes.dart';
 
 final _handlePattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$');
@@ -140,7 +141,7 @@ class _ObHandleState extends ConsumerState<ObHandle> {
     final handle = _handleController.text.trim().toLowerCase();
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpacing.pageX),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -148,7 +149,7 @@ class _ObHandleState extends ConsumerState<ObHandle> {
           Text(
             'Your booking page.',
             style: TextStyle(
-              fontSize: 32,
+              fontSize: 28,
               fontWeight: FontWeight.w600,
               color: AppColors.t1,
               letterSpacing: 0,
@@ -157,7 +158,7 @@ class _ObHandleState extends ConsumerState<ObHandle> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Clients can find and book you at this link. You can share it anywhere.',
+            'Clients can find you and request a booking at this link. You can share it anywhere.',
             style: TextStyle(fontSize: 15, color: AppColors.t3, height: 1.5),
           ),
           const SizedBox(height: 32),
@@ -165,7 +166,7 @@ class _ObHandleState extends ConsumerState<ObHandle> {
           // URL preview card
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
               color: AppColors.bgCard,
               borderRadius: BorderRadius.circular(16),
@@ -189,7 +190,7 @@ class _ObHandleState extends ConsumerState<ObHandle> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                     children: [
                       TextSpan(
-                        text: 'workloop.app/',
+                        text: '$publicBookingPageHost/',
                         style: TextStyle(color: AppColors.t3),
                       ),
                       TextSpan(
@@ -232,7 +233,7 @@ class _ObHandleState extends ConsumerState<ObHandle> {
               hintText: 'yourname',
               counterText: '',
               hintStyle: TextStyle(color: AppColors.t3),
-              prefixText: 'workloop.app/',
+              prefixText: '$publicBookingPageHost/',
               prefixStyle: TextStyle(color: AppColors.t3, fontSize: 15),
               filled: true,
               fillColor: AppColors.bgCard,
@@ -350,16 +351,6 @@ class _ObHandleState extends ConsumerState<ObHandle> {
             height: 54,
             child: ElevatedButton(
               onPressed: _canContinue ? _continue : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.brandAccent,
-                disabledBackgroundColor: AppColors.bgInteract,
-                foregroundColor: AppColors.onBrandAccent,
-                disabledForegroundColor: AppColors.t3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 0,
-              ),
               child: const Text(
                 'Looks good',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),

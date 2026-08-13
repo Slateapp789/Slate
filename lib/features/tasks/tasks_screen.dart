@@ -15,6 +15,7 @@ import '../../shared/utils/workflow_idempotency.dart';
 import '../../shared/widgets/slate_ui.dart';
 import 'task_filters.dart';
 import '../imports/text_import_screen.dart';
+import '../work/work_workspace_switcher.dart';
 
 part 'task_logic.dart';
 part 'task_card.dart';
@@ -23,8 +24,17 @@ part 'task_editor_widgets.dart';
 
 class TasksScreen extends ConsumerStatefulWidget {
   final int createRequest;
+  final VoidCallback? onOpenSchedule;
+  final VoidCallback? onOpenNotes;
+  final bool embedded;
 
-  const TasksScreen({super.key, this.createRequest = 0});
+  const TasksScreen({
+    super.key,
+    this.createRequest = 0,
+    this.onOpenSchedule,
+    this.onOpenNotes,
+    this.embedded = false,
+  });
 
   @override
   ConsumerState<TasksScreen> createState() => _TasksScreenState();
@@ -59,94 +69,113 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   @override
   Widget build(BuildContext context) {
     final tasks = ref.watch(allTasksProvider);
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!widget.embedded) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.pageX,
+              AppSpacing.screenTop,
+              AppSpacing.pageX,
+              0,
+            ),
+            child: WorkloopPageHeader(
+              title: widget.onOpenSchedule == null ? 'Tasks' : 'Work',
+              subtitle: widget.onOpenSchedule == null
+                  ? 'Know what needs doing next.'
+                  : 'Plan the day, do the work, keep the context.',
+              color: AppColors.accentPrimary,
+              trailing: WorkloopTopAction(
+                label: 'New task',
+                semanticLabel: 'New task',
+                onTap: () => _showTaskEditor(context),
+              ),
+            ),
+          ),
+          if (widget.onOpenSchedule != null && widget.onOpenNotes != null) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
+              child: WorkWorkspaceSwitcher(
+                selected: WorkWorkspaceSection.tasks,
+                onChanged: (section) {
+                  switch (section) {
+                    case WorkWorkspaceSection.schedule:
+                      widget.onOpenSchedule!();
+                    case WorkWorkspaceSection.tasks:
+                      break;
+                    case WorkWorkspaceSection.notes:
+                      widget.onOpenNotes!();
+                  }
+                },
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.lg),
+        ],
+        Expanded(
+          child: tasks.when(
+            loading: () => _skeletonList(),
+            error: (_, _) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
+              child: SlateErrorState(
+                message: 'Could not load tasks',
+                onRetry: () => ref.invalidate(allTasksProvider),
+              ),
+            ),
+            data: (data) {
+              final sorted = [...data]..sort(_taskSort);
+              final sections = _sectionsForView(sorted, _view);
+              final counts = _countsForTasks(sorted);
+
+              return RefreshIndicator(
+                onRefresh: () async => ref.invalidate(allTasksProvider),
+                color: AppColors.accentPrimary,
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    0,
+                    AppSpacing.pageX,
+                    AppSpacing.shellBottomClearance(context),
+                  ),
+                  children: [
+                    _TaskViewSwitcher(
+                      value: _view,
+                      counts: counts,
+                      onChanged: (view) => setState(() => _view = view),
+                    ),
+                    const SizedBox(height: 18),
+                    if (sections.every((section) => section.tasks.isEmpty))
+                      _emptyState(context)
+                    else
+                      ...sections
+                          .where((section) => section.tasks.isNotEmpty)
+                          .map(
+                            (section) => _TaskSectionView(
+                              section: section,
+                              onOpen: _showTaskDetails,
+                              onCompleteRequest: _confirmComplete,
+                              onReopen: _reopenTask,
+                              onDelete: _confirmDelete,
+                            ),
+                          ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+    if (widget.embedded) return content;
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
-          SafeArea(
-            bottom: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.pageX,
-                    AppSpacing.screenTop,
-                    AppSpacing.pageX,
-                    0,
-                  ),
-                  child: WorkloopPageHeader(
-                    title: 'Tasks',
-                    subtitle: 'Know what needs doing next.',
-                    color: AppColors.modTasks,
-                    trailing: WorkloopTopAction(
-                      label: 'New task',
-                      semanticLabel: 'New task',
-                      onTap: () => _showTaskEditor(context),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                Expanded(
-                  child: tasks.when(
-                    loading: () => _skeletonList(),
-                    error: (_, _) => Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.pageX,
-                      ),
-                      child: SlateErrorState(
-                        message: 'Could not load tasks',
-                        onRetry: () => ref.invalidate(allTasksProvider),
-                      ),
-                    ),
-                    data: (data) {
-                      final sorted = [...data]..sort(_taskSort);
-                      final sections = _sectionsForView(sorted, _view);
-                      final counts = _countsForTasks(sorted);
-
-                      return RefreshIndicator(
-                        onRefresh: () async => ref.invalidate(allTasksProvider),
-                        color: AppColors.accentPrimary,
-                        child: ListView(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.pageX,
-                            0,
-                            AppSpacing.pageX,
-                            AppSpacing.bottomNavClearance,
-                          ),
-                          children: [
-                            _TaskViewSwitcher(
-                              value: _view,
-                              counts: counts,
-                              onChanged: (view) => setState(() => _view = view),
-                            ),
-                            const SizedBox(height: 18),
-                            if (sections.every(
-                              (section) => section.tasks.isEmpty,
-                            ))
-                              _emptyState(context)
-                            else
-                              ...sections
-                                  .where((section) => section.tasks.isNotEmpty)
-                                  .map(
-                                    (section) => _TaskSectionView(
-                                      section: section,
-                                      onOpen: _showTaskDetails,
-                                      onCompleteRequest: _confirmComplete,
-                                      onReopen: _reopenTask,
-                                      onDelete: _confirmDelete,
-                                    ),
-                                  ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
+          SafeArea(bottom: false, child: content),
         ],
       ),
     );
@@ -877,6 +906,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   void _showChecklistEditor(SlateTask task, {TaskChecklistItem? item}) {
     final controller = TextEditingController(text: item?.title ?? '');
+    final closeDuration = AppMotion.responsive(
+      context,
+      AppMotion.deliberate + AppMotion.fast,
+    );
     var saving = false;
     String? errorMessage;
 
@@ -986,11 +1019,16 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           );
         },
       ),
-    ).whenComplete(() => _disposeControllerAfterSheetClose(controller));
+    ).whenComplete(
+      () => _disposeControllerAfterSheetClose(controller, closeDuration),
+    );
   }
 
-  void _disposeControllerAfterSheetClose(TextEditingController controller) {
-    Future.delayed(AppMotion.deliberate + AppMotion.fast, controller.dispose);
+  void _disposeControllerAfterSheetClose(
+    TextEditingController controller,
+    Duration closeDuration,
+  ) {
+    Future.delayed(closeDuration, controller.dispose);
   }
 
   Future<void> _toggleChecklistItem(

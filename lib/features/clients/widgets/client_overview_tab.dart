@@ -601,7 +601,7 @@ class _DetailsSection extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.t1.withValues(alpha: 0.035),
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: Text(
                       tag,

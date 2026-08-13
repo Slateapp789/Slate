@@ -20,7 +20,6 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
-  bool _unreadOnly = false;
   bool _markingAllRead = false;
 
   Future<void> _markAllRead() async {
@@ -63,7 +62,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pageX,
+                    AppSpacing.screenTop,
+                    AppSpacing.pageX,
+                    AppSpacing.xs,
+                  ),
                   child: WorkloopRouteHeader(
                     title: 'Notifications',
                     trailing: notifications.maybeWhen(
@@ -78,29 +82,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       orElse: () => null,
                     ),
                   ),
-                ),
-                notifications.maybeWhen(
-                  data: (items) {
-                    if (items.isEmpty) return const SizedBox.shrink();
-                    final unread = items.where((item) => !item.read).length;
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
-                      child: WorkloopSegmentedControl<bool>(
-                        segments: [
-                          const WorkloopSegment(value: false, label: 'All'),
-                          WorkloopSegment(
-                            value: true,
-                            label: 'Unread',
-                            badge: unread == 0 ? null : '$unread',
-                          ),
-                        ],
-                        selected: _unreadOnly,
-                        onChanged: (value) =>
-                            setState(() => _unreadOnly = value),
-                      ),
-                    );
-                  },
-                  orElse: () => const SizedBox.shrink(),
                 ),
                 Expanded(
                   child: notifications.when(
@@ -120,19 +101,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       ),
                     ),
                     data: (items) {
-                      final visible = _unreadOnly
-                          ? items.where((item) => !item.read).toList()
-                          : items;
                       if (items.isEmpty) {
                         return const _EmptyNotifications(
                           title: 'No notifications',
                           subtitle: 'Important updates will appear here.',
-                        );
-                      }
-                      if (visible.isEmpty) {
-                        return const _EmptyNotifications(
-                          title: 'Nothing unread',
-                          subtitle: 'You are caught up for now.',
                         );
                       }
                       return RefreshIndicator(
@@ -140,8 +112,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                         onRefresh: () async =>
                             ref.invalidate(notificationsProvider),
                         child: ListView(
-                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-                          children: _groupedNotificationChildren(visible),
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.pageX,
+                            AppSpacing.sm,
+                            AppSpacing.pageX,
+                            AppSpacing.xxl,
+                          ),
+                          children: _groupedNotificationChildren(items),
                         ),
                       );
                     },
@@ -227,7 +204,7 @@ class NotificationSettingsView extends ConsumerWidget {
               _PreferenceItem(
                 'new_booking',
                 'New booking',
-                'A client books from your page.',
+                'A booking has been confirmed.',
               ),
               _PreferenceItem(
                 'booking_request',
@@ -523,22 +500,20 @@ List<Widget> _groupedNotificationChildren(List<SlateNotification> items) {
   return [
     if (todayItems.isNotEmpty) ...[
       const _NotificationGroupLabel('Today'),
-      ...todayItems.map(
-        (item) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _NotificationTile(item: item),
-        ),
-      ),
+      for (var index = 0; index < todayItems.length; index++) ...[
+        _NotificationTile(item: todayItems[index]),
+        if (index != todayItems.length - 1)
+          const WorkloopDivider(margin: EdgeInsets.zero),
+      ],
     ],
     if (earlierItems.isNotEmpty) ...[
-      const SizedBox(height: 10),
+      const SizedBox(height: AppSpacing.lg),
       const _NotificationGroupLabel('Earlier'),
-      ...earlierItems.map(
-        (item) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _NotificationTile(item: item),
-        ),
-      ),
+      for (var index = 0; index < earlierItems.length; index++) ...[
+        _NotificationTile(item: earlierItems[index]),
+        if (index != earlierItems.length - 1)
+          const WorkloopDivider(margin: EdgeInsets.zero),
+      ],
     ],
   ];
 }
@@ -550,7 +525,7 @@ class _NotificationGroupLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8, top: 4),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs, top: 2),
       child: Text(
         label.toUpperCase(),
         style: const TextStyle(
@@ -595,62 +570,75 @@ class _NotificationTile extends ConsumerWidget {
       }
     }
 
-    final tile = Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: item.read ? AppColors.bgCard : AppColors.greenDim,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: item.read ? AppColors.border : AppColors.green,
-        ),
-      ),
+    final tile = Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            _iconForType(item.type),
-            color: item.read ? AppColors.t3 : AppColors.green,
-            size: 20,
+          SizedBox(
+            width: 28,
+            height: 28,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Icon(
+                    _iconForType(item.type),
+                    color: item.read ? AppColors.t3 : AppColors.t1,
+                    size: 18,
+                  ),
+                ),
+                if (!item.read)
+                  const Positioned(
+                    right: 1,
+                    top: 1,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppColors.brandAccent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: SizedBox(width: 7, height: 7),
+                    ),
+                  ),
+              ],
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    if (!item.read) ...[
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: AppColors.green,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                    ],
-                    Expanded(
-                      child: Text(
-                        item.title,
-                        style: const TextStyle(
-                          color: AppColors.t1,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
+                Text(
+                  item.title,
+                  style: TextStyle(
+                    color: AppColors.t1,
+                    fontSize: 14,
+                    fontWeight: item.read ? FontWeight.w500 : FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   item.body,
-                  style: const TextStyle(color: AppColors.t2, fontSize: 13),
+                  style: const TextStyle(
+                    color: AppColors.t2,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
           ),
           if (item.deepLink?.isNotEmpty == true) ...[
-            const SizedBox(width: 8),
-            const Icon(LucideIcons.chevronRight, color: AppColors.t3, size: 16),
+            const SizedBox(width: AppSpacing.xs),
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Icon(
+                LucideIcons.chevronRight,
+                color: AppColors.t3,
+                size: 15,
+              ),
+            ),
           ],
         ],
       ),
@@ -669,9 +657,13 @@ class _NotificationTile extends ConsumerWidget {
       },
       onTap: isInteractive ? activate : null,
       child: ExcludeSemantics(
-        child: GestureDetector(
-          onTap: isInteractive ? activate : null,
-          child: tile,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            onTap: isInteractive ? activate : null,
+            child: tile,
+          ),
         ),
       ),
     );

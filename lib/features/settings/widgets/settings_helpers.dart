@@ -88,16 +88,6 @@ Widget skeletonBox(double height) => Container(
   ),
 );
 
-Widget errorBox(String msg) => Container(
-  padding: const EdgeInsets.all(16),
-  decoration: BoxDecoration(
-    color: AppColors.t1.withValues(alpha: 0.028),
-    borderRadius: BorderRadius.circular(16),
-    border: Border.all(color: AppColors.border.withValues(alpha: 0.54)),
-  ),
-  child: Text(msg, style: const TextStyle(color: AppColors.t3)),
-);
-
 Widget saveBtn({
   required String label,
   required VoidCallback onTap,
