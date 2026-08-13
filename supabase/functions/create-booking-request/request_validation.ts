@@ -12,6 +12,16 @@ export function normalizePhoneDigits(value: string) {
   return value.replace(/\D/g, "");
 }
 
+export function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+export function isValidEmail(value: string) {
+  const email = normalizeEmail(value);
+  return email.length >= 3 && email.length <= 254 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
     .test(value);
@@ -29,6 +39,7 @@ export function bookingRequestValidationError(input: {
   handle: string;
   name: string;
   phone: string;
+  email: string;
   serviceId: string;
   requestToken: string;
 }) {
@@ -41,6 +52,9 @@ export function bookingRequestValidationError(input: {
     normalizePhoneDigits(input.phone).length < 7
   ) {
     return "Name and a valid phone are required";
+  }
+  if (!isValidEmail(input.email)) {
+    return "A valid email is required";
   }
   if (input.serviceId.length > 0 && !isUuid(input.serviceId)) {
     return "Invalid service";

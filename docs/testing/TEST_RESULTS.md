@@ -1,6 +1,6 @@
 # Workloop Test Results
 
-Last updated: 2026-08-12
+Last updated: 2026-08-13
 
 > **Final local evidence ledger for branch
 > `codex/comprehensive-launch-audit-2026-07-26`.** Commands below were observed
@@ -1001,3 +1001,24 @@ and distribution artifact gates are green; hosted staging, destructive
 deletion, external Auth, exact-build manual accessibility/lifecycle, support
 and legal operations, observability/load, and safe production promotion remain
 open.
+
+## 48. 2026-08-13 booking-confirmation email source verification
+
+This is working-tree evidence for the Build 5 feature slice, not a clean-tag,
+deployed-staging, external-inbox or signed-artifact result.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| Flutter | Full 383/383 suite passes after updating the v2 Edge source contract; analysis reports no issues | Local unit/widget/golden source evidence, not deployed E2E |
+| Deno | 37 files format-clean, 28 files lint-clean, both new handler entry points type-check, 38/38 full Edge tests pass | Provider calls are mocked; functions are not deployed |
+| Local Supabase | Empty reset replays all 53 migrations; lint reports zero warning-level schema errors | Isolated local database |
+| pgTAP | Four files, 109/109 assertions pass, including 26 outbox/email-boundary assertions | No hosted/live-derived parity proof |
+| iOS profile | Build succeeds as `1.0.0 (5)`, 71.2 MB; strict code-sign verification passes | Dirty working-tree profile evidence, not an App Store archive/IPA |
+| Diff hygiene | `git diff --check` passes | Working tree remains intentionally uncommitted |
+
+The local contracts prove normalized intake, legacy compatibility, private
+grants, atomic one-row enqueue, workflow retry idempotency, contact-email
+preservation, lease ownership, backoff, stale-lease recovery and terminal
+failure. They do not prove Resend delivery, the every-minute scheduler,
+SPF/DKIM/DMARC, bounce/suppression handling or recipient/content correctness in
+a controlled external inbox. Production remains unchanged.

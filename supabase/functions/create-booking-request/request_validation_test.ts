@@ -3,6 +3,8 @@ import {
   bookingRequestOutcomeResponse,
   bookingRequestValidationError,
   isUuid,
+  isValidEmail,
+  normalizeEmail,
   normalizePhoneDigits,
   nullableStringValue,
   resolveRequestToken,
@@ -27,6 +29,15 @@ Deno.test("normalises equivalent phone formats to the same digits", () => {
   assertEquals(normalizePhoneDigits("44 0 7123 456 789"), "4407123456789");
 });
 
+Deno.test("normalises and validates public booking email", () => {
+  assertEquals(normalizeEmail("  ADA@Example.COM "), "ada@example.com");
+  assertEquals(isValidEmail("ada@example.com"), true);
+  assertEquals(isValidEmail("ada example.com"), false);
+  assertEquals(isValidEmail("ada@localhost"), false);
+  assertEquals(isValidEmail(`${"a".repeat(242)}@example.com`), true);
+  assertEquals(isValidEmail(`${"a".repeat(243)}@example.com`), false);
+});
+
 Deno.test("accepts UUID request tokens and rejects arbitrary identifiers", () => {
   assertEquals(isUuid("c2499f36-c3f4-4f80-80dd-31ba2b581f78"), true);
   assertEquals(isUuid("retry-me"), false);
@@ -44,10 +55,15 @@ Deno.test("rejects invalid booking fields before any database call", () => {
     handle: "ada-studio",
     name: "Ada",
     phone: "+44 7123 456 789",
+    email: "ada@example.com",
     serviceId: "c2499f36-c3f4-4f80-80dd-31ba2b581f78",
     requestToken: "e72d0756-7440-4ae3-88f2-c6dce8bcbdf7",
   };
   assertEquals(bookingRequestValidationError(valid), null);
+  assertEquals(
+    bookingRequestValidationError({ ...valid, email: "missing-at.example" }),
+    "A valid email is required",
+  );
   assertEquals(
     bookingRequestValidationError({ ...valid, handle: "../admin" }),
     "Invalid profile handle",

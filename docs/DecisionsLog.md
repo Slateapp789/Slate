@@ -2037,3 +2037,30 @@ Consequences:
   remain separate approval boundaries.
 - Any app-source change requires a new monotonically increasing build and tag;
   documentation-only evidence must identify the immutable binary SHA.
+
+## 2026-08-13 - Booking Confirmation Uses A Durable Email Outbox
+
+Decision:
+
+Require email on new public booking requests and send a transactional
+confirmation only after the owner converts the request. Commit one private
+email intent in the same transaction as booking creation, then deliver it
+through a separately leased and bounded Resend worker. Keep the originally
+captured request address authoritative during conversion.
+
+Reasoning:
+
+Sending directly after the database commit can lose confirmation when an Edge
+process or provider fails, while sending before commit can email a booking that
+does not exist. A private outbox preserves the business workflow, supports safe
+retry and prevents a client from redirecting the recipient.
+
+Consequences:
+
+- New intake requires a valid normalized email; legacy blank rows still work.
+- Booking success is independent from provider availability and the owner sees
+  sent, queued, failed or no-email truth.
+- Resend secrets remain Edge-only and a token-authenticated worker must run
+  every minute; delivery stops after eight attempts or 24 hours.
+- Build 4 stays immutable. This source change requires Build 5, a new tag,
+  controlled-inbox staging evidence and new signed artifacts.

@@ -30,6 +30,12 @@ if command -v "$deno_bin" >/dev/null 2>&1; then
     --config supabase/functions/create-booking-request/deno.json \
     supabase/functions/create-booking-request/index.ts
   "$deno_bin" check \
+    --config supabase/functions/confirm-booking-request/deno.json \
+    supabase/functions/confirm-booking-request/index.ts
+  "$deno_bin" check \
+    --config supabase/functions/drain-booking-confirmation-emails/deno.json \
+    supabase/functions/drain-booking-confirmation-emails/index.ts
+  "$deno_bin" check \
     --config supabase/functions/get-public-profile/deno.json \
     supabase/functions/get-public-profile/index.ts
   "$deno_bin" check \

@@ -74,6 +74,7 @@ class ProfileRepository {
     required String handle,
     required String name,
     required String phone,
+    required String email,
     required String requestToken,
     String? serviceId,
     String? preferredTimeText,
@@ -81,15 +82,16 @@ class ProfileRepository {
   }) async {
     await _client.functions.invoke(
       'create-booking-request',
-      body: {
-        'handle': handle,
-        'name': name,
-        'phone': phone,
-        'requestToken': requestToken,
-        'serviceId': serviceId,
-        'preferredTimeText': preferredTimeText,
-        'message': message,
-      },
+      body: buildPublicBookingRequestPayload(
+        handle: handle,
+        name: name,
+        phone: phone,
+        email: email,
+        requestToken: requestToken,
+        serviceId: serviceId,
+        preferredTimeText: preferredTimeText,
+        message: message,
+      ),
     );
   }
 
@@ -149,13 +151,14 @@ class ProfileRepository {
     }
   }
 
-  Future<void> confirmBookingRequest({
+  Future<BookingRequestConfirmationOutcome> confirmBookingRequest({
     required BookingRequest request,
     required DateTime startTime,
     required int durationMins,
     required double price,
     String? clientName,
     String? clientPhone,
+    String? clientEmail,
     String? serviceTitle,
     String? location,
     String? extraNotes,
@@ -200,6 +203,9 @@ class ProfileRepository {
     final name = clientName?.trim().isNotEmpty == true
         ? clientName!.trim()
         : request.name.trim();
+    final email = clientEmail?.trim().isNotEmpty == true
+        ? clientEmail!.trim()
+        : request.email.trim();
     final contactNotes = [
       'Created from public booking request.',
       if (request.preferredTimeText?.trim().isNotEmpty == true)
@@ -207,32 +213,46 @@ class ProfileRepository {
       if (request.message?.trim().isNotEmpty == true) request.message!.trim(),
     ].join('\n\n');
 
+    final payload = buildBookingWorkflowPayload(
+      workspaceId: request.workspaceId,
+      idempotencyKey: bookingRequestConfirmationIdempotencyKey(request.id),
+      newContactName: name.isEmpty ? 'New client' : name,
+      newContactPhone: phone,
+      newContactEmail: email.isEmpty ? null : email,
+      newContactNotes: contactNotes,
+      reuseContactByPhone: true,
+      bookingRequestId: request.id,
+      serviceId: serviceId,
+      startTime: startUtc,
+      endTime: endUtc,
+      price: price,
+      title: title,
+      notes: notes.isEmpty ? null : notes,
+      location: location?.trim().isNotEmpty == true ? location!.trim() : null,
+      createPaymentDue: createPaymentDue,
+      paymentNote: createPaymentDue ? 'Payment due for $title' : null,
+      notificationTitle: 'Booking request confirmed',
+      notificationBody: '${request.name} has been added to your calendar.',
+    );
     try {
-      await AppointmentsRepository(_client).createBookingWorkflow(
-        workspaceId: request.workspaceId,
-        idempotencyKey: bookingRequestConfirmationIdempotencyKey(request.id),
-        newContactName: name.isEmpty ? 'New client' : name,
-        newContactPhone: phone,
-        newContactNotes: contactNotes,
-        reuseContactByPhone: true,
-        bookingRequestId: request.id,
-        serviceId: serviceId,
-        startTime: startUtc,
-        endTime: endUtc,
-        price: price,
-        title: title,
-        notes: notes.isEmpty ? null : notes,
-        location: location?.trim().isNotEmpty == true ? location!.trim() : null,
-        createPaymentDue: createPaymentDue,
-        paymentNote: createPaymentDue ? 'Payment due for $title' : null,
-        notificationTitle: 'Booking request confirmed',
-        notificationBody: '${request.name} has been added to your calendar.',
+      final response = await _client.functions.invoke(
+        'confirm-booking-request',
+        body: {'payload': payload},
       );
-    } on PostgrestException catch (error) {
-      if (isBookingRequestStateError(
-        code: error.code,
-        message: error.message,
-      )) {
+      return BookingRequestConfirmationOutcome.fromResponse(response.data);
+    } on FunctionException catch (error) {
+      final details = error.details is Map
+          ? Map<String, dynamic>.from(error.details as Map)
+          : const <String, dynamic>{};
+      final code = details['code']?.toString();
+      final message = details['error']?.toString() ?? '';
+      if (isAppointmentConflictError(code: code, message: message)) {
+        throw const AppointmentScheduleException(
+          'This time now overlaps an existing booking. Choose another time.',
+          issue: AppointmentScheduleIssue.conflict,
+        );
+      }
+      if (isBookingRequestStateError(code: code, message: message)) {
         throw const BookingRequestStateException(
           'This request was already handled or is no longer available.',
         );
@@ -251,6 +271,66 @@ class ProfileRepository {
         .eq('workspace_id', request.workspaceId)
         .maybeSingle();
     return service == null ? null : serviceId;
+  }
+}
+
+Map<String, dynamic> buildPublicBookingRequestPayload({
+  required String handle,
+  required String name,
+  required String phone,
+  required String email,
+  required String requestToken,
+  String? serviceId,
+  String? preferredTimeText,
+  String? message,
+}) => {
+  'handle': handle,
+  'name': name,
+  'phone': phone,
+  'email': email,
+  'requestToken': requestToken,
+  'serviceId': serviceId,
+  'preferredTimeText': preferredTimeText,
+  'message': message,
+};
+
+bool isValidBookingRequestEmail(String value) {
+  final email = value.trim();
+  if (email.isEmpty || email.length > 254) return false;
+  return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
+}
+
+enum BookingRequestConfirmationEmailStatus {
+  sent,
+  pending,
+  failed,
+  notApplicable,
+}
+
+class BookingRequestConfirmationOutcome {
+  final BookingRequestConfirmationEmailStatus confirmationEmailStatus;
+
+  const BookingRequestConfirmationOutcome({
+    required this.confirmationEmailStatus,
+  });
+
+  factory BookingRequestConfirmationOutcome.fromResponse(Object? value) {
+    final response = value is Map
+        ? Map<String, dynamic>.from(value)
+        : const <String, dynamic>{};
+    final confirmationEmail = response['confirmationEmail'] is Map
+        ? Map<String, dynamic>.from(response['confirmationEmail'] as Map)
+        : const <String, dynamic>{};
+    final status = switch (confirmationEmail['status']) {
+      'sent' => BookingRequestConfirmationEmailStatus.sent,
+      'pending' => BookingRequestConfirmationEmailStatus.pending,
+      'failed' => BookingRequestConfirmationEmailStatus.failed,
+      'not_applicable' => BookingRequestConfirmationEmailStatus.notApplicable,
+      _ => throw const FormatException(
+        'Booking confirmation returned an invalid email status.',
+      ),
+    };
+    return BookingRequestConfirmationOutcome(confirmationEmailStatus: status);
   }
 }
 

@@ -19,6 +19,7 @@ type BookingRequestPayload = {
   handle?: unknown;
   name?: unknown;
   phone?: unknown;
+  email?: unknown;
   serviceId?: unknown;
   service_id?: unknown;
   preferredTimeText?: unknown;
@@ -85,6 +86,9 @@ Deno.serve(async (req: Request) => {
   const handle = stringValue(payload.handle, 80).toLowerCase();
   const name = stringValue(payload.name, 80);
   const phone = stringValue(payload.phone, 32);
+  const email = typeof payload.email === "string"
+    ? payload.email.trim().toLowerCase()
+    : "";
   const preferredTimeText = nullableStringValue(
     payload.preferredTimeText ?? payload.preferred_time_text,
     160,
@@ -98,6 +102,7 @@ Deno.serve(async (req: Request) => {
     handle,
     name,
     phone,
+    email,
     serviceId,
     requestToken,
   });
@@ -125,11 +130,12 @@ Deno.serve(async (req: Request) => {
   );
 
   const { data: result, error: createError } = await supabase.rpc(
-    "create_public_booking_request",
+    "create_public_booking_request_v2",
     {
       p_workspace_id: profile.workspace_id,
       p_name: name,
       p_phone: phone,
+      p_email: email,
       p_service_id: serviceId || null,
       p_preferred_time_text: preferredTimeText,
       p_message: message,

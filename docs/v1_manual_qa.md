@@ -23,6 +23,18 @@ appearance, system text size, pass/fail result, evidence link, and defect ID.
 - Submit a public booking request in disposable staging, review it under the
   booking Requests view, and convert or decline it without automatic
   confirmation wording.
+- For a new public request, leave Email blank and enter malformed/overlength
+  values; verify inline errors preserve the draft. Submit a controlled inbox,
+  confirm the receipt says nothing is booked yet, and verify the owner sees the
+  same read-only address.
+- Confirm the request once and verify exactly one booking/client and one
+  confirmation email with the correct business, service, local date/time and
+  location. Repeat submission and confirmation with the same tokens and verify
+  no duplicates.
+- Simulate a mail-provider timeout/429/5xx, verify the booking remains
+  confirmed with queued status, run the scheduled drain, and verify one later
+  delivery. Exercise terminal failure and confirm the owner sees a direct
+  contact action rather than a false booking failure.
 
 ## Current V1 surfaces
 

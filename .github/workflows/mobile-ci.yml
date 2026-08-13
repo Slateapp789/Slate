@@ -102,6 +102,8 @@ jobs:
         run: |
           deno check --config supabase/functions/complete-account-deletion/deno.json supabase/functions/complete-account-deletion/index.ts
           deno check --config supabase/functions/create-booking-request/deno.json supabase/functions/create-booking-request/index.ts
+          deno check --config supabase/functions/confirm-booking-request/deno.json supabase/functions/confirm-booking-request/index.ts
+          deno check --config supabase/functions/drain-booking-confirmation-emails/deno.json supabase/functions/drain-booking-confirmation-emails/index.ts
           deno check --config supabase/functions/get-public-profile/deno.json supabase/functions/get-public-profile/index.ts
           deno check --config supabase/functions/places-address-search/deno.json supabase/functions/places-address-search/index.ts
           deno check --config supabase/functions/request-account-deletion/deno.json supabase/functions/request-account-deletion/index.ts

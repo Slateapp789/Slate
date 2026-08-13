@@ -522,3 +522,40 @@ definition also requires hosted staging, external Auth and manual exact-build
 device evidence. The required Supabase preview branch begins at $0.01344/hour
 plus metered usage and needs explicit owner approval. Uploading remains a
 separate prohibited boundary until final approval.
+
+## 2026-08-13 Build 5 booking-email gate
+
+- [x] New public requests capture a required normalized customer email; legacy
+      rows remain nullable and confirmable.
+- [x] Booking confirmation and one private outbox intent commit atomically;
+      retries cannot duplicate the request, booking or email intent.
+- [x] The stored request email is the immutable delivery address during owner
+      confirmation; provider content is escaped and uses a fixed verified
+      sender plus a stable idempotency key.
+- [x] Delivery has stale-lease recovery, capped exponential retry, an
+      eight-attempt/24-hour terminal boundary and honest sent/queued/failed UI.
+- [x] Local proof passes all 53 migrations, 109/109 pgTAP assertions, database
+      lint, 38/38 Deno tests, both new handler type checks, focused Flutter
+      tests, the full 383/383 Flutter suite and Flutter analysis.
+- [x] An iOS profile build compiles and signs as `1.0.0 (5)` at 71.2 MB and
+      passes strict code-sign verification. It is working-tree evidence, not a
+      distribution candidate.
+- [ ] Reconcile and promote the 53rd migration without a blanket production
+      push, then deploy `create-booking-request`,
+      `confirm-booking-request`, and `drain-booking-confirmation-emails` in that
+      order.
+- [ ] Configure `RESEND_API_KEY`, verified
+      `BOOKING_CONFIRMATION_EMAIL_FROM`, and a random 32+ character
+      `BOOKING_CONFIRMATION_DRAIN_TOKEN`. Deploy only the drain with
+      `--no-verify-jwt`, then schedule its token-authenticated POST every minute.
+- [ ] In disposable staging, prove one controlled inbox receives exactly one
+      correctly timed confirmation after owner acceptance; exercise duplicate
+      submission/confirmation, provider outage/retry, SPF/DKIM/DMARC,
+      bounce/suppression and deletion/export behaviour.
+- [ ] Monitor terminal failures and oldest pending age, with a documented owner
+      response to contact the customer directly.
+- [ ] Freeze a clean `1.0.0+5` commit as a new immutable
+      `v1.0.0-beta.5`, then rerun full release checks and build/sign a new IPA.
+
+No paid preview branch was created. Build 4 must not be reused or retagged for
+this changed public data and transactional-email contract.

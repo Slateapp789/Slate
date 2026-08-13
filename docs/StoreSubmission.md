@@ -146,7 +146,7 @@ Review the final App Store Connect definitions before submission.
 
 | Data type | Collected | Linked to user | Tracking | Purpose |
 | --- | --- | --- | --- | --- |
-| Name and email | Yes | Yes | No | Account, app functionality and optional Stripe receipt delivery when payment collection is enabled |
+| Name and email | Yes | Yes | No | Account, public booking requests and confirmations, app functionality, and optional Stripe receipt delivery when payment collection is enabled |
 | Phone/address | Optional | Yes | No | Business/client workflow |
 | Contacts | Optional | Yes | No | User-selected client import |
 | User content | Yes | Yes | No | Notes, tasks, bookings, support, business records |
@@ -168,8 +168,8 @@ store answers.
   contacts, calendar events, files selected for import, user-generated content,
   and user-entered financial records. A payment-enabled build may additionally
   process connected-account identity, provider transaction/refund/dispute
-  references, and a customer email supplied for receipt delivery through
-  Stripe.
+  references, a public booking requester's email used for confirmation through
+  Resend, and a customer email supplied for receipt delivery through Stripe.
 - Contacts, calendar, files, and notifications are optional.
 - No data is sold and the current source has no advertising SDK.
 - Confirm Play’s current distinction between service-provider processing and
@@ -219,6 +219,33 @@ the business owner reviews rather than automatic confirmations.
 
 Report the screen, action, expected result, actual result, screenshot, device,
 OS version and Workloop build number to `support@workloop.uk`.
+
+## TestFlight beta 5 handoff draft
+
+Build name: `Workloop 1.0.0 (5) - Booking confirmations`
+
+### Plain-English release notes
+
+This build adds customer email to public booking requests. A request is still
+not a booking: after the business accepts and schedules it, Workloop sends the
+customer a confirmation with the agreed service, date/time and location. Email
+delivery is queued safely if the provider is temporarily unavailable.
+
+### Additional What to Test
+
+- Submit a signed-out booking request with a real controlled email address and
+  confirm the receipt says nothing is booked yet.
+- As the owner, verify the same email is shown, choose the agreed date/time and
+  create the booking.
+- Confirm the customer receives exactly one accurate email and the new client
+  record retains the address.
+- Retry a submission or confirmation after a connection interruption and
+  report any duplicate request, booking or email.
+
+Card collection, payment links and Tap to Pay remain disabled for this beta.
+Do not distribute Build 5 until the backend migration, three booking functions,
+Resend secrets and scheduled retry worker have passed the controlled-inbox
+staging gate.
 
 ### Known beta limitations
 

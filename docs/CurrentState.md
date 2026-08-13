@@ -1218,3 +1218,36 @@ Current verdict: **not ready to upload** under the strict beta definition. The
 signed artifact is valid and reproducible, but hosted staging, external Auth,
 exact-build manual-device, support/legal and production-promotion gates remain
 open.
+
+### 2026-08-13 booking-request confirmation email implementation
+
+- Build 5 source now requires a customer email on new public booking requests,
+  normalizes it at the public Edge boundary, retains it on the request and
+  converted client, and keeps legacy email-less requests confirmable.
+- Owner confirmation now enters an authenticated Edge Function and the existing
+  MFA-aware, tenant-checked, idempotent booking workflow. The captured request
+  address is authoritative and cannot be redirected by a tampered or older app.
+- The booking transaction also creates one private confirmation-email outbox
+  row. Resend delivery is idempotent, HTML-escaped, leased and retried with a
+  bounded backoff. The app distinguishes sent, queued, terminal failure and
+  legacy no-email outcomes without pretending the booking failed.
+- Public and in-app privacy copy now describes requester email, confirmation
+  purpose and Resend processing. Payment collection remains independently
+  disabled for beta.
+- Local backend proof replays all 53 migrations, passes 109/109 pgTAP
+  assertions across four files, reports zero warning-level database lint
+  findings, passes 38/38 Deno tests, and type-checks both new handlers. Focused
+  Flutter booking/public-profile tests, the full 383/383 Flutter suite and
+  analysis also pass.
+- The 71.2 MB iOS profile compiles and signs as `1.0.0 (5)` and passes strict
+  code-sign verification. Because the feature tree is not frozen or deployed,
+  this is compile evidence only and is not the next App Store IPA.
+- This work supersedes Build 4 as the next source candidate: the intended next
+  identity is `1.0.0+5` / `v1.0.0-beta.5`. Beta 4 and its signed IPA remain
+  immutable historical evidence.
+
+Production is unchanged. Promotion requires migration reconciliation first,
+then the three booking Edge deployments, verified Resend sender/secrets, the
+token-protected every-minute drain, and a controlled-inbox staging journey.
+Until that evidence exists, Build 5 is implemented source—not an upload-ready
+or email-operational beta.

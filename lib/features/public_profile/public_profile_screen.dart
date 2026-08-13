@@ -36,11 +36,13 @@ class PublicProfileScreen extends ConsumerStatefulWidget {
 class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _preferredTimeController = TextEditingController();
   final _messageController = TextEditingController();
   String? _selectedServiceId;
   String? _nameError;
   String? _phoneError;
+  String? _emailError;
   String? _submitError;
   bool _sending = false;
   bool _sent = false;
@@ -50,6 +52,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     _preferredTimeController.dispose();
     _messageController.dispose();
     super.dispose();
@@ -59,6 +62,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
     if (_sending || _sent) return;
     final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
+    final email = _emailController.text.trim();
     final phoneDigits = phone.replaceAll(RegExp(r'[^0-9]'), '');
     final nameError = name.isEmpty ? 'Add your name' : null;
     final phoneError = phone.isEmpty
@@ -66,12 +70,18 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
         : phoneDigits.length < 7
         ? 'Add a valid phone number'
         : null;
+    final emailError = email.isEmpty
+        ? 'Add your email address'
+        : !isValidBookingRequestEmail(email)
+        ? 'Add a valid email address'
+        : null;
     setState(() {
       _nameError = nameError;
       _phoneError = phoneError;
+      _emailError = emailError;
       _submitError = null;
     });
-    if (nameError != null || phoneError != null) {
+    if (nameError != null || phoneError != null || emailError != null) {
       return;
     }
     setState(() => _sending = true);
@@ -82,6 +92,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             handle: profile.profile.handle,
             name: name,
             phone: phone,
+            email: email,
             requestToken: _requestToken,
             serviceId: _selectedServiceId,
             preferredTimeText: _preferredTimeController.text.trim().isEmpty
@@ -114,6 +125,10 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
 
   void _clearPhoneError(String _) {
     if (_phoneError != null) setState(() => _phoneError = null);
+  }
+
+  void _clearEmailError(String _) {
+    if (_emailError != null) setState(() => _emailError = null);
   }
 
   @override
@@ -150,16 +165,19 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                   selectedServiceId: _selectedServiceId,
                   nameController: _nameController,
                   phoneController: _phoneController,
+                  emailController: _emailController,
                   preferredTimeController: _preferredTimeController,
                   messageController: _messageController,
                   sending: _sending,
                   sent: _sent,
                   nameError: _nameError,
                   phoneError: _phoneError,
+                  emailError: _emailError,
                   submitError: _submitError,
                   topInset: canGoBack ? 84 : 28,
                   onNameChanged: _clearNameError,
                   onPhoneChanged: _clearPhoneError,
+                  onEmailChanged: _clearEmailError,
                   onServiceChanged: (id) =>
                       setState(() => _selectedServiceId = id),
                   onPreferredTimePicked: (value) =>
@@ -195,16 +213,19 @@ class _ProfileContent extends StatelessWidget {
   final String? selectedServiceId;
   final TextEditingController nameController;
   final TextEditingController phoneController;
+  final TextEditingController emailController;
   final TextEditingController preferredTimeController;
   final TextEditingController messageController;
   final bool sending;
   final bool sent;
   final String? nameError;
   final String? phoneError;
+  final String? emailError;
   final String? submitError;
   final double topInset;
   final ValueChanged<String> onNameChanged;
   final ValueChanged<String> onPhoneChanged;
+  final ValueChanged<String> onEmailChanged;
   final ValueChanged<String?> onServiceChanged;
   final ValueChanged<String> onPreferredTimePicked;
   final VoidCallback onSubmit;
@@ -214,16 +235,19 @@ class _ProfileContent extends StatelessWidget {
     required this.selectedServiceId,
     required this.nameController,
     required this.phoneController,
+    required this.emailController,
     required this.preferredTimeController,
     required this.messageController,
     required this.sending,
     required this.sent,
     required this.nameError,
     required this.phoneError,
+    required this.emailError,
     required this.submitError,
     required this.topInset,
     required this.onNameChanged,
     required this.onPhoneChanged,
+    required this.onEmailChanged,
     required this.onServiceChanged,
     required this.onPreferredTimePicked,
     required this.onSubmit,
@@ -305,7 +329,10 @@ class _ProfileContent extends StatelessWidget {
               child: bookingClosed
                   ? const _ClosedBookingState()
                   : sent
-                  ? _SentState(businessName: profile.businessName)
+                  ? _SentState(
+                      businessName: profile.businessName,
+                      email: emailController.text.trim(),
+                    )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -339,6 +366,18 @@ class _ProfileContent extends StatelessWidget {
                           onChanged: onPhoneChanged,
                           keyboardType: TextInputType.phone,
                           maxLength: 32,
+                        ),
+                        const SizedBox(height: 10),
+                        _ProfileField(
+                          controller: emailController,
+                          label: 'Email',
+                          hint: 'Email address',
+                          errorText: emailError,
+                          autofillHints: const [AutofillHints.email],
+                          textInputAction: TextInputAction.next,
+                          onChanged: onEmailChanged,
+                          keyboardType: TextInputType.emailAddress,
+                          maxLength: 254,
                         ),
                         const SizedBox(height: 10),
                         WorkloopPickerField<String?>(
@@ -457,7 +496,7 @@ class _BookingPrivacyNotice extends StatelessWidget {
       child: Column(
         children: [
           const Text(
-            'Workloop sends these details to this business so they can respond to your request.',
+            'Workloop sends these details to this business so they can respond. Your email is also used to send a confirmation if they accept the request.',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.t3, fontSize: 12, height: 1.4),
           ),
@@ -880,15 +919,17 @@ InputDecoration _fieldDecoration(
 
 class _SentState extends StatelessWidget {
   final String businessName;
+  final String email;
 
-  const _SentState({required this.businessName});
+  const _SentState({required this.businessName, required this.email});
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       liveRegion: true,
       container: true,
-      label: 'Request sent. $businessName will contact you to confirm.',
+      label:
+          'Request sent. Nothing is booked yet. If $businessName accepts, confirmation will be emailed to $email.',
       child: ExcludeSemantics(
         child: Column(
           children: [
@@ -908,7 +949,7 @@ class _SentState extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '$businessName will contact you to agree the details. Nothing is booked until they confirm it with you.',
+              '$businessName will contact you to agree the details. Nothing is booked yet. If they accept, confirmation will be emailed to $email.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: AppColors.t3,

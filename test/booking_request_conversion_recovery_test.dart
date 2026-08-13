@@ -20,15 +20,17 @@ class _RetryingConfirmationRepository extends ProfileRepository {
 
   int attempts = 0;
   final submittedNames = <String?>[];
+  final submittedEmails = <String?>[];
 
   @override
-  Future<void> confirmBookingRequest({
+  Future<BookingRequestConfirmationOutcome> confirmBookingRequest({
     required BookingRequest request,
     required DateTime startTime,
     required int durationMins,
     required double price,
     String? clientName,
     String? clientPhone,
+    String? clientEmail,
     String? serviceTitle,
     String? location,
     String? extraNotes,
@@ -37,7 +39,11 @@ class _RetryingConfirmationRepository extends ProfileRepository {
   }) async {
     attempts += 1;
     submittedNames.add(clientName);
+    submittedEmails.add(clientEmail);
     if (attempts == 1) throw StateError('offline');
+    return const BookingRequestConfirmationOutcome(
+      confirmationEmailStatus: BookingRequestConfirmationEmailStatus.sent,
+    );
   }
 }
 
@@ -47,6 +53,7 @@ void main() {
     workspaceId: 'workspace-1',
     name: 'Alex Smith',
     phone: '07123 456789',
+    email: 'alex@example.com',
     serviceName: 'Window clean',
     serviceDurationMins: 60,
     servicePrice: 45,
@@ -97,6 +104,41 @@ void main() {
       'Alex Smith Updated',
       'Alex Smith Updated',
     ]);
+    expect(repository.submittedEmails, [
+      'alex@example.com',
+      'alex@example.com',
+    ]);
+    expect(find.text('Confirm booking'), findsNothing);
+  });
+
+  testWidgets('legacy request without email remains convertible', (
+    tester,
+  ) async {
+    const legacyRequest = BookingRequest(
+      id: 'legacy-request',
+      workspaceId: 'workspace-1',
+      name: 'Legacy Client',
+      phone: '07123 000000',
+    );
+    final repository = _RetryingConfirmationRepository()..attempts = 1;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [profileRepositoryProvider.overrideWithValue(repository)],
+        child: const MaterialApp(
+          home: BookingRequestDetailScreen(request: legacyRequest),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Book'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Create booking').last);
+    await tester.tap(find.text('Create booking').last);
+    await tester.pumpAndSettle();
+
+    expect(repository.attempts, 2);
+    expect(repository.submittedEmails, [null]);
     expect(find.text('Confirm booking'), findsNothing);
   });
 
@@ -136,5 +178,10 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Duration mins'), findsOneWidget);
     expect(find.text('Price'), findsOneWidget);
+    expect(find.text('Customer email'), findsOneWidget);
+    final emailField = tester.widget<TextField>(
+      find.widgetWithText(TextField, 'Customer email'),
+    );
+    expect(emailField.readOnly, isTrue);
   });
 }

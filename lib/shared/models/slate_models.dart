@@ -653,6 +653,7 @@ class BookingRequest {
   final String workspaceId;
   final String name;
   final String phone;
+  final String email;
   final String? serviceId;
   final String? serviceName;
   final int? serviceDurationMins;
@@ -667,6 +668,7 @@ class BookingRequest {
     required this.workspaceId,
     required this.name,
     required this.phone,
+    this.email = '',
     this.serviceId,
     this.serviceName,
     this.serviceDurationMins,
@@ -684,6 +686,7 @@ class BookingRequest {
       workspaceId: map['workspace_id'] as String? ?? '',
       name: map['name'] as String? ?? '',
       phone: map['phone'] as String? ?? '',
+      email: map['email'] as String? ?? '',
       serviceId: map['service_id'] as String?,
       serviceName: service?['name'] as String?,
       serviceDurationMins: _intFrom(service?['duration_mins'], 0) == 0
@@ -704,6 +707,7 @@ class BookingRequest {
     'workspace_id': workspaceId,
     'name': name,
     'phone': phone,
+    'email': email,
     'service_id': serviceId,
     'preferred_time_text': preferredTimeText,
     'message': message,

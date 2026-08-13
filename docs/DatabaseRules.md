@@ -1,6 +1,6 @@
 # Workloop Database Rules
 
-Last updated: 2026-07-26
+Last updated: 2026-08-13
 
 ## Source of Truth
 
@@ -121,6 +121,9 @@ Private launch-hardening state lives in the unexposed `app_private` schema:
 
 - Public profile request-booking submissions.
 - Owner triages and can manually confirm into a booking.
+- New public requests require a normalized customer email. Legacy rows may be
+  blank. The captured request email is immutable during owner confirmation and
+  remains the authoritative confirmation-email recipient.
 - `request_token` makes a retried client submission idempotent per workspace.
 - `source_hash` is an Edge-only abuse-control value, not a public identity.
 
@@ -220,6 +223,13 @@ Rules:
 Public booking and Places abuse controls are service-role-only database
 functions called by Edge Functions. They serialise limit consumption, validate
 hash format and payload bounds, and keep rate-limit rows private.
+
+Booking-request conversion also commits one private transactional-email outbox
+row in the same transaction. Provider delivery is a separately retryable side
+effect: a five-minute lease recovers stale workers, retry delay is capped, and
+delivery stops after eight attempts or 24 hours. The event/request unique key
+prevents workflow retries from duplicating email intent. Client roles cannot
+inspect recipient or body data.
 
 Deployment state checked 2026-07-26:
 

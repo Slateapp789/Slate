@@ -450,6 +450,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
       text: widget.request.name,
     );
     final phoneController = TextEditingController(text: widget.request.phone);
+    final emailController = TextEditingController(text: widget.request.email);
     final serviceController = TextEditingController(
       text: widget.request.serviceName?.trim().isNotEmpty == true
           ? widget.request.serviceName!.trim()
@@ -471,7 +472,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
       AppMotion.deliberate,
     );
 
-    final created = await showModalBottomSheet<bool>(
+    final confirmation = await showModalBottomSheet<BookingRequestConfirmationOutcome>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -532,7 +533,9 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                 selectedTime.minute,
               );
 
-              Future<void> confirm({bool enforceWorkingHours = true}) {
+              Future<BookingRequestConfirmationOutcome> confirm({
+                bool enforceWorkingHours = true,
+              }) {
                 return ref
                     .read(profileRepositoryProvider)
                     .confirmBookingRequest(
@@ -542,6 +545,10 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                       price: price,
                       clientName: clientNameController.text.trim(),
                       clientPhone: phoneController.text.trim(),
+                      clientEmail:
+                          isValidBookingRequestEmail(widget.request.email)
+                          ? widget.request.email.trim()
+                          : null,
                       serviceTitle: serviceController.text.trim(),
                       location: locationController.text.trim(),
                       extraNotes: notesController.text.trim(),
@@ -552,7 +559,8 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
 
               try {
                 try {
-                  await confirm();
+                  final outcome = await confirm();
+                  if (context.mounted) Navigator.pop(context, outcome);
                 } on AppointmentScheduleException catch (error) {
                   if (error.issue != AppointmentScheduleIssue.workingHours) {
                     rethrow;
@@ -568,9 +576,9 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                     }
                     return;
                   }
-                  await confirm(enforceWorkingHours: false);
+                  final outcome = await confirm(enforceWorkingHours: false);
+                  if (context.mounted) Navigator.pop(context, outcome);
                 }
-                if (context.mounted) Navigator.pop(context, true);
               } on AppointmentScheduleException catch (error) {
                 if (context.mounted) {
                   setSheetState(() {
@@ -702,6 +710,14 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                           ),
                           const SizedBox(height: 10),
                           _SheetField(
+                            controller: emailController,
+                            label: 'Customer email',
+                            icon: LucideIcons.mail,
+                            keyboardType: TextInputType.emailAddress,
+                            readOnly: true,
+                          ),
+                          const SizedBox(height: 10),
+                          _SheetField(
                             controller: serviceController,
                             label: 'Service',
                             icon: LucideIcons.scissors,
@@ -804,13 +820,14 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
     Future<void>.delayed(sheetCloseDuration, () {
       clientNameController.dispose();
       phoneController.dispose();
+      emailController.dispose();
       serviceController.dispose();
       durationController.dispose();
       priceController.dispose();
       locationController.dispose();
       notesController.dispose();
     });
-    if (created != true) return;
+    if (confirmation == null) return;
 
     ref.invalidate(bookingRequestsProvider);
     ref.invalidate(appointmentsProvider);
@@ -822,10 +839,17 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
     ref.invalidate(notificationsProvider);
     ref.invalidate(unreadNotificationsProvider);
     if (mounted) {
+      final successMessage = bookingRequestConfirmationMessage(
+        confirmation.confirmationEmailStatus,
+      );
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Booking added to your calendar'),
-          backgroundColor: AppColors.success,
+        SnackBar(
+          content: Text(successMessage),
+          backgroundColor:
+              confirmation.confirmationEmailStatus ==
+                  BookingRequestConfirmationEmailStatus.failed
+              ? AppColors.warning
+              : AppColors.success,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -836,6 +860,10 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
   Future<void> _call() async {
     final phone = widget.request.phone.replaceAll(' ', '');
     await launchUrl(Uri(scheme: 'tel', path: phone));
+  }
+
+  Future<void> _email() async {
+    await launchUrl(Uri(scheme: 'mailto', path: widget.request.email));
   }
 
   @override
@@ -872,6 +900,48 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
               _StatusBadge(status: request.status),
             ],
           ),
+          if (isValidBookingRequestEmail(request.email)) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    request.email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppColors.t2),
+                  ),
+                ),
+                Semantics(
+                  button: true,
+                  label: 'Email ${request.name}',
+                  onTap: _email,
+                  child: ExcludeSemantics(
+                    child: OutlinedButton.icon(
+                      onPressed: _email,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.t2,
+                        minimumSize: const Size(0, AppSpacing.minTouch),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                        ),
+                      ),
+                      icon: const Icon(LucideIcons.mail, size: 14),
+                      label: const Text(
+                        'Email',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 6),
           Row(
             children: [
@@ -980,6 +1050,19 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
   }
 }
 
+String bookingRequestConfirmationMessage(
+  BookingRequestConfirmationEmailStatus status,
+) => switch (status) {
+  BookingRequestConfirmationEmailStatus.sent =>
+    'Booking confirmed and confirmation email sent.',
+  BookingRequestConfirmationEmailStatus.pending =>
+    'Booking confirmed. The confirmation email is queued.',
+  BookingRequestConfirmationEmailStatus.failed =>
+    'Booking confirmed, but the email could not be sent. Contact the customer directly.',
+  BookingRequestConfirmationEmailStatus.notApplicable =>
+    'Booking confirmed. No email was available for confirmation.',
+};
+
 String _formatSheetDate(DateTime date) {
   final day = date.day.toString().padLeft(2, '0');
   final month = date.month.toString().padLeft(2, '0');
@@ -1074,6 +1157,7 @@ class _SheetField extends StatelessWidget {
   final IconData icon;
   final TextInputType keyboardType;
   final int maxLines;
+  final bool readOnly;
   final ValueChanged<String>? onChanged;
 
   const _SheetField({
@@ -1082,6 +1166,7 @@ class _SheetField extends StatelessWidget {
     required this.icon,
     required this.keyboardType,
     this.maxLines = 1,
+    this.readOnly = false,
     this.onChanged,
   });
 
@@ -1091,6 +1176,7 @@ class _SheetField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      readOnly: readOnly,
       onChanged: onChanged,
       style: const TextStyle(color: AppColors.t1, fontWeight: FontWeight.w600),
       decoration: InputDecoration(

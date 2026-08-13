@@ -177,6 +177,16 @@ logic. The intended boundary is:
   profile/service ownership, forces safe state, applies honeypot and source/phone
   rate limits, uses a stable request token, and creates owner notification
   server-side;
+- `confirm-booking-request`: accepts exactly `{payload: <existing booking
+  workflow payload>}`, invokes the authenticated/MFA-aware workflow, and then
+  opportunistically drains only that request's durable confirmation-email row;
+- `drain-booking-confirmation-emails`: requires an Edge-only token, claims no
+  more than 20 due rows, never exposes recipient/body data in its response or
+  logs, and returns aggregate counts only. After deployment, configure a
+  scheduler to POST it every minute. Deploy this one worker with
+  `supabase functions deploy drain-booking-confirmation-emails --no-verify-jwt`;
+  its constant-time 32+ character drain token is the function authentication,
+  and no service-role secret is stored in Postgres;
 - `places-address-search`: keeps the Google key server-side and requires an
   authenticated call;
 - `request-account-deletion`: creates a guarded deletion request;

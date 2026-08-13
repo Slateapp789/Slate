@@ -31,6 +31,31 @@ The public booking/profile Edge Functions remain deployed with JWT verification 
 - Anonymous users do not read `business_profiles`, `services`, or `booking_requests` directly.
 - Public profile reads go through the `get-public-profile` Edge Function, which returns only the safe public projection.
 - Public booking requests go through the `create-booking-request` Edge Function, which validates handle/service ownership, forces `pending` status, applies length limits, rate-limits by source hash and phone, and creates the owner notification server-side.
+- New public booking requests require a normalized email. Owner confirmation
+  enters the authenticated `confirm-booking-request` Edge boundary while the
+  database workflow remains authoritative for MFA, tenancy, idempotency and
+  booking conflicts. Confirmation commits a private email outbox intent in the
+  same transaction; provider delivery cannot roll back a confirmed booking.
+- Confirmation mail reuses Resend with Edge-only `RESEND_API_KEY` and
+  `BOOKING_CONFIRMATION_EMAIL_FROM` secrets. The protected scheduled drain also
+  requires `BOOKING_CONFIRMATION_DRAIN_TOKEN`. Never put those values in
+  Flutter, a migration, a public schema or client environment.
+- Deploy only `drain-booking-confirmation-emails` with gateway JWT verification
+  disabled and schedule a POST every minute with its 32+ character
+  `x-workloop-drain-token`. All other authenticated Edge boundaries retain JWT
+  verification. The worker fails closed when its token is missing or short.
+- The sender uses `booking-request-confirmed/<outbox-id>` as the provider
+  idempotency key, never logs recipient/body data, recovers stale leases, and
+  stops after eight attempts or 24 hours. Terminal failures require operations
+  review rather than an unbounded late resend.
+- Before beta, create an external scheduler that sends `POST
+  https://<project-ref>.supabase.co/functions/v1/drain-booking-confirmation-emails`
+  every minute with `x-workloop-drain-token`; store the token only in the
+  scheduler and Edge secrets. Alert when any row is `failed`, when pending rows
+  are older than five minutes, or when the oldest due row continues ageing.
+  Exercise the scheduler and alert path on disposable staging before production
+  promotion. This is an operational release gate, not completed by migration or
+  function deployment alone.
 - Workspace data access remains gated by RLS policies scoped to authenticated workspace members.
 
 ## Account Deletion Boundary

@@ -3,7 +3,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 abstract final class WorkloopAppInfo {
   static const name = 'Workloop';
   static String version = '1.0.0';
-  static String buildNumber = '4';
+  static String buildNumber = '5';
   static String get versionLabel => '$version ($buildNumber)';
   static const supportEmail = 'support@workloop.uk';
   static const privacyUrl = 'https://workloop.uk/privacy.html';

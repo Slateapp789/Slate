@@ -232,6 +232,7 @@ void main() {
         'workspace_id': 'workspace-1',
         'name': 'Nadia',
         'phone': '07123 000000',
+        'email': 'nadia@example.com',
         'service_id': 'service-1',
         'preferred_time_text': 'Friday afternoon',
         'message': 'First visit',
@@ -247,8 +248,10 @@ void main() {
       expect(request.serviceDurationMins, 75);
       expect(request.servicePrice, 80);
       expect(request.preferredTimeText, 'Friday afternoon');
+      expect(request.email, 'nadia@example.com');
       expect(request.status, 'contacted');
       expect(request.toMap()['preferred_time_text'], 'Friday afternoon');
+      expect(request.toMap()['email'], 'nadia@example.com');
     });
   });
 

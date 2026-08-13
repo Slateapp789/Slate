@@ -161,6 +161,7 @@ create table if not exists booking_requests (
   workspace_id uuid not null references workspaces(id) on delete cascade,
   name text not null,
   phone text not null,
+  email text,
   phone_normalized text
     generated always as (regexp_replace(phone, '[^0-9]', '', 'g')) stored,
   service_id uuid references services(id) on delete set null,
@@ -174,10 +175,35 @@ create table if not exists booking_requests (
 
 alter table if exists booking_requests
   add column if not exists preferred_time_text text,
+  add column if not exists email text,
   add column if not exists phone_normalized text
     generated always as (regexp_replace(phone, '[^0-9]', '', 'g')) stored,
   add column if not exists source_hash text,
   add column if not exists request_token uuid;
+
+-- Email is nullable only for legacy requests. New public submissions use the
+-- service-role-only v2 RPC, which requires and normalizes it.
+
+create table if not exists app_private.transactional_email_outbox (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  booking_request_id uuid not null references booking_requests(id) on delete cascade,
+  event text not null,
+  recipient_email text not null,
+  payload jsonb not null,
+  status text not null default 'pending',
+  attempt_count integer not null default 0,
+  next_attempt_at timestamptz not null default now(),
+  lease_token uuid,
+  lease_expires_at timestamptz,
+  delivery_expires_at timestamptz not null default (now() + interval '24 hours'),
+  provider_message_id text,
+  last_error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  sent_at timestamptz,
+  unique(event, booking_request_id)
+);
 create index if not exists booking_requests_workspace_id_idx
   on booking_requests(workspace_id);
 create index if not exists booking_requests_service_id_idx

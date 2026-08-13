@@ -361,8 +361,9 @@ void main() {
       'supabase/functions/create-booking-request/index.ts',
     ).readAsStringSync();
 
-    expect(edgeHandler, contains('"create_public_booking_request"'));
+    expect(edgeHandler, contains('"create_public_booking_request_v2"'));
     expect(edgeHandler, contains('p_request_token: requestToken'));
+    expect(edgeHandler, contains('p_email: email'));
     expect(edgeHandler, contains('bookingRequestOutcomeResponse(outcome)'));
     expect(edgeHandler, isNot(contains('.from("booking_requests").insert')));
     expect(edgeHandler, isNot(contains('.from("notifications").insert')));

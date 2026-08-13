@@ -77,3 +77,9 @@ verify_enabled = true
 
 [analytics]
 enabled = false
+
+# This worker uses its own constant-time, 32+ character Edge secret so an
+# external scheduler does not need a user or service-role JWT. Deploy it with
+# `--no-verify-jwt`; other authenticated functions keep gateway JWT checks.
+[functions.drain-booking-confirmation-emails]
+verify_jwt = false

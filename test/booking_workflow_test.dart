@@ -48,6 +48,7 @@ void main() {
       idempotencyKey: 'booking-request-confirm:1234567890',
       newContactName: 'Ada Lovelace',
       newContactPhone: '07123456789',
+      newContactEmail: 'ada@example.com',
       newContactNotes: 'Created from public booking request.',
       reuseContactByPhone: true,
       bookingRequestId: 'request-1',
@@ -62,9 +63,84 @@ void main() {
       (payload['new_contact'] as Map)['notes'],
       'Created from public booking request.',
     );
+    expect((payload['new_contact'] as Map)['email'], 'ada@example.com');
     expect(payload['booking_request_id'], 'request-1');
     expect(payload['reuse_contact_by_phone'], isTrue);
   });
+
+  test('public request payload carries the required customer email', () {
+    final payload = buildPublicBookingRequestPayload(
+      handle: 'bright-studio',
+      name: 'Ada Lovelace',
+      phone: '07123456789',
+      email: 'ada@example.com',
+      requestToken: 'ad5f5592-9f8f-4b35-9604-8fc09270982d',
+      serviceId: 'service-1',
+    );
+
+    expect(payload['email'], 'ada@example.com');
+    expect(payload['phone'], '07123456789');
+    expect(payload['requestToken'], isNotEmpty);
+  });
+
+  test(
+    'booking request email validation is shared by intake and conversion',
+    () {
+      expect(isValidBookingRequestEmail(' ada@example.com '), isTrue);
+      expect(isValidBookingRequestEmail('not-an-email'), isFalse);
+      expect(isValidBookingRequestEmail(''), isFalse);
+    },
+  );
+
+  test('confirmation response distinguishes every email delivery outcome', () {
+    for (final entry in const {
+      'sent': BookingRequestConfirmationEmailStatus.sent,
+      'pending': BookingRequestConfirmationEmailStatus.pending,
+      'failed': BookingRequestConfirmationEmailStatus.failed,
+      'not_applicable': BookingRequestConfirmationEmailStatus.notApplicable,
+    }.entries) {
+      final outcome = BookingRequestConfirmationOutcome.fromResponse({
+        'ok': true,
+        'result': {
+          'appointment_ids': ['appointment-1'],
+          'contact_id': 'contact-1',
+          'booking_request_id': 'request-1',
+        },
+        'confirmationEmail': {'status': entry.key},
+      });
+      expect(outcome.confirmationEmailStatus, entry.value);
+    }
+  });
+
+  test(
+    'owner confirmation copy reports email outcome without undoing booking',
+    () {
+      expect(
+        bookingRequestConfirmationMessage(
+          BookingRequestConfirmationEmailStatus.failed,
+        ),
+        'Booking confirmed, but the email could not be sent. Contact the customer directly.',
+      );
+      expect(
+        bookingRequestConfirmationMessage(
+          BookingRequestConfirmationEmailStatus.sent,
+        ),
+        'Booking confirmed and confirmation email sent.',
+      );
+      expect(
+        bookingRequestConfirmationMessage(
+          BookingRequestConfirmationEmailStatus.pending,
+        ),
+        'Booking confirmed. The confirmation email is queued.',
+      );
+      expect(
+        bookingRequestConfirmationMessage(
+          BookingRequestConfirmationEmailStatus.notApplicable,
+        ),
+        'Booking confirmed. No email was available for confirmation.',
+      );
+    },
+  );
 
   test('completion payload keeps one retry key and linked payment', () {
     final payload = buildCompletionWorkflowPayload(
