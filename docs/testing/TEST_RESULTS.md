@@ -1004,15 +1004,17 @@ open.
 
 ## 48. 2026-08-13 booking-confirmation email source verification
 
-This is working-tree evidence for the Build 5 feature slice, not a clean-tag,
-deployed-staging, external-inbox or signed-artifact result.
+This section began as working-tree evidence for the Build 5 feature slice. The
+later hosted preview and external-inbox results are recorded in section 49. A
+clean local `v1.0.0-beta.5` tag is frozen after the final checks below; a Build
+5 distribution artifact still does not exist.
 
 | Evidence | Observed result | Limit |
 | --- | --- | --- |
 | Flutter | Full 383/383 suite passes after updating the v2 Edge source contract; analysis reports no issues | Local unit/widget/golden source evidence, not deployed E2E |
 | Deno | 37 files format-clean, 28 files lint-clean, both new handler entry points type-check, 38/38 full Edge tests pass | Provider calls are mocked; functions are not deployed |
-| Local Supabase | Empty reset replays all 53 migrations; lint reports zero warning-level schema errors | Isolated local database |
-| pgTAP | Four files, 109/109 assertions pass, including 26 outbox/email-boundary assertions | No hosted/live-derived parity proof |
+| Local Supabase | Empty reset replays all 55 migrations; lint reports zero warning-level schema errors | Isolated local database |
+| pgTAP | Four files, 111/111 assertions pass, including 28 outbox/email-boundary assertions | Hosted preview proof is recorded in section 49 |
 | iOS profile | Build succeeds as `1.0.0 (5)`, 71.2 MB; strict code-sign verification passes | Dirty working-tree profile evidence, not an App Store archive/IPA |
 | Diff hygiene | `git diff --check` passes | Working tree remains intentionally uncommitted |
 
@@ -1022,3 +1024,28 @@ preservation, lease ownership, backoff, stale-lease recovery and terminal
 failure. They do not prove Resend delivery, the every-minute scheduler,
 SPF/DKIM/DMARC, bounce/suppression handling or recipient/content correctness in
 a controlled external inbox. Production remains unchanged.
+
+## 49. 2026-08-13 hosted booking-email rehearsal
+
+Owner-approved preview branch
+`booking-email-beta5-rehearsal-20260813` was isolated from production data and
+charged at the quoted $0.01344/hour while active. It was cleaned and deleted
+after this evidence was captured; production schema and functions were not
+changed.
+
+| Evidence | Observed result | Limit |
+| --- | --- | --- |
+| Hosted schema | All 55 migrations applied; remote lint reports no schema errors | Preview branch, not production promotion |
+| Hosted pgTAP | Four files, 111/111 assertions pass | Does not replace production-history reconciliation |
+| Staging app E2E | Core workflow, practical two-tenant isolation and signed-out public request/conversion pass on iPhone 17 Pro simulator | Account deletion and external Auth lifecycle remain open |
+| Intake safety | Honeypot creates no request; duplicate token creates one request; invalid service is rejected | Load/abuse volume was not measured |
+| External delivery | Resend delivered the fixed-sender confirmation to `delivered@resend.dev` with the expected customer, business, title and BST time | Sandbox delivery, not a broad mailbox/client matrix |
+| Retry operations | Forced provider 401 leaves the booking successful, records attempt 1 with bounded backoff, then sends after key recovery at attempt 2 | Terminal alerting and human response still need operations ownership |
+| Scheduler/auth | Vault-backed pg_cron invokes the custom-token drain every minute; cron succeeds and pg_net receives HTTP 200; missing/wrong tokens return 401 | Must be recreated deliberately during production promotion |
+| Domain trust | Resend marks `workloop.uk`, DKIM and SPF verified; message insights mark DMARC valid and plain text present | Bounce/complaint/suppression lifecycle is not yet exercised |
+
+Final source recheck after the two portability/index migrations: 222 Dart files
+format-clean, Flutter analysis clean, 383/383 Flutter tests pass, 55 local
+migrations replay from empty, 111/111 local pgTAP pass, local database lint is
+clean, 38/38 Deno tests pass, all ten Edge entry points type-check, and the iOS
+profile build succeeds as `1.0.0 (5)` at 71.2 MB.

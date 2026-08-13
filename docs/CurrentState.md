@@ -1234,7 +1234,7 @@ open.
 - Public and in-app privacy copy now describes requester email, confirmation
   purpose and Resend processing. Payment collection remains independently
   disabled for beta.
-- Local backend proof replays all 53 migrations, passes 109/109 pgTAP
+- Local backend proof replays all 55 migrations, passes 111/111 pgTAP
   assertions across four files, reports zero warning-level database lint
   findings, passes 38/38 Deno tests, and type-checks both new handlers. Focused
   Flutter booking/public-profile tests, the full 383/383 Flutter suite and
@@ -1246,8 +1246,17 @@ open.
   identity is `1.0.0+5` / `v1.0.0-beta.5`. Beta 4 and its signed IPA remain
   immutable historical evidence.
 
-Production is unchanged. Promotion requires migration reconciliation first,
-then the three booking Edge deployments, verified Resend sender/secrets, the
-token-protected every-minute drain, and a controlled-inbox staging journey.
-Until that evidence exists, Build 5 is implemented source—not an upload-ready
-or email-operational beta.
+Production is unchanged. A paid disposable preview branch successfully
+replayed all 55 migrations, passed 111/111 hosted pgTAP assertions and clean
+database lint, and ran the core, two-tenant-isolation and public-booking
+journeys. The public journey proved one delivered confirmation with correct
+recipient/content/time, one request/outbox on retry, honeypot and invalid-
+service rejection, owner conversion, a secure every-minute Vault-backed drain,
+and real provider-401 backoff/recovery. Resend reports `workloop.uk` verified
+with DKIM/SPF and a valid DMARC record. The branch was cleaned and deleted.
+
+Production promotion still requires explicit approval and ordered migration/
+function deployment. Bounce/suppression operations, disposable account
+deletion, external Auth lifecycle, physical accessibility and an exact clean
+Build 5 distribution artifact remain open, so this is not yet an upload-ready
+beta.

@@ -17,6 +17,7 @@ required_vars=(
   E2E_USER_B_EMAIL
   E2E_USER_B_PASSWORD
   E2E_PUBLIC_HANDLE
+  E2E_REQUESTER_EMAIL
 )
 
 for variable in "${required_vars[@]}"; do
@@ -48,7 +49,7 @@ e2e_defines_file="$(mktemp "${TMPDIR:-/tmp}/workloop-e2e-defines.XXXXXX.json")"
 trap 'rm -f "$e2e_defines_file"' EXIT
 export E2E_PUBLIC_HANDLE E2E_STAGING_PROJECT_REF E2E_SUPABASE_ANON_KEY
 export E2E_SUPABASE_URL E2E_USER_A_EMAIL E2E_USER_A_PASSWORD
-export E2E_USER_B_EMAIL E2E_USER_B_PASSWORD
+export E2E_USER_B_EMAIL E2E_USER_B_PASSWORD E2E_REQUESTER_EMAIL
 export WORKLOOP_E2E_DEFINES_FILE="$e2e_defines_file"
 python3 <<'PY'
 import json
@@ -61,6 +62,7 @@ keys = (
     "E2E_USER_A_PASSWORD",
     "E2E_USER_B_EMAIL",
     "E2E_USER_B_PASSWORD",
+    "E2E_REQUESTER_EMAIL",
 )
 defines = {key: os.environ[key] for key in keys}
 defines.update({

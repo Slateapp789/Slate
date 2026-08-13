@@ -534,28 +534,36 @@ separate prohibited boundary until final approval.
       sender plus a stable idempotency key.
 - [x] Delivery has stale-lease recovery, capped exponential retry, an
       eight-attempt/24-hour terminal boundary and honest sent/queued/failed UI.
-- [x] Local proof passes all 53 migrations, 109/109 pgTAP assertions, database
+- [x] Local proof passes all 55 migrations, 111/111 pgTAP assertions, database
       lint, 38/38 Deno tests, both new handler type checks, focused Flutter
       tests, the full 383/383 Flutter suite and Flutter analysis.
 - [x] An iOS profile build compiles and signs as `1.0.0 (5)` at 71.2 MB and
       passes strict code-sign verification. It is working-tree evidence, not a
       distribution candidate.
-- [ ] Reconcile and promote the 53rd migration without a blanket production
-      push, then deploy `create-booking-request`,
+- [x] Rehearse all 55 migrations without a blanket production push, then deploy
+      `create-booking-request`,
       `confirm-booking-request`, and `drain-booking-confirmation-emails` in that
-      order.
-- [ ] Configure `RESEND_API_KEY`, verified
+      order on a disposable preview branch. Production remains unchanged.
+- [x] Configure `RESEND_API_KEY`, verified
       `BOOKING_CONFIRMATION_EMAIL_FROM`, and a random 32+ character
       `BOOKING_CONFIRMATION_DRAIN_TOKEN`. Deploy only the drain with
       `--no-verify-jwt`, then schedule its token-authenticated POST every minute.
-- [ ] In disposable staging, prove one controlled inbox receives exactly one
+- [x] In disposable staging, prove a controlled Resend inbox receives one
       correctly timed confirmation after owner acceptance; exercise duplicate
-      submission/confirmation, provider outage/retry, SPF/DKIM/DMARC,
-      bounce/suppression and deletion/export behaviour.
+      submission, honeypot, invalid service, atomic conversion and a real
+      provider 401/retry/recovery. Resend reports delivered, verified DKIM/SPF,
+      and a valid DMARC record.
+- [ ] Exercise bounced/suppressed recipients and deletion/export behaviour in
+      disposable staging; keep operational bounce monitoring explicit.
 - [ ] Monitor terminal failures and oldest pending age, with a documented owner
       response to contact the customer directly.
-- [ ] Freeze a clean `1.0.0+5` commit as a new immutable
-      `v1.0.0-beta.5`, then rerun full release checks and build/sign a new IPA.
+- [x] Freeze the fully verified `1.0.0+5` source as a new immutable local
+      `v1.0.0-beta.5` tag.
+- [ ] Build/sign a new distribution IPA from that exact tag, then repeat the
+      artifact signature/provenance and TestFlight-install gates.
 
-No paid preview branch was created. Build 4 must not be reused or retagged for
-this changed public data and transactional-email contract.
+A metered preview branch was created with owner approval at $0.01344/hour,
+rehearsed, cleaned and deleted after evidence capture. Build 4 must not be
+reused or retagged for this changed public data and transactional-email
+contract. Production promotion and Apple upload remain separate approval
+boundaries.

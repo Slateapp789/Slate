@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(26);
+select plan(28);
 
 select has_column(
   'public',
@@ -14,6 +14,18 @@ select has_table(
   'app_private',
   'transactional_email_outbox',
   'transactional email intent is durable and private'
+);
+select has_index(
+  'app_private',
+  'transactional_email_outbox',
+  'transactional_email_outbox_workspace_id_idx',
+  'workspace deletion has a covering outbox foreign-key index'
+);
+select has_index(
+  'app_private',
+  'transactional_email_outbox',
+  'transactional_email_outbox_booking_request_id_idx',
+  'booking-request joins have a covering outbox foreign-key index'
 );
 select ok(
   not has_table_privilege(

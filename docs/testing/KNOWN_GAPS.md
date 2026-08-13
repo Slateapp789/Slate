@@ -163,9 +163,11 @@ brand, performance/load, and crash-observability work remain external gates.
   `support@workloop.uk` and current Business deletion navigation. The live
   12 August policy copy still trails the fuller tagged copy, and monitored
   support, named controller details and professional legal review remain open.
-- H-02, H-03, H-04 and H-05 remain high. The guarded hosted staging journeys
-  have not run because the only configured remote is production and creating a
-  preview branch incurs metered cost requiring owner approval.
+- H-02 and H-03 are materially narrower: an owner-approved isolated preview
+  branch ran the core, practical two-user-isolation and public-booking journeys,
+  plus controlled Resend delivery and real outage/retry recovery. Production
+  promotion, disposable account deletion and broader export/destructive checks
+  remain open. H-04 and H-05 remain high for payments and operational evidence.
 - H-06 and H-09 remain high: local Auth is substantially proven, but external
   provider/email/linking and exact-build physical accessibility, permissions,
   lifecycle, deep-link, reinstall and upgrade evidence are absent.

@@ -114,6 +114,24 @@ Candidate: `1.0.0 (4)`, `v1.0.0-beta.4`,
 - VoiceOver, TalkBack, real permissions, reminders, offline/background,
   recovery deep links, reinstall/upgrade and DST interaction remain unchecked.
 
+## 2026-08-13 Build 5 preview execution record
+
+- An owner-approved disposable Supabase branch ran all 55 migrations, clean
+  hosted lint and 111/111 hosted pgTAP assertions.
+- Simulator staging passed the core workflow, practical two-account isolation,
+  and the signed-out request-to-owner-conversion journey.
+- Resend delivered the acceptance confirmation with the expected recipient,
+  fixed sender, customer/business/title and Europe/London time. DKIM and SPF
+  are verified and message insights mark DMARC valid.
+- A forced provider 401 kept the booking accepted, queued one bounded retry and
+  sent after recovery. The Vault-backed one-minute drain returned HTTP 200;
+  missing and incorrect drain tokens returned 401.
+- The branch contained no production data, disposable rows were removed, and
+  the metered branch was deleted after evidence capture.
+- Still manual/open: bounce and complaint handling, external Auth lifecycle,
+  destructive account deletion, VoiceOver/TalkBack, permissions, offline/
+  lifecycle/deep links, support monitoring and legal approval.
+
 Do not tick or infer the human-only items above from the automated results.
 Record each completed physical pass with tester, device/OS, timestamp and
 defect/evidence reference before changing the upload verdict.

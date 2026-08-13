@@ -10,6 +10,7 @@ import 'staging_test_config.dart';
 const _ownerEmail = String.fromEnvironment('E2E_USER_A_EMAIL');
 const _ownerPassword = String.fromEnvironment('E2E_USER_A_PASSWORD');
 const _publicHandle = String.fromEnvironment('E2E_PUBLIC_HANDLE');
+const _requesterEmail = String.fromEnvironment('E2E_REQUESTER_EMAIL');
 
 final _configured =
     stagingWritesAllowed &&
@@ -17,7 +18,8 @@ final _configured =
     stagingAnonKey.isNotEmpty &&
     _ownerEmail.isNotEmpty &&
     _ownerPassword.isNotEmpty &&
-    _publicHandle.isNotEmpty;
+    _publicHandle.isNotEmpty &&
+    _requesterEmail.isNotEmpty;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -69,7 +71,7 @@ void main() {
           handle: _publicHandle,
           name: requesterName,
           phone: phone,
-          email: 'workloop-e2e-$runId@example.com',
+          email: _requesterEmail,
           requestToken: requestToken,
           serviceId: service?.id,
           preferredTimeText: 'A weekday morning',
@@ -81,7 +83,7 @@ void main() {
             'handle': _publicHandle,
             'name': requesterName,
             'phone': phone,
-            'email': 'workloop-e2e-$runId@example.com',
+            'email': _requesterEmail,
             'requestToken': requestToken,
             'serviceId': service?.id,
             'preferredTimeText': 'A weekday morning',
@@ -102,7 +104,7 @@ void main() {
               'name': 'Invalid service $runId',
               'phone': '+44 7700 800000',
               'email': 'invalid-service-$runId@example.com',
-              'requestToken': _uuidFor('invalid$runId'),
+              'requestToken': _uuidFor('${runId}invalid'),
               'serviceId': '00000000-0000-4000-8000-000000000000',
             },
           ),
@@ -139,7 +141,7 @@ void main() {
           start.day,
           10,
         );
-        await ownerProfiles.confirmBookingRequest(
+        final confirmation = await ownerProfiles.confirmBookingRequest(
           request: request,
           startTime: bookingStart,
           durationMins: service?.durationMins ?? 60,
@@ -147,6 +149,11 @@ void main() {
           serviceTitle: bookingTitle,
           createPaymentDue: true,
           enforceWorkingHours: false,
+        );
+        expect(
+          confirmation.confirmationEmailStatus,
+          BookingRequestConfirmationEmailStatus.sent,
+          reason: 'The controlled staging recipient must be provider-accepted.',
         );
 
         requests = await ownerProfiles.bookingRequests(workspaceId);
