@@ -567,3 +567,21 @@ rehearsed, cleaned and deleted after evidence capture. Build 4 must not be
 reused or retagged for this changed public data and transactional-email
 contract. Production promotion and Apple upload remain separate approval
 boundaries.
+
+## 2026-08-15 TestFlight distribution status
+
+- [x] Promote the reviewed booking-email schema, functions, secrets and
+      minute-by-minute retry worker to production in the rehearsed order.
+- [x] Verify production is healthy, current migrations/functions are present,
+      the retry job is active, no paid preview branch remains, and payments are
+      still closed by default.
+- [x] Export and strictly verify the exact-tag `1.0.0 (5)` App Store IPA; retain
+      its immutable SHA/tag provenance.
+- [x] Upload Build 5 and confirm App Store Connect reports the upload complete.
+- [x] Add accurate What to Test, beta description, URLs, feedback contact and
+      review notes, and create `Workloop Private Beta` as the external group.
+- [ ] Enter the owner's monitored reviewer phone number, attach Build 5 to the
+      external group, submit it for Beta App Review, and enable/copy the public
+      TestFlight link after Apple approves it.
+- [ ] Add the intended testers or share the approved public link, then record
+      one real TestFlight install/launch and the short physical-device smoke.

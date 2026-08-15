@@ -2,6 +2,33 @@
 
 Last updated: 2026-08-15
 
+## 2026-08-15 TestFlight beta 5 handoff
+
+- Apple has processed `Workloop 1.0.0 (5)` successfully. The upload is complete,
+  the build is attached to `Workloop Internal Beta`, and the exact local
+  distribution IPA still matches immutable tag `v1.0.0-beta.5` at commit
+  `6ae85c8fff5e523b83b47f357d2d9b4ac4bceede` with SHA-256
+  `d01e8aa70cac321f5b2b9f7780704d4f4cb7e341c4f8111534cb70fa64d2787f`.
+- App Store Connect now has tester-facing What to Test notes, a concise beta
+  description, the Workloop marketing and privacy URLs, feedback email, and
+  reviewer notes that describe optional permissions, request-only public
+  booking, portrait scope, and the payments-off boundary.
+- The external `Workloop Private Beta` group is created. Apple keeps Build 5
+  unavailable for external selection until the required reviewer contact form
+  is valid; the only missing owner-supplied field is a monitored phone number.
+  External submission, approval, and a public TestFlight link therefore remain
+  pending that value and Apple's Beta App Review.
+- Production Supabase is healthy and now contains the booking-email migrations,
+  the three current booking functions, the minute-by-minute Vault-backed drain,
+  and the independently deployed private launch waitlist. No paid preview
+  branch remains active. Payment collection remains disabled in both the app
+  and Edge Function boundary.
+- Fresh handoff checks pass: 222 Dart files are format-clean, Flutter analysis
+  is clean, 383/383 Flutter tests pass, all 11 Edge entry points type-check,
+  Deno formatting/lint pass, and 42/42 Edge tests pass. Strict IPA code-sign
+  verification passes with the App Store profile, `get-task-allow=false`,
+  `beta-reports-active=true`, and Sign in with Apple.
+
 ## 2026-08-15 public-launch waitlist boundary
 
 - The marketing funnel can collect explicit early-access consent through a new

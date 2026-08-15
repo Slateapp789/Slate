@@ -271,3 +271,15 @@ staging gate.
   build or add testers until upload approval and processing succeed.
 - External testers: defer until internal smoke, support monitoring, legal
   controller details and external-beta review information are complete.
+
+### 2026-08-15 live TestFlight handoff
+
+- Build 5 is uploaded, processed and marked Ready to Submit.
+- What to Test, beta description, feedback email, marketing/privacy URLs and
+  honest payments-off/request-only review notes are entered.
+- `Workloop Private Beta` exists as the external group.
+- Apple still requires the owner's monitored reviewer phone number before the
+  contact form can be saved and Build 5 can be submitted for Beta App Review.
+- After approval, enable the group's public link and share that link with the
+  intended tester cohort; do not publish an invitation URL before Apple has
+  made it active.
