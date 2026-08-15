@@ -12,7 +12,9 @@ Last updated: 2026-08-15
 - App Store Connect now has tester-facing What to Test notes, a concise beta
   description, the Workloop marketing and privacy URLs, feedback email, and
   reviewer notes that describe optional permissions, request-only public
-  booking, portrait scope, and the payments-off boundary.
+  booking, portrait scope, and the payments-off boundary. A dedicated
+  fictional-data reviewer login is confirmed and its credentials are stored in
+  App Store Connect and the owner's local Keychain, not in source control.
 - The external `Workloop Private Beta` group is created. Apple keeps Build 5
   unavailable for external selection until the required reviewer contact form
   is valid; the only missing owner-supplied field is a monitored phone number.
@@ -23,6 +25,12 @@ Last updated: 2026-08-15
   and the independently deployed private launch waitlist. No paid preview
   branch remains active. Payment collection remains disabled in both the app
   and Edge Function boundary.
+- The release handoff found and corrected a stale Auth default redirect:
+  production now uses `https://workloop.uk`, explicitly allows
+  `https://workloop.uk/**`, retains the two mobile deep links, and no longer
+  allows the third-party-owned `workloop.app` origin. A resent confirmation
+  reached the verified sender path, the reviewer account confirmed, and a
+  password sign-in succeeds.
 - Fresh handoff checks pass: 222 Dart files are format-clean, Flutter analysis
   is clean, 383/383 Flutter tests pass, all 11 Edge entry points type-check,
   Deno formatting/lint pass, and 42/42 Edge tests pass. Strict IPA code-sign

@@ -278,6 +278,10 @@ staging gate.
 - What to Test, beta description, feedback email, marketing/privacy URLs and
   honest payments-off/request-only review notes are entered.
 - `Workloop Private Beta` exists as the external group.
+- A confirmed dedicated reviewer account is entered with credentials retained
+  only in App Store Connect and the owner's local Keychain. Production Auth now
+  redirects web confirmations to `workloop.uk`; the retired `workloop.app`
+  allow-list entry has been removed.
 - Apple still requires the owner's monitored reviewer phone number before the
   contact form can be saved and Build 5 can be submitted for Beta App Review.
 - After approval, enable the group's public link and share that link with the

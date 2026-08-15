@@ -580,6 +580,10 @@ boundaries.
 - [x] Upload Build 5 and confirm App Store Connect reports the upload complete.
 - [x] Add accurate What to Test, beta description, URLs, feedback contact and
       review notes, and create `Workloop Private Beta` as the external group.
+- [x] Correct the production Auth site URL and web redirect allow-list from the
+      retired third-party-owned domain to `workloop.uk`; confirm a dedicated
+      reviewer account and verify password sign-in without storing credentials
+      in the repository.
 - [ ] Enter the owner's monitored reviewer phone number, attach Build 5 to the
       external group, submit it for Beta App Review, and enable/copy the public
       TestFlight link after Apple approves it.
