@@ -145,30 +145,82 @@ void main() {
   });
 
   testWidgets('populated client list surface', (tester) async {
-    const client = Client(
-      id: 'client-1',
-      workspaceId: 'workspace-1',
-      name: 'A very long customer name used to verify wrapping',
-      phone: '+44 7700 900123',
-      email: 'quality.fixture.with.a.long.address@example.invalid',
-      tags: ['Regular', 'Priority'],
-    );
-    const record = ClientCrmRecord(
-      client: client,
-      bookingCount: 8,
-      completedBookingCount: 6,
-      nextBooking: null,
-      lastBooking: null,
-      lifetimeValue: 1249.99,
-      outstandingBalance: 49.99,
-      openTaskCount: 2,
-      overdueTaskCount: 1,
-    );
+    final records = [
+      ClientCrmRecord(
+        client: const Client(
+          id: 'client-1',
+          workspaceId: 'workspace-1',
+          name: 'Maya Patel',
+          tags: ['Regular'],
+        ),
+        bookingCount: 8,
+        completedBookingCount: 7,
+        nextBooking: Appointment(
+          id: 'client-1-next',
+          workspaceId: 'workspace-1',
+          startTime: DateTime(2026, 8, 18, 10),
+        ),
+        lastBooking: Appointment(
+          id: 'client-1-last',
+          workspaceId: 'workspace-1',
+          startTime: DateTime(2026, 7, 28, 10),
+        ),
+        lifetimeValue: 1240,
+        outstandingBalance: 0,
+        openTaskCount: 0,
+        overdueTaskCount: 0,
+      ),
+      ClientCrmRecord(
+        client: const Client(
+          id: 'client-2',
+          workspaceId: 'workspace-1',
+          name: 'Sam Reed',
+          tags: ['Follow-up'],
+        ),
+        bookingCount: 4,
+        completedBookingCount: 3,
+        nextBooking: Appointment(
+          id: 'client-2-next',
+          workspaceId: 'workspace-1',
+          startTime: DateTime(2026, 8, 20, 14),
+        ),
+        lastBooking: Appointment(
+          id: 'client-2-last',
+          workspaceId: 'workspace-1',
+          startTime: DateTime(2026, 8, 6, 14),
+        ),
+        lifetimeValue: 560,
+        outstandingBalance: 85,
+        openTaskCount: 1,
+        overdueTaskCount: 0,
+      ),
+      ClientCrmRecord(
+        client: const Client(
+          id: 'client-3',
+          workspaceId: 'workspace-1',
+          name: 'Jordan Ellis',
+          tags: ['New client'],
+        ),
+        bookingCount: 1,
+        completedBookingCount: 0,
+        nextBooking: Appointment(
+          id: 'client-3-next',
+          workspaceId: 'workspace-1',
+          startTime: DateTime(2026, 8, 22, 9, 30),
+        ),
+        lastBooking: null,
+        lifetimeValue: 0,
+        outstandingBalance: 0,
+        openTaskCount: 0,
+        overdueTaskCount: 0,
+      ),
+    ];
     await _pumpSurface(
       tester,
       const ClientsScreen(),
+      theme: AppTheme.light,
       overrides: [
-        clientCrmRecordsProvider.overrideWith((ref) async => const [record]),
+        clientCrmRecordsProvider.overrideWith((ref) async => records),
       ],
     );
 
@@ -225,8 +277,33 @@ void main() {
         authOptions: const AuthClientOptions(autoRefreshToken: false),
       ),
     );
+    final payments = [
+      Payment(
+        id: 'payment-focus-1',
+        workspaceId: 'workspace-1',
+        contactId: 'client-1',
+        number: 'PAY-101',
+        status: 'paid',
+        issueDate: now,
+        incomeRecordedAt: now,
+        total: 185,
+        amountPaid: 185,
+        clientName: 'Maya Patel',
+      ),
+      Payment(
+        id: 'payment-focus-2',
+        workspaceId: 'workspace-1',
+        contactId: 'client-2',
+        number: 'PAY-102',
+        status: 'pending',
+        issueDate: now.subtract(const Duration(days: 5)),
+        dueDate: now.subtract(const Duration(days: 1)),
+        total: 85,
+        clientName: 'Sam Reed',
+      ),
+    ];
     final summary = FinanceSummary.from(
-      payments: const [],
+      payments: payments,
       expenses: const [],
       monthlyTarget: 5000,
       now: now,
@@ -248,17 +325,65 @@ void main() {
             'start_time': DateTime(2026, 7, 30, 10).toIso8601String(),
             'end_time': DateTime(2026, 7, 30, 11).toIso8601String(),
             'status': 'scheduled',
-            'contacts': {'name': 'Maya Johnson'},
+            'contacts': {'name': 'Maya Patel'},
             'services': {'name': 'Signature appointment'},
+          },
+          {
+            'id': 'appointment-focus-2',
+            'workspace_id': 'workspace-1',
+            'start_time': DateTime(2026, 7, 30, 12, 30).toIso8601String(),
+            'end_time': DateTime(2026, 7, 30, 13, 15).toIso8601String(),
+            'status': 'scheduled',
+            'contacts': {'name': 'Sam Reed'},
+            'services': {'name': 'Follow-up'},
+          },
+          {
+            'id': 'appointment-focus-3',
+            'workspace_id': 'workspace-1',
+            'start_time': DateTime(2026, 7, 30, 15).toIso8601String(),
+            'end_time': DateTime(2026, 7, 30, 16).toIso8601String(),
+            'status': 'scheduled',
+            'contacts': {'name': 'Jordan Ellis'},
+            'services': {'name': 'First appointment'},
           },
         ],
       ),
-      invoicesProvider.overrideWith((ref) async => const []),
+      invoicesProvider.overrideWith((ref) async => payments),
       financeSummaryProvider.overrideWith((ref) async => summary),
-      dashboardAttentionProvider.overrideWith((ref) async => const []),
-      unreadNotificationsProvider.overrideWith((ref) async => 0),
-      allTasksProvider.overrideWith((ref) async => const []),
-      allNotesProvider.overrideWith((ref) async => const []),
+      dashboardAttentionProvider.overrideWith(
+        (ref) async => [
+          DashboardAttentionItem(
+            type: DashboardAttentionType.bookingRequest,
+            title: 'Review 2 booking requests',
+            detail: 'Waiting for your response',
+            source: 2,
+            sortTime: now,
+          ),
+        ],
+      ),
+      unreadNotificationsProvider.overrideWith((ref) async => 2),
+      allTasksProvider.overrideWith(
+        (ref) async => [
+          SlateTask(
+            id: 'task-focus-1',
+            workspaceId: 'workspace-1',
+            title: 'Confirm tomorrow’s address',
+            dueDate: now,
+          ),
+        ],
+      ),
+      allNotesProvider.overrideWith(
+        (ref) async => [
+          SlateNote(
+            id: 'note-focus-1',
+            workspaceId: 'workspace-1',
+            title: 'Maya’s appointment preferences',
+            body: 'Prefers a quiet appointment.',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ],
+      ),
       businessFeedProvider.overrideWith((ref) async => const []),
     ];
     final screen = DashboardScreen(
@@ -270,7 +395,7 @@ void main() {
 
     expect(find.semantics.byLabel('Open profile'), findsNothing);
     expect(find.semantics.byLabel('Open settings'), findsNothing);
-    expect(find.byIcon(LucideIcons.bell), findsOneWidget);
+    expect(find.byIcon(LucideIcons.bellRing), findsOneWidget);
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/dashboard-focus.png'),
@@ -289,11 +414,13 @@ void main() {
   });
 
   testWidgets('populated booking schedule surface', (tester) async {
-    final now = DateTime.now();
+    final current = DateTime.now();
+    final now = DateTime(current.year, current.month, current.day, 9);
     final start = DateTime(now.year, now.month, now.day, 10);
     await _pumpSurface(
       tester,
       const AppointmentsScreen(),
+      theme: AppTheme.light,
       overrides: [
         appointmentsProvider.overrideWith(
           (ref) async => [
@@ -309,8 +436,74 @@ void main() {
                   .toIso8601String(),
               'status': 'scheduled',
               'price': 149.99,
-              'contacts': {'name': 'Samira Khan'},
+              'contacts': {'name': 'Maya Patel'},
               'services': {'name': 'Signature consultation'},
+            },
+            {
+              'id': 'appointment-2',
+              'workspace_id': 'workspace-1',
+              'contact_id': 'client-2',
+              'service_id': 'service-2',
+              'title': 'Follow-up appointment',
+              'start_time': start
+                  .add(const Duration(hours: 3))
+                  .toIso8601String(),
+              'end_time': start
+                  .add(const Duration(hours: 3, minutes: 45))
+                  .toIso8601String(),
+              'status': 'scheduled',
+              'price': 85.0,
+              'contacts': {'name': 'Sam Reed'},
+              'services': {'name': 'Follow-up appointment'},
+            },
+            {
+              'id': 'appointment-3',
+              'workspace_id': 'workspace-1',
+              'contact_id': 'client-3',
+              'service_id': 'service-3',
+              'title': 'First appointment',
+              'start_time': start
+                  .add(const Duration(hours: 5))
+                  .toIso8601String(),
+              'end_time': start.add(const Duration(hours: 6)).toIso8601String(),
+              'status': 'scheduled',
+              'price': 110.0,
+              'contacts': {'name': 'Jordan Ellis'},
+              'services': {'name': 'First appointment'},
+            },
+            {
+              'id': 'appointment-4',
+              'workspace_id': 'workspace-1',
+              'contact_id': 'client-4',
+              'service_id': 'service-1',
+              'title': 'Signature consultation',
+              'start_time': start
+                  .add(const Duration(days: 1))
+                  .toIso8601String(),
+              'end_time': start
+                  .add(const Duration(days: 1, minutes: 75))
+                  .toIso8601String(),
+              'status': 'scheduled',
+              'price': 149.99,
+              'contacts': {'name': 'Alex Morgan'},
+              'services': {'name': 'Signature consultation'},
+            },
+            {
+              'id': 'appointment-5',
+              'workspace_id': 'workspace-1',
+              'contact_id': 'client-5',
+              'service_id': 'service-2',
+              'title': 'Follow-up appointment',
+              'start_time': start
+                  .add(const Duration(days: 1, hours: 4))
+                  .toIso8601String(),
+              'end_time': start
+                  .add(const Duration(days: 1, hours: 4, minutes: 45))
+                  .toIso8601String(),
+              'status': 'scheduled',
+              'price': 85.0,
+              'contacts': {'name': 'Priya Shah'},
+              'services': {'name': 'Follow-up appointment'},
             },
           ],
         ),
@@ -377,18 +570,105 @@ void main() {
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/bookings-populated.png'),
     );
+
+    await tester.tap(find.text('Upcoming'));
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/bookings-tomorrow-populated.png'),
+    );
   });
 
   testWidgets('Work workspace schedule surface', (tester) async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day, 9, 30);
     await _pumpSurface(
       tester,
       const WorkScreen(),
       theme: AppTheme.light,
       overrides: [
-        appointmentsProvider.overrideWith((ref) async => const []),
-        bookingRequestsProvider.overrideWith((ref) async => const []),
-        allTasksProvider.overrideWith((ref) async => const []),
-        allNotesProvider.overrideWith((ref) async => const []),
+        appointmentsProvider.overrideWith(
+          (ref) async => [
+            {
+              'id': 'work-appointment-1',
+              'workspace_id': 'workspace-1',
+              'start_time': start.toIso8601String(),
+              'end_time': start
+                  .add(const Duration(minutes: 60))
+                  .toIso8601String(),
+              'status': 'scheduled',
+              'price': 95.0,
+              'contacts': {'name': 'Maya Patel'},
+              'services': {'name': 'Signature appointment'},
+            },
+            {
+              'id': 'work-appointment-2',
+              'workspace_id': 'workspace-1',
+              'start_time': start
+                  .add(const Duration(hours: 3))
+                  .toIso8601String(),
+              'end_time': start
+                  .add(const Duration(hours: 3, minutes: 45))
+                  .toIso8601String(),
+              'status': 'scheduled',
+              'price': 65.0,
+              'contacts': {'name': 'Sam Reed'},
+              'services': {'name': 'Follow-up appointment'},
+            },
+            {
+              'id': 'work-appointment-3',
+              'workspace_id': 'workspace-1',
+              'start_time': start
+                  .add(const Duration(hours: 5, minutes: 30))
+                  .toIso8601String(),
+              'end_time': start
+                  .add(const Duration(hours: 6, minutes: 30))
+                  .toIso8601String(),
+              'status': 'scheduled',
+              'price': 110.0,
+              'contacts': {'name': 'Jordan Ellis'},
+              'services': {'name': 'First appointment'},
+            },
+          ],
+        ),
+        bookingRequestsProvider.overrideWith(
+          (ref) async => const [
+            BookingRequest(
+              id: 'work-request-1',
+              workspaceId: 'workspace-1',
+              name: 'Alex Morgan',
+              phone: '+44 7700 900321',
+            ),
+            BookingRequest(
+              id: 'work-request-2',
+              workspaceId: 'workspace-1',
+              name: 'Priya Shah',
+              phone: '+44 7700 900654',
+            ),
+          ],
+        ),
+        allTasksProvider.overrideWith(
+          (ref) async => [
+            SlateTask(
+              id: 'work-task-1',
+              workspaceId: 'workspace-1',
+              title: 'Confirm tomorrow’s address',
+              dueDate: now,
+            ),
+          ],
+        ),
+        allNotesProvider.overrideWith(
+          (ref) async => [
+            SlateNote(
+              id: 'work-note-1',
+              workspaceId: 'workspace-1',
+              title: 'Maya’s appointment preferences',
+              body: 'Prefers a quiet appointment.',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          ],
+        ),
       ],
     );
 
@@ -596,10 +876,64 @@ void main() {
         workspaceProvider.overrideWith(
           (ref) async => const {'id': 'workspace-1', 'name': 'Workloop Studio'},
         ),
-        settingsBusinessProfileProvider.overrideWith((ref) async => null),
-        settingsWorkspaceSettingsProvider.overrideWith((ref) async => const {}),
-        settingsServicesProvider.overrideWith((ref) async => const []),
-        bookingRequestsProvider.overrideWith((ref) async => const []),
+        settingsBusinessProfileProvider.overrideWith(
+          (ref) async => const BusinessProfile(
+            id: 'profile-1',
+            workspaceId: 'workspace-1',
+            handle: 'workloop-studio',
+            bio: 'Calm, thoughtful appointments built around every client.',
+            bookingMode: 'manual',
+          ),
+        ),
+        settingsWorkspaceSettingsProvider.overrideWith(
+          (ref) async => const {
+            'working_hours': {
+              'monday': {'enabled': true},
+              'tuesday': {'enabled': true},
+              'wednesday': {'enabled': true},
+              'thursday': {'enabled': true},
+              'friday': {'enabled': true},
+            },
+          },
+        ),
+        settingsServicesProvider.overrideWith(
+          (ref) async => const [
+            {
+              'id': 'service-1',
+              'workspace_id': 'workspace-1',
+              'name': 'Signature appointment',
+              'duration_mins': 60,
+              'price': 95.0,
+              'active': true,
+              'show_on_profile': true,
+            },
+            {
+              'id': 'service-2',
+              'workspace_id': 'workspace-1',
+              'name': 'Follow-up appointment',
+              'duration_mins': 45,
+              'price': 65.0,
+              'active': true,
+              'show_on_profile': true,
+            },
+          ],
+        ),
+        bookingRequestsProvider.overrideWith(
+          (ref) async => const [
+            BookingRequest(
+              id: 'business-request-1',
+              workspaceId: 'workspace-1',
+              name: 'Alex Morgan',
+              phone: '+44 7700 900321',
+            ),
+            BookingRequest(
+              id: 'business-request-2',
+              workspaceId: 'workspace-1',
+              name: 'Priya Shah',
+              phone: '+44 7700 900654',
+            ),
+          ],
+        ),
       ],
     );
 
