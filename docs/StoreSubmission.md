@@ -274,16 +274,18 @@ staging gate.
 
 ### 2026-08-15 live TestFlight handoff
 
-- Build 5 is uploaded, processed and marked Ready to Submit.
+- Build 5 is uploaded, processed, attached to `Workloop Private Beta`, and
+  marked `Waiting for Review` after successful Beta App Review submission.
 - What to Test, beta description, feedback email, marketing/privacy URLs and
   honest payments-off/request-only review notes are entered.
-- `Workloop Private Beta` exists as the external group.
+- `Workloop Private Beta` exists as the external group and contains Build 5.
 - A confirmed dedicated reviewer account is entered with credentials retained
   only in App Store Connect and the owner's local Keychain. Production Auth now
   redirects web confirmations to `workloop.uk`; the retired `workloop.app`
   allow-list entry has been removed.
-- Apple still requires the owner's monitored reviewer phone number before the
-  contact form can be saved and Build 5 can be submitted for Beta App Review.
-- After approval, enable the group's public link and share that link with the
-  intended tester cohort; do not publish an invitation URL before Apple has
-  made it active.
+- The owner's monitored reviewer contact is saved with the dedicated reviewer
+  login, and Apple has accepted the build for Beta App Review.
+- The controlled 50-tester public link is
+  `https://testflight.apple.com/join/1ycJPHWx`. Share it with the intended
+  tester cohort after Apple approves the build; Apple keeps it closed until
+  then.

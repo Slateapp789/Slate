@@ -584,8 +584,9 @@ boundaries.
       retired third-party-owned domain to `workloop.uk`; confirm a dedicated
       reviewer account and verify password sign-in without storing credentials
       in the repository.
-- [ ] Enter the owner's monitored reviewer phone number, attach Build 5 to the
-      external group, submit it for Beta App Review, and enable/copy the public
-      TestFlight link after Apple approves it.
-- [ ] Add the intended testers or share the approved public link, then record
+- [x] Save the owner's monitored reviewer phone number, attach Build 5 to the
+      external group, submit it for Beta App Review, and create the controlled
+      50-tester public link. Build 5 is `Waiting for Review`; Apple keeps the
+      link closed until approval.
+- [ ] Share `https://testflight.apple.com/join/1ycJPHWx` after approval, then record
       one real TestFlight install/launch and the short physical-device smoke.

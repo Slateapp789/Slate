@@ -15,11 +15,13 @@ Last updated: 2026-08-15
   booking, portrait scope, and the payments-off boundary. A dedicated
   fictional-data reviewer login is confirmed and its credentials are stored in
   App Store Connect and the owner's local Keychain, not in source control.
-- The external `Workloop Private Beta` group is created. Apple keeps Build 5
-  unavailable for external selection until the required reviewer contact form
-  is valid; the only missing owner-supplied field is a monitored phone number.
-  External submission, approval, and a public TestFlight link therefore remain
-  pending that value and Apple's Beta App Review.
+- The external `Workloop Private Beta` group contains Build 5. Reviewer contact
+  and dedicated sign-in details are saved, Apple accepted the Beta App Review
+  submission, and the build is `Waiting for Review`.
+- A public invitation URL is created with a controlled 50-tester limit:
+  `https://testflight.apple.com/join/1ycJPHWx`. Apple keeps the link closed until
+  the build is approved; the first tester install and physical-device smoke
+  remain pending.
 - Production Supabase is healthy and now contains the booking-email migrations,
   the three current booking functions, the minute-by-minute Vault-backed drain,
   and the independently deployed private launch waitlist. No paid preview

@@ -1054,12 +1054,13 @@ profile build succeeds as `1.0.0 (5)` at 71.2 MB.
 
 | Evidence | Observed result | Limit |
 | --- | --- | --- |
-| App Store upload | `1.0.0 (5)` upload is complete and processed; Apple reports Build 5 Ready to Submit | External Beta App Review is not submitted until reviewer contact is complete |
+| App Store upload | `1.0.0 (5)` upload is complete and processed; it is attached to `Workloop Private Beta` and is `Waiting for Review` | Apple Beta App Review is pending |
 | Distribution provenance | Remote immutable tag resolves to `6ae85c8fff5e523b83b47f357d2d9b4ac4bceede`; local IPA is 33,864,325 bytes with SHA-256 `d01e8aa70cac321f5b2b9f7780704d4f4cb7e341c4f8111534cb70fa64d2787f` | Later website/waitlist/golden-only commits do not alter the tagged mobile binary |
 | iOS signature | Strict verification passes; Store profile has `get-task-allow=false`, `beta-reports-active=true` and Sign in with Apple | TestFlight install and interactive physical-device smoke still need a tester |
 | Flutter gate | 222 files format-clean, analysis clean, 383/383 tests pass | Automated source/widget evidence |
 | Edge gate | 42/42 tests pass; 11 handlers type-check; format and lint pass | Provider and production behaviour additionally rely on the recorded hosted rehearsal |
 | Production backend | Current booking-email migrations and functions are deployed; Vault-backed every-minute drain is active; no paid preview branch exists | Bounce/suppression and terminal-failure operations remain an owner support responsibility |
-| TestFlight setup | Internal group retains Build 5; external `Workloop Private Beta` group and tester-facing metadata are prepared | Reviewer phone, Apple approval, public link and first tester install remain pending |
-| Reviewer access | Dedicated fictional-data account confirmation email delivered, corrected `workloop.uk` redirect consumed, and password grant authenticated successfully | Credentials live in App Store Connect/local Keychain only; owner reviewer phone is still required |
+| TestFlight setup | Internal group retains Build 5; external `Workloop Private Beta` contains Build 5 and the submission is waiting for review | Apple approval and first tester install remain pending |
+| Public invitation | `https://testflight.apple.com/join/1ycJPHWx` is created with a controlled 50-tester limit | Apple keeps the link closed until the build is approved |
+| Reviewer access | Dedicated fictional-data account confirmation email delivered, corrected `workloop.uk` redirect consumed, password grant authenticated, and monitored reviewer contact saved | Credentials live in App Store Connect/local Keychain only |
 | Auth redirect boundary | Site URL is `https://workloop.uk`; allow-list retains the two mobile deep links plus `https://workloop.uk/**`; retired `workloop.app/**` was removed | Existing issued links retain their original redirect and should not be reused |
