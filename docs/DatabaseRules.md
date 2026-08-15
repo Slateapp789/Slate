@@ -56,6 +56,9 @@ Private launch-hardening state lives in the unexposed `app_private` schema:
 - `launch_waitlist` stores normalized launch-interest email addresses, consent
   time, source and operational status. It is Edge-only and has no anonymous or
   authenticated table grants.
+- `waitlist_email_outbox` stores one durable welcome-delivery job per launch
+  signup. It is private, service-role only, leased for delivery, retried with a
+  cap, and never exposes recipient or provider state to web or app clients.
 
 ## Table Purposes
 

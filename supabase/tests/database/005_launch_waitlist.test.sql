@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(19);
+select plan(27);
 
 select has_table(
   'app_private',
@@ -130,6 +130,57 @@ select is(
   (select count(*) from app_private.launch_waitlist),
   1::bigint,
   'duplicate signup keeps one waitlist row'
+);
+select has_table(
+  'app_private',
+  'waitlist_email_outbox',
+  'welcome messages use a private durable outbox'
+);
+select ok(
+  not has_table_privilege('anon', 'app_private.waitlist_email_outbox', 'SELECT')
+  and not has_table_privilege('authenticated', 'app_private.waitlist_email_outbox', 'SELECT'),
+  'clients cannot inspect recipient or delivery data'
+);
+select is(
+  (select count(*) from app_private.waitlist_email_outbox),
+  1::bigint,
+  'created and duplicate signup enqueue exactly one welcome email'
+);
+select ok(
+  has_function_privilege('service_role', 'public.claim_waitlist_welcome_emails(integer)', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.claim_waitlist_welcome_emails(integer)', 'EXECUTE'),
+  'only the service boundary can claim welcome messages'
+);
+
+set local role service_role;
+select is(
+  (select count(*) from public.claim_waitlist_welcome_emails(20)),
+  1::bigint,
+  'the queued welcome message can be leased once'
+);
+reset role;
+select is(
+  (select status from app_private.waitlist_email_outbox limit 1),
+  'processing',
+  'claiming records processing state'
+);
+set local role service_role;
+select is(
+  public.finish_waitlist_welcome_email(
+    (select id from app_private.waitlist_email_outbox limit 1),
+    (select lease_token from app_private.waitlist_email_outbox limit 1),
+    true,
+    'resend-message-1',
+    null
+  ),
+  'sent',
+  'a valid delivery acknowledgement closes the lease'
+);
+reset role;
+select is(
+  (select status from app_private.waitlist_email_outbox limit 1),
+  'sent',
+  'successful delivery remains auditable without exposing the message body'
 );
 
 set local role service_role;

@@ -49,6 +49,11 @@ Last updated: 2026-08-15
 - The migration, function, tests and production deployment evidence must be
   verified independently from the immutable `v1.0.0-beta.5` mobile candidate;
   the website capability does not change that signed Build 5 binary.
+- Every accepted signup now creates one private welcome-email outbox record in
+  the same transaction. Resend delivery uses a stable idempotency key, immediate
+  delivery when available, and the existing scheduled retry boundary. The
+  receipt explains what Workloop does, what happens next, beta payment terms,
+  planned pricing, support and how to unsubscribe.
 
 ## Completed / Mostly Working Features
 

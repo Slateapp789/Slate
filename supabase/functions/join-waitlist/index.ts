@@ -5,6 +5,10 @@ import {
   waitlistOutcomeResponse,
   waitlistSource,
 } from "./validation.ts";
+import {
+  drainWaitlistWelcomeEmails,
+  waitlistWelcomeEmailConfig,
+} from "../_shared/waitlist_welcome_email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -82,5 +86,21 @@ Deno.serve(async (req: Request) => {
   }
 
   const mapped = waitlistOutcomeResponse(data);
+  if (mapped.status === 200) {
+    const emailConfig = waitlistWelcomeEmailConfig();
+    if (emailConfig !== null) {
+      try {
+        await drainWaitlistWelcomeEmails({
+          client: supabase,
+          config: emailConfig,
+          limit: 20,
+        });
+      } catch (_) {
+        // The database transaction already accepted the signup. The scheduled
+        // drain retries without exposing recipient data in logs.
+        console.error("waitlist_welcome_email_immediate_drain_failed");
+      }
+    }
+  }
   return response(mapped.status, mapped.body);
 });

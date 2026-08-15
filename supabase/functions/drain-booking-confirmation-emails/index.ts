@@ -5,6 +5,10 @@ import {
   drainBookingConfirmationEmails,
   validBookingConfirmationDrainToken,
 } from "../_shared/booking_confirmation_email.ts";
+import {
+  drainWaitlistWelcomeEmails,
+  waitlistWelcomeEmailConfig,
+} from "../_shared/waitlist_welcome_email.ts";
 
 function response(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
@@ -28,7 +32,11 @@ Deno.serve(async (req: Request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const emailConfig = bookingConfirmationEmailConfig();
-  if (!supabaseUrl || serviceRoleKey.length < 32 || emailConfig === null) {
+  const waitlistConfig = waitlistWelcomeEmailConfig();
+  if (
+    !supabaseUrl || serviceRoleKey.length < 32 || emailConfig === null ||
+    waitlistConfig === null
+  ) {
     return response(503, { error: "Email delivery is not configured" });
   }
 
@@ -36,13 +44,18 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   try {
-    const result = await drainBookingConfirmationEmails({
+    const booking = await drainBookingConfirmationEmails({
       client: serviceClient as unknown as BookingConfirmationRpcClient,
       config: emailConfig,
       limit: 20,
     });
+    const waitlist = await drainWaitlistWelcomeEmails({
+      client: serviceClient as unknown as BookingConfirmationRpcClient,
+      config: waitlistConfig,
+      limit: 20,
+    });
     // Counts provide operational evidence without logging recipient/body data.
-    return response(200, { ok: true, ...result });
+    return response(200, { ok: true, booking, waitlist });
   } catch (_) {
     console.error("booking_confirmation_email_scheduled_drain_failed");
     return response(503, {

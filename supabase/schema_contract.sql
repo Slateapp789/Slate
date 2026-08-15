@@ -500,6 +500,33 @@ revoke all on sequence app_private.launch_waitlist_id_seq
 grant usage, select on sequence app_private.launch_waitlist_id_seq
   to service_role;
 
+create table if not exists app_private.waitlist_email_outbox (
+  id uuid primary key default gen_random_uuid(),
+  waitlist_id bigint not null references app_private.launch_waitlist(id)
+    on delete cascade,
+  event text not null default 'launch_waitlist_joined'
+    check (event = 'launch_waitlist_joined'),
+  recipient_email text not null,
+  status text not null default 'pending'
+    check (status in ('pending', 'processing', 'sent', 'failed')),
+  attempt_count integer not null default 0 check (attempt_count between 0 and 8),
+  next_attempt_at timestamptz not null default clock_timestamp(),
+  lease_token uuid,
+  lease_expires_at timestamptz,
+  delivery_expires_at timestamptz not null default clock_timestamp() + interval '24 hours',
+  provider_message_id text,
+  last_error text,
+  created_at timestamptz not null default clock_timestamp(),
+  updated_at timestamptz not null default clock_timestamp(),
+  sent_at timestamptz,
+  unique (event, waitlist_id)
+);
+alter table app_private.waitlist_email_outbox enable row level security;
+revoke all on table app_private.waitlist_email_outbox
+  from public, anon, authenticated;
+grant select, insert, update on table app_private.waitlist_email_outbox
+  to service_role;
+
 create table if not exists app_private.payment_counters (
   workspace_id uuid primary key references public.workspaces(id) on delete cascade,
   next_number bigint not null default 1 check (next_number > 0)
@@ -521,6 +548,14 @@ create index if not exists workflow_idempotency_created_at_idx
   on app_private.workflow_idempotency(created_at);
 
 -- RPC contracts expected by the launch clients:
+--
+-- Edge-only launch list intake and delivery:
+-- public.join_launch_waitlist(text, text, text) returns text
+-- public.claim_waitlist_welcome_emails(integer) returns table (...)
+-- public.finish_waitlist_welcome_email(uuid, uuid, boolean, text, text)
+-- The join is transactional with a unique private outbox record. Claims use a
+-- short lease, capped retry backoff, a 24-hour delivery window, and service
+-- role only grants. The scheduled transactional-email drain supplies recovery.
 --
 -- Edge-only public booking intake:
 -- public.create_public_booking_request(
