@@ -199,7 +199,8 @@ void main() {
           id: 'client-3',
           workspaceId: 'workspace-1',
           name: 'Jordan Ellis',
-          tags: ['New client'],
+          status: 'active',
+          tags: ['Regular'],
         ),
         bookingCount: 1,
         completedBookingCount: 0,
@@ -214,10 +215,61 @@ void main() {
         openTaskCount: 0,
         overdueTaskCount: 0,
       ),
+      const ClientCrmRecord(
+        client: Client(
+          id: 'client-4',
+          workspaceId: 'workspace-1',
+          name: 'Alex Morgan',
+          status: 'lead',
+          tags: ['New enquiry'],
+        ),
+        bookingCount: 0,
+        completedBookingCount: 0,
+        nextBooking: null,
+        lastBooking: null,
+        lifetimeValue: 0,
+        outstandingBalance: 0,
+        openTaskCount: 1,
+        overdueTaskCount: 0,
+      ),
+      const ClientCrmRecord(
+        client: Client(
+          id: 'client-5',
+          workspaceId: 'workspace-1',
+          name: 'Priya Shah',
+          status: 'lead',
+          tags: ['Consultation'],
+        ),
+        bookingCount: 0,
+        completedBookingCount: 0,
+        nextBooking: null,
+        lastBooking: null,
+        lifetimeValue: 0,
+        outstandingBalance: 0,
+        openTaskCount: 0,
+        overdueTaskCount: 0,
+      ),
+      const ClientCrmRecord(
+        client: Client(
+          id: 'client-6',
+          workspaceId: 'workspace-1',
+          name: 'Taylor Brooks',
+          status: 'inactive',
+          tags: ['Past client'],
+        ),
+        bookingCount: 3,
+        completedBookingCount: 3,
+        nextBooking: null,
+        lastBooking: null,
+        lifetimeValue: 290,
+        outstandingBalance: 0,
+        openTaskCount: 0,
+        overdueTaskCount: 0,
+      ),
     ];
     await _pumpSurface(
       tester,
-      const ClientsScreen(),
+      _marketingSurface(const ClientsScreen(), currentIndex: 1),
       theme: AppTheme.light,
       overrides: [
         clientCrmRecordsProvider.overrideWith((ref) async => records),
@@ -370,6 +422,18 @@ void main() {
             title: 'Confirm tomorrow’s address',
             dueDate: now,
           ),
+          SlateTask(
+            id: 'task-focus-2',
+            workspaceId: 'workspace-1',
+            title: 'Send Sam’s receipt',
+            dueDate: now,
+          ),
+          SlateTask(
+            id: 'task-focus-3',
+            workspaceId: 'workspace-1',
+            title: 'Order consultation packs',
+            dueDate: now.add(const Duration(days: 1)),
+          ),
         ],
       ),
       allNotesProvider.overrideWith(
@@ -382,6 +446,30 @@ void main() {
             createdAt: now,
             updatedAt: now,
           ),
+          SlateNote(
+            id: 'note-focus-2',
+            workspaceId: 'workspace-1',
+            title: 'August supply list',
+            body: 'Consultation packs and aftercare cards.',
+            createdAt: now,
+            updatedAt: now,
+          ),
+          SlateNote(
+            id: 'note-focus-3',
+            workspaceId: 'workspace-1',
+            title: 'Jordan’s first appointment',
+            body: 'Allow ten minutes for the initial consultation.',
+            createdAt: now,
+            updatedAt: now,
+          ),
+          SlateNote(
+            id: 'note-focus-4',
+            workspaceId: 'workspace-1',
+            title: 'Friday follow-ups',
+            body: 'Check in with recent clients before the weekend.',
+            createdAt: now,
+            updatedAt: now,
+          ),
         ],
       ),
       businessFeedProvider.overrideWith((ref) async => const []),
@@ -391,7 +479,11 @@ void main() {
       onOpenMoneyFollowUps: () {},
     );
 
-    await _pumpSurface(tester, screen, overrides: overrides);
+    await _pumpSurface(
+      tester,
+      _marketingSurface(screen, currentIndex: 0),
+      overrides: overrides,
+    );
 
     expect(find.semantics.byLabel('Open profile'), findsNothing);
     expect(find.semantics.byLabel('Open settings'), findsNothing);
@@ -403,7 +495,7 @@ void main() {
 
     await _pumpSurface(
       tester,
-      screen,
+      _marketingSurface(screen, currentIndex: 0),
       overrides: overrides,
       theme: AppTheme.light,
     );
@@ -419,7 +511,7 @@ void main() {
     final start = DateTime(now.year, now.month, now.day, 10);
     await _pumpSurface(
       tester,
-      const AppointmentsScreen(),
+      _marketingSurface(const AppointmentsScreen(), currentIndex: 2),
       theme: AppTheme.light,
       overrides: [
         appointmentsProvider.overrideWith(
@@ -584,7 +676,7 @@ void main() {
     final start = DateTime(now.year, now.month, now.day, 9, 30);
     await _pumpSurface(
       tester,
-      const WorkScreen(),
+      _marketingSurface(const WorkScreen(), currentIndex: 2),
       theme: AppTheme.light,
       overrides: [
         appointmentsProvider.overrideWith(
@@ -631,22 +723,7 @@ void main() {
             },
           ],
         ),
-        bookingRequestsProvider.overrideWith(
-          (ref) async => const [
-            BookingRequest(
-              id: 'work-request-1',
-              workspaceId: 'workspace-1',
-              name: 'Alex Morgan',
-              phone: '+44 7700 900321',
-            ),
-            BookingRequest(
-              id: 'work-request-2',
-              workspaceId: 'workspace-1',
-              name: 'Priya Shah',
-              phone: '+44 7700 900654',
-            ),
-          ],
-        ),
+        bookingRequestsProvider.overrideWith((ref) async => const []),
         allTasksProvider.overrideWith(
           (ref) async => [
             SlateTask(
@@ -654,6 +731,21 @@ void main() {
               workspaceId: 'workspace-1',
               title: 'Confirm tomorrow’s address',
               dueDate: now,
+            ),
+            SlateTask(
+              id: 'work-task-2',
+              workspaceId: 'workspace-1',
+              title: 'Send Sam’s receipt',
+              priority: 'medium',
+              dueDate: now,
+              clientName: 'Sam Reed',
+            ),
+            SlateTask(
+              id: 'work-task-3',
+              workspaceId: 'workspace-1',
+              title: 'Order consultation packs',
+              priority: 'low',
+              dueDate: now.add(const Duration(days: 1)),
             ),
           ],
         ),
@@ -667,18 +759,49 @@ void main() {
               createdAt: now,
               updatedAt: now,
             ),
+            SlateNote(
+              id: 'work-note-2',
+              workspaceId: 'workspace-1',
+              title: 'August supply list',
+              body: 'Consultation packs and aftercare cards.',
+              createdAt: now,
+              updatedAt: now,
+            ),
+            SlateNote(
+              id: 'work-note-3',
+              workspaceId: 'workspace-1',
+              title: 'Jordan’s first appointment',
+              body: 'Allow ten minutes for the initial consultation.',
+              clientName: 'Jordan Ellis',
+              createdAt: now,
+              updatedAt: now,
+            ),
           ],
         ),
       ],
     );
 
-    expect(find.text('Work'), findsOneWidget);
+    expect(find.text('Work'), findsWidgets);
     expect(find.text('Schedule'), findsOneWidget);
     expect(find.text('Tasks'), findsOneWidget);
     expect(find.text('Notes'), findsOneWidget);
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/work-schedule-light.png'),
+    );
+
+    await tester.tap(find.text('Tasks').first);
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/work-tasks-light.png'),
+    );
+
+    await tester.tap(find.text('Notes').first);
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byKey(const ValueKey('golden-surface')),
+      matchesGoldenFile('files/work-notes-light.png'),
     );
   });
 
@@ -778,7 +901,7 @@ void main() {
   });
 
   testWidgets('populated money surface', (tester) async {
-    final now = DateTime(2026, 8, 10, 12);
+    final now = DateTime(2026, 8, 13, 12);
     final payments = [
       Payment(
         id: 'payment-1',
@@ -803,6 +926,41 @@ void main() {
         total: 85,
         clientName: 'Omar Rahman',
       ),
+      Payment(
+        id: 'payment-3',
+        workspaceId: 'workspace-1',
+        contactId: 'client-3',
+        number: 'PAY-003',
+        status: 'paid',
+        issueDate: now.subtract(const Duration(days: 2)),
+        incomeRecordedAt: now.subtract(const Duration(days: 2)),
+        total: 95,
+        amountPaid: 95,
+        clientName: 'Maya Patel',
+      ),
+      Payment(
+        id: 'payment-4',
+        workspaceId: 'workspace-1',
+        contactId: 'client-4',
+        number: 'PAY-004',
+        status: 'paid',
+        issueDate: now.subtract(const Duration(days: 3)),
+        incomeRecordedAt: now.subtract(const Duration(days: 3)),
+        total: 140,
+        amountPaid: 140,
+        clientName: 'Jordan Ellis',
+      ),
+      Payment(
+        id: 'payment-5',
+        workspaceId: 'workspace-1',
+        contactId: 'client-5',
+        number: 'PAY-005',
+        status: 'pending',
+        issueDate: now.subtract(const Duration(days: 1)),
+        dueDate: now.add(const Duration(days: 1)),
+        total: 110,
+        clientName: 'Priya Shah',
+      ),
     ];
     final expenses = [
       Expense(
@@ -813,6 +971,14 @@ void main() {
         expenseDate: now,
         notes: 'Studio supplies',
       ),
+      Expense(
+        id: 'expense-2',
+        workspaceId: 'workspace-1',
+        amount: 18,
+        category: 'Travel',
+        expenseDate: now.subtract(const Duration(days: 1)),
+        notes: 'Client travel',
+      ),
     ];
     final summary = FinanceSummary.from(
       payments: payments,
@@ -822,7 +988,7 @@ void main() {
     );
     await _pumpSurface(
       tester,
-      FinanceScreen(referenceDate: now),
+      _marketingSurface(FinanceScreen(referenceDate: now), currentIndex: 3),
       theme: AppTheme.light,
       overrides: [
         invoicesProvider.overrideWith((ref) async => payments),
@@ -834,7 +1000,7 @@ void main() {
       ],
     );
 
-    expect(find.textContaining('£185'), findsWidgets);
+    expect(find.textContaining('£420'), findsWidgets);
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
       matchesGoldenFile('files/money-populated-light.png'),
@@ -844,7 +1010,7 @@ void main() {
   testWidgets('Business workspace hierarchy surface', (tester) async {
     await _pumpSurface(
       tester,
-      const BusinessScreen(),
+      _marketingSurface(const BusinessScreen(), currentIndex: 4),
       overrides: [
         workspaceProvider.overrideWith(
           (ref) async => const {'id': 'workspace-1', 'name': 'Workloop Studio'},
@@ -870,7 +1036,7 @@ void main() {
   testWidgets('Business light appearance surface', (tester) async {
     await _pumpSurface(
       tester,
-      const BusinessScreen(),
+      _marketingSurface(const BusinessScreen(), currentIndex: 4),
       theme: AppTheme.light,
       overrides: [
         workspaceProvider.overrideWith(
@@ -1450,6 +1616,44 @@ Future<void> _pumpSurface(
   );
   await tester.pumpAndSettle();
   expect(tester.takeException(), isNull);
+}
+
+Widget _marketingSurface(Widget screen, {required int currentIndex}) {
+  return Scaffold(
+    backgroundColor: AppColors.bg,
+    body: screen,
+    bottomNavigationBar: WorkloopBottomNav(
+      currentIndex: currentIndex,
+      items: const [
+        WorkloopNavItem(
+          label: 'Today',
+          icon: LucideIcons.home,
+          color: AppColors.accentPrimary,
+        ),
+        WorkloopNavItem(
+          label: 'Clients',
+          icon: LucideIcons.users,
+          color: AppColors.accentPrimary,
+        ),
+        WorkloopNavItem(
+          label: 'Work',
+          icon: LucideIcons.briefcase,
+          color: AppColors.accentPrimary,
+        ),
+        WorkloopNavItem(
+          label: 'Money',
+          icon: LucideIcons.circlePoundSterling,
+          color: AppColors.accentPrimary,
+        ),
+        WorkloopNavItem(
+          label: 'Business',
+          icon: LucideIcons.store,
+          color: AppColors.accentPrimary,
+        ),
+      ],
+      onTap: (_) {},
+    ),
+  );
 }
 
 Future<void> _loadDeterministicFonts() async {
