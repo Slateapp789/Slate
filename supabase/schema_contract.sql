@@ -431,7 +431,8 @@ create table if not exists app_private.edge_rate_limit_events (
       'booking_source',
       'booking_phone',
       'places_autocomplete',
-      'places_details'
+      'places_details',
+      'waitlist_email'
     )
   ),
   resource_key text not null default '',
@@ -465,6 +466,38 @@ create policy edge_rate_limit_events_deny_clients
 revoke all on sequence app_private.edge_rate_limit_events_id_seq
   from public, anon, authenticated;
 grant usage, select on sequence app_private.edge_rate_limit_events_id_seq
+  to service_role;
+
+create table if not exists app_private.launch_waitlist (
+  id bigint generated always as identity primary key,
+  email text not null unique,
+  source text not null default 'website',
+  status text not null default 'active'
+    check (status in ('active', 'invited', 'unsubscribed')),
+  consent_at timestamptz not null default clock_timestamp(),
+  created_at timestamptz not null default clock_timestamp(),
+  updated_at timestamptz not null default clock_timestamp(),
+  constraint launch_waitlist_email_check check (
+    email = lower(btrim(email))
+    and char_length(email) between 3 and 254
+    and email ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
+  ),
+  constraint launch_waitlist_source_check check (
+    source ~ '^[a-z0-9_-]{1,40}$'
+  )
+);
+
+create index if not exists launch_waitlist_status_created_idx
+  on app_private.launch_waitlist(status, created_at desc);
+
+alter table app_private.launch_waitlist enable row level security;
+revoke all on table app_private.launch_waitlist
+  from public, anon, authenticated;
+grant select, insert, update on table app_private.launch_waitlist
+  to service_role;
+revoke all on sequence app_private.launch_waitlist_id_seq
+  from public, anon, authenticated;
+grant usage, select on sequence app_private.launch_waitlist_id_seq
   to service_role;
 
 create table if not exists app_private.payment_counters (

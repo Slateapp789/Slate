@@ -31,6 +31,12 @@ The public booking/profile Edge Functions remain deployed with JWT verification 
 - Anonymous users do not read `business_profiles`, `services`, or `booking_requests` directly.
 - Public profile reads go through the `get-public-profile` Edge Function, which returns only the safe public projection.
 - Public booking requests go through the `create-booking-request` Edge Function, which validates handle/service ownership, forces `pending` status, applies length limits, rate-limits by source hash and phone, and creates the owner notification server-side.
+- Public launch-interest submissions go through the `join-waitlist` Edge
+  Function. The function validates and normalizes the address, handles a
+  honeypot without disclosure, hashes the normalized email with an Edge-only
+  salt for bounded rate limiting, and invokes a service-only RPC. The private
+  waitlist table has no `anon` or `authenticated` grants and duplicate
+  responses do not reveal whether an email already exists.
 - New public booking requests require a normalized email. Owner confirmation
   enters the authenticated `confirm-booking-request` Edge boundary while the
   database workflow remains authoritative for MFA, tenancy, idempotency and

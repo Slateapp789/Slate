@@ -1,6 +1,17 @@
 # Workloop Current State
 
-Last updated: 2026-08-12
+Last updated: 2026-08-15
+
+## 2026-08-15 public-launch waitlist boundary
+
+- The marketing funnel can collect explicit early-access consent through a new
+  `join-waitlist` Edge Function and private `app_private.launch_waitlist`
+  table. Email is normalized, direct client table access is denied, duplicate
+  responses are non-disclosing, and abuse throttling uses only a salted email
+  hash rather than a stored IP address.
+- The migration, function, tests and production deployment evidence must be
+  verified independently from the immutable `v1.0.0-beta.5` mobile candidate;
+  the website capability does not change that signed Build 5 binary.
 
 ## Completed / Mostly Working Features
 

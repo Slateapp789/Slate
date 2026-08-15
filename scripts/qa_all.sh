@@ -39,6 +39,9 @@ if command -v "$deno_bin" >/dev/null 2>&1; then
     --config supabase/functions/get-public-profile/deno.json \
     supabase/functions/get-public-profile/index.ts
   "$deno_bin" check \
+    --config supabase/functions/join-waitlist/deno.json \
+    supabase/functions/join-waitlist/index.ts
+  "$deno_bin" check \
     --config supabase/functions/places-address-search/deno.json \
     supabase/functions/places-address-search/index.ts
   "$deno_bin" check \

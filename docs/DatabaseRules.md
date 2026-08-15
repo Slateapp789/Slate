@@ -1,6 +1,6 @@
 # Workloop Database Rules
 
-Last updated: 2026-08-13
+Last updated: 2026-08-15
 
 ## Source of Truth
 
@@ -51,7 +51,11 @@ Private launch-hardening state lives in the unexposed `app_private` schema:
 - `workflow_idempotency` records the result of authenticated booking/task
   workflows by workspace, user, operation, and idempotency key.
 - `edge_rate_limit_events` stores short-lived public booking and Google Places
-  rate-limit events. `anon` and `authenticated` have no direct access.
+  rate-limit events, plus salted-hash waitlist throttling events.
+  `anon` and `authenticated` have no direct access.
+- `launch_waitlist` stores normalized launch-interest email addresses, consent
+  time, source and operational status. It is Edge-only and has no anonymous or
+  authenticated table grants.
 
 ## Table Purposes
 
