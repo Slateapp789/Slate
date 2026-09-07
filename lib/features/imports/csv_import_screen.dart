@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,8 +9,7 @@ import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/clients_repository.dart';
 import '../../shared/widgets/slate_ui.dart';
 import 'import_models.dart';
-
-enum _ClientField { ignore, name, phone, email, address, notes, tags }
+import 'client_file_import.dart';
 
 class CsvImportScreen extends ConsumerStatefulWidget {
   const CsvImportScreen({super.key});
@@ -24,8 +21,10 @@ class CsvImportScreen extends ConsumerStatefulWidget {
 class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
   CsvTable? _table;
   String? _fileName;
-  final Map<int, _ClientField> _mapping = {};
+  final Map<int, ClientImportField> _mapping = {};
   final Set<int> _completedRows = {};
+  final Set<int> _excludedRows = {};
+  int _previewLimit = 20;
   bool _loading = false;
   bool _importing = false;
   bool _reviewing = false;
@@ -41,26 +40,20 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
     try {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: const ['csv', 'txt'],
+        allowedExtensions: const ['csv', 'txt', 'vcf'],
         withData: true,
       );
       if (result == null) return;
       final file = result.files.single;
       final bytes = file.bytes;
       if (bytes == null) throw const FormatException('File could not be read');
-      String source;
-      try {
-        source = utf8.decode(bytes);
-      } on FormatException {
-        source = latin1.decode(bytes);
-      }
-      final table = parseCsv(source);
-      if (table.headers.isEmpty || table.rows.isEmpty) {
-        throw const FormatException('No data rows were found');
-      }
-      final mapping = <int, _ClientField>{};
+      final table = parseClientFile(bytes, fileName: file.name);
+      final mapping = <int, ClientImportField>{};
       for (var index = 0; index < table.headers.length; index++) {
-        mapping[index] = _guessField(table.headers[index]);
+        final field = guessClientImportField(table.headers[index]);
+        mapping[index] = mapping.containsValue(field)
+            ? ClientImportField.ignore
+            : field;
       }
       if (!mounted) return;
       setState(() {
@@ -70,12 +63,15 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
           ..clear()
           ..addAll(mapping);
         _completedRows.clear();
+        _excludedRows.clear();
+        _previewLimit = 20;
       });
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         setState(
-          () => _error =
-              'This file could not be prepared. Check that it is a valid CSV and try again.',
+          () => _error = error is FormatException
+              ? error.message.toString()
+              : 'This file could not be prepared. Choose a CSV or vCard file and try again.',
         );
       }
     } finally {
@@ -83,74 +79,51 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
     }
   }
 
-  _ClientField _guessField(String header) {
-    final value = normaliseImportValue(header).replaceAll('_', ' ');
-    if (value.contains('name') || value == 'client') return _ClientField.name;
-    if (value.contains('phone') || value.contains('mobile')) {
-      return _ClientField.phone;
-    }
-    if (value.contains('email')) return _ClientField.email;
-    if (value.contains('address') || value.contains('location')) {
-      return _ClientField.address;
-    }
-    if (value.contains('note')) return _ClientField.notes;
-    if (value.contains('tag') || value.contains('category')) {
-      return _ClientField.tags;
-    }
-    return _ClientField.ignore;
-  }
+  bool get _hasNameMapping => [
+    ClientImportField.name,
+    ClientImportField.givenName,
+    ClientImportField.familyName,
+  ].any(_mapping.containsValue);
 
-  List<ImportCandidate> _candidates() {
+  List<ImportCandidate> _candidates({bool includeExcluded = false}) {
     final table = _table;
-    if (table == null) return const [];
-    final nameIndex = _mapping.entries
-        .where((entry) => entry.value == _ClientField.name)
-        .map((entry) => entry.key)
-        .firstOrNull;
-    if (nameIndex == null) return const [];
-    String? field(List<String> row, _ClientField field) {
-      final index = _mapping.entries
-          .where((entry) => entry.value == field)
-          .map((entry) => entry.key)
-          .firstOrNull;
-      if (index == null || index >= row.length) return null;
-      return row[index].trim().isEmpty ? null : row[index].trim();
-    }
-
+    if (table == null || !_hasNameMapping) return const [];
     return [
       for (var index = 0; index < table.rows.length; index++)
         if (!_completedRows.contains(index) &&
-            table.rows[index][nameIndex].trim().isNotEmpty)
+            (includeExcluded || !_excludedRows.contains(index)) &&
+            _field(table.rows[index], ClientImportField.name) != null)
           ImportCandidate(
             sourceId: 'csv-$index',
-            name: table.rows[index][nameIndex].trim(),
-            phone: field(table.rows[index], _ClientField.phone),
-            email: field(table.rows[index], _ClientField.email),
-            address: field(table.rows[index], _ClientField.address),
+            name: _field(table.rows[index], ClientImportField.name)!,
+            phone: _field(table.rows[index], ClientImportField.phone),
+            email: _field(table.rows[index], ClientImportField.email),
+            address: _field(table.rows[index], ClientImportField.address),
           ),
     ];
   }
 
-  String? _field(List<String> row, _ClientField field) {
-    final index = _mapping.entries
-        .where((entry) => entry.value == field)
-        .map((entry) => entry.key)
-        .firstOrNull;
-    if (index == null || index >= row.length) return null;
-    return row[index].trim().isEmpty ? null : row[index].trim();
-  }
+  String? _field(List<String> row, ClientImportField field) =>
+      clientImportValue(row, _mapping, field);
 
   Future<void> _import() async {
     if (_importing || _reviewing) return;
     final table = _table;
     if (table == null) return;
     final candidates = _candidates();
-    if (!_mapping.containsValue(_ClientField.name)) {
-      setState(() => _error = 'Choose which column contains the client name.');
+    if (!_hasNameMapping) {
+      setState(
+        () => _error =
+            'Choose a client name column, or first and last name columns.',
+      );
       return;
     }
     if (candidates.isEmpty) {
-      setState(() => _error = 'No rows contain a client name.');
+      setState(
+        () => _error = _candidates(includeExcluded: true).isEmpty
+            ? 'No rows contain a client name. Check the name columns above.'
+            : 'Select at least one client to import.',
+      );
       return;
     }
     setState(() => _reviewing = true);
@@ -165,7 +138,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Review CSV import',
+                'Review client import',
                 style: TextStyle(
                   color: AppColors.t1,
                   fontSize: 22,
@@ -174,7 +147,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                '${candidates.length} valid rows are ready. Invalid rows will be reported, never silently ignored.',
+                '${candidates.length} selected clients are ready. Unselected contacts stay in your file. Rows without a name will be reported.',
                 style: const TextStyle(color: AppColors.t3, height: 1.45),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -196,7 +169,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
     } finally {
       if (mounted) setState(() => _reviewing = false);
     }
-    if (confirmed != true) return;
+    if (!mounted || confirmed != true) return;
     setState(() {
       _importing = true;
       _error = null;
@@ -217,9 +190,11 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
           .toList();
       final repository = ref.read(clientsRepositoryProvider);
       for (var index = 0; index < table.rows.length; index++) {
-        if (_completedRows.contains(index)) continue;
+        if (_completedRows.contains(index) || _excludedRows.contains(index)) {
+          continue;
+        }
         final row = table.rows[index];
-        final name = _field(row, _ClientField.name);
+        final name = _field(row, ClientImportField.name);
         if (name == null) {
           failures.add('Row ${index + 2}: missing name');
           continue;
@@ -227,9 +202,9 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
         final candidate = ImportCandidate(
           sourceId: 'csv-$index',
           name: name,
-          phone: _field(row, _ClientField.phone),
-          email: _field(row, _ClientField.email),
-          address: _field(row, _ClientField.address),
+          phone: _field(row, ClientImportField.phone),
+          email: _field(row, ClientImportField.email),
+          address: _field(row, ClientImportField.address),
         );
         if (_skipDuplicates &&
             isLikelyDuplicate(candidate: candidate, existing: existing)) {
@@ -238,7 +213,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
           continue;
         }
         try {
-          final tags = (_field(row, _ClientField.tags) ?? '')
+          final tags = (_field(row, ClientImportField.tags) ?? '')
               .split(RegExp(r'[|;]'))
               .map((value) => value.trim())
               .where((value) => value.isNotEmpty)
@@ -249,8 +224,10 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
             phone: candidate.phone,
             email: candidate.email,
             address: candidate.address,
-            notes: _field(row, _ClientField.notes),
-            source: 'CSV import',
+            notes: _field(row, ClientImportField.notes),
+            source: _fileName?.toLowerCase().endsWith('.vcf') == true
+                ? 'vCard import'
+                : 'CSV import',
             status: 'lead',
             preferredContactMethod: candidate.email?.isNotEmpty == true
                 ? 'email'
@@ -268,10 +245,12 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
           failures.add('Row ${index + 2}: $name');
         }
       }
-      final attemptedRows = List.generate(
-        table.rows.length,
-        (index) => index,
-      ).where((index) => !_completedRows.contains(index));
+      final attemptedRows = List.generate(table.rows.length, (index) => index)
+          .where(
+            (index) =>
+                !_completedRows.contains(index) &&
+                !_excludedRows.contains(index),
+          );
       final result = reconcileImportAttempt(
         attempted: attemptedRows,
         completed: completedThisAttempt,
@@ -318,7 +297,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
       if (mounted) {
         setState(
           () => _error =
-              'The import could not be completed. No error details were hidden; please try again.',
+              'The import could not be completed. Check your connection and try again.',
         );
       }
     } finally {
@@ -329,19 +308,21 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
   @override
   Widget build(BuildContext context) {
     final table = _table;
+    final preview = _candidates(includeExcluded: true);
+    final previewRows = preview.take(_previewLimit).toList();
     return WorkloopPage(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const WorkloopRouteHeader(title: 'Import CSV'),
+          const WorkloopRouteHeader(title: 'Import clients'),
           const SizedBox(height: AppSpacing.xs),
           const Text(
-            'Choose a CSV, map its columns, preview the result and confirm before anything is created.',
+            'Bring contacts from Apple Contacts, Google Contacts or a spreadsheet. Choose a CSV or vCard (.vcf), review the details and select who to import.',
             style: TextStyle(color: AppColors.t2, fontSize: 15, height: 1.45),
           ),
           const SizedBox(height: AppSpacing.lg),
           WorkloopPrimaryButton(
-            label: _loading ? 'Reading file…' : 'Choose CSV file',
+            label: _loading ? 'Reading file…' : 'Choose contact file',
             icon: LucideIcons.fileUp,
             onPressed: _loading || _importing || _reviewing
                 ? null
@@ -377,7 +358,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _fileName ?? 'CSV file',
+                          _fileName ?? 'Contact file',
                           style: const TextStyle(
                             color: AppColors.t1,
                             fontWeight: FontWeight.w600,
@@ -413,43 +394,54 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
-              WorkloopPickerField<_ClientField>(
+              WorkloopPickerField<ClientImportField>(
                 value: _mapping[index],
                 title: 'Map ${table.headers[index]}',
                 hint: 'Ignore this column',
                 options: const [
                   WorkloopPickerOption(
-                    value: _ClientField.ignore,
+                    value: ClientImportField.ignore,
                     label: 'Ignore this column',
                   ),
                   WorkloopPickerOption(
-                    value: _ClientField.name,
-                    label: 'Client name',
+                    value: ClientImportField.name,
+                    label: 'Full client name',
                   ),
                   WorkloopPickerOption(
-                    value: _ClientField.phone,
+                    value: ClientImportField.givenName,
+                    label: 'First name',
+                  ),
+                  WorkloopPickerOption(
+                    value: ClientImportField.familyName,
+                    label: 'Last name',
+                  ),
+                  WorkloopPickerOption(
+                    value: ClientImportField.phone,
                     label: 'Phone number',
                   ),
                   WorkloopPickerOption(
-                    value: _ClientField.email,
+                    value: ClientImportField.email,
                     label: 'Email address',
                   ),
                   WorkloopPickerOption(
-                    value: _ClientField.address,
+                    value: ClientImportField.address,
                     label: 'Booking address',
                   ),
                   WorkloopPickerOption(
-                    value: _ClientField.notes,
+                    value: ClientImportField.notes,
                     label: 'Client notes',
                   ),
-                  WorkloopPickerOption(value: _ClientField.tags, label: 'Tags'),
+                  WorkloopPickerOption(
+                    value: ClientImportField.tags,
+                    label: 'Tags',
+                  ),
                 ],
                 enabled: !_importing && !_reviewing,
                 onChanged: (value) => setState(() {
-                  if (value != _ClientField.ignore) {
+                  if (value != ClientImportField.ignore) {
                     for (final entry in _mapping.entries.toList()) {
                       if (entry.key != index && entry.value == value) {
-                        _mapping[entry.key] = _ClientField.ignore;
+                        _mapping[entry.key] = ClientImportField.ignore;
                       }
                     }
                   }
@@ -459,43 +451,53 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
               const SizedBox(height: AppSpacing.md),
             ],
             const SizedBox(height: AppSpacing.sm),
-            const WorkloopSectionHeader(label: 'Preview'),
-            const SizedBox(height: AppSpacing.xs),
-            WorkloopSurface(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              child: Column(
-                children: [
-                  for (
-                    var index = 0;
-                    index < _candidates().take(5).length;
-                    index++
-                  )
-                    WorkloopListRow(
-                      flat: true,
-                      showDivider: index != _candidates().take(5).length - 1,
-                      leading: const Icon(
-                        LucideIcons.user,
-                        color: AppColors.t3,
-                        size: 18,
-                      ),
-                      title: Text(
-                        _candidates()[index].name,
-                        style: const TextStyle(
-                          color: AppColors.t1,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      subtitle: Text(
-                        [
-                          _candidates()[index].phone,
-                          _candidates()[index].email,
-                        ].whereType<String>().join(' · '),
-                        style: const TextStyle(color: AppColors.t3),
-                      ),
-                    ),
-                ],
-              ),
+            WorkloopSectionHeader(
+              label: 'Choose clients (${_candidates().length} selected)',
             ),
+            const SizedBox(height: AppSpacing.xs),
+            const Text(
+              'Review the first phone and email below. Additional vCard numbers and addresses are preserved in client notes. Photos and unsupported fields are not imported.',
+              style: TextStyle(color: AppColors.t3, fontSize: 14, height: 1.45),
+            ),
+            for (final candidate in previewRows)
+              CheckboxListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: !_excludedRows.contains(
+                  int.parse(candidate.sourceId.substring(4)),
+                ),
+                onChanged: _importing || _reviewing
+                    ? null
+                    : (selected) => setState(() {
+                        final index = int.parse(
+                          candidate.sourceId.substring(4),
+                        );
+                        if (selected == true) {
+                          _excludedRows.remove(index);
+                        } else {
+                          _excludedRows.add(index);
+                        }
+                      }),
+                title: Text(candidate.name),
+                subtitle: Text(
+                  [
+                    candidate.phone,
+                    candidate.email,
+                    candidate.address,
+                  ].whereType<String>().join(' · '),
+                ),
+              ),
+            if (preview.length > previewRows.length)
+              WorkloopTextButton(
+                label:
+                    'Show more clients (${preview.length - previewRows.length} remaining)',
+                onPressed: () => setState(() => _previewLimit += 20),
+              ),
+            if (preview.isEmpty)
+              const Text(
+                'No names to preview. Check the name columns above.',
+                style: TextStyle(color: AppColors.t3),
+              ),
             const SizedBox(height: AppSpacing.sm),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
@@ -523,8 +525,4 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
       ),
     );
   }
-}
-
-extension<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }

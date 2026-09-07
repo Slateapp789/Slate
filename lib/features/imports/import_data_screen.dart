@@ -49,8 +49,8 @@ class ImportDataScreen extends StatelessWidget {
           ),
           _ImportRow(
             icon: LucideIcons.fileSpreadsheet,
-            title: 'Client CSV',
-            subtitle: 'Map columns, preview rows and skip duplicates',
+            title: 'Client files',
+            subtitle: 'Apple / Google Contacts vCards and spreadsheet CSVs',
             showDivider: false,
             onTap: () => _open(context, const CsvImportScreen()),
           ),

@@ -2027,3 +2027,37 @@ seven-test enabled run. Analysis and the signed iOS profile build are clean.
 Build 14 is compiled locally; phone installation/physical checks remain pending
 device connectivity, and it has not been uploaded to TestFlight. See the
 [integrated receipt and limits](releases/2026-09-07-booking-fixes-build14.md).
+
+## Build 14 upload — 7 September 2026, 08:31 BST
+
+The prior local-only status is superseded: the signed distribution candidate
+**1.0.0 (14)** was uploaded successfully from a frozen clean copy of the tested
+source. Apple reported the package is processing at 08:31:11 BST. Production
+push signing, version/bundle identity and location-purpose strings were verified.
+Root working changes remain intact.
+
+Processing completion and beta tester availability still require verification;
+App Store Connect's browser session has expired. Physical iPhone checks remain
+pending because the user is at work. No public release or availability email was
+sent. See the [upload follow-up and evidence](releases/2026-09-07-booking-fixes-build14.md).
+
+## Android beta candidate — 7 September 2026
+
+Signed APK and Play App Bundle **1.0.0 (14)** are prepared from the same tested
+source as iOS build 14. Signature, version, Android 8+ compatibility, ARM64 native
+alignment and isolated release-emulator startup/navigation checks passed. Google
+Play organisation registration is still pending the permanent owner-login choice,
+fee and verification; neither Play nor Firebase distribution is claimed. Live
+beta configuration confirms verified new Workloop accounts receive lifetime
+access without a purchase. See the [Android beta receipt and limits](releases/2026-09-07-android-beta-build14.md).
+
+
+### 2026-09-07 — Social links and reviewed contact-file imports
+
+Website version 38 is live with four social profiles, a Works with strip and
+`/help/connections`. Locally, client imports now accept UTF-8 vCard 3.0/4.0,
+combine split CSV names, ignore provider type-label columns and allow contact
+exclusion before import. Analysis, 1,018 full-suite tests (six capability skips),
+24 final import checks and the final signed iOS profile build passed. No new
+TestFlight/Android distribution or physical-device import check is claimed.
+See [the scoped release record](releases/2026-09-07-social-links-and-client-imports.md).

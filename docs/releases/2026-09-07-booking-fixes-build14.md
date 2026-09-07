@@ -40,3 +40,26 @@ Existing incorrectly confirmed bookings are not silently moved. Their owner must
 The user's Settings screenshot confirmed the iPhone pairing, Allow connections and Keep this Mac awake already enabled. The user opened this task over 5G and subsequently confirmed current messages were working after reopening. No new VPN, public port or account change was needed. Keep the Mac online, plugged in and running ChatGPT; laptop lid open unless using a supported external-display setup. Setup guidance: https://learn.chatgpt.com/docs/remote-connections.
 
 Suggested app commit: `fix: preserve requested booking times and open exact bookings directly`.
+
+## TestFlight upload follow-up — 7 September 2026, 08:31 BST
+
+The user is at work and cannot reconnect the iPhone. The earlier local-only
+release status above is superseded by this upload receipt; physical checks remain
+pending. No cable connection is required for a later TestFlight installation.
+
+- Frozen clean source: `/Users/ismaeelsmiley/Workloop-Releases/build14-20260907T072221Z/Workloop`, commit `9abee299b88f5fd639c54ca3c2ab9b5184a146d7`. Root dirty work was preserved.
+- Signed distribution build **1.0.0 (14)** succeeded from the tested source. Bundle/version, strict signature verification, production APNs entitlement and both location-purpose strings were checked in the exported IPA. No background-location mode is enabled.
+- Release configuration matches build 13: payment collection, subscriptions and crash reporting enabled; production APNs; Tap to Pay disabled. Public build configuration SHA-256: `2a5d4f056113a5abcf3031a0021235f9c3d856bc36e9759aa4744a85b0a63bce`.
+- Local reviewed IPA: 35,828,145 bytes, SHA-256 `d9c24bee0c4a8be4a6b778e107816971c6cc0f9e96d65f5014a49f2c8a915ea1`. The upload used the same signed archive via Xcode's App Store Connect export; this hash describes the retained local IPA, not an independently retrieved Apple package.
+- Xcode upload **succeeded at 08:31:11 BST / 07:31:11 UTC**. Apple reported **“Uploaded package is processing”** and Xcode returned `EXPORT SUCCEEDED`.
+- The known nonblocking upstream StripeTerminal dSYM warning remains. It affects symbolication inside that vendor framework; see the [overnight release record](2026-09-07-launch-preparation.md). No location-purpose warning occurred in this upload log; later processing messages have not been independently checked.
+
+**Availability limit:** processing completion and assignment/availability to beta
+testers are not yet verified. Safari's App Store Connect session is signed out;
+Xcode's existing login worked for upload, but Organizer does not supply the live
+build/group status here. No user announcement was sent claiming build 14 is
+already installable. No public App Store release was submitted.
+
+Durable build/upload logs, source manifest and `release-verification.json` are
+stored beside the frozen checkout in
+`/Users/ismaeelsmiley/Workloop-Releases/build14-20260907T072221Z`.
