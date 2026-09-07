@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/workloop_capabilities.dart';
 import '../../shared/providers/appointments_provider.dart';
+import '../../shared/providers/booking_whatsapp_reminder_provider.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/finance_provider.dart';
@@ -13,16 +15,20 @@ import '../../shared/providers/tasks_provider.dart';
 import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/models/slate_models.dart';
+import '../../shared/notifications/notification_route.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/currency_format.dart';
 import '../../shared/utils/maps_launcher.dart';
 import '../../shared/utils/workflow_idempotency.dart';
+import '../../shared/utils/whatsapp_reminder.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../clients/client_detail_screen.dart';
 import '../clients/widgets/client_form.dart';
 import '../finance/add_payment_screen.dart';
 import '../finance/payment_collection_sheet.dart';
+import 'booking_schedule_warning_sheet.dart';
 import 'widgets/appointment_detail_widgets.dart';
+import 'widgets/booking_whatsapp_reminder_action.dart';
 
 part 'appointment_detail_sections.dart';
 
@@ -128,7 +134,9 @@ class _AppointmentDetailScreenState
   late TextEditingController _locationController;
   late TextEditingController _notesController;
   late TextEditingController _priceController;
-  List<Map<String, dynamic>> _services = [];
+  bool _applyingSnapshot = false;
+  List<Map<String, dynamic>> get _services =>
+      ref.read(servicesProvider).value ?? const [];
   bool _notesExpanded = false;
   bool _paymentExpanded = false;
   bool _tasksExpanded = false;
@@ -191,11 +199,17 @@ class _AppointmentDetailScreenState
       controller.addListener(_handleDraftChanged);
     }
     _savedEditDraft = _currentEditDraft;
-    _loadServices();
+    ref.listenManual(appointmentsProvider, (_, next) {
+      if (next.isLoading || next.hasError || _editing || _loading) return;
+      final latest = next.value
+          ?.where((row) => row['id'] == _appt['id'])
+          .firstOrNull;
+      if (latest != null) _applyAppointmentSnapshot(latest);
+    }, fireImmediately: true);
   }
 
   void _handleDraftChanged() {
-    if (mounted) setState(() {});
+    if (mounted && !_applyingSnapshot) setState(() {});
   }
 
   @override
@@ -226,6 +240,7 @@ class _AppointmentDetailScreenState
   bool get _hasEditChanges => _currentEditDraft != _savedEditDraft;
 
   Future<void> _handleBack() async {
+    if (_loading) return;
     FocusManager.instance.primaryFocus?.unfocus();
     if (!_editing || !_hasEditChanges) {
       await _leaveScreen();
@@ -258,13 +273,34 @@ class _AppointmentDetailScreenState
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
-  Future<void> _loadServices() async {
-    final workspaceId = await ref.read(workspaceIdProvider.future);
-    if (workspaceId == null) return;
-    final data = await ref
-        .read(servicesRepositoryProvider)
-        .listRows(workspaceId);
-    setState(() => _services = data);
+  void _applyAppointmentSnapshot(Map<String, dynamic> row) {
+    if (!mounted || _editing || _loading || mapEquals(_appt, row)) return;
+    setState(() {
+      _applyingSnapshot = true;
+      _appt = Map<String, dynamic>.from(row);
+      final appointment = Appointment.fromMap(row);
+      _selectedClientId = appointment.contactId;
+      _selectedServiceId = appointment.serviceId ?? '__custom__';
+      _selectedDate = appointment.startTime.toLocal();
+      _selectedHour = _selectedDate.hour;
+      _selectedMinute = _selectedDate.minute;
+      _durationController.text = appointment.endTime == null
+          ? '60'
+          : '${appointment.endTime!.difference(appointment.startTime).inMinutes}';
+      _serviceTitleController.text =
+          appointment.serviceName ?? appointment.title ?? '';
+      _priceController.text = appointment.price.toString();
+      _notesController.text = appointment.notes ?? '';
+      _locationController.text = appointment.location ?? '';
+      final location = (appointment.location ?? '').toLowerCase();
+      _locationMode = location.contains('client')
+          ? 'client'
+          : location.contains('online') || location.contains('phone')
+          ? 'online'
+          : 'business';
+      _savedEditDraft = _currentEditDraft;
+      _applyingSnapshot = false;
+    });
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -304,6 +340,7 @@ class _AppointmentDetailScreenState
   }
 
   Future<bool> _updateStatus(String status, {String? cancelReason}) async {
+    if (_loading) return false;
     setState(() => _loading = true);
     try {
       final updates = {'status': status};
@@ -311,24 +348,9 @@ class _AppointmentDetailScreenState
       await ref
           .read(appointmentsRepositoryProvider)
           .update(_appt['id'] as String, updates);
-      final workspaceId = await ref.read(workspaceIdProvider.future);
-      if (workspaceId != null &&
-          (status == 'cancelled' || status == 'no_show')) {
-        final name = _appt['contacts']?['name'] as String? ?? 'Client';
-        await ref
-            .read(notificationsRepositoryProvider)
-            .create(
-              workspaceId: workspaceId,
-              type: status == 'no_show' ? 'no_show' : 'booking',
-              title: status == 'no_show'
-                  ? 'Booking no-show'
-                  : 'Booking cancelled',
-              body: cancelReason?.isNotEmpty == true
-                  ? '$name: $cancelReason'
-                  : '$name booking was updated.',
-              deepLink: '/work',
-            );
-      }
+      if (!mounted) return true;
+      // The owner just made this change; the saved state is its confirmation.
+      // Customer cancellation emails are handled by the transactional backend.
       setState(() {
         _appt['status'] = status;
         if (cancelReason != null) _appt['notes'] = cancelReason;
@@ -339,8 +361,9 @@ class _AppointmentDetailScreenState
       ref.invalidate(unreadNotificationsProvider);
       return true;
     } catch (_) {
+      if (!mounted) return false;
       setState(() => _loading = false);
-      if (mounted) _snack('The booking could not be updated.');
+      _snack('The booking could not be updated.');
       return false;
     }
   }
@@ -371,10 +394,11 @@ class _AppointmentDetailScreenState
     final payments = await ref
         .read(paymentsRepositoryProvider)
         .forAppointment(_appt['id'] as String);
+    if (!mounted) return;
     final payment = payments
         .where((item) => item.outstandingAmount > 0)
         .firstOrNull;
-    if (payment == null || !mounted) {
+    if (payment == null) {
       _snack('The booking is complete, but no payment is ready to collect.');
       return;
     }
@@ -382,16 +406,18 @@ class _AppointmentDetailScreenState
       context: context,
       payment: payment,
     );
-    if (collected) _refreshPaymentState();
+    if (collected && mounted) _refreshPaymentState();
   }
 
   Future<bool> _runCompletionWorkflow({
     required String paymentMode,
     Payment? linkedPayment,
   }) async {
+    if (_loading) return false;
     setState(() => _loading = true);
     try {
       final workspaceId = await ref.read(workspaceIdProvider.future);
+      if (!mounted) return false;
       if (workspaceId == null) {
         throw StateError('No active workspace.');
       }
@@ -431,6 +457,7 @@ class _AppointmentDetailScreenState
   Future<void> _markLinkedPaymentPaid(Payment payment) async {
     try {
       await ref.read(paymentsRepositoryProvider).markPaid(payment);
+      if (!mounted) return;
     } catch (_) {
       if (mounted) {
         _snack('The payment could not be updated. Please try again.');
@@ -446,12 +473,17 @@ class _AppointmentDetailScreenState
             title: 'Payment received',
             body:
                 '${formatPounds(payment.total)} from ${payment.clientName ?? 'a client'} is now paid.',
-            deepLink: '/payments',
+            deepLink: workloopNotificationEntityRoute(
+              WorkloopNotificationEntity.payment,
+              payment.id,
+            ),
           );
+      if (!mounted) return;
     } catch (_) {
       // The confirmed payment remains the source of truth. Notification
       // delivery is best-effort and must not leave the booking visibly stale.
     }
+    if (!mounted) return;
     _refreshPaymentState();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -490,11 +522,10 @@ class _AppointmentDetailScreenState
     final hasPaidLinkedPayment = payments.any(
       (payment) => payment.status == 'paid',
     );
-    showModalBottomSheet(
+    showWorkloopBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (ctx) => SlateSheetFrame(
+        scrollable: true,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -587,6 +618,18 @@ class _AppointmentDetailScreenState
   }
 
   Future<bool> _saveEdit() async {
+    if (_loading) return false;
+    final services = ref.read(servicesProvider);
+    final serviceChanged =
+        _selectedServiceId != (_appt['service_id'] ?? '__custom__');
+    if (serviceChanged &&
+        _selectedServiceId != '__custom__' &&
+        (services.hasError || !services.hasValue)) {
+      _snack(
+        'Reload services before changing the booking service. Your draft is kept.',
+      );
+      return false;
+    }
     setState(() => _loading = true);
     try {
       final startTime = DateTime(
@@ -618,33 +661,19 @@ class _AppointmentDetailScreenState
           ? Map<String, dynamic>.from(settings!['working_hours'] as Map)
           : <String, dynamic>{};
       final repository = ref.read(appointmentsRepositoryProvider);
-      try {
-        await repository.ensureScheduleAvailable(
-          workspaceId: workspaceId,
-          startTime: startTime,
-          endTime: endTime,
-          workingHours: workingHours,
-          excludeAppointmentId: _appt['id'] as String?,
-        );
-      } on AppointmentScheduleException catch (error) {
-        if (error.issue != AppointmentScheduleIssue.workingHours) rethrow;
-        if (!mounted) return false;
-        final proceed = await showWorkloopOutsideHoursConfirmation(
-          context,
-          detail: error.message,
-        );
-        if (!proceed) {
-          if (mounted) setState(() => _loading = false);
-          return false;
-        }
-        await repository.ensureScheduleAvailable(
-          workspaceId: workspaceId,
-          startTime: startTime,
-          endTime: endTime,
-          workingHours: workingHours,
-          excludeAppointmentId: _appt['id'] as String?,
-          enforceWorkingHours: false,
-        );
+      final scheduleReview = await repository.reviewSchedule(
+        workspaceId: workspaceId,
+        startTime: startTime,
+        endTime: endTime,
+        workingHours: workingHours,
+        workingHoursTimezone: settings?['timezone'] as String?,
+        excludeAppointmentId: _appt['id'] as String?,
+      );
+      if (!mounted) return false;
+      final proceed = await showBookingScheduleWarning(context, scheduleReview);
+      if (!proceed) {
+        if (mounted) setState(() => _loading = false);
+        return false;
       }
       final updates = {
         'contact_id': _selectedClientId,
@@ -665,6 +694,7 @@ class _AppointmentDetailScreenState
       await ref
           .read(appointmentsRepositoryProvider)
           .update(_appt['id'] as String, updates);
+      if (!mounted) return false;
       setState(() {
         _appt = {
           ..._appt,
@@ -679,8 +709,9 @@ class _AppointmentDetailScreenState
       ref.invalidate(appointmentsProvider);
       return true;
     } catch (_) {
+      if (!mounted) return false;
       setState(() => _loading = false);
-      if (mounted) _snack('The booking could not be updated.');
+      _snack('The booking could not be updated.');
       return false;
     }
   }
@@ -768,7 +799,7 @@ class _AppointmentDetailScreenState
     final cleaned = title.trim();
     if (cleaned.isEmpty) return;
     final workspaceId = await ref.read(workspaceIdProvider.future);
-    if (workspaceId == null) return;
+    if (!mounted || workspaceId == null) return;
     await ref
         .read(tasksRepositoryProvider)
         .create(
@@ -779,6 +810,7 @@ class _AppointmentDetailScreenState
           contactId: _appt['contact_id'] as String?,
           appointmentId: _appt['id'] as String,
         );
+    if (!mounted) return;
     ref.invalidate(appointmentTasksProvider(_appt['id'] as String));
     ref.invalidate(tasksProvider);
     ref.invalidate(allTasksProvider);
@@ -786,69 +818,66 @@ class _AppointmentDetailScreenState
 
   void _showAddTaskSheet() {
     final controller = TextEditingController();
-    showModalBottomSheet(
+    showWorkloopBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          16,
-          20,
-          MediaQuery.of(context).viewInsets.bottom + 20,
+      builder: (sheetContext) => AnimatedPadding(
+        duration: AppMotion.responsive(context, AppMotion.fast),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Add booking task',
-              style: TextStyle(
-                color: AppColors.t1,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              style: const TextStyle(color: AppColors.t1),
-              decoration: InputDecoration(
-                hintText: 'e.g. Confirm address',
-                hintStyle: const TextStyle(color: AppColors.t3),
-                filled: true,
-                fillColor: AppColors.bgInteract,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.green),
+        child: SlateSheetFrame(
+          scrollable: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Add booking task',
+                style: TextStyle(
+                  color: AppColors.t1,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: () async {
-                  await _addLinkedTask(controller.text);
-                  if (context.mounted) Navigator.pop(context);
-                },
-                child: const Text('Add Task'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                style: const TextStyle(color: AppColors.t1),
+                decoration: InputDecoration(
+                  hintText: 'e.g. Confirm address',
+                  hintStyle: const TextStyle(color: AppColors.t3),
+                  filled: true,
+                  fillColor: AppColors.bgInteract,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderSide: const BorderSide(color: AppColors.green),
+                  ),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await _addLinkedTask(controller.text);
+                    if (sheetContext.mounted) Navigator.pop(sheetContext);
+                  },
+                  child: const Text('Add Task'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -873,7 +902,7 @@ class _AppointmentDetailScreenState
         child: child!,
       ),
     );
-    if (picked != null) setState(() => _selectedDate = picked);
+    if (picked != null && mounted) setState(() => _selectedDate = picked);
   }
 
   Future<void> _pickTime() async {
@@ -882,7 +911,7 @@ class _AppointmentDetailScreenState
       initialHour: _selectedHour,
       initialMinute: _selectedMinute,
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     setState(() {
       _selectedHour = picked.hour;
       _selectedMinute = picked.minute;
@@ -893,163 +922,152 @@ class _AppointmentDetailScreenState
     String? selectedReason;
     final otherController = TextEditingController();
 
-    showModalBottomSheet(
+    showWorkloopBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (context) => StatefulBuilder(
-        builder: (context, setModal) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            12,
-            20,
-            MediaQuery.of(context).viewInsets.bottom + 24,
+        builder: (context, setModal) => AnimatedPadding(
+          duration: AppMotion.responsive(context, AppMotion.fast),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2),
+          child: SlateSheetFrame(
+            scrollable: true,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Cancel Booking',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.t1,
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Cancel Booking',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.t1,
+                const SizedBox(height: 6),
+                const Text(
+                  'Why is this being cancelled?',
+                  style: TextStyle(fontSize: 14, color: AppColors.t3),
                 ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Why is this being cancelled?',
-                style: TextStyle(fontSize: 14, color: AppColors.t3),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _cancelReasons.map((reason) {
-                  final active = selectedReason == reason;
-                  return Semantics(
-                    button: true,
-                    selected: active,
-                    label: reason,
-                    onTap: () => setModal(() => selectedReason = reason),
-                    child: ExcludeSemantics(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => setModal(() => selectedReason = reason),
-                        child: Container(
-                          constraints: const BoxConstraints(
-                            minHeight: AppSpacing.minTouch,
-                          ),
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          decoration: BoxDecoration(
-                            color: active
-                                ? AppColors.errorDim
-                                : AppColors.bgInteract,
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                            border: Border.all(
-                              color: active
-                                  ? AppColors.error
-                                  : AppColors.border,
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _cancelReasons.map((reason) {
+                    final active = selectedReason == reason;
+                    return Semantics(
+                      button: true,
+                      selected: active,
+                      label: reason,
+                      onTap: () => setModal(() => selectedReason = reason),
+                      child: ExcludeSemantics(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setModal(() => selectedReason = reason),
+                          child: Container(
+                            constraints: const BoxConstraints(
+                              minHeight: AppSpacing.minTouch,
                             ),
-                          ),
-                          child: Text(
-                            reason,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: active ? AppColors.error : AppColors.t2,
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? AppColors.errorDim
+                                  : AppColors.bgInteract,
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              border: Border.all(
+                                color: active
+                                    ? AppColors.error
+                                    : AppColors.border,
+                              ),
+                            ),
+                            child: Text(
+                              reason,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: active ? AppColors.error : AppColors.t2,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              if (selectedReason == 'Other') ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: otherController,
-                  autofocus: true,
-                  style: const TextStyle(color: AppColors.t1),
-                  decoration: InputDecoration(
-                    hintText: 'Enter reason...',
-                    hintStyle: const TextStyle(color: AppColors.t3),
-                    filled: true,
-                    fillColor: AppColors.bgInteract,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: AppColors.error,
-                        width: 1.5,
+                    );
+                  }).toList(),
+                ),
+                if (selectedReason == 'Other') ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: otherController,
+                    autofocus: true,
+                    style: const TextStyle(color: AppColors.t1),
+                    decoration: InputDecoration(
+                      hintText: 'Enter reason...',
+                      hintStyle: const TextStyle(color: AppColors.t3),
+                      filled: true,
+                      fillColor: AppColors.bgInteract,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: AppColors.error,
+                          width: 1.5,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
                       ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
+                  ),
+                ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: selectedReason == null
+                        ? null
+                        : () {
+                            final reason = selectedReason == 'Other'
+                                ? otherController.text.trim()
+                                : selectedReason!;
+                            Navigator.pop(context);
+                            _updateStatus(
+                              'cancelled',
+                              cancelReason: reason.isEmpty
+                                  ? selectedReason
+                                  : reason,
+                            );
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                      disabledBackgroundColor: AppColors.bgInteract,
+                      foregroundColor: AppColors.bg,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Cancel Booking',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
               ],
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: selectedReason == null
-                      ? null
-                      : () {
-                          final reason = selectedReason == 'Other'
-                              ? otherController.text.trim()
-                              : selectedReason!;
-                          Navigator.pop(context);
-                          _updateStatus(
-                            'cancelled',
-                            cancelReason: reason.isEmpty
-                                ? selectedReason
-                                : reason,
-                          );
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.error,
-                    disabledBackgroundColor: AppColors.bgInteract,
-                    foregroundColor: AppColors.bg,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Cancel Booking',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1060,12 +1078,13 @@ class _AppointmentDetailScreenState
 
   @override
   Widget build(BuildContext context) {
+    final services = _editing
+        ? ref.watch(servicesProvider)
+        : const AsyncData<List<Map<String, dynamic>>>([]);
+    final appointment = Appointment.fromMap(_appt);
     final status = _appt['status'] as String? ?? 'scheduled';
     final clientName = _appt['contacts']?['name'] as String? ?? 'Walk-in';
-    final serviceName =
-        _appt['services']?['name'] as String? ??
-        _appt['title'] as String? ??
-        'Booking';
+    final serviceName = appointment.serviceName ?? 'Booking';
     final startTime = DateTime.tryParse(
       _appt['start_time'] as String? ?? '',
     )?.toLocal();
@@ -1076,6 +1095,7 @@ class _AppointmentDetailScreenState
     final price = _appt['price'];
     final bookingPrice = price?.toDouble() ?? 0;
     final recurrenceRule = _appt['recurrence_rule'] as String?;
+    final serviceItems = appointment.serviceItems;
     final clients = ref.watch(clientsProvider);
     final linkedTasks = ref.watch(
       appointmentTasksProvider(_appt['id'] as String),
@@ -1099,12 +1119,12 @@ class _AppointmentDetailScreenState
         .toUpperCase();
 
     return PopScope(
-      canPop: _allowPop || !_editing || !_hasEditChanges,
+      canPop: !_loading && (_allowPop || !_editing || !_hasEditChanges),
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _handleBack();
       },
       child: Scaffold(
-        backgroundColor: AppColors.bg,
+        backgroundColor: Colors.transparent,
         body: Stack(
           children: [
             const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -1112,7 +1132,7 @@ class _AppointmentDetailScreenState
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.pageX,
-                  AppSpacing.lg,
+                  AppSpacing.screenTop,
                   AppSpacing.pageX,
                   AppSpacing.xxl,
                 ),
@@ -1124,7 +1144,7 @@ class _AppointmentDetailScreenState
                     // ── Header ────────────────────────────────────────────────────
                     WorkloopRouteHeader(
                       title: 'Booking',
-                      backSemanticLabel: 'Back to bookings',
+                      backSemanticLabel: 'Back',
                       onBack: _handleBack,
                       trailing: status == 'scheduled'
                           ? _BookingDetailAction(
@@ -1166,6 +1186,7 @@ class _AppointmentDetailScreenState
                       editing: _editing,
                       clientName: clientName,
                       serviceName: serviceName,
+                      serviceItems: serviceItems,
                       price: price as num?,
                       initials: initials,
                       contactId: _appt['contact_id'] as String?,
@@ -1174,7 +1195,7 @@ class _AppointmentDetailScreenState
                       clients: clients.whenData(
                         (data) => data.map((client) => client.toMap()).toList(),
                       ),
-                      services: _services,
+                      services: services,
                       selectedClientId: _selectedClientId,
                       selectedServiceId: _selectedServiceId,
                       priceController: _priceController,
@@ -1208,6 +1229,7 @@ class _AppointmentDetailScreenState
                         });
                       },
                       onRetryClients: () => ref.invalidate(clientsProvider),
+                      onRetryServices: () => ref.invalidate(servicesProvider),
                     ),
                     const SizedBox(height: 12),
 
@@ -1245,6 +1267,24 @@ class _AppointmentDetailScreenState
                       },
                       onCancel: _showCancelSheet,
                     ),
+                    if (!_editing &&
+                        status == 'scheduled' &&
+                        canRemindBooking(
+                          appointment,
+                          ref.watch(bookingReminderClockProvider)(),
+                        )) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      BookingWhatsAppReminderAction(
+                        appointment: appointment,
+                        onOpenClient: appointment.contactId == null
+                            ? null
+                            : _openLinkedClient,
+                        onAppointmentRefreshed: (latest) =>
+                            _applyAppointmentSnapshot(
+                              bookingReminderSnapshot(latest),
+                            ),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.lg),
 
                     Container(
@@ -1252,7 +1292,7 @@ class _AppointmentDetailScreenState
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                         border: Border.all(color: AppColors.border),
                       ),
                       child: _editing
@@ -1414,7 +1454,7 @@ class _AppointmentDetailScreenState
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: AppColors.bgCard,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                           border: Border.all(color: AppColors.border),
                         ),
                         child: Row(
@@ -1527,6 +1567,7 @@ class _AppointmentDetailScreenState
                               ),
                             ),
                           );
+                          if (!mounted) return;
                           _refreshPaymentState();
                         },
                         onMarkPaid: _markLinkedPaymentPaid,
@@ -1550,14 +1591,18 @@ class _AppointmentDetailScreenState
                       child: _BookingTasksCard(
                         tasks: linkedTasks,
                         onAddTask: _showAddTaskSheet,
-                        onRetry: () => ref.invalidate(
-                          appointmentTasksProvider(_appt['id'] as String),
-                        ),
+                        onRetry: () {
+                          ref.invalidate(allTasksProvider);
+                          ref.invalidate(
+                            appointmentTasksProvider(_appt['id'] as String),
+                          );
+                        },
                         onToggle: (task) async {
                           final done = task.status == 'done';
                           await ref
                               .read(tasksRepositoryProvider)
                               .updateStatus(task.id, done ? 'open' : 'done');
+                          if (!mounted) return;
                           ref.invalidate(
                             appointmentTasksProvider(_appt['id'] as String),
                           );

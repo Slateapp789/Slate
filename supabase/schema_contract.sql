@@ -10,7 +10,9 @@
 -- workspace_settings(workspace_id, working_hours jsonb, revenue_target numeric)
 -- contacts(id, workspace_id, name, phone, email, address, notes, important_notes, status, preferred_contact_method, source, birthday, tags, last_activity_at, created_at)
 -- services(id, workspace_id, name, duration_mins, price, description, show_on_profile, active, created_at)
+-- service_add_ons(id, workspace_id, service_id, name, description, duration_mins, price, active, position, created_at, updated_at)
 -- appointments(id, workspace_id, contact_id, service_id, title, start_time, end_time, price, status, notes, created_at)
+-- appointment_items(id, workspace_id, appointment_id, item_kind, source_service_id, source_add_on_id, name, duration_mins, price, position, created_at)
 -- invoices(id, workspace_id, contact_id, invoice_number, type, status, issue_date, due_date, subtotal, tax_rate, tax_amount, discount_value, total, amount_paid, notes, created_at)
 -- expenses(id, workspace_id, amount, category, expense_date, notes, created_at, updated_at)
 -- tasks(id, workspace_id, contact_id, appointment_id, title, priority, due_date, status, reminder_timing, completed_at, created_at, updated_at)
@@ -39,6 +41,45 @@ alter table if exists services
   add column if not exists show_on_profile boolean not null default true,
   add column if not exists active boolean not null default true;
 
+do $$
+begin
+  if not exists (
+    select 1
+      from pg_constraint
+     where conname = 'services_duration_mins_check'
+       and conrelid = 'public.services'::regclass
+  ) then
+    alter table public.services
+      add constraint services_duration_mins_check
+      check (duration_mins between 5 and 1440);
+  end if;
+end $$;
+
+create unique index if not exists services_workspace_id_id_uidx
+  on services(workspace_id, id);
+
+create table if not exists service_add_ons (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  service_id uuid not null,
+  name text not null check (char_length(btrim(name)) between 1 and 80),
+  description text check (description is null or char_length(description) <= 500),
+  duration_mins integer not null default 0 check (duration_mins between 0 and 1440),
+  price numeric(12, 2) not null default 0 check (price between 0 and 1000000),
+  active boolean not null default true,
+  position integer not null default 0 check (position between 0 and 1000),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint service_add_ons_workspace_service_fk
+    foreign key (workspace_id, service_id)
+    references services(workspace_id, id)
+    on delete cascade
+);
+create unique index if not exists service_add_ons_workspace_id_id_uidx
+  on service_add_ons(workspace_id, id);
+create index if not exists service_add_ons_service_position_idx
+  on service_add_ons(workspace_id, service_id, active, position, id);
+
 alter table if exists contacts
   add column if not exists address text,
   add column if not exists tags text[],
@@ -66,6 +107,9 @@ create index if not exists appointments_contact_id_idx
   on appointments(contact_id);
 create index if not exists appointments_service_id_idx
   on appointments(service_id);
+create index if not exists appointments_workspace_schedule_lookup_idx
+  on appointments(workspace_id, start_time, end_time)
+  where status not in ('cancelled', 'no_show');
 
 alter table if exists workspace_settings
   add column if not exists min_booking_notice_hours integer not null default 2,
@@ -166,6 +210,8 @@ create table if not exists booking_requests (
     generated always as (regexp_replace(phone, '[^0-9]', '', 'g')) stored,
   service_id uuid references services(id) on delete set null,
   preferred_time_text text,
+  requested_for timestamptz,
+  requested_timezone text,
   message text,
   status text not null default 'pending',
   source_hash text,
@@ -173,8 +219,83 @@ create table if not exists booking_requests (
   created_at timestamptz not null default now()
 );
 
+create unique index if not exists booking_requests_workspace_id_id_uidx
+  on booking_requests(workspace_id, id);
+create unique index if not exists appointments_workspace_id_id_uidx
+  on appointments(workspace_id, id);
+
+create table if not exists booking_request_items (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  booking_request_id uuid not null,
+  item_kind text not null check (item_kind in ('base', 'service', 'add_on')),
+  source_service_id uuid,
+  source_add_on_id uuid,
+  name text not null check (char_length(btrim(name)) between 1 and 80),
+  duration_mins integer not null check (duration_mins between 0 and 1440),
+  price numeric(12, 2) not null check (price between 0 and 1000000),
+  position integer not null check (position between 0 and 1000),
+  created_at timestamptz not null default now(),
+  constraint booking_request_items_workspace_request_fk
+    foreign key (workspace_id, booking_request_id)
+    references booking_requests(workspace_id, id)
+    on delete cascade,
+  constraint booking_request_items_workspace_service_fk
+    foreign key (workspace_id, source_service_id)
+    references services(workspace_id, id)
+    on delete set null (source_service_id),
+  constraint booking_request_items_workspace_add_on_fk
+    foreign key (workspace_id, source_add_on_id)
+    references service_add_ons(workspace_id, id)
+    on delete set null (source_add_on_id),
+  unique (booking_request_id, position)
+);
+create unique index if not exists booking_request_items_one_base_uidx
+  on booking_request_items(booking_request_id) where item_kind = 'base';
+create unique index if not exists booking_request_items_source_add_on_uidx
+  on booking_request_items(booking_request_id, source_add_on_id)
+  where source_add_on_id is not null;
+create index if not exists booking_request_items_workspace_request_idx
+  on booking_request_items(workspace_id, booking_request_id, position);
+
+create table if not exists appointment_items (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  appointment_id uuid not null,
+  item_kind text not null check (item_kind in ('base', 'service', 'add_on')),
+  source_service_id uuid,
+  source_add_on_id uuid,
+  name text not null check (char_length(btrim(name)) between 1 and 80),
+  duration_mins integer not null check (duration_mins between 0 and 1440),
+  price numeric(12, 2) not null check (price between 0 and 1000000),
+  position integer not null check (position between 0 and 1000),
+  created_at timestamptz not null default now(),
+  constraint appointment_items_workspace_appointment_fk
+    foreign key (workspace_id, appointment_id)
+    references appointments(workspace_id, id)
+    on delete cascade,
+  constraint appointment_items_workspace_service_fk
+    foreign key (workspace_id, source_service_id)
+    references services(workspace_id, id)
+    on delete set null (source_service_id),
+  constraint appointment_items_workspace_add_on_fk
+    foreign key (workspace_id, source_add_on_id)
+    references service_add_ons(workspace_id, id)
+    on delete set null (source_add_on_id),
+  unique (appointment_id, position)
+);
+create unique index if not exists appointment_items_one_base_uidx
+  on appointment_items(appointment_id) where item_kind = 'base';
+create unique index if not exists appointment_items_source_add_on_uidx
+  on appointment_items(appointment_id, source_add_on_id)
+  where source_add_on_id is not null;
+create index if not exists appointment_items_workspace_appointment_idx
+  on appointment_items(workspace_id, appointment_id, position);
+
 alter table if exists booking_requests
   add column if not exists preferred_time_text text,
+  add column if not exists requested_for timestamptz,
+  add column if not exists requested_timezone text,
   add column if not exists email text,
   add column if not exists phone_normalized text
     generated always as (regexp_replace(phone, '[^0-9]', '', 'g')) stored,
@@ -183,6 +304,10 @@ alter table if exists booking_requests
 
 -- Email is nullable only for legacy requests. New public submissions use the
 -- service-role-only v2 RPC, which requires and normalizes it.
+-- app_private.require_booking_request_workspace_member() runs before insert
+-- so a stale service-role public endpoint cannot write into a workspace after
+-- its final member has gone. Public profile Edge handlers also check this
+-- boundary before returning or accepting profile data.
 
 create table if not exists app_private.transactional_email_outbox (
   id uuid primary key default gen_random_uuid(),
@@ -231,6 +356,15 @@ create index if not exists notifications_workspace_id_idx
 create unique index if not exists notifications_workspace_dedupe_uidx
   on notifications(workspace_id, dedupe_key);
 
+-- Notification routing contract:
+-- app_private.route_notification_to_entity() runs before a notification is
+-- inserted or its routing fields change. When a workspace-owned booking,
+-- booking request, invoice/payment, task or note identifier is available, the
+-- stored deep_link uses the corresponding UUID route. The trigger never
+-- infers an entity across workspace boundaries. The Flutter route resolver
+-- independently allowlists these paths and resolves their records through
+-- authenticated, workspace-scoped providers/RLS.
+
 create table if not exists notification_preferences (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null unique references workspaces(id) on delete cascade,
@@ -254,14 +388,42 @@ create table if not exists push_tokens (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references workspaces(id) on delete cascade,
   user_id uuid not null,
-  token text not null,
+  -- Validated registering session; legacy NULL bindings must re-register.
+  -- No Auth foreign key or guessed session backfill. Delivery rechecks Auth.
+  auth_session_id uuid,
+  token text not null unique,
   platform text not null,
+  app_build text,
   created_at timestamptz not null default now(),
   last_seen_at timestamptz not null default now(),
-  unique(user_id, token)
+  updated_at timestamptz not null default now(),
+  disabled_at timestamptz
 );
 create index if not exists push_tokens_workspace_id_idx
   on push_tokens(workspace_id);
+
+create table if not exists app_private.push_delivery_outbox (
+  id uuid primary key default gen_random_uuid(),
+  notification_id uuid not null references notifications(id) on delete cascade,
+  push_token_id uuid not null references push_tokens(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  status text not null default 'pending',
+  attempt_count integer not null default 0,
+  next_attempt_at timestamptz not null default now(),
+  lease_token uuid,
+  lease_expires_at timestamptz,
+  provider_message_id text,
+  last_error_code text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  sent_at timestamptz,
+  unique(notification_id, push_token_id)
+);
+alter table app_private.push_delivery_outbox enable row level security;
+create index if not exists push_delivery_outbox_push_token_idx
+  on app_private.push_delivery_outbox(push_token_id);
+create index if not exists push_delivery_outbox_workspace_idx
+  on app_private.push_delivery_outbox(workspace_id);
 
 create table if not exists calendar_sync_accounts (
   id uuid primary key default gen_random_uuid(),
@@ -430,6 +592,7 @@ create table if not exists app_private.edge_rate_limit_events (
     scope in (
       'booking_source',
       'booking_phone',
+      'booking_availability',
       'places_autocomplete',
       'places_details',
       'waitlist_email'
@@ -527,6 +690,78 @@ revoke all on table app_private.waitlist_email_outbox
 grant select, insert, update on table app_private.waitlist_email_outbox
   to service_role;
 
+create table if not exists app_private.account_welcome_email_outbox (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  event text not null default 'account_email_verified'
+    check (event = 'account_email_verified'),
+  recipient_email text not null,
+  status text not null default 'pending'
+    check (status in ('pending', 'processing', 'sent', 'failed')),
+  attempt_count integer not null default 0 check (attempt_count between 0 and 8),
+  next_attempt_at timestamptz not null default clock_timestamp(),
+  lease_token uuid,
+  lease_expires_at timestamptz,
+  delivery_expires_at timestamptz not null default clock_timestamp() + interval '24 hours',
+  provider_message_id text,
+  last_error text,
+  created_at timestamptz not null default clock_timestamp(),
+  updated_at timestamptz not null default clock_timestamp(),
+  sent_at timestamptz,
+  unique (event, user_id)
+);
+alter table app_private.account_welcome_email_outbox enable row level security;
+revoke all on table app_private.account_welcome_email_outbox
+  from public, anon, authenticated;
+grant select, insert, update on table app_private.account_welcome_email_outbox
+  to service_role;
+
+create table if not exists app_private.account_deletion_email_outbox (
+  id uuid primary key default gen_random_uuid(),
+  request_id uuid not null references public.account_deletion_requests(id)
+    on delete cascade,
+  event text not null
+    check (event in ('deletion_requested', 'account_deleted')),
+  recipient_email text not null,
+  status text not null default 'pending'
+    check (status in ('pending', 'processing', 'sent', 'failed')),
+  attempt_count integer not null default 0 check (attempt_count between 0 and 8),
+  next_attempt_at timestamptz not null default clock_timestamp(),
+  lease_token uuid,
+  lease_expires_at timestamptz,
+  delivery_expires_at timestamptz not null default clock_timestamp() + interval '24 hours',
+  provider_message_id text,
+  last_error text,
+  created_at timestamptz not null default clock_timestamp(),
+  updated_at timestamptz not null default clock_timestamp(),
+  sent_at timestamptz,
+  unique (event, request_id)
+);
+alter table app_private.account_deletion_email_outbox enable row level security;
+revoke all on table app_private.account_deletion_email_outbox
+  from public, anon, authenticated;
+grant select, insert, update on table app_private.account_deletion_email_outbox
+  to service_role;
+
+create table if not exists app_private.operational_alerts (
+  id uuid primary key default gen_random_uuid(),
+  alert_key text not null unique,
+  category text not null,
+  severity text not null check (severity in ('warning', 'critical')),
+  message text not null check (char_length(message) between 1 and 500),
+  status text not null default 'open'
+    check (status in ('open', 'resolved')),
+  first_seen_at timestamptz not null default clock_timestamp(),
+  last_seen_at timestamptz not null default clock_timestamp(),
+  last_notified_at timestamptz,
+  resolved_at timestamptz
+);
+alter table app_private.operational_alerts enable row level security;
+revoke all on table app_private.operational_alerts
+  from public, anon, authenticated;
+grant select, insert, update on table app_private.operational_alerts
+  to service_role;
+
 create table if not exists app_private.payment_counters (
   workspace_id uuid primary key references public.workspaces(id) on delete cascade,
   next_number bigint not null default 1 check (next_number > 0)
@@ -567,6 +802,16 @@ create index if not exists workflow_idempotency_created_at_idx
 -- token idempotency, and inserts the request/counters atomically. The
 -- allow_booking_request_notification trigger suppresses its notification when
 -- all_notifications or booking_request preferences are disabled.
+-- public.create_public_booking_request_v3(..., uuid[]) adds a bounded list of
+-- catalog add-on IDs and snapshots trusted service/add-on values. Legacy v2
+-- overloads remain available to older clients.
+-- public.get_public_booking_slot_suggestions_v2(text, uuid, text, uuid[])
+-- validates the same active add-on IDs and uses their server-summed duration;
+-- it returns capped UTC starts without appointment or occupancy metadata.
+-- public.get_public_booking_slot_suggestions_v3(
+--   text, uuid, text, uuid[], date
+-- ) keeps the default response compatible and can restrict suggestions to one
+-- customer-selected workspace-local date.
 --
 -- Authenticated transactional workflows:
 -- public.create_task_workflow(jsonb) returns jsonb
@@ -585,3 +830,22 @@ create unique index if not exists invoices_workspace_invoice_number_unique_idx
 
 -- A private before-insert trigger assigns PAY-### numbers when invoice_number
 -- is omitted. Flutter should not generate payment numbers by counting rows.
+
+-- 2026-09-05 email journey contract (authoritative rollout: dated migrations).
+-- New workspaces: [1440,60]. Existing workspaces stay [] until configured.
+-- User-owned tips: record_account_email_choice/get_account_email_preference;
+-- touch_workloop_email_activity updates authenticated activity only.
+-- Recipient mappings, reminder leases and marketing queues stay in app_private.
+-- Worker RPCs are service-only; elevated Auth reads use private definer helpers.
+alter table if exists workspace_settings
+  add column if not exists customer_reminder_minutes integer[] not null default '{}';
+alter table if exists workspace_settings
+  alter column customer_reminder_minutes set default array[1440,60];
+
+-- 2026-09-05 customer lifecycle emails (migration 20260905161843):
+-- app_private.customer_event_emails + customer_email_suppression are service-only.
+-- public.queue_payment_request_email(uuid,boolean,text) is authenticated,
+-- membership/MFA checked, recipient-bound and deduplicated per Stripe transaction.
+-- claim/customer_event_still_allowed/finish/suppress RPCs are service-only invokers.
+-- public.account_email_context(uuid,integer) is a service-only wrapper over a
+-- private Auth-aware definer; missing setup records and weekly aggregates are computed.

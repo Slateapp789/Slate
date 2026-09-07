@@ -62,6 +62,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
       _birthday != null;
 
   Future<void> _handleBack() async {
+    if (_saving) return;
     FocusManager.instance.primaryFocus?.unfocus();
     if (!_hasChanges) {
       await _leaveScreen();
@@ -90,7 +91,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
   Future<void> _leaveScreen() async {
     if (!_allowPop && mounted) setState(() => _allowPop = true);
     await WidgetsBinding.instance.endOfFrame;
-    if (mounted) Navigator.pop(context);
+    if (mounted) workloopGoBack(context, fallbackLocation: '/clients');
   }
 
   Future<void> _save() async {
@@ -187,7 +188,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
         if (!didPop) _handleBack();
       },
       child: Scaffold(
-        backgroundColor: AppColors.bg,
+        backgroundColor: Colors.transparent,
         body: Stack(
           children: [
             const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -197,7 +198,7 @@ class _AddClientScreenState extends ConsumerState<AddClientScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.pageX,
-                      AppSpacing.lg,
+                      AppSpacing.screenTop,
                       AppSpacing.pageX,
                       0,
                     ),

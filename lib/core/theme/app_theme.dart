@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show ColorSpace;
 
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
@@ -51,43 +52,43 @@ class _AdaptiveColor extends Color {
 }
 
 class AppColors {
-  // Workloop Studio replaces the retired lime/graphite identity with a warm
-  // porcelain and midnight system led by confident indigo and human teal.
-  static const bg = _AdaptiveColor(Color(0xFFF6F4EF), Color(0xFF111318));
-  static const bgCard = _AdaptiveColor(Color(0xFFFFFFFF), Color(0xFF1C2027));
-  static const bgRaised = _AdaptiveColor(Color(0xFFF0EEF8), Color(0xFF252A33));
+  // Quiet + Warm: paper, powder blue and readable brown ink. Legacy names
+  // remain aliases so existing screens keep their functional contracts.
+  static const bg = _AdaptiveColor(Color(0xFFF5EDD9), Color(0xFF24231F));
+  static const bgCard = _AdaptiveColor(Color(0xFFFBF7ED), Color(0xFF2F2D27));
+  static const bgRaised = _AdaptiveColor(Color(0xFFEFE5CF), Color(0xFF39372F));
   static const bgInteract = _AdaptiveColor(
-    Color(0xFFECEFF3),
-    Color(0xFF2E343F),
+    Color(0xFFE9DFCA),
+    Color(0xFF434037),
   );
-  static const border = _AdaptiveColor(Color(0xFFDDE2E8), Color(0xFF3A414D));
+  static const border = _AdaptiveColor(Color(0xFFB5A997), Color(0xFF746A58));
   static const borderStrong = _AdaptiveColor(
-    Color(0xFFC7CED8),
-    Color(0xFF545D6B),
+    Color(0xFF80715E),
+    Color(0xFFA59880),
   );
 
-  static const t1 = _AdaptiveColor(Color(0xFF172033), Color(0xFFF6F7FB));
-  static const t2 = _AdaptiveColor(Color(0xFF5F6B7A), Color(0xFFC5CAD3));
-  static const t3 = _AdaptiveColor(Color(0xFF7C8795), Color(0xFF9CA4B0));
-  static const t4 = _AdaptiveColor(Color(0xFF929BA7), Color(0xFF7E8794));
+  static const t1 = _AdaptiveColor(Color(0xFF443C32), Color(0xFFF5EDD9));
+  static const t2 = _AdaptiveColor(Color(0xFF665949), Color(0xFFD4C8B1));
+  static const t3 = _AdaptiveColor(Color(0xFF706658), Color(0xFFBDB19B));
+  static const t4 = _AdaptiveColor(Color(0xFF928674), Color(0xFF938875));
 
   static const brandAccent = _AdaptiveColor(
-    Color(0xFF4F46E5),
-    Color(0xFF9496E8),
+    Color(0xFF91B4C8),
+    Color(0xFF91B4C8),
   );
   static const onBrandAccent = _AdaptiveColor(
-    Color(0xFFFFFFFF),
-    Color(0xFF111427),
+    Color(0xFF443C32),
+    Color(0xFF26231E),
   );
-  static const accentInk = brandAccent;
+  static const accentInk = _AdaptiveColor(Color(0xFF286280), Color(0xFFB6D5E7));
   static const accentBorder = _AdaptiveColor(
-    Color(0xFF4038C9),
-    Color(0xFF7D80D4),
+    Color(0xFF88ADC2),
+    Color(0xFFA5C5D8),
   );
   static const slate = brandAccent;
   static const slateLight = brandAccent;
-  static const slateDim = _AdaptiveColor(Color(0xFFE9E8FF), Color(0xFF2A2D3E));
-  static const slateGlow = _AdaptiveColor(Color(0x334F46E5), Color(0x309496E8));
+  static const slateDim = _AdaptiveColor(Color(0xFFC3D7E4), Color(0xFF384D59));
+  static const slateGlow = _AdaptiveColor(Color(0x3391B4C8), Color(0x3091B4C8));
   static const accentPrimary = accentInk;
   static const accentPrimaryStrong = brandAccent;
   static const green = accentInk;
@@ -95,59 +96,59 @@ class AppColors {
   static const greenDim = slateDim;
   static const greenGlow = slateGlow;
 
-  static const violet = _AdaptiveColor(Color(0xFF7557D9), Color(0xFF9A96E3));
-  static const violetDim = _AdaptiveColor(Color(0xFFECE7FF), Color(0xFF302F45));
+  static const violet = _AdaptiveColor(Color(0xFF286280), Color(0xFFB6D5E7));
+  static const violetDim = _AdaptiveColor(Color(0xFFDFE8E8), Color(0xFF384D59));
   static const violetGlow = _AdaptiveColor(
-    Color(0x337557D9),
-    Color(0x309A96E3),
+    Color(0x33286280),
+    Color(0x30B6D5E7),
   );
 
   static const statusSuccess = _AdaptiveColor(
-    Color(0xFF19704E),
-    Color(0xFF65D9A5),
+    Color(0xFF356246),
+    Color(0xFFA8D0A2),
   );
   static const statusSuccessDim = _AdaptiveColor(
-    Color(0xFFDFF3E9),
-    Color(0xFF173A31),
+    Color(0xFFE5EAD6),
+    Color(0xFF344636),
   );
   static const success = statusSuccess;
   static const successDim = statusSuccessDim;
-  static const warning = _AdaptiveColor(Color(0xFF8B5A12), Color(0xFFF2BE62));
+  static const warning = _AdaptiveColor(Color(0xFF745322), Color(0xFFF0D18B));
   static const warningDim = _AdaptiveColor(
-    Color(0xFFFFF0D6),
-    Color(0xFF42331E),
+    Color(0xFFF0D18B),
+    Color(0xFF5E4D2F),
   );
-  static const error = _AdaptiveColor(Color(0xFFB23C4A), Color(0xFFFF8490));
-  static const errorDim = _AdaptiveColor(Color(0xFFF9E4E7), Color(0xFF44232B));
+  static const error = _AdaptiveColor(Color(0xFFA7442D), Color(0xFFEFA58D));
+  static const errorDim = _AdaptiveColor(Color(0xFFF3DAD0), Color(0xFF57392E));
 
-  static const modHome = brandAccent;
+  static const modHome = accentInk;
   static const modClients = _AdaptiveColor(
-    Color(0xFF168F83),
-    Color(0xFF5FD6C5),
+    Color(0xFF286280),
+    Color(0xFFB6D5E7),
   );
   static const modCalendar = violet;
   static const modFinance = _AdaptiveColor(
-    Color(0xFFB87516),
-    Color(0xFFF1B85B),
+    Color(0xFF745322),
+    Color(0xFFF0D18B),
   );
-  static const modTasks = _AdaptiveColor(Color(0xFFC65E55), Color(0xFFFF9188));
-  static const modNotes = _AdaptiveColor(Color(0xFF3185B8), Color(0xFF78C8F3));
+  static const modTasks = _AdaptiveColor(Color(0xFFA7442D), Color(0xFFEFA58D));
+  static const modNotes = _AdaptiveColor(Color(0xFF286280), Color(0xFFB6D5E7));
 
-  static const modBg = _AdaptiveColor(Color(0xFFF0EEF8), Color(0xFF252A33));
+  static const modBg = _AdaptiveColor(Color(0xFFEFE5CF), Color(0xFF39372F));
 
-  static const panelSoft = _AdaptiveColor(Color(0xFFE9E8FF), Color(0xFF2A2D3E));
+  static const panelSoft = _AdaptiveColor(Color(0xFFC3D7E4), Color(0xFF384D59));
   static const panelSoftRaised = _AdaptiveColor(
-    Color(0xFFDDF5F1),
-    Color(0xFF173A38),
+    Color(0xFFE5EAD6),
+    Color(0xFF344636),
   );
   static const panelInk = onBrandAccent;
   static const panelMuted = _AdaptiveColor(
-    Color(0xFF5F6B7A),
-    Color(0xFFC5CAD3),
+    Color(0xFF665949),
+    Color(0xFFD4C8B1),
   );
   static const panelFaint = _AdaptiveColor(
-    Color(0x334F46E5),
-    Color(0x309496E8),
+    Color(0x3391B4C8),
+    Color(0x3091B4C8),
   );
 }
 
@@ -185,21 +186,30 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
   final Color skeletonBase;
   final Color skeletonHighlight;
 
-  // Hero roles are explicit because Dark mode uses a deep, muted indigo field
-  // rather than expanding the brighter interactive accent across the screen.
+  // Compatibility hero roles now describe a flat paper panel, never a gradient.
   bool get _isDarkContract => background.computeLuminance() < 0.1;
-  Color get heroGradientStart =>
-      _isDarkContract ? const Color(0xFF333852) : accentStrong;
-  Color get heroGradientEnd =>
-      _isDarkContract ? const Color(0xFF414866) : primaryAction;
-  Color get onHeroPrimary =>
-      _isDarkContract ? const Color(0xFFF8F9FC) : onPrimaryAction;
-  Color get heroActionForeground => _isDarkContract ? onAccent : primaryAction;
-  Color get onHeroSecondary => onHeroPrimary.withValues(alpha: 0.92);
-  Color get onHeroMuted => onHeroPrimary.withValues(alpha: 0.82);
-  Color get heroBorder => onHeroPrimary.withValues(alpha: 0.20);
-  Color get heroSurface => onHeroPrimary.withValues(alpha: 0.08);
-  Color get heroControlSurface => onHeroPrimary.withValues(alpha: 0.10);
+  Color get paperBlue =>
+      _isDarkContract ? const Color(0xFF384D59) : const Color(0xFFC3D7E4);
+  Color get paperYellow =>
+      _isDarkContract ? const Color(0xFF5E4D2F) : const Color(0xFFF0D18B);
+  Color get onPaperStrip => textPrimary;
+  Color get illustrationAccent =>
+      _isDarkContract ? const Color(0xFFEFA58D) : const Color(0xFFD57958);
+  Color get headerField =>
+      _isDarkContract ? const Color(0xFF303B3E) : const Color(0xFFC3D7E4);
+  Color get frame => dividerStrong;
+  // Required neutral ink for third-party map attribution.
+  Color get providerAttributionInk =>
+      surface.computeLuminance() < .5 ? Colors.white : const Color(0xFF5E5E5E);
+  Color get heroGradientStart => surface;
+  Color get heroGradientEnd => surface;
+  Color get onHeroPrimary => textPrimary;
+  Color get heroActionForeground => onPrimaryAction;
+  Color get onHeroSecondary => textSecondary;
+  Color get onHeroMuted => textSecondary;
+  Color get heroBorder => frame;
+  Color get heroSurface => paperBlue;
+  Color get heroControlSurface => primaryAction;
 
   const WorkloopThemeTokens({
     required this.background,
@@ -236,71 +246,71 @@ class WorkloopThemeTokens extends ThemeExtension<WorkloopThemeTokens> {
   });
 
   static const light = WorkloopThemeTokens(
-    background: Color(0xFFF6F4EF),
-    surface: Color(0xFFFFFFFF),
-    surfaceRaised: Color(0xFFF0EEF8),
-    surfaceSubtle: Color(0xFFECEFF3),
-    divider: Color(0xFFDDE2E8),
-    dividerStrong: Color(0xFFC7CED8),
-    textPrimary: Color(0xFF172033),
-    textSecondary: Color(0xFF5F6B7A),
-    textTertiary: Color(0xFF7C8795),
-    textDisabled: Color(0xFF929BA7),
-    accent: Color(0xFF4F46E5),
-    accentStrong: Color(0xFF4038C9),
-    accentInk: Color(0xFF4F46E5),
-    accentBorder: Color(0xFF4038C9),
-    onAccent: Color(0xFFFFFFFF),
-    primaryAction: Color(0xFF4F46E5),
-    onPrimaryAction: Color(0xFFFFFFFF),
-    inkSurface: Color(0xFF4F46E5),
-    onInk: Color(0xFFFFFFFF),
-    onInkMuted: Color(0xFFE9E8FF),
-    success: Color(0xFF19704E),
-    successContainer: Color(0xFFDFF3E9),
-    warning: Color(0xFF8B5A12),
-    warningContainer: Color(0xFFFFF0D6),
-    error: Color(0xFFB23C4A),
-    errorContainer: Color(0xFFF9E4E7),
-    info: Color(0xFF246F9E),
-    infoContainer: Color(0xFFE1F1FA),
+    background: Color(0xFFF5EDD9),
+    surface: Color(0xFFFBF7ED),
+    surfaceRaised: Color(0xFFEFE5CF),
+    surfaceSubtle: Color(0xFFE9DFCA),
+    divider: Color(0xFFB5A997),
+    dividerStrong: Color(0xFF80715E),
+    textPrimary: Color(0xFF443C32),
+    textSecondary: Color(0xFF665949),
+    textTertiary: Color(0xFF706658),
+    textDisabled: Color(0xFF928674),
+    accent: Color(0xFF91B4C8),
+    accentStrong: Color(0xFF88ADC2),
+    accentInk: Color(0xFF286280),
+    accentBorder: Color(0xFF88ADC2),
+    onAccent: Color(0xFF443C32),
+    primaryAction: Color(0xFF91B4C8),
+    onPrimaryAction: Color(0xFF443C32),
+    inkSurface: Color(0xFFC3D7E4),
+    onInk: Color(0xFF443C32),
+    onInkMuted: Color(0xFF665949),
+    success: Color(0xFF356246),
+    successContainer: Color(0xFFE5EAD6),
+    warning: Color(0xFF745322),
+    warningContainer: Color(0xFFF0D18B),
+    error: Color(0xFFA7442D),
+    errorContainer: Color(0xFFF3DAD0),
+    info: Color(0xFF286280),
+    infoContainer: Color(0xFFDCE8EB),
     scrim: Color(0x52000000),
-    skeletonBase: Color(0xFFE2E5EA),
-    skeletonHighlight: Color(0xFFF7F8FA),
+    skeletonBase: Color(0xFFDFD5C1),
+    skeletonHighlight: Color(0xFFFBF7ED),
   );
 
   static const dark = WorkloopThemeTokens(
-    background: Color(0xFF111318),
-    surface: Color(0xFF1C2027),
-    surfaceRaised: Color(0xFF252A33),
-    surfaceSubtle: Color(0xFF2E343F),
-    divider: Color(0xFF3A414D),
-    dividerStrong: Color(0xFF545D6B),
-    textPrimary: Color(0xFFF6F7FB),
-    textSecondary: Color(0xFFC5CAD3),
-    textTertiary: Color(0xFF9CA4B0),
-    textDisabled: Color(0xFF7E8794),
-    accent: Color(0xFF9496E8),
-    accentStrong: Color(0xFF7D80D4),
-    accentInk: Color(0xFFA4A6F2),
-    accentBorder: Color(0xFF7D80D4),
-    onAccent: Color(0xFF111427),
-    primaryAction: Color(0xFF9496E8),
-    onPrimaryAction: Color(0xFF111427),
-    inkSurface: Color(0xFF2A2D3E),
-    onInk: Color(0xFFF6F7FB),
-    onInkMuted: Color(0xFFC5CAD3),
-    success: Color(0xFF65D9A5),
-    successContainer: Color(0xFF173A31),
-    warning: Color(0xFFF2BE62),
-    warningContainer: Color(0xFF42331E),
-    error: Color(0xFFFF8490),
-    errorContainer: Color(0xFF44232B),
-    info: Color(0xFF78C8F3),
-    infoContainer: Color(0xFF183548),
+    background: Color(0xFF24231F),
+    surface: Color(0xFF2F2D27),
+    surfaceRaised: Color(0xFF39372F),
+    surfaceSubtle: Color(0xFF434037),
+    divider: Color(0xFF746A58),
+    dividerStrong: Color(0xFFA59880),
+    textPrimary: Color(0xFFF5EDD9),
+    textSecondary: Color(0xFFD4C8B1),
+    textTertiary: Color(0xFFBDB19B),
+    textDisabled: Color(0xFF938875),
+    accent: Color(0xFF91B4C8),
+    accentStrong: Color(0xFFA5C5D8),
+    accentInk: Color(0xFFB6D5E7),
+    accentBorder: Color(0xFFA5C5D8),
+    onAccent: Color(0xFF26231E),
+    primaryAction: Color(0xFF91B4C8),
+    onPrimaryAction: Color(0xFF26231E),
+    inkSurface: Color(0xFF384D59),
+    onInk: Color(0xFFF5EDD9),
+    onInkMuted: Color(0xFFD4C8B1),
+    success: Color(0xFFA8D0A2),
+    successContainer: Color(0xFF344636),
+    warning: Color(0xFFF0D18B),
+    warningContainer: Color(0xFF5E4D2F),
+    error: Color(0xFFEFA58D),
+    errorContainer: Color(0xFF57392E),
+    info: Color(0xFFB6D5E7),
+    infoContainer: Color(0xFF384D59),
     scrim: Color(0xA6000000),
-    skeletonBase: Color(0xFF2E343F),
-    skeletonHighlight: Color(0xFF414955),
+    skeletonBase: Color(0xFF434037),
+    skeletonHighlight: Color(0xFF514C41),
   );
 
   @override
@@ -427,45 +437,58 @@ class AppSpacing {
   static const double section = 24;
 
   /// Canonical content inset below the platform safe area.
-  static const double screenTop = 12;
+  static const double screenTop = 8;
   static const double minTouch = 44;
 
-  /// Shared floating-navigation geometry. Shell screens calculate their final
+  /// Shared full-width navigation geometry. Shell screens calculate their final
   /// content inset from these values and the real device safe area.
-  static const double bottomNavHeight = 66;
-  static const double bottomNavOffset = 10;
+  static const double bottomNavHeight = 52;
+  static const double bottomNavOffset = 0;
   static const double bottomNavBreathingRoom = 18;
 
+  static double bottomNavHeightFor(BuildContext context) =>
+      bottomNavHeight +
+      (MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.3).scale(11) -
+                  11)
+              .clamp(0.0, 33.0) *
+          2.3;
+
   static double shellBottomClearance(BuildContext context) {
-    return bottomNavHeight +
-        bottomNavOffset +
-        MediaQuery.paddingOf(context).bottom +
+    // An extending Scaffold injects the whole bar into padding.bottom and
+    // removes its occupied viewPadding. Outside it, viewPadding is the physical
+    // inset. Take the greater occupied area rather than counting the bar twice.
+    return math.max(
+          bottomNavHeightFor(context) +
+              bottomNavOffset +
+              MediaQuery.viewPaddingOf(context).bottom,
+          MediaQuery.paddingOf(context).bottom,
+        ) +
         bottomNavBreathingRoom;
   }
 }
 
 class AppRadius {
-  static const double xs = 8;
-  static const double sm = 10;
-  static const double md = 14;
-  static const double lg = 18;
-  static const double xl = 24;
-  static const double sheet = 28;
+  static const double xs = 4;
+  static const double sm = 6;
+  static const double md = 8;
+  static const double lg = 10;
+  static const double xl = 10;
+  static const double sheet = 12;
 
-  /// Reserved for status, compact filters and progress markers.
+  /// Reserved for circular progress and avatar geometry, never navigation.
   static const double capsule = 999;
 }
 
 class AppMotion {
-  static const fast = Duration(milliseconds: 140);
-  static const standard = Duration(milliseconds: 200);
-  static const deliberate = Duration(milliseconds: 280);
+  static const fast = Duration(milliseconds: 160);
+  static const standard = Duration(milliseconds: 240);
+  static const deliberate = Duration(milliseconds: 360);
   static const celebration = Duration(milliseconds: 440);
   static const navigation = Duration(milliseconds: 220);
   static const double navigationOffset = 0.04;
   static const double destinationOffset = 14;
   static const curve = Curves.easeOutCubic;
-  static const emphasized = Curves.easeOutBack;
+  static const emphasized = Curves.easeOutCubic;
   static const double pressedScale = 0.98;
 
   static Duration responsive(BuildContext context, Duration duration) {
@@ -476,28 +499,13 @@ class AppMotion {
 }
 
 class AppShadows {
-  static List<BoxShadow> get soft => [
-    BoxShadow(
-      color: const Color(0xFF172033).withValues(alpha: 0.07),
-      blurRadius: 24,
-      offset: const Offset(0, 12),
-    ),
-  ];
-
-  static List<BoxShadow> get glass => [
-    BoxShadow(
-      color: const Color(0xFF172033).withValues(alpha: 0.14),
-      blurRadius: 32,
-      offset: const Offset(0, 16),
-    ),
-  ];
-
-  static List<BoxShadow> get dock => [
-    BoxShadow(
-      color: const Color(0xFF172033).withValues(alpha: 0.16),
-      blurRadius: 30,
-      offset: const Offset(0, 12),
-    ),
+  // Paper panels and navigation have no ambient elevation. Tactile offset
+  // shadows are reserved for explicit primary controls.
+  static List<BoxShadow> get soft => const [];
+  static List<BoxShadow> get glass => const [];
+  static List<BoxShadow> get dock => const [];
+  static List<BoxShadow> tactile(Color ink) => [
+    BoxShadow(color: ink.withValues(alpha: 0.6), offset: const Offset(1, 2)),
   ];
 }
 
@@ -514,8 +522,8 @@ class AppTheme {
   }) {
     final colorScheme = brightness == Brightness.dark
         ? ColorScheme.dark(
-            primary: tokens.accent,
-            onPrimary: tokens.onAccent,
+            primary: tokens.accentInk,
+            onPrimary: tokens.surface,
             secondary: tokens.accent,
             onSecondary: tokens.onAccent,
             surface: tokens.surface,
@@ -523,8 +531,8 @@ class AppTheme {
             error: tokens.error,
           )
         : ColorScheme.light(
-            primary: tokens.accent,
-            onPrimary: tokens.onAccent,
+            primary: tokens.accentInk,
+            onPrimary: tokens.surface,
             secondary: tokens.accentInk,
             onSecondary: tokens.surface,
             surface: tokens.surface,
@@ -536,6 +544,8 @@ class AppTheme {
       fontFamily: 'Manrope',
       brightness: brightness,
       extensions: [tokens],
+      // Pages must cover outgoing routes, including keyboard/native transitions.
+      // Local paper backdrops add the shared header tint on this opaque base.
       scaffoldBackgroundColor: tokens.background,
       canvasColor: tokens.background,
       cardColor: tokens.surface,
@@ -644,19 +654,19 @@ class AppTheme {
         suffixIconColor: tokens.textSecondary,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: tokens.divider),
+          borderSide: BorderSide(color: tokens.frame),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: tokens.divider),
+          borderSide: BorderSide(color: tokens.frame),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: tokens.accent, width: 2),
+          borderSide: BorderSide(color: tokens.accentInk, width: 2),
         ),
         disabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: tokens.divider),
+          borderSide: BorderSide(color: tokens.frame),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
@@ -668,9 +678,9 @@ class AppTheme {
           backgroundColor: tokens.primaryAction,
           foregroundColor: tokens.onPrimaryAction,
           minimumSize: const Size(44, 52),
-          elevation: 1,
+          elevation: 0,
           shadowColor: tokens.accent.withValues(alpha: 0.2),
-          side: BorderSide(color: tokens.primaryAction, width: 1),
+          side: BorderSide(color: tokens.frame, width: 1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
@@ -686,7 +696,7 @@ class AppTheme {
           backgroundColor: tokens.primaryAction,
           foregroundColor: tokens.onPrimaryAction,
           minimumSize: const Size(44, 52),
-          side: BorderSide(color: tokens.primaryAction, width: 1),
+          side: BorderSide(color: tokens.frame, width: 1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
@@ -735,7 +745,7 @@ class AppTheme {
         highlightElevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          side: BorderSide(color: tokens.primaryAction, width: 1),
+          side: BorderSide(color: tokens.frame, width: 1),
         ),
       ),
       checkboxTheme: CheckboxThemeData(
@@ -763,11 +773,12 @@ class AppTheme {
         circularTrackColor: tokens.surfaceSubtle,
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: tokens.surfaceRaised,
-        modalBackgroundColor: tokens.surfaceRaised,
+        backgroundColor: tokens.surface,
+        modalBackgroundColor: tokens.surface,
         surfaceTintColor: Colors.transparent,
         showDragHandle: true,
         dragHandleColor: tokens.dividerStrong,
+        dragHandleSize: const Size(36, 4),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(AppRadius.sheet),
@@ -848,19 +859,18 @@ class _SlatePageTransitionsBuilder extends PageTransitionsBuilder {
         begin: Offset.zero,
         end: const Offset(-0.015, 0),
       ).animate(outgoing),
-      child: FadeTransition(
-        opacity: Tween<double>(begin: 1, end: 0.96).animate(outgoing),
-        child: FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(AppMotion.navigationOffset, 0),
-              end: Offset.zero,
-            ).animate(curved),
-            child: child,
-          ),
-        ),
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(AppMotion.navigationOffset, 0),
+          end: Offset.zero,
+        ).animate(curved),
+        child: child,
       ),
     );
   }
+}
+
+/// Consistent visible frame weight, including rounded corners and title strips.
+abstract final class AppStroke {
+  static const double frame = 1.5;
 }

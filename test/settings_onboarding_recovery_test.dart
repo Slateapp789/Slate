@@ -25,6 +25,16 @@ SupabaseClient _testClient() {
   );
 }
 
+class _SignedInAuthRepository extends AuthRepository {
+  _SignedInAuthRepository() : super(_testClient());
+  @override
+  String? get currentUserId => 'owner-a';
+  @override
+  String get currentEmail => 'owner@example.com';
+  @override
+  Future<void> signOutLocal({String? expectedUserId}) async {}
+}
+
 class _RetryingPrivacyRepository extends PrivacyRepository {
   _RetryingPrivacyRepository({this.failFirstRequest = false})
     : super(_testClient());
@@ -69,15 +79,13 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          authRepositoryProvider.overrideWithValue(
-            AuthRepository(_testClient()),
-          ),
+          authRepositoryProvider.overrideWithValue(_SignedInAuthRepository()),
           workspaceIdProvider.overrideWith((ref) async => workspaceId),
           privacyRepositoryProvider.overrideWithValue(repository),
         ],
         child: MaterialApp(
           theme: AppTheme.dark,
-          home: const Scaffold(body: SettingsAccountTab()),
+          home: const Scaffold(body: SettingsAccountTab(showDataOnly: true)),
         ),
       ),
     );
@@ -140,7 +148,9 @@ void main() {
 
     expect(repository.requestedWorkspaceIds, ['workspace-1']);
     expect(
-      find.text('The deletion request could not be created.'),
+      find.text(
+        'Your deletion request could not be confirmed. Please try again or contact support.',
+      ),
       findsOneWidget,
     );
     expect(find.text('Request account deletion'), findsOneWidget);

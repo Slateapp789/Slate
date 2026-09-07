@@ -27,7 +27,7 @@ class _BusinessFeedScreenState extends ConsumerState<BusinessFeedScreen> {
     final feed = ref.watch(businessFeedProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),

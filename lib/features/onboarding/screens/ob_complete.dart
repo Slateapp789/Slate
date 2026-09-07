@@ -8,9 +8,12 @@ import '../../../shared/providers/workspace_provider.dart';
 import '../../../shared/repositories/slate_repositories.dart';
 import '../../../shared/utils/currency_format.dart';
 import '../../../shared/utils/public_booking_url.dart';
+import '../../getting_started/getting_started_store.dart';
 
 class ObComplete extends ConsumerStatefulWidget {
-  const ObComplete({super.key});
+  final VoidCallback? onReviewSetup;
+
+  const ObComplete({super.key, this.onReviewSetup});
 
   @override
   ConsumerState<ObComplete> createState() => _ObCompleteState();
@@ -23,6 +26,8 @@ class _ObCompleteState extends ConsumerState<ObComplete>
   late Animation<double> _slideUp;
   bool _saving = false;
   bool _saved = false;
+  String? _savedWorkspaceId;
+  bool _reminderPreferencesFailed = false;
   bool _animationStarted = false;
   String? _saveError;
 
@@ -79,15 +84,27 @@ class _ObCompleteState extends ConsumerState<ObComplete>
             revenueTarget: onboarding.revenueTarget,
             firstBooking: onboarding.firstBooking,
           );
+      if (!mounted) return;
       if (workspaceId == null) {
         throw StateError('Workspace was not created');
       }
-      await ref
-          .read(notificationsRepositoryProvider)
-          .upsertPreferences(workspaceId, onboarding.notificationPreferences);
-      ref.invalidate(workspaceProvider);
+      // The workspace and any first booking have already committed. An
+      // optional reminder preference failure must never invite another create.
+      var reminderPreferencesFailed = false;
+      try {
+        await ref
+            .read(notificationsRepositoryProvider)
+            .upsertPreferences(workspaceId, onboarding.notificationPreferences)
+            .timeout(const Duration(seconds: 8));
+      } catch (_) {
+        reminderPreferencesFailed = true;
+      }
       if (!mounted) return;
-      setState(() => _saved = true);
+      setState(() {
+        _saved = true;
+        _savedWorkspaceId = workspaceId;
+        _reminderPreferencesFailed = reminderPreferencesFailed;
+      });
     } catch (e, stack) {
       if (kDebugMode) {
         debugPrint('Error saving workspace: $e');
@@ -105,10 +122,20 @@ class _ObCompleteState extends ConsumerState<ObComplete>
   }
 
   Future<void> _goToDashboard() async {
-    if (!_saved) return;
+    if (!_saved || _savedWorkspaceId == null || _saving) return;
+    setState(() => _saving = true);
     final importAfterSetup = ref.read(onboardingProvider).importAfterSetup;
+    final userId = ref.read(supabaseClientProvider).auth.currentUser?.id;
+    if (userId != null) {
+      await ref.read(gettingStartedStoreProvider).prepareIntroduction((
+        userId: userId,
+        workspaceId: _savedWorkspaceId!,
+      ));
+    }
+    if (!mounted) return;
     await ref.read(onboardingProvider.notifier).clearDraft();
     if (!mounted) return;
+    ref.invalidate(workspaceProvider);
     context.go(importAfterSetup ? '/import-data' : '/');
   }
 
@@ -147,18 +174,20 @@ class _ObCompleteState extends ConsumerState<ObComplete>
                       _saveError == null
                           ? Icons.celebration_rounded
                           : Icons.error_outline_rounded,
-                      size: 64,
+                      size: 48,
                       color: _saveError == null
                           ? AppColors.green
                           : AppColors.error,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                     Text(
-                      _saveError == null
+                      _saveError != null
+                          ? 'Setup needs\none more try.'
+                          : _saved
                           ? 'Your workspace\nis ready.'
-                          : 'Setup needs\none more try.',
+                          : 'Preparing your\nworkspace…',
                       style: TextStyle(
-                        fontSize: 32,
+                        fontSize: 28,
                         fontWeight: FontWeight.w600,
                         color: _saveError == null
                             ? AppColors.t1
@@ -207,6 +236,20 @@ class _ObCompleteState extends ConsumerState<ObComplete>
                         ),
                       ),
                     ],
+                    if (_reminderPreferencesFailed) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Semantics(
+                        liveRegion: true,
+                        child: const Text(
+                          'Your workspace is saved. Reminder preferences could not be saved; you can choose them in Settings.',
+                          style: TextStyle(
+                            color: AppColors.t2,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
                     const Spacer(),
                     SizedBox(
                       width: double.infinity,
@@ -243,6 +286,11 @@ class _ObCompleteState extends ConsumerState<ObComplete>
                               ),
                       ),
                     ),
+                    if (_saveError != null && widget.onReviewSetup != null)
+                      TextButton(
+                        onPressed: _saving ? null : widget.onReviewSetup,
+                        child: const Text('Review setup'),
+                      ),
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -268,7 +316,7 @@ class _SummaryRow extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(

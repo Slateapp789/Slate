@@ -26,10 +26,10 @@ void main() {
   test('Workloop ships coordinated light and dark theme contracts', () {
     expect(AppTheme.light.brightness, Brightness.light);
     expect(AppTheme.dark.brightness, Brightness.dark);
-    expect(WorkloopThemeTokens.light.background.toARGB32(), 0xFFF6F4EF);
-    expect(WorkloopThemeTokens.dark.background.toARGB32(), 0xFF111318);
-    expect(WorkloopThemeTokens.light.accent.toARGB32(), 0xFF4F46E5);
-    expect(WorkloopThemeTokens.dark.accent.toARGB32(), 0xFF9496E8);
+    expect(WorkloopThemeTokens.light.background.toARGB32(), 0xFFF5EDD9);
+    expect(WorkloopThemeTokens.dark.background.toARGB32(), 0xFF24231F);
+    expect(WorkloopThemeTokens.light.accent.toARGB32(), 0xFF91B4C8);
+    expect(WorkloopThemeTokens.dark.accent.toARGB32(), 0xFF91B4C8);
   });
 
   test('native startup windows allow the operating-system appearance', () {
@@ -49,10 +49,10 @@ void main() {
 
     expect(androidStyles, contains('Theme.Light.NoTitleBar'));
     expect(androidNightStyles, contains('Theme.Black.NoTitleBar'));
-    expect(androidColors, contains('#F6F4EF'));
-    expect(androidColors, contains('#6362EB'));
-    expect(androidNightColors, contains('#111318'));
-    expect(androidNightColors, contains('#6362EB'));
+    expect(androidColors, contains('#F5EDD9'));
+    expect(androidColors, contains('#C3D7E4'));
+    expect(androidNightColors, contains('#24231F'));
+    expect(androidNightColors, contains('#C3D7E4'));
     expect(
       File(
         'android/app/src/main/res/drawable/launch_background.xml',
@@ -123,66 +123,69 @@ void main() {
     expect(store.value, WorkloopAppearance.light.name);
   });
 
-  testWidgets('Settings icon surfaces change appearance in the first frame', (
-    tester,
-  ) async {
-    final client = SupabaseClient(
-      'https://example.supabase.co',
-      'test-anon-key',
-      authOptions: const AuthClientOptions(autoRefreshToken: false),
-    );
-    final store = _MemoryThemeModeStore();
-    var themeMode = ThemeMode.light;
-    late StateSetter setThemeMode;
+  testWidgets(
+    'Settings avatar and row ink change appearance in the first frame',
+    (tester) async {
+      final client = SupabaseClient(
+        'https://example.supabase.co',
+        'test-anon-key',
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+      final store = _MemoryThemeModeStore();
+      var themeMode = ThemeMode.light;
+      late StateSetter setThemeMode;
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authRepositoryProvider.overrideWithValue(AuthRepository(client)),
-          themeModeStoreProvider.overrideWithValue(store),
-        ],
-        child: StatefulBuilder(
-          builder: (context, setState) {
-            setThemeMode = setState;
-            return MaterialApp(
-              theme: AppTheme.light,
-              darkTheme: AppTheme.dark,
-              themeMode: themeMode,
-              themeAnimationDuration: Duration.zero,
-              home: const SettingsScreen(),
-            );
-          },
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authRepositoryProvider.overrideWithValue(AuthRepository(client)),
+            themeModeStoreProvider.overrideWithValue(store),
+          ],
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              setThemeMode = setState;
+              return MaterialApp(
+                theme: AppTheme.light,
+                darkTheme: AppTheme.dark,
+                themeMode: themeMode,
+                themeAnimationDuration: Duration.zero,
+                home: const SettingsScreen(),
+              );
+            },
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    Color iconSurface(String key) {
-      final container = tester.widget<Container>(find.byKey(ValueKey(key)));
-      return (container.decoration! as BoxDecoration).color!;
-    }
+      Color iconSurface(String key) {
+        final container = tester.widget<Container>(find.byKey(ValueKey(key)));
+        return (container.decoration! as BoxDecoration).color!;
+      }
 
-    final appearanceIconKey =
-        'settings-row-icon-${LucideIcons.sunMoon.codePoint}';
-    expect(
-      iconSurface(appearanceIconKey),
-      WorkloopThemeTokens.light.surfaceRaised,
-    );
-    expect(
-      iconSurface('settings-account-avatar'),
-      WorkloopThemeTokens.light.surfaceRaised,
-    );
+      final appearanceIconKey =
+          'settings-row-icon-${LucideIcons.sunMoon.codePoint}';
+      Color rowIconInk() => tester
+          .widget<Icon>(
+            find.descendant(
+              of: find.byKey(ValueKey(appearanceIconKey)),
+              matching: find.byIcon(LucideIcons.sunMoon),
+            ),
+          )
+          .color!;
+      expect(rowIconInk(), WorkloopThemeTokens.light.accentInk);
+      expect(
+        iconSurface('settings-account-avatar'),
+        WorkloopThemeTokens.light.surfaceRaised,
+      );
 
-    setThemeMode(() => themeMode = ThemeMode.dark);
-    await tester.pump();
+      setThemeMode(() => themeMode = ThemeMode.dark);
+      await tester.pump();
 
-    expect(
-      iconSurface(appearanceIconKey),
-      WorkloopThemeTokens.dark.surfaceRaised,
-    );
-    expect(
-      iconSurface('settings-account-avatar'),
-      WorkloopThemeTokens.dark.surfaceRaised,
-    );
-  });
+      expect(rowIconInk(), WorkloopThemeTokens.dark.accentInk);
+      expect(
+        iconSurface('settings-account-avatar'),
+        WorkloopThemeTokens.dark.surfaceRaised,
+      );
+    },
+  );
 }

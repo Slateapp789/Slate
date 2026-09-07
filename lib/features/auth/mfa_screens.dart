@@ -285,12 +285,10 @@ class _MfaSetupScreenState extends ConsumerState<MfaSetupScreen> {
   }
 
   Future<void> _removeFactor(Factor factor) async {
-    final confirmed = await showModalBottomSheet<bool>(
+    final confirmed = await showWorkloopBottomSheet<bool>(
       context: context,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: SlateTheme.of(context).scrim,
       builder: (sheetContext) => SlateSheetFrame(
+        scrollable: true,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

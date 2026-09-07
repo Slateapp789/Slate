@@ -9,8 +9,11 @@ import 'package:workloop/shared/models/slate_models.dart';
 import 'package:workloop/shared/repositories/payments_repository.dart';
 
 void main() {
-  test('beta payment collection is build-gated off by default', () {
-    expect(WorkloopCapabilities.paymentCollectionEnabled, isFalse);
+  test('payment collection follows the requested build gate', () {
+    expect(
+      WorkloopCapabilities.paymentCollectionEnabled,
+      const bool.fromEnvironment('PAYMENT_COLLECTION_ENABLED'),
+    );
 
     final financeSource = File(
       'lib/features/finance/finance_screen.dart',

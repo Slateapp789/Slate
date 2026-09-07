@@ -41,12 +41,23 @@ class OnboardingRepository {
       throw StateError('Workspace was not created');
     }
 
-    // Profile metadata is outside the workspace transaction. Perform it after
-    // the idempotent RPC so a transient auth failure can safely be retried
-    // without creating another workspace.
-    await _client.auth.updateUser(
-      UserAttributes(data: {'first_name': firstName.trim()}),
-    );
+    void requireOriginalAccount() {
+      if (_client.auth.currentUser?.id != user.id) {
+        throw const AuthException('Your account changed. Open Workloop again.');
+      }
+    }
+
+    requireOriginalAccount();
+    // The workspace transaction has committed. Optional profile metadata must
+    // not report a failed setup or keep the completion screen waiting forever.
+    try {
+      await _client.auth
+          .updateUser(UserAttributes(data: {'first_name': firstName.trim()}))
+          .timeout(const Duration(seconds: 8));
+    } catch (_) {
+      // The owner can update their name in Settings; their business is saved.
+    }
+    requireOriginalAccount();
 
     return workspaceId.toString();
   }

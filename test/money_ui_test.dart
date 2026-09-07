@@ -16,7 +16,7 @@ void main() {
             body: WorkloopNavigationControl<MoneySection>(
               selected: selected,
               segments: const [
-                WorkloopSegment(value: MoneySection.made, label: 'Made'),
+                WorkloopSegment(value: MoneySection.made, label: 'Overview'),
                 WorkloopSegment(value: MoneySection.spent, label: 'Spent'),
                 WorkloopSegment(value: MoneySection.owed, label: 'Owed'),
               ],
@@ -27,7 +27,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Made'), findsOneWidget);
+    expect(find.text('Overview'), findsOneWidget);
     expect(find.text('Spent'), findsOneWidget);
     expect(find.text('Owed'), findsOneWidget);
 

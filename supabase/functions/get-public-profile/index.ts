@@ -64,6 +64,19 @@ Deno.serve(async (req: Request) => {
   if (profileError) return response(500, { error: "Could not load profile" });
   if (!profile) return response(404, { error: "Profile not found" });
 
+  // This endpoint uses the service role, so RLS cannot protect an orphaned
+  // workspace by itself. A profile remains public only while the workspace has
+  // at least one member who can own and maintain what it publishes.
+  const { data: member, error: memberError } = await supabase
+    .from("workspace_members")
+    .select("id")
+    .eq("workspace_id", profile.workspace_id)
+    .limit(1)
+    .maybeSingle();
+
+  if (memberError) return response(500, { error: "Could not load profile" });
+  if (!member) return response(404, { error: "Profile not found" });
+
   const { data: workspace, error: workspaceError } = await supabase
     .from("workspaces")
     .select("name, industry")
@@ -76,7 +89,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: settings, error: settingsError } = await supabase
     .from("workspace_settings")
-    .select("working_hours")
+    .select("working_hours, timezone")
     .eq("workspace_id", profile.workspace_id)
     .maybeSingle();
 
@@ -86,10 +99,16 @@ Deno.serve(async (req: Request) => {
 
   const { data: services, error: servicesError } = await supabase
     .from("services")
-    .select("id, name, duration_mins, price, description, show_on_profile")
+    .select(
+      "id, name, duration_mins, price, description, show_on_profile, service_add_ons(id, name, description, duration_mins, price, position)",
+    )
     .eq("workspace_id", profile.workspace_id)
     .eq("show_on_profile", true)
     .eq("active", true)
+    .gte("duration_mins", 5)
+    .lte("duration_mins", 1440)
+    .eq("service_add_ons.active", true)
+    .order("position", { foreignTable: "service_add_ons", ascending: true })
     .order("name", { ascending: true });
 
   if (servicesError) {
@@ -102,6 +121,7 @@ Deno.serve(async (req: Request) => {
     businessName: workspace?.name ?? "Business",
     industry: workspace?.industry ?? null,
     workingHours: settings?.working_hours ?? {},
+    timezone: settings?.timezone ?? "Europe/London",
     services: services ?? [],
   });
 });

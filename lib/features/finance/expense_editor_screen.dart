@@ -83,6 +83,7 @@ class _ExpenseEditorScreenState extends ConsumerState<ExpenseEditorScreen> {
   bool get _hasChanges => _currentDraft != _savedDraft;
 
   Future<void> _handleBack() async {
+    if (_saving) return;
     FocusManager.instance.primaryFocus?.unfocus();
     if (!_hasChanges) {
       await _leaveScreen();
@@ -209,7 +210,7 @@ class _ExpenseEditorScreenState extends ConsumerState<ExpenseEditorScreen> {
         if (!didPop) _handleBack();
       },
       child: Scaffold(
-        backgroundColor: AppColors.bg,
+        backgroundColor: Colors.transparent,
         body: Stack(
           children: [
             const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -219,7 +220,7 @@ class _ExpenseEditorScreenState extends ConsumerState<ExpenseEditorScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.pageX,
-                      AppSpacing.lg,
+                      AppSpacing.screenTop,
                       AppSpacing.pageX,
                       0,
                     ),

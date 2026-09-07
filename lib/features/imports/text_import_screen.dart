@@ -310,6 +310,7 @@ class _TextImportScreenState extends ConsumerState<TextImportScreen> {
                 children: [
                   for (var index = 0; index < _files.length; index++)
                     WorkloopListRow(
+                      flat: true,
                       onTap: _importing
                           ? null
                           : () => setState(() {

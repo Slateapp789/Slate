@@ -15,7 +15,9 @@ const workspacePrivacyExportTables = <String>{
   'business_profiles',
   'contacts',
   'services',
+  'service_add_ons',
   'appointments',
+  'appointment_items',
   'invoices',
   'invoice_line_items',
   'expenses',
@@ -23,6 +25,7 @@ const workspacePrivacyExportTables = <String>{
   'task_checklist_items',
   'notes',
   'booking_requests',
+  'booking_request_items',
   'notification_preferences',
   'notifications',
   'push_tokens',
@@ -89,7 +92,13 @@ class PrivacyRepository {
       ),
       'contacts': await _list('contacts', workspaceId, warnings),
       'services': await _list('services', workspaceId, warnings),
+      'service_add_ons': await _list('service_add_ons', workspaceId, warnings),
       'appointments': await _list('appointments', workspaceId, warnings),
+      'appointment_items': await _list(
+        'appointment_items',
+        workspaceId,
+        warnings,
+      ),
       'payments': await _list('invoices', workspaceId, warnings),
       'payment_line_items': await _list(
         'invoice_line_items',
@@ -106,6 +115,11 @@ class PrivacyRepository {
       'notes': await _list('notes', workspaceId, warnings),
       'booking_requests': await _list(
         'booking_requests',
+        workspaceId,
+        warnings,
+      ),
+      'booking_request_items': await _list(
+        'booking_request_items',
         workspaceId,
         warnings,
       ),

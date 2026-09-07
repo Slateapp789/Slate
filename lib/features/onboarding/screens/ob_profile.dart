@@ -10,6 +10,7 @@ const List<String> industries = [
   'Health & Fitness',
   'Massage & Therapy',
   'Cleaning & Home Services',
+  'Mobile Valeting & Detailing',
   'Mobile Trades',
   'Tutoring & Coaching',
   'Photography',
@@ -28,6 +29,7 @@ class ObProfile extends ConsumerStatefulWidget {
 class _ObProfileState extends ConsumerState<ObProfile> {
   final _firstNameController = TextEditingController();
   final _businessNameController = TextEditingController();
+  final _occupationController = TextEditingController();
   String? _selectedIndustry;
 
   @override
@@ -36,30 +38,51 @@ class _ObProfileState extends ConsumerState<ObProfile> {
     final draft = ref.read(onboardingProvider);
     _firstNameController.text = draft.firstName;
     _businessNameController.text = draft.businessName;
-    _selectedIndustry = draft.industry.isEmpty ? null : draft.industry;
+    _selectedIndustry = draft.industry.isEmpty
+        ? null
+        : industries.contains(draft.industry)
+        ? draft.industry
+        : 'Other';
+    if (_selectedIndustry == 'Other' && draft.industry != 'Other') {
+      _occupationController.text = draft.industry;
+    }
   }
 
   @override
   void dispose() {
     _firstNameController.dispose();
     _businessNameController.dispose();
+    _occupationController.dispose();
     super.dispose();
   }
 
   bool get _canContinue =>
       _firstNameController.text.trim().isNotEmpty &&
       _businessNameController.text.trim().isNotEmpty &&
-      _selectedIndustry != null;
+      _selectedIndustry != null &&
+      (_selectedIndustry != 'Other' ||
+          _occupationController.text.trim().isNotEmpty);
+
+  void _saveDraft() {
+    final notifier = ref.read(onboardingProvider.notifier);
+    notifier.setName(
+      _firstNameController.text.trim(),
+      _businessNameController.text.trim(),
+    );
+    notifier.setIndustry(
+      _selectedIndustry == 'Other'
+          ? _occupationController.text.trim().isEmpty
+                ? 'Other'
+                : _occupationController.text.trim()
+          : _selectedIndustry ?? '',
+    );
+    setState(() {});
+  }
 
   void _continue() {
     if (!_canContinue) return;
-    ref
-        .read(onboardingProvider.notifier)
-        .setName(
-          _firstNameController.text.trim(),
-          _businessNameController.text.trim(),
-        );
-    ref.read(onboardingProvider.notifier).setIndustry(_selectedIndustry!);
+    _saveDraft();
+    FocusScope.of(context).unfocus();
     widget.onNext();
   }
 
@@ -72,7 +95,7 @@ class _ObProfileState extends ConsumerState<ObProfile> {
         children: [
           const SizedBox(height: 24),
           Text(
-            'Tell us about\nyourself.',
+            'Make Workloop\nyour own.',
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w600,
@@ -83,7 +106,7 @@ class _ObProfileState extends ConsumerState<ObProfile> {
           ),
           const SizedBox(height: 8),
           Text(
-            'This is how you\'ll appear to clients.',
+            'Start with your name and the work you do. You can refine your business details later.',
             style: TextStyle(fontSize: 15, color: AppColors.t3),
           ),
           const SizedBox(height: 32),
@@ -92,32 +115,52 @@ class _ObProfileState extends ConsumerState<ObProfile> {
           _field(
             controller: _firstNameController,
             hint: 'Alex',
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) => _saveDraft(),
           ),
           const SizedBox(height: 20),
           _label('Business name'),
           const SizedBox(height: 8),
           _field(
             controller: _businessNameController,
-            hint: 'Alex\'s Barbershop',
-            onChanged: (_) => setState(() {}),
+            hint: 'Your trading name, or your own name',
+            onChanged: (_) => _saveDraft(),
           ),
           const SizedBox(height: 20),
           _label('What do you do?'),
           const SizedBox(height: 8),
           WorkloopPickerField<String>(
             value: _selectedIndustry,
-            title: 'Choose your industry',
-            hint: 'Select your industry',
-            searchHint: 'Search industries',
+            title: 'Choose your occupation',
+            hint: 'Select the closest match',
+            searchHint: 'Search occupations',
             options: industries
                 .map(
                   (industry) =>
                       WorkloopPickerOption(value: industry, label: industry),
                 )
                 .toList(),
-            onChanged: (value) => setState(() => _selectedIndustry = value),
+            onChanged: (value) {
+              _selectedIndustry = value;
+              _saveDraft();
+            },
           ),
+          if (_selectedIndustry == 'Other') ...[
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              key: const ValueKey('custom-occupation'),
+              controller: _occupationController,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.done,
+              maxLength: 80,
+              onChanged: (_) => _saveDraft(),
+              onSubmitted: (_) => _continue(),
+              decoration: const InputDecoration(
+                labelText: 'Your occupation',
+                hintText: 'For example, dog groomer or gardener',
+                helperText: 'Use the words your customers know.',
+              ),
+            ),
+          ],
           const SizedBox(height: 40),
           SizedBox(
             width: double.infinity,
@@ -156,6 +199,8 @@ class _ObProfileState extends ConsumerState<ObProfile> {
     return TextField(
       controller: controller,
       onChanged: onChanged,
+      textCapitalization: TextCapitalization.words,
+      textInputAction: TextInputAction.next,
       style: TextStyle(color: AppColors.t1, fontSize: 15),
       decoration: InputDecoration(
         hintText: hint,
@@ -163,15 +208,15 @@ class _ObProfileState extends ConsumerState<ObProfile> {
         filled: true,
         fillColor: AppColors.bgCard,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide(color: AppColors.green, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(

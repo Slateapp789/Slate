@@ -518,6 +518,7 @@ class _CalendarImportScreenState extends ConsumerState<CalendarImportScreen> {
                     final start = event.start!.toLocal();
                     final failure = _eventFailures[id];
                     return WorkloopListRow(
+                      flat: true,
                       onTap: _importing
                           ? null
                           : () => setState(() {

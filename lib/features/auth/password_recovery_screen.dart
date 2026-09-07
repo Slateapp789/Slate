@@ -74,7 +74,7 @@ class _PasswordRecoveryScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),

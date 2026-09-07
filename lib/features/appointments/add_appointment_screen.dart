@@ -12,10 +12,13 @@ import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/currency_format.dart';
+import '../../shared/utils/duration_format.dart';
 import '../../shared/utils/workflow_idempotency.dart';
 import '../../shared/utils/working_hours.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../../shared/widgets/additional_services_picker.dart';
 import '../clients/widgets/client_form.dart';
+import 'booking_schedule_warning_sheet.dart';
 
 part 'add_appointment_logic.dart';
 part 'add_appointment_widgets.dart';
@@ -40,7 +43,14 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
 
   String? _selectedClientId;
   String? _selectedServiceId;
+  List<String> _selectedServiceIds = [];
+  int _serviceSelectionRevision = 0;
   String? _selectedServiceName;
+  List<ServiceAddOn> _availableServiceAddOns = const [];
+  final Set<String> _selectedAddOnIds = {};
+  bool _loadingServiceAddOns = false;
+  double _selectedServiceBasePrice = 0;
+  int _selectedServiceBaseDuration = 60;
   bool _creatingClient = false;
   bool _customService = false;
   DateTime _selectedDate = DateTime.now();
@@ -128,7 +138,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         child: child!,
       ),
     );
-    if (picked != null) setState(() => _selectedDate = picked);
+    if (picked != null && mounted) setState(() => _selectedDate = picked);
   }
 
   Future<void> _pickTime() async {
@@ -137,7 +147,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       initialHour: _selectedHour,
       initialMinute: _selectedMinute,
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     setState(() {
       _selectedHour = picked.hour;
       _selectedMinute = picked.minute;
@@ -156,6 +166,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         _newClientEmailController.text.trim().isNotEmpty ||
         _newClientAddressController.text.trim().isNotEmpty ||
         _selectedServiceId != null ||
+        _selectedAddOnIds.isNotEmpty ||
         _customService ||
         _customServiceController.text.trim().isNotEmpty ||
         _priceController.text.trim().isNotEmpty ||
@@ -173,6 +184,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   }
 
   Future<void> _handleBack() async {
+    if (_saving) return;
     FocusManager.instance.primaryFocus?.unfocus();
     if (!_hasDraftChanges) {
       await _leaveScreen();
@@ -201,26 +213,25 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   Future<void> _leaveScreen() async {
     if (!_allowPop && mounted) setState(() => _allowPop = true);
     await WidgetsBinding.instance.endOfFrame;
-    if (mounted) Navigator.pop(context);
+    if (mounted) workloopGoBack(context, fallbackLocation: '/work');
   }
 
   Future<void> _save() async {
-    if (!_canSave) return;
+    if (!_canSave || _saving) return;
     setState(() => _saving = true);
     try {
       final workspaceId = await ref.read(workspaceIdProvider.future);
+      if (!mounted) return;
       if (workspaceId == null) {
-        if (mounted) {
-          setState(() => _saving = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Your workspace is unavailable. Reload Workloop and try again.',
-              ),
-              backgroundColor: AppColors.error,
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Your workspace is unavailable. Reload Workloop and try again.',
             ),
-          );
-        }
+            backgroundColor: AppColors.error,
+          ),
+        );
         return;
       }
 
@@ -247,6 +258,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
           ? serviceName!
           : 'Booking';
       final settings = await ref.read(workspaceSettingsProvider.future);
+      if (!mounted) return;
       final workingHours = settings?['working_hours'] is Map
           ? Map<String, dynamic>.from(settings!['working_hours'] as Map)
           : <String, dynamic>{};
@@ -258,36 +270,20 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       );
 
       final repository = ref.read(appointmentsRepositoryProvider);
-      try {
-        await repository.ensureScheduleAvailable(
-          workspaceId: workspaceId,
-          startTime: startTime,
-          endTime: endTime,
-          workingHours: workingHours,
-          recurrenceRule: recurrenceRule,
-          repeatOccurrences: repeatOccurrences,
-        );
-      } on AppointmentScheduleException catch (error) {
-        if (error.issue != AppointmentScheduleIssue.workingHours) rethrow;
-        if (!mounted) return;
-        final proceed = await showWorkloopOutsideHoursConfirmation(
-          context,
-          detail: error.message,
-          repeating: repeatOccurrences > 1,
-        );
-        if (!proceed) {
-          if (mounted) setState(() => _saving = false);
-          return;
-        }
-        await repository.ensureScheduleAvailable(
-          workspaceId: workspaceId,
-          startTime: startTime,
-          endTime: endTime,
-          workingHours: workingHours,
-          recurrenceRule: recurrenceRule,
-          repeatOccurrences: repeatOccurrences,
-          enforceWorkingHours: false,
-        );
+      final scheduleReview = await repository.reviewSchedule(
+        workspaceId: workspaceId,
+        startTime: startTime,
+        endTime: endTime,
+        workingHours: workingHours,
+        workingHoursTimezone: settings?['timezone'] as String?,
+        recurrenceRule: recurrenceRule,
+        repeatOccurrences: repeatOccurrences,
+      );
+      if (!mounted) return;
+      final proceed = await showBookingScheduleWarning(context, scheduleReview);
+      if (!proceed) {
+        if (mounted) setState(() => _saving = false);
+        return;
       }
 
       final taskTitles = _taskControllers
@@ -309,6 +305,8 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
             ? _newClientAddressController.text
             : null,
         serviceId: _customService ? null : _selectedServiceId,
+        addOnIds: _selectedAddOnIds.toList(growable: false),
+        serviceIds: _selectedServiceIds,
         title: serviceName,
         startTime: startTime,
         endTime: endTime,
@@ -327,8 +325,10 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         notificationBody: repeatOccurrences > 1
             ? 'Created $repeatOccurrences bookings for $serviceLabel.'
             : '$serviceLabel booked for ${_formatAppointmentDate(_selectedDate)}.',
+        allowOverlap: scheduleReview.conflictCount > 0,
       );
 
+      if (!mounted) return;
       ref.invalidate(appointmentsProvider);
       ref.invalidate(invoicesProvider);
       ref.invalidate(financeSummaryProvider);
@@ -337,17 +337,16 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
       ref.invalidate(clientsProvider);
       ref.invalidate(notificationsProvider);
       ref.invalidate(unreadNotificationsProvider);
-      if (mounted) await _leaveScreen();
+      await _leaveScreen();
     } catch (_) {
+      if (!mounted) return;
       setState(() => _saving = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('The booking could not be saved. Please try again.'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('The booking could not be saved. Please try again.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 
@@ -362,10 +361,13 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
     final duration = int.tryParse(_durationController.text.trim());
     return hasClient &&
         hasService &&
+        !_loadingServiceAddOns &&
         price != null &&
         price >= 0 &&
         duration != null &&
-        duration > 0;
+        duration > 0 &&
+        (_selectedServiceIds.length < 2 ||
+            (duration <= 1440 && price <= 1000000));
   }
 
   int get _selectedDurationValue =>
@@ -382,6 +384,121 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
   void _showCustomDuration() {
     setState(() {
       _customDuration = true;
+    });
+  }
+
+  Future<void> _selectService(
+    String? value,
+    List<Map<String, dynamic>> services,
+  ) async {
+    if (value == _customServiceId) {
+      _serviceSelectionRevision++;
+      setState(() {
+        _selectedServiceId = value;
+        _selectedServiceIds = [];
+        _customService = true;
+        _selectedServiceName = null;
+        _availableServiceAddOns = const [];
+        _selectedAddOnIds.clear();
+        _loadingServiceAddOns = false;
+        _selectedServiceBasePrice = 0;
+        _selectedServiceBaseDuration = 60;
+        _priceController.clear();
+        _durationController.text = '60';
+        _selectedDuration = 60;
+        _customDuration = false;
+      });
+      return;
+    }
+    await _updateSelectedServices(value == null ? [] : [value], services);
+  }
+
+  Future<void> _updateSelectedServices(
+    List<String> ids,
+    List<Map<String, dynamic>> services,
+  ) async {
+    final revision = ++_serviceSelectionRevision;
+    final selected = ids
+        .map((id) => services.firstWhere((service) => service['id'] == id))
+        .toList();
+    final price = selected.fold<double>(
+      0,
+      (total, service) => total + (service['price'] as num).toDouble(),
+    );
+    final duration = selected.fold<int>(
+      0,
+      (total, service) => total + (service['duration_mins'] as num).toInt(),
+    );
+    setState(() {
+      _selectedServiceIds = List.of(ids);
+      _selectedServiceId = ids.firstOrNull;
+      _customService = false;
+      _selectedServiceName = selected
+          .map((service) => service['name'])
+          .join(' + ');
+      _selectedServiceBasePrice = price;
+      _selectedServiceBaseDuration = duration;
+      _availableServiceAddOns = const [];
+      _selectedAddOnIds.clear();
+      _loadingServiceAddOns = ids.isNotEmpty;
+      _selectedDuration = duration;
+      _customDuration = ![30, 45, 60, 90, 120].contains(duration);
+      _priceController.text = currencyInputValue(price);
+      _durationController.text = '$duration';
+    });
+    if (ids.isEmpty) return;
+    try {
+      final workspaceId = await ref.read(workspaceIdProvider.future);
+      if (workspaceId == null) throw StateError('Workspace unavailable');
+      final groups = await Future.wait(
+        ids.map(
+          (id) => ref
+              .read(servicesRepositoryProvider)
+              .listAddOns(
+                workspaceId: workspaceId,
+                serviceId: id,
+                includeInactive: false,
+              ),
+        ),
+      );
+      if (!mounted || revision != _serviceSelectionRevision) return;
+      setState(() {
+        _availableServiceAddOns = groups.expand((group) => group).toList();
+        _loadingServiceAddOns = false;
+      });
+    } catch (_) {
+      if (!mounted || revision != _serviceSelectionRevision) return;
+      setState(() {
+        _availableServiceAddOns = const [];
+        _loadingServiceAddOns = false;
+      });
+    }
+  }
+
+  void _setAddOnSelected(String id, bool selected) {
+    setState(() {
+      if (selected) {
+        if (_selectedAddOnIds.length >= 8) return;
+        _selectedAddOnIds.add(id);
+      } else {
+        _selectedAddOnIds.remove(id);
+      }
+      final composition = appointmentComposition(
+        baseDurationMins: _selectedServiceBaseDuration,
+        basePrice: _selectedServiceBasePrice,
+        addOns: _availableServiceAddOns,
+        selectedAddOnIds: _selectedAddOnIds,
+      );
+      _selectedDuration = composition.durationMins;
+      _customDuration = ![
+        30,
+        45,
+        60,
+        90,
+        120,
+      ].contains(composition.durationMins);
+      _durationController.text = '${composition.durationMins}';
+      _priceController.text = currencyInputValue(composition.price);
     });
   }
 
@@ -496,7 +613,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
         if (!didPop) _handleBack();
       },
       child: Scaffold(
-        backgroundColor: AppColors.bg,
+        backgroundColor: Colors.transparent,
         body: Stack(
           children: [
             const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -506,7 +623,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.pageX,
-                      AppSpacing.lg,
+                      AppSpacing.screenTop,
                       AppSpacing.pageX,
                       0,
                     ),
@@ -659,14 +776,13 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                   title: 'Choose a service',
                                   hint: 'Select service',
                                   searchHint: 'Search services',
-                                  leadingIcon: LucideIcons.briefcase,
                                   options: [
                                     ...data.map(
                                       (service) => WorkloopPickerOption(
                                         value: service['id'] as String,
                                         label: service['name'] as String,
                                         subtitle:
-                                            '${formatPounds(service['price'] as num)} · ${service['duration_mins']} min',
+                                            '${formatPounds(service['price'] as num)} · ${formatFriendlyDuration((service['duration_mins'] as num?)?.toInt() ?? 60)}',
                                       ),
                                     ),
                                     const WorkloopPickerOption(
@@ -675,69 +791,59 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                       subtitle: 'Enter a one-off service',
                                     ),
                                   ],
-                                  onChanged: (v) {
-                                    if (v == _customServiceId) {
-                                      setState(() {
-                                        _selectedServiceId = v;
-                                        _customService = true;
-                                        _selectedServiceName = null;
-                                        _priceController.clear();
-                                        _durationController.text = '60';
-                                        _selectedDuration = 60;
-                                        _customDuration = false;
-                                      });
-                                      return;
-                                    }
-                                    final svc = data.firstWhere(
-                                      (s) => s['id'] == v,
-                                      orElse: () => {},
-                                    );
-                                    final price = (svc['price'] as num?)
-                                        ?.toDouble();
-                                    final duration =
-                                        svc['duration_mins'] as int? ?? 60;
-                                    setState(() {
-                                      _selectedServiceId = v;
-                                      _customService = false;
-                                      _selectedServiceName =
-                                          svc['name'] as String?;
-                                      _selectedDuration = duration;
-                                      _customDuration = ![
-                                        30,
-                                        45,
-                                        60,
-                                        90,
-                                        120,
-                                      ].contains(duration);
-                                      _priceController.text = price == null
-                                          ? ''
-                                          : currencyInputValue(price);
-                                      _durationController.text = '$duration';
-                                    });
-                                  },
+                                  onChanged: (value) =>
+                                      _selectService(value, data),
                                 ),
+                                if (!_customService &&
+                                    _selectedServiceIds.isNotEmpty) ...[
+                                  const SizedBox(height: 10),
+                                  AdditionalServicesPicker(
+                                    services: data
+                                        .map(Service.fromMap)
+                                        .toList(),
+                                    selectedIds: _selectedServiceIds,
+                                    onChanged: (ids) =>
+                                        _updateSelectedServices(ids, data),
+                                  ),
+                                ],
+                                if (_loadingServiceAddOns) ...[
+                                  const SizedBox(height: 10),
+                                  const _AppointmentSkeleton(height: 58),
+                                ] else if (_availableServiceAddOns
+                                    .isNotEmpty) ...[
+                                  const SizedBox(height: 10),
+                                  _AppointmentAddOnSelector(
+                                    addOns: _availableServiceAddOns,
+                                    selectedIds: _selectedAddOnIds,
+                                    onChanged: _setAddOnSelected,
+                                  ),
+                                ],
                                 if (_customService) ...[
                                   const SizedBox(height: 10),
                                   _AppointmentTextInput(
                                     controller: _customServiceController,
                                     label: 'Service name',
                                     hint: 'Service name',
-                                    icon: LucideIcons.briefcase,
                                     onChanged: (_) => setState(() {}),
                                   ),
                                 ],
                                 const SizedBox(height: 10),
-                                _AppointmentTextInput(
-                                  controller: _priceController,
-                                  label: 'Price',
-                                  hint: 'Price',
-                                  prefix: '£',
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                  onChanged: (_) => setState(() {}),
-                                ),
+                                if (_selectedServiceIds.length > 1)
+                                  Text(
+                                    'Combined price · ${formatPounds(double.tryParse(_priceController.text) ?? 0)}',
+                                  )
+                                else
+                                  _AppointmentTextInput(
+                                    controller: _priceController,
+                                    label: 'Price',
+                                    hint: 'Price',
+                                    prefix: '£',
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                    onChanged: (_) => setState(() {}),
+                                  ),
                                 const SizedBox(height: 12),
                                 _PaymentDueToggle(
                                   value: _createPaymentDue,
@@ -772,7 +878,9 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: AppColors.bgCard,
-                                    borderRadius: BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadius.md,
+                                    ),
                                     border: Border.all(color: AppColors.border),
                                   ),
                                   child: Row(
@@ -820,7 +928,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: AppColors.bgCard,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                               border: Border.all(color: AppColors.border),
                             ),
                             child: Column(
@@ -878,28 +986,36 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 14),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    ...[30, 45, 60, 90, 120].map((minutes) {
-                                      final selected =
-                                          !_customDuration &&
-                                          _selectedDurationValue == minutes;
-                                      return WorkloopFilterChip(
-                                        label: '${minutes}m',
-                                        selected: selected,
-                                        onTap: () => _setDuration(minutes),
-                                      );
-                                    }),
-                                    WorkloopFilterChip(
-                                      label: 'Custom',
-                                      selected: _customDuration,
-                                      onTap: _showCustomDuration,
-                                    ),
-                                  ],
-                                ),
-                                if (_customDuration) ...[
+                                if (_selectedServiceIds.length > 1)
+                                  Text(
+                                    _selectedDurationValue > 1440
+                                        ? 'Choose services totalling no more than 24 hours.'
+                                        : 'Combined duration · ${formatFriendlyDuration(_selectedDurationValue)}',
+                                  )
+                                else
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      ...[30, 45, 60, 90, 120].map((minutes) {
+                                        final selected =
+                                            !_customDuration &&
+                                            _selectedDurationValue == minutes;
+                                        return WorkloopFilterChip(
+                                          label: '${minutes}m',
+                                          selected: selected,
+                                          onTap: () => _setDuration(minutes),
+                                        );
+                                      }),
+                                      WorkloopFilterChip(
+                                        label: 'Custom',
+                                        selected: _customDuration,
+                                        onTap: _showCustomDuration,
+                                      ),
+                                    ],
+                                  ),
+                                if (_customDuration &&
+                                    _selectedServiceIds.length < 2) ...[
                                   const SizedBox(height: 10),
                                   _AppointmentTextInput(
                                     controller: _durationController,
@@ -970,7 +1086,9 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: AppColors.warningDim,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
                                 border: Border.all(
                                   color: AppColors.warning.withValues(
                                     alpha: 0.24,
@@ -1008,7 +1126,9 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: AppColors.errorDim,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
                                 border: Border.all(
                                   color: AppColors.error.withValues(
                                     alpha: 0.24,
@@ -1026,7 +1146,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      'This overlaps ${conflicts.length} existing booking${conflicts.length == 1 ? '' : 's'}. Move it to another time before saving.',
+                                      'This overlaps ${conflicts.length} existing booking${conflicts.length == 1 ? '' : 's'}. You can still save it if this is intentional.',
                                       style: const TextStyle(
                                         color: AppColors.t2,
                                         fontSize: 13,
@@ -1052,7 +1172,7 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: AppColors.bgCard,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                               border: Border.all(color: AppColors.border),
                             ),
                             child: Column(
@@ -1149,19 +1269,25 @@ class _AddAppointmentScreenState extends ConsumerState<AddAppointmentScreen> {
                               filled: true,
                               fillColor: AppColors.bgCard,
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
                                 borderSide: const BorderSide(
                                   color: AppColors.border,
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
                                 borderSide: const BorderSide(
                                   color: AppColors.border,
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
                                 borderSide: const BorderSide(
                                   color: AppColors.green,
                                   width: 1.5,

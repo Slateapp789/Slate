@@ -9,6 +9,7 @@ import '../../../shared/utils/public_profile_routes.dart';
 import '../../../shared/utils/working_hours.dart';
 import '../../../shared/widgets/slate_ui.dart';
 import '../providers/settings_providers.dart';
+import 'service_add_ons_editor.dart';
 import 'settings_helpers.dart';
 import 'settings_services_section.dart';
 
@@ -16,14 +17,22 @@ final _profileHandlePattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$');
 
 enum SettingsBusinessSection { business, workingHours, publicProfile, services }
 
+class SettingsBusinessController {
+  VoidCallback? _showAddService;
+
+  void showAddService() => _showAddService?.call();
+}
+
 class SettingsBusinessTab extends ConsumerStatefulWidget {
   final SettingsBusinessSection initialSection;
   final bool showOnlySelected;
+  final SettingsBusinessController? controller;
 
   const SettingsBusinessTab({
     super.key,
     this.initialSection = SettingsBusinessSection.business,
     this.showOnlySelected = false,
+    this.controller,
   });
 
   @override
@@ -51,6 +60,29 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   bool _saving = false;
   bool _profileHydrated = false;
   String _savedHandle = '';
+
+  int? _serviceDurationMinutes(
+    TextEditingController hoursController,
+    TextEditingController minutesController,
+  ) {
+    final hours = int.tryParse(
+      hoursController.text.trim().isEmpty ? '0' : hoursController.text.trim(),
+    );
+    final minutes = int.tryParse(
+      minutesController.text.trim().isEmpty
+          ? '0'
+          : minutesController.text.trim(),
+    );
+    if (hours == null ||
+        minutes == null ||
+        hours < 0 ||
+        minutes < 0 ||
+        minutes > 59) {
+      return null;
+    }
+    final total = (hours * 60) + minutes;
+    return total >= 5 && total <= 1440 ? total : null;
+  }
 
   Future<void> _scrollToSection() async {
     if (widget.showOnlySelected) return;
@@ -97,11 +129,24 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     _handleController = TextEditingController();
     _bioController = TextEditingController();
     _noticeController = TextEditingController();
+    widget.controller?._showAddService = _showAddServiceSheet;
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSection());
   }
 
   @override
+  void didUpdateWidget(covariant SettingsBusinessTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._showAddService = null;
+      widget.controller?._showAddService = _showAddServiceSheet;
+    }
+  }
+
+  @override
   void dispose() {
+    if (widget.controller?._showAddService == _showAddServiceSheet) {
+      widget.controller?._showAddService = null;
+    }
     _scrollController.dispose();
     _ownerNameController.dispose();
     _nameController.dispose();
@@ -284,239 +329,237 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                 .toList();
     }
 
-    showModalBottomSheet(
+    showWorkloopBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModal) => DraggableScrollableSheet(
           expand: false,
           initialChildSize: 0.82,
           minChildSize: 0.45,
           maxChildSize: 0.92,
-          builder: (ctx, scrollController) => ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.pageX,
-              AppSpacing.md,
-              AppSpacing.pageX,
-              AppSpacing.xl,
-            ),
-            children: [
-              settingsHandle(),
-              const SizedBox(height: 20),
-              const Text(
-                'Working Hours',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.t1,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'These hours appear on your public profile and will guide booking rules.',
-                style: TextStyle(color: AppColors.t3, fontSize: 13),
-              ),
-              const SizedBox(height: 18),
-              ...workingHourDays.map((day) {
-                final blocks = blockControllers[day]!;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgInteract,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.border),
+          builder: (ctx, scrollController) => SlateSheetFrame(
+            child: ListView(
+              controller: scrollController,
+              padding: EdgeInsets.zero,
+              children: [
+                const Text(
+                  'Working Hours',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.t1,
                   ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              day,
-                              style: const TextStyle(
-                                color: AppColors.t1,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'These hours appear on your public profile and will guide booking rules.',
+                  style: TextStyle(color: AppColors.t3, fontSize: 13),
+                ),
+                const SizedBox(height: 18),
+                ...workingHourDays.map((day) {
+                  final blocks = blockControllers[day]!;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgInteract,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                day,
+                                style: const TextStyle(
+                                  color: AppColors.t1,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Semantics(
+                              label: '$day working hours',
+                              value: enabled[day]! ? 'Working' : 'Off',
+                              child: Switch.adaptive(
+                                value: enabled[day]!,
+                                onChanged: (value) =>
+                                    setModal(() => enabled[day] = value),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (enabled[day]!) ...[
+                          const SizedBox(height: 8),
+                          ...blocks.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final block = entry.value;
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                bottom: index == blocks.length - 1 ? 0 : 8,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _timeField(
+                                      label: 'Start',
+                                      controller: block.startController,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _timeField(
+                                      label: 'End',
+                                      controller: block.endController,
+                                    ),
+                                  ),
+                                  if (blocks.length > 1) ...[
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      tooltip:
+                                          'Remove $day time block ${index + 1}',
+                                      constraints: const BoxConstraints(
+                                        minWidth: AppSpacing.minTouch,
+                                        minHeight: AppSpacing.minTouch,
+                                      ),
+                                      onPressed: () => setModal(
+                                        () => blocks.removeAt(index),
+                                      ),
+                                      icon: const Icon(
+                                        Icons.close_rounded,
+                                        color: AppColors.t3,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          }),
+                          const SizedBox(height: 10),
+                          TextButton.icon(
+                            onPressed: () => setModal(
+                              () => blocks.add(
+                                _HoursBlockControllers(
+                                  start: '16:00',
+                                  end: '21:00',
+                                ),
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.green,
+                              minimumSize: const Size(
+                                AppSpacing.minTouch,
+                                AppSpacing.minTouch,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                            ),
+                            icon: const Icon(Icons.add_rounded, size: 16),
+                            label: const Text(
+                              'Add another block',
+                              style: TextStyle(
+                                fontSize: 13,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
-                          Semantics(
-                            label: '$day working hours',
-                            value: enabled[day]! ? 'Working' : 'Off',
-                            child: Switch.adaptive(
-                              value: enabled[day]!,
-                              onChanged: (value) =>
-                                  setModal(() => enabled[day] = value),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (enabled[day]!) ...[
-                        const SizedBox(height: 8),
-                        ...blocks.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final block = entry.value;
-                          return Padding(
-                            padding: EdgeInsets.only(
-                              bottom: index == blocks.length - 1 ? 0 : 8,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _timeField(
-                                    label: 'Start',
-                                    controller: block.startController,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _timeField(
-                                    label: 'End',
-                                    controller: block.endController,
-                                  ),
-                                ),
-                                if (blocks.length > 1) ...[
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    tooltip:
-                                        'Remove $day time block ${index + 1}',
-                                    constraints: const BoxConstraints(
-                                      minWidth: AppSpacing.minTouch,
-                                      minHeight: AppSpacing.minTouch,
-                                    ),
-                                    onPressed: () =>
-                                        setModal(() => blocks.removeAt(index)),
-                                    icon: const Icon(
-                                      Icons.close_rounded,
-                                      color: AppColors.t3,
-                                      size: 18,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          );
-                        }),
-                        const SizedBox(height: 10),
-                        TextButton.icon(
-                          onPressed: () => setModal(
-                            () => blocks.add(
-                              _HoursBlockControllers(
-                                start: '16:00',
-                                end: '21:00',
+                          if (blocks.length > 1) ...[
+                            const SizedBox(height: 8),
+                            const Text(
+                              'The gap between blocks is treated as a break.',
+                              style: TextStyle(
+                                color: AppColors.t3,
+                                fontSize: 12,
                               ),
                             ),
-                          ),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.green,
-                            minimumSize: const Size(
-                              AppSpacing.minTouch,
-                              AppSpacing.minTouch,
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                          ),
-                          icon: const Icon(Icons.add_rounded, size: 16),
-                          label: const Text(
-                            'Add another block',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        if (blocks.length > 1) ...[
-                          const SizedBox(height: 8),
-                          const Text(
-                            'The gap between blocks is treated as a break.',
-                            style: TextStyle(color: AppColors.t3, fontSize: 12),
-                          ),
+                          ],
                         ],
                       ],
-                    ],
-                  ),
-                );
-              }),
-              const SizedBox(height: 10),
-              if (error != null) ...[
-                Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    error!,
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                    ),
+                  );
+                }),
+                const SizedBox(height: 10),
+                if (error != null) ...[
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      error!,
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              saveBtn(
-                label: 'Save Hours',
-                loading: saving,
-                onTap: () async {
-                  if (saving) return;
-                  setModal(() {
-                    saving = true;
-                    error = null;
-                  });
-                  try {
-                    final workspaceId = await ref.read(
-                      workspaceIdProvider.future,
-                    );
-                    if (workspaceId == null) {
-                      throw StateError('Workspace unavailable');
-                    }
-                    final nextHours = <String, dynamic>{};
-                    for (final day in workingHourDays) {
-                      final blocks = blockControllers[day]!
-                          .map(
-                            (block) => {
-                              'start': block.startController.text.trim(),
-                              'end': block.endController.text.trim(),
-                            },
-                          )
-                          .toList();
-                      nextHours[day] = {
-                        'enabled': enabled[day],
-                        'blocks': blocks,
-                        if (blocks.isNotEmpty) 'start': blocks.first['start'],
-                        if (blocks.isNotEmpty) 'end': blocks.last['end'],
-                      };
-                    }
-                    await ref.read(workspaceSettingsRepositoryProvider).update(
-                      workspaceId,
-                      {'working_hours': nextHours},
-                    );
-                    ref.invalidate(settingsWorkspaceSettingsProvider);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    if (mounted) {
-                      _snack('Working hours updated', AppColors.green);
-                    }
-                  } catch (_) {
-                    if (!ctx.mounted) {
-                      if (mounted) {
-                        _snack(
-                          'Working hours could not be saved.',
-                          AppColors.error,
-                        );
-                      }
-                      return;
-                    }
+                  const SizedBox(height: 12),
+                ],
+                saveBtn(
+                  label: 'Save Hours',
+                  loading: saving,
+                  onTap: () async {
+                    if (saving) return;
                     setModal(() {
-                      saving = false;
-                      error =
-                          'Couldn’t save working hours. Your previous hours are unchanged.';
+                      saving = true;
+                      error = null;
                     });
-                  }
-                },
-              ),
-            ],
+                    try {
+                      final workspaceId = await ref.read(
+                        workspaceIdProvider.future,
+                      );
+                      if (!mounted || !ctx.mounted) return;
+                      if (workspaceId == null) {
+                        throw StateError('Workspace unavailable');
+                      }
+                      final nextHours = <String, dynamic>{};
+                      for (final day in workingHourDays) {
+                        final blocks = blockControllers[day]!
+                            .map(
+                              (block) => {
+                                'start': block.startController.text.trim(),
+                                'end': block.endController.text.trim(),
+                              },
+                            )
+                            .toList();
+                        nextHours[day] = {
+                          'enabled': enabled[day],
+                          'blocks': blocks,
+                          if (blocks.isNotEmpty) 'start': blocks.first['start'],
+                          if (blocks.isNotEmpty) 'end': blocks.last['end'],
+                        };
+                      }
+                      await ref
+                          .read(workspaceSettingsRepositoryProvider)
+                          .update(workspaceId, {'working_hours': nextHours});
+                      if (!mounted) return;
+                      ref.invalidate(settingsWorkspaceSettingsProvider);
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (mounted) {
+                        _snack('Working hours updated', AppColors.green);
+                      }
+                    } catch (_) {
+                      if (!ctx.mounted) {
+                        if (mounted) {
+                          _snack(
+                            'Working hours could not be saved.',
+                            AppColors.error,
+                          );
+                        }
+                        return;
+                      }
+                      setModal(() {
+                        saving = false;
+                        error =
+                            'Couldn’t save working hours. Your previous hours are unchanged.';
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -555,161 +598,185 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
   void _showAddServiceSheet() {
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
-    final durCtrl = TextEditingController(text: '60');
+    final durationHoursCtrl = TextEditingController(text: '1');
+    final durationMinutesCtrl = TextEditingController(text: '0');
     final descCtrl = TextEditingController();
     bool showOnProfile = true;
     bool saving = false;
     String? error;
 
-    showModalBottomSheet(
+    showWorkloopBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModal) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            24,
-            20,
-            24,
-            MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              settingsHandle(),
-              const SizedBox(height: 20),
-              const Text(
-                'New Service',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.t1,
-                ),
-              ),
-              const SizedBox(height: 16),
-              settingsField(
-                label: 'SERVICE NAME',
-                controller: nameCtrl,
-                hint: 'e.g. 1-on-1 PT Session',
-                autofocus: true,
-              ),
-              const SizedBox(height: 12),
-              settingsField(
-                label: 'DESCRIPTION',
-                controller: descCtrl,
-                hint: 'Optional public description',
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              Row(
+        builder: (ctx, setModal) => AnimatedPadding(
+          duration: AppMotion.responsive(context, AppMotion.fast),
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+          child: SlateSheetFrame(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: settingsField(
-                      label: 'PRICE (£)',
-                      controller: priceCtrl,
-                      hint: '65',
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
+                  const Text(
+                    'New service or package',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.t1,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: settingsField(
-                      label: 'DURATION (MIN)',
-                      controller: durCtrl,
-                      hint: '60',
-                      keyboardType: TextInputType.number,
+                  const SizedBox(height: 4),
+                  const Text(
+                    'For a bundle, use one combined name, duration and total price. You can add optional extras after saving.',
+                    style: TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 12,
+                      height: 1.35,
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  settingsField(
+                    label: 'SERVICE NAME',
+                    controller: nameCtrl,
+                    hint: 'e.g. 1-on-1 PT Session',
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 12),
+                  settingsField(
+                    label: 'DESCRIPTION',
+                    controller: descCtrl,
+                    hint: 'Optional public description',
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 12),
+                  settingsField(
+                    label: 'PRICE (£)',
+                    controller: priceCtrl,
+                    hint: '65',
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: settingsField(
+                          label: 'DURATION HOURS',
+                          controller: durationHoursCtrl,
+                          hint: '1',
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: settingsField(
+                          label: 'MINUTES',
+                          controller: durationMinutesCtrl,
+                          hint: '30',
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: showOnProfile,
+                    title: const Text(
+                      'Show on public profile',
+                      style: TextStyle(
+                        color: AppColors.t1,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Clients can request this service from your link.',
+                      style: TextStyle(color: AppColors.t3, fontSize: 12),
+                    ),
+                    onChanged: (value) => setModal(() => showOnProfile = value),
+                  ),
+                  const SizedBox(height: 20),
+                  if (error != null) ...[
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        error!,
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  saveBtn(
+                    label: 'Add Service',
+                    loading: saving,
+                    onTap: () async {
+                      if (saving) return;
+                      if (nameCtrl.text.trim().isEmpty) {
+                        setModal(
+                          () => error = 'Add a service name to continue.',
+                        );
+                        return;
+                      }
+                      final durationMins = _serviceDurationMinutes(
+                        durationHoursCtrl,
+                        durationMinutesCtrl,
+                      );
+                      if (durationMins == null) {
+                        setModal(
+                          () => error =
+                              'Use a duration from 5 minutes to 24 hours.',
+                        );
+                        return;
+                      }
+                      setModal(() {
+                        saving = true;
+                        error = null;
+                      });
+                      try {
+                        final wsId = await ref.read(workspaceIdProvider.future);
+                        if (wsId == null) {
+                          throw StateError('Workspace unavailable');
+                        }
+                        await ref
+                            .read(servicesRepositoryProvider)
+                            .create(
+                              workspaceId: wsId,
+                              name: nameCtrl.text.trim(),
+                              price: double.tryParse(priceCtrl.text) ?? 0,
+                              durationMins: durationMins,
+                              description: descCtrl.text,
+                              showOnProfile: showOnProfile,
+                            );
+                        ref.invalidate(settingsServicesProvider);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) _snack('Service added', AppColors.green);
+                      } catch (_) {
+                        if (!ctx.mounted) {
+                          if (mounted) {
+                            _snack(
+                              'The service could not be added.',
+                              AppColors.error,
+                            );
+                          }
+                          return;
+                        }
+                        setModal(() {
+                          saving = false;
+                          error =
+                              'Couldn’t add this service. Nothing was saved. Please try again.';
+                        });
+                      }
+                    },
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: showOnProfile,
-                title: const Text(
-                  'Show on public profile',
-                  style: TextStyle(
-                    color: AppColors.t1,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: const Text(
-                  'Clients can request this service from your link.',
-                  style: TextStyle(color: AppColors.t3, fontSize: 12),
-                ),
-                onChanged: (value) => setModal(() => showOnProfile = value),
-              ),
-              const SizedBox(height: 20),
-              if (error != null) ...[
-                Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    error!,
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              saveBtn(
-                label: 'Add Service',
-                loading: saving,
-                onTap: () async {
-                  if (saving) return;
-                  if (nameCtrl.text.trim().isEmpty) {
-                    setModal(() => error = 'Add a service name to continue.');
-                    return;
-                  }
-                  setModal(() {
-                    saving = true;
-                    error = null;
-                  });
-                  try {
-                    final wsId = await ref.read(workspaceIdProvider.future);
-                    if (wsId == null) {
-                      throw StateError('Workspace unavailable');
-                    }
-                    await ref
-                        .read(servicesRepositoryProvider)
-                        .create(
-                          workspaceId: wsId,
-                          name: nameCtrl.text.trim(),
-                          price: double.tryParse(priceCtrl.text) ?? 0,
-                          durationMins: int.tryParse(durCtrl.text) ?? 60,
-                          description: descCtrl.text,
-                          showOnProfile: showOnProfile,
-                        );
-                    ref.invalidate(settingsServicesProvider);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    if (mounted) _snack('Service added', AppColors.green);
-                  } catch (_) {
-                    if (!ctx.mounted) {
-                      if (mounted) {
-                        _snack(
-                          'The service could not be added.',
-                          AppColors.error,
-                        );
-                      }
-                      return;
-                    }
-                    setModal(() {
-                      saving = false;
-                      error =
-                          'Couldn’t add this service. Nothing was saved. Please try again.';
-                    });
-                  }
-                },
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -721,8 +788,12 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     final priceCtrl = TextEditingController(
       text: currencyInputValue(svc['price'] as num?),
     );
-    final durCtrl = TextEditingController(
-      text: svc['duration_mins']?.toString() ?? '60',
+    final initialDuration = (svc['duration_mins'] as num? ?? 60).toInt();
+    final durationHoursCtrl = TextEditingController(
+      text: '${initialDuration ~/ 60}',
+    );
+    final durationMinutesCtrl = TextEditingController(
+      text: '${initialDuration.remainder(60)}',
     );
     final descCtrl = TextEditingController(
       text: svc['description'] as String? ?? '',
@@ -731,169 +802,187 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     bool saving = false;
     String? error;
 
-    showModalBottomSheet(
+    showWorkloopBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModal) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            24,
-            20,
-            24,
-            MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              settingsHandle(),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        builder: (ctx, setModal) => AnimatedPadding(
+          duration: AppMotion.responsive(context, AppMotion.fast),
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+          child: SlateSheetFrame(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Edit Service',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.t1,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Edit Service',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.t1,
+                        ),
+                      ),
+                      WorkloopTextButton(
+                        label: 'Delete',
+                        destructive: true,
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                final deleted = await _confirmDelete(svc);
+                                if (deleted && ctx.mounted) Navigator.pop(ctx);
+                              },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  settingsField(
+                    label: 'SERVICE NAME',
+                    controller: nameCtrl,
+                    hint: 'e.g. 1-on-1 PT Session',
+                  ),
+                  const SizedBox(height: 12),
+                  settingsField(
+                    label: 'DESCRIPTION',
+                    controller: descCtrl,
+                    hint: 'Optional public description',
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 12),
+                  settingsField(
+                    label: 'PRICE (£)',
+                    controller: priceCtrl,
+                    hint: '65',
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
                     ),
                   ),
-                  WorkloopTextButton(
-                    label: 'Delete',
-                    destructive: true,
-                    onPressed: saving
-                        ? null
-                        : () async {
-                            final deleted = await _confirmDelete(svc);
-                            if (deleted && ctx.mounted) Navigator.pop(ctx);
-                          },
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: settingsField(
+                          label: 'DURATION HOURS',
+                          controller: durationHoursCtrl,
+                          hint: '1',
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: settingsField(
+                          label: 'MINUTES',
+                          controller: durationMinutesCtrl,
+                          hint: '30',
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              settingsField(
-                label: 'SERVICE NAME',
-                controller: nameCtrl,
-                hint: 'e.g. 1-on-1 PT Session',
-              ),
-              const SizedBox(height: 12),
-              settingsField(
-                label: 'DESCRIPTION',
-                controller: descCtrl,
-                hint: 'Optional public description',
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: settingsField(
-                      label: 'PRICE (£)',
-                      controller: priceCtrl,
-                      hint: '65',
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: showOnProfile,
+                    title: const Text(
+                      'Show on public profile',
+                      style: TextStyle(
+                        color: AppColors.t1,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: settingsField(
-                      label: 'DURATION (MIN)',
-                      controller: durCtrl,
-                      hint: '60',
-                      keyboardType: TextInputType.number,
+                    subtitle: const Text(
+                      'Clients can request this service from your link.',
+                      style: TextStyle(color: AppColors.t3, fontSize: 12),
                     ),
+                    onChanged: (value) => setModal(() => showOnProfile = value),
+                  ),
+                  const Divider(height: 32, color: AppColors.border),
+                  ServiceAddOnsEditor(
+                    workspaceId: svc['workspace_id'] as String,
+                    serviceId: svc['id'] as String,
+                  ),
+                  const SizedBox(height: 20),
+                  if (error != null) ...[
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        error!,
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  saveBtn(
+                    label: 'Save Changes',
+                    loading: saving,
+                    onTap: () async {
+                      if (saving) return;
+                      if (nameCtrl.text.trim().isEmpty) {
+                        setModal(
+                          () => error = 'Add a service name to continue.',
+                        );
+                        return;
+                      }
+                      final durationMins = _serviceDurationMinutes(
+                        durationHoursCtrl,
+                        durationMinutesCtrl,
+                      );
+                      if (durationMins == null) {
+                        setModal(
+                          () => error =
+                              'Use a duration from 5 minutes to 24 hours.',
+                        );
+                        return;
+                      }
+                      setModal(() {
+                        saving = true;
+                        error = null;
+                      });
+                      try {
+                        await ref.read(servicesRepositoryProvider).update(
+                          svc['id'] as String,
+                          {
+                            'name': nameCtrl.text.trim(),
+                            'price':
+                                double.tryParse(priceCtrl.text) ?? svc['price'],
+                            'duration_mins': durationMins,
+                            'description': descCtrl.text.trim().isEmpty
+                                ? null
+                                : descCtrl.text.trim(),
+                            'show_on_profile': showOnProfile,
+                          },
+                        );
+                        ref.invalidate(settingsServicesProvider);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) _snack('Service updated', AppColors.green);
+                      } catch (_) {
+                        if (!ctx.mounted) {
+                          if (mounted) {
+                            _snack(
+                              'The service could not be updated.',
+                              AppColors.error,
+                            );
+                          }
+                          return;
+                        }
+                        setModal(() {
+                          saving = false;
+                          error =
+                              'Couldn’t save this service. Your previous details are unchanged.';
+                        });
+                      }
+                    },
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: showOnProfile,
-                title: const Text(
-                  'Show on public profile',
-                  style: TextStyle(
-                    color: AppColors.t1,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: const Text(
-                  'Clients can request this service from your link.',
-                  style: TextStyle(color: AppColors.t3, fontSize: 12),
-                ),
-                onChanged: (value) => setModal(() => showOnProfile = value),
-              ),
-              const SizedBox(height: 20),
-              if (error != null) ...[
-                Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    error!,
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              saveBtn(
-                label: 'Save Changes',
-                loading: saving,
-                onTap: () async {
-                  if (saving) return;
-                  if (nameCtrl.text.trim().isEmpty) {
-                    setModal(() => error = 'Add a service name to continue.');
-                    return;
-                  }
-                  setModal(() {
-                    saving = true;
-                    error = null;
-                  });
-                  try {
-                    await ref.read(servicesRepositoryProvider).update(
-                      svc['id'] as String,
-                      {
-                        'name': nameCtrl.text.trim(),
-                        'price':
-                            double.tryParse(priceCtrl.text) ?? svc['price'],
-                        'duration_mins':
-                            int.tryParse(durCtrl.text) ?? svc['duration_mins'],
-                        'description': descCtrl.text.trim().isEmpty
-                            ? null
-                            : descCtrl.text.trim(),
-                        'show_on_profile': showOnProfile,
-                      },
-                    );
-                    ref.invalidate(settingsServicesProvider);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    if (mounted) _snack('Service updated', AppColors.green);
-                  } catch (_) {
-                    if (!ctx.mounted) {
-                      if (mounted) {
-                        _snack(
-                          'The service could not be updated.',
-                          AppColors.error,
-                        );
-                      }
-                      return;
-                    }
-                    setModal(() {
-                      saving = false;
-                      error =
-                          'Couldn’t save this service. Your previous details are unchanged.';
-                    });
-                  }
-                },
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -904,108 +993,95 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
     var deleting = false;
     String? deleteError;
 
-    final deleted = await showModalBottomSheet<bool>(
+    final deleted = await showWorkloopBottomSheet<bool>(
       context: context,
       isDismissible: false,
       enableDrag: false,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModal) => PopScope(
           canPop: !deleting,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.pageX,
-                AppSpacing.sm,
-                AppSpacing.pageX,
-                AppSpacing.xl,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  settingsHandle(),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Delete "${svc['name']}"?',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.t1,
-                    ),
-                    textAlign: TextAlign.center,
+          child: SlateSheetFrame(
+            scrollable: true,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Delete "${svc['name']}"?',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.t1,
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "This won't affect existing bookings.",
-                    style: TextStyle(fontSize: 14, color: AppColors.t3),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (deleteError != null) ...[
-                    const SizedBox(height: 16),
-                    Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        deleteError!,
-                        style: const TextStyle(
-                          color: AppColors.error,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        textAlign: TextAlign.center,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "This won't affect existing bookings.",
+                  style: TextStyle(fontSize: 14, color: AppColors.t3),
+                  textAlign: TextAlign.center,
+                ),
+                if (deleteError != null) ...[
+                  const SizedBox(height: 16),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      deleteError!,
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  saveBtn(
-                    label: 'Delete Service',
-                    color: AppColors.error,
-                    loading: deleting,
-                    onTap: () async {
-                      if (deleting) return;
-                      setModal(() {
-                        deleting = true;
-                        deleteError = null;
-                      });
-                      try {
-                        await ref
-                            .read(servicesRepositoryProvider)
-                            .delete(svc['id'] as String);
-                      } catch (_) {
-                        if (!ctx.mounted) return;
-                        setModal(() {
-                          deleting = false;
-                          deleteError =
-                              'Couldn’t delete this service. Nothing was removed. Please try again.';
-                        });
-                        return;
-                      }
-                      ref.invalidate(settingsServicesProvider);
-                      if (ctx.mounted) Navigator.pop(ctx, true);
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: TextButton(
-                      onPressed: deleting
-                          ? null
-                          : () => Navigator.pop(ctx, false),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.t3,
-                        ),
-                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ],
-              ),
+                const SizedBox(height: 24),
+                saveBtn(
+                  label: 'Delete Service',
+                  color: AppColors.error,
+                  loading: deleting,
+                  onTap: () async {
+                    if (deleting) return;
+                    setModal(() {
+                      deleting = true;
+                      deleteError = null;
+                    });
+                    try {
+                      await ref
+                          .read(servicesRepositoryProvider)
+                          .delete(svc['id'] as String);
+                    } catch (_) {
+                      if (!ctx.mounted) return;
+                      setModal(() {
+                        deleting = false;
+                        deleteError =
+                            'Couldn’t delete this service. Nothing was removed. Please try again.';
+                      });
+                      return;
+                    }
+                    ref.invalidate(settingsServicesProvider);
+                    if (ctx.mounted) Navigator.pop(ctx, true);
+                  },
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: TextButton(
+                    onPressed: deleting
+                        ? null
+                        : () => Navigator.pop(ctx, false),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.t3,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -1075,7 +1151,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                     color: widget.showOnlySelected
                         ? Colors.transparent
                         : AppColors.bgCard,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     border: widget.showOnlySelected
                         ? null
                         : Border.all(color: AppColors.border),
@@ -1246,7 +1322,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                 return Container(
                   decoration: BoxDecoration(
                     color: AppColors.bgCard,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                     border: Border.all(color: AppColors.border),
                   ),
                   child: tappableRow(
@@ -1294,7 +1370,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                       color: widget.showOnlySelected
                           ? Colors.transparent
                           : AppColors.bgCard,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                       border: widget.showOnlySelected
                           ? null
                           : Border.all(color: AppColors.border),
@@ -1373,6 +1449,7 @@ class _SettingsBusinessTabState extends ConsumerState<SettingsBusinessTab> {
                 onAdd: _showAddServiceSheet,
                 onEdit: _showEditServiceSheet,
                 onRetry: () => ref.invalidate(settingsServicesProvider),
+                showAddAction: !widget.showOnlySelected,
               ),
             ),
         ],

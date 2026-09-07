@@ -158,12 +158,11 @@ class _ContactsImportScreenState extends ConsumerState<ContactsImportScreen> {
     }
     setState(() => _reviewing = true);
     try {
-      final confirmed = await showModalBottomSheet<bool>(
+      final confirmed = await showWorkloopBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        barrierColor: SlateTheme.of(context).scrim,
         builder: (context) => SlateSheetFrame(
+          scrollable: true,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -504,6 +503,7 @@ class _ContactRow extends StatelessWidget {
       contact.email,
     ].whereType<String>().where((value) => value.isNotEmpty).join(' · ');
     return WorkloopListRow(
+      flat: true,
       onTap: enabled ? () => onChanged(!selected) : null,
       showDivider: showDivider,
       leading: Checkbox.adaptive(

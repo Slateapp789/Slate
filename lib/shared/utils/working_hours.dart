@@ -64,6 +64,28 @@ String formatWorkingHourValue(dynamic value) {
   return blocks.map((block) => '${block.start} - ${block.end}').join(', ');
 }
 
+String formatFriendlyWorkingHourValue(dynamic value) {
+  final blocks = workingHourBlocks(value);
+  if (blocks.isEmpty) return 'Closed';
+  return blocks
+      .map(
+        (block) =>
+            '${formatFriendlyClockTime(block.start)} - ${formatFriendlyClockTime(block.end)}',
+      )
+      .join(', ');
+}
+
+String formatFriendlyClockTime(String value) {
+  final minutes = _timeToMinutes(value);
+  if (minutes == null) return value;
+  final hour24 = minutes ~/ 60;
+  final minute = minutes.remainder(60);
+  final suffix = hour24 < 12 ? 'am' : 'pm';
+  final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+  if (minute == 0) return '$hour12$suffix';
+  return '$hour12:${minute.toString().padLeft(2, '0')}$suffix';
+}
+
 String weekdayName(DateTime date) => workingHourDays[date.weekday - 1];
 
 dynamic workingHoursValueForDate(Map<String, dynamic> hours, DateTime date) {
@@ -81,21 +103,31 @@ bool isWithinWorkingHours({
 }) {
   final localStart = start.toLocal();
   final localEnd = end.toLocal();
-  if (!localEnd.isAfter(localStart) ||
-      localStart.year != localEnd.year ||
-      localStart.month != localEnd.month ||
-      localStart.day != localEnd.day) {
+  return isWallClockWithinWorkingHours(
+    hours: hours,
+    start: localStart,
+    end: localEnd,
+  );
+}
+
+bool isWallClockWithinWorkingHours({
+  required Map<String, dynamic> hours,
+  required DateTime start,
+  required DateTime end,
+}) {
+  if (!end.isAfter(start) ||
+      start.year != end.year ||
+      start.month != end.month ||
+      start.day != end.day) {
     return false;
   }
 
-  final value = workingHoursValueForDate(hours, localStart);
+  final value = workingHoursValueForDate(hours, start);
   final blocks = workingHourBlocks(value);
   if (blocks.isEmpty) return false;
 
-  final startSeconds =
-      localStart.hour * 3600 + localStart.minute * 60 + localStart.second;
-  final endSeconds =
-      localEnd.hour * 3600 + localEnd.minute * 60 + localEnd.second;
+  final startSeconds = start.hour * 3600 + start.minute * 60 + start.second;
+  final endSeconds = end.hour * 3600 + end.minute * 60 + end.second;
   return blocks.any((block) {
     final blockStart = _timeToMinutes(block.start);
     final blockEnd = _timeToMinutes(block.end);

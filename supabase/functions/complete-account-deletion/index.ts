@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { closeWorkloopStripeAccount } from "../_shared/stripe_account_offboarding.ts";
-import { isSoleWorkspaceOwner } from "../_shared/sole_workspace_owner.ts";
+import { canCompleteAccountDeletion } from "../_shared/account_deletion_owner.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -118,7 +118,21 @@ Deno.serve(async (req: Request) => {
         error: "Could not verify workspace ownership",
       });
     }
-    if (!isSoleWorkspaceOwner(memberships, userId)) {
+    const { data: authUserResult, error: authUserLookupError } = await supabase
+      .auth.admin.getUserById(userId);
+    const authUserMissing = authUserLookupError &&
+      (authUserLookupError.status === 404 ||
+        /not found|does not exist/i.test(authUserLookupError.message));
+    if (authUserLookupError && !authUserMissing) {
+      return response(500, { error: "Could not verify the Auth owner" });
+    }
+    if (
+      !canCompleteAccountDeletion({
+        memberships,
+        requestedUserId: userId,
+        authUserExists: authUserResult?.user != null,
+      })
+    ) {
       return response(409, {
         error:
           "Deletion blocked because sole workspace ownership could not be verified",
@@ -250,6 +264,11 @@ Deno.serve(async (req: Request) => {
   workspaceDeleted = true;
 
   if (userId) {
+    // Prevent new sign-ins while the final delete is being completed. Existing
+    // access JWTs are bounded separately by RLS and the app's server check.
+    await supabase.auth.admin.updateUserById(userId, {
+      ban_duration: "876000h",
+    }).catch(() => null);
     const { error: authDeleteError } = await supabase.auth.admin.deleteUser(
       userId,
     );

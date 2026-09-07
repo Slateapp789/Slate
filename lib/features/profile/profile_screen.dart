@@ -5,25 +5,21 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
+import '../../shared/utils/working_hours.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../settings/providers/settings_providers.dart';
 import '../settings/widgets/settings_business_tab.dart';
 import 'profile_editor_screen.dart';
 
 String profileWorkingHoursSummary(Map<String, dynamic> workingHours) {
-  const dayOrder = [
-    'monday',
-    'tuesday',
-    'wednesday',
-    'thursday',
-    'friday',
-    'saturday',
-    'sunday',
-  ];
-  final enabled = dayOrder.where((day) {
-    final value = workingHours[day];
-    if (value is! Map) return false;
-    return Map<String, dynamic>.from(value)['enabled'] == true;
+  final normalized = {
+    for (final entry in workingHours.entries)
+      entry.key.toLowerCase(): entry.value,
+  };
+  final enabled = workingHourDays.where((day) {
+    final lower = day.toLowerCase();
+    final value = normalized[lower] ?? normalized[lower.substring(0, 3)];
+    return workingHourBlocks(value).isNotEmpty;
   }).toList();
   if (enabled.isEmpty) return 'Working hours not set';
   if (enabled.length == 7) return 'Open every day';
@@ -75,7 +71,7 @@ class ProfileScreen extends ConsumerWidget {
         : <String, dynamic>{};
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -84,9 +80,10 @@ class ProfileScreen extends ConsumerWidget {
               color: AppColors.accentPrimary,
               onRefresh: () => _refresh(ref),
               child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.pageX,
-                  AppSpacing.lg,
+                  AppSpacing.screenTop,
                   AppSpacing.pageX,
                   AppSpacing.xxl,
                 ),
@@ -98,7 +95,7 @@ class ProfileScreen extends ConsumerWidget {
                       SettingsBusinessSection.business,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xl),
+                  const SizedBox(height: AppSpacing.md),
                   _ProfileIdentity(
                     businessName: displayName,
                     industry: industry?.isNotEmpty == true
@@ -111,7 +108,7 @@ class ProfileScreen extends ConsumerWidget {
                       SettingsBusinessSection.business,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xxl),
+                  const SizedBox(height: AppSpacing.lg),
                   const WorkloopSectionHeader(label: 'Business'),
                   const SizedBox(height: AppSpacing.xs),
                   _ProfileRow(
@@ -183,11 +180,15 @@ class ProfileScreen extends ConsumerWidget {
     ref.invalidate(workspaceProvider);
     ref.invalidate(settingsWorkspaceSettingsProvider);
     ref.invalidate(settingsServicesProvider);
-    await Future.wait([
-      ref.read(workspaceProvider.future),
-      ref.read(settingsWorkspaceSettingsProvider.future),
-      ref.read(settingsServicesProvider.future),
-    ]);
+    try {
+      await Future.wait([
+        ref.read(workspaceProvider.future),
+        ref.read(settingsWorkspaceSettingsProvider.future),
+        ref.read(settingsServicesProvider.future),
+      ]);
+    } catch (_) {
+      // Provider error states remain visible and can be retried.
+    }
   }
 
   Future<void> _openProfileEditor(
@@ -215,7 +216,7 @@ class _ProfileInitialState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -227,13 +228,13 @@ class _ProfileInitialState extends StatelessWidget {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.pageX,
-                  AppSpacing.lg,
+                  AppSpacing.screenTop,
                   AppSpacing.pageX,
                   AppSpacing.xxl,
                 ),
                 children: [
                   const _ProfileHeader(onEdit: null),
-                  const SizedBox(height: AppSpacing.xl),
+                  const SizedBox(height: AppSpacing.md),
                   if (failed)
                     SlateErrorState(
                       message:
@@ -300,8 +301,8 @@ class _ProfileIdentity extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 64,
-                  height: 64,
+                  width: 48,
+                  height: 48,
                   decoration: const BoxDecoration(
                     color: AppColors.accentPrimaryStrong,
                     shape: BoxShape.circle,
@@ -311,7 +312,7 @@ class _ProfileIdentity extends StatelessWidget {
                     initial,
                     style: const TextStyle(
                       color: AppColors.onBrandAccent,
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -327,7 +328,7 @@ class _ProfileIdentity extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: AppColors.t1,
-                          fontSize: 22,
+                          fontSize: 20,
                           height: 1.15,
                           fontWeight: FontWeight.w600,
                         ),
@@ -391,12 +392,10 @@ class _ProfileRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return WorkloopListRow(
+      flat: true,
       onTap: onTap,
       showDivider: showDivider,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.md,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       leading: Container(
         width: 40,
         height: 40,

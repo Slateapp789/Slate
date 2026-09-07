@@ -29,6 +29,54 @@ function isUuid(value: string) {
     .test(value);
 }
 
+async function lockAccountAccess(
+  serviceClient: {
+    auth: {
+      admin: {
+        updateUserById: (
+          userId: string,
+          attributes: { ban_duration: string },
+        ) => PromiseLike<{
+          error: { code?: string } | null;
+        }>;
+        signOut: (
+          accessToken: string,
+          scope: "global",
+        ) => PromiseLike<{
+          error: { code?: string } | null;
+        }>;
+      };
+    };
+  },
+  userId: string,
+  authHeader: string,
+) {
+  const { error: banError } = await serviceClient.auth.admin.updateUserById(
+    userId,
+    { ban_duration: "876000h" },
+  );
+  if (banError) {
+    console.error("account_deletion_access_lock_failed", {
+      code: banError.code,
+    });
+    return false;
+  }
+
+  const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (accessToken.length > 0) {
+    const { error: signOutError } = await serviceClient.auth.admin.signOut(
+      accessToken,
+      "global",
+    );
+    if (signOutError) {
+      console.error("account_deletion_refresh_revocation_failed", {
+        code: signOutError.code,
+      });
+    }
+  }
+  return true;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -132,10 +180,16 @@ Deno.serve(async (req: Request) => {
     if (updateError) {
       return response(500, { error: "Could not refresh deletion request" });
     }
+    const accessLocked = await lockAccountAccess(
+      serviceClient,
+      user.id,
+      authHeader,
+    );
     return response(200, {
       ok: true,
       requestId: existing.id,
       status: existing.status,
+      accessLocked,
     });
   }
 
@@ -157,9 +211,15 @@ Deno.serve(async (req: Request) => {
     return response(500, { error: "Could not create deletion request" });
   }
 
+  const accessLocked = await lockAccountAccess(
+    serviceClient,
+    user.id,
+    authHeader,
+  );
   return response(200, {
     ok: true,
     requestId: inserted.id,
     status: inserted.status,
+    accessLocked,
   });
 });

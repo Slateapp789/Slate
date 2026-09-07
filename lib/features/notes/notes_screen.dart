@@ -8,6 +8,7 @@ import '../../shared/providers/notes_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/notes_repository.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../../shared/widgets/record_link_unavailable.dart';
 import 'note_logic.dart';
 import '../imports/text_import_screen.dart';
 import '../work/work_workspace_switcher.dart';
@@ -44,6 +45,7 @@ class NotesScreen extends ConsumerStatefulWidget {
   final VoidCallback? onOpenSchedule;
   final VoidCallback? onOpenTasks;
   final bool embedded;
+  final String? initialNoteId;
 
   const NotesScreen({
     super.key,
@@ -53,6 +55,7 @@ class NotesScreen extends ConsumerStatefulWidget {
     this.onOpenSchedule,
     this.onOpenTasks,
     this.embedded = false,
+    this.initialNoteId,
   });
 
   @override
@@ -62,6 +65,9 @@ class NotesScreen extends ConsumerStatefulWidget {
 class _NotesScreenState extends ConsumerState<NotesScreen> {
   String _query = '';
   _NoteFilter _filter = _NoteFilter.all;
+  bool _didHandleInitialNote = false;
+  String? _scheduledInitialId;
+  bool _initialRecordMissing = false;
 
   @override
   void initState() {
@@ -76,6 +82,11 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   @override
   void didUpdateWidget(covariant NotesScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.initialNoteId != oldWidget.initialNoteId) {
+      _didHandleInitialNote = false;
+      _scheduledInitialId = null;
+      _initialRecordMissing = false;
+    }
     if (widget.createRequest == oldWidget.createRequest ||
         widget.createRequest == 0) {
       return;
@@ -86,9 +97,31 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     });
   }
 
+  Future<void> _refreshNotes() async {
+    ref.invalidate(allNotesProvider);
+    try {
+      await ref.read(allNotesProvider.future);
+    } catch (_) {
+      // The provider's visible error state offers retry.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.initialNoteId != null) ref.watch(workspaceIdProvider);
     final notes = ref.watch(allNotesProvider);
+    if (_initialRecordMissing) {
+      return WorkloopRecordLinkUnavailable(
+        recordName: 'Note',
+        onRetry: () {
+          setState(() {
+            _didHandleInitialNote = false;
+            _initialRecordMissing = false;
+          });
+          ref.invalidate(allNotesProvider);
+        },
+      );
+    }
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,10 +145,14 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                   )
                 : WorkloopPageHeader(
                     title: widget.onOpenSchedule == null ? 'Notes' : 'Work',
-                    subtitle: widget.onOpenSchedule == null
-                        ? 'Keep the context you will need later.'
-                        : 'Plan the day, do the work, keep the context.',
-                    color: AppColors.accentPrimary,
+                    subtitle: MediaQuery.textScalerOf(context).scale(1) >= 1.4
+                        ? ''
+                        : widget.onOpenSchedule == null
+                        ? 'Keep useful details close.'
+                        : 'Your schedule, tasks and notes.',
+                    color: widget.onOpenSchedule == null
+                        ? AppColors.modNotes
+                        : AppColors.modCalendar,
                     trailing: WorkloopTopAction(
                       label: 'New note',
                       semanticLabel: 'New note',
@@ -126,7 +163,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           if (!widget.showBackButton &&
               widget.onOpenSchedule != null &&
               widget.onOpenTasks != null) ...[
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.sm),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
               child: WorkWorkspaceSwitcher(
@@ -144,7 +181,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
               ),
             ),
           ],
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.sm),
         ],
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
@@ -154,7 +191,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
             semanticLabel: 'Search notes',
           ),
         ),
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: AppSpacing.sm),
         notes.maybeWhen(
           data: (_) => _NoteFilterRail(
             selected: _filter,
@@ -173,24 +210,28 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                 onRetry: () => ref.invalidate(allNotesProvider),
               ),
             ),
-            data: (data) => _NotesList(
-              notes: _filteredNotes(data),
-              referenceDate: widget.referenceDate,
-              hasSearch: _query.trim().isNotEmpty,
-              onRefresh: () async => ref.invalidate(allNotesProvider),
-              onOpen: (note) => _openEditor(note: note),
-              onCreate: _openEditor,
-              onImport: () async {
-                await Navigator.push<void>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        const TextImportScreen(type: TextImportType.notes),
-                  ),
-                );
-                ref.invalidate(allNotesProvider);
-              },
-            ),
+            data: (data) {
+              _openInitialNote(data);
+              return _NotesList(
+                notes: _filteredNotes(data),
+                referenceDate: widget.referenceDate,
+                hasSearch: _query.trim().isNotEmpty,
+                onRefresh: _refreshNotes,
+                onOpen: (note) => _openEditor(note: note),
+                onCreate: _openEditor,
+                onImport: () async {
+                  await Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          const TextImportScreen(type: TextImportType.notes),
+                    ),
+                  );
+                  if (!mounted) return;
+                  ref.invalidate(allNotesProvider);
+                },
+              );
+            },
           ),
         ),
       ],
@@ -198,7 +239,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     if (widget.embedded) return content;
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -242,9 +283,66 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
 
   Future<void> _openEditor({SlateNote? note}) async {
     await Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => _NoteEditorScreen(note: note)),
+      MaterialPageRoute(
+        settings: RouteSettings(
+          name: note == null ? null : '/notes/${note.id}',
+        ),
+        builder: (_) => _NoteEditorScreen(note: note),
+      ),
     );
     if (mounted) ref.invalidate(allNotesProvider);
+  }
+
+  void _openInitialNote(List<SlateNote> records) {
+    final id = widget.initialNoteId?.trim();
+    final snapshot = ref.read(allNotesProvider);
+    final workspace = ref.read(workspaceIdProvider);
+    if (_didHandleInitialNote ||
+        id == null ||
+        id.isEmpty ||
+        _scheduledInitialId == id ||
+        snapshot.isLoading ||
+        snapshot.hasError ||
+        !snapshot.hasValue ||
+        workspace.isLoading ||
+        workspace.hasError ||
+        workspace.value == null) {
+      return;
+    }
+    final workspaceId = workspace.value;
+    _scheduledInitialId = id;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          _scheduledInitialId != id ||
+          widget.initialNoteId?.trim() != id) {
+        return;
+      }
+      _scheduledInitialId = null;
+      final current = ref.read(allNotesProvider);
+      final currentWorkspace = ref.read(workspaceIdProvider);
+      if (current.isLoading ||
+          current.hasError ||
+          !current.hasValue ||
+          currentWorkspace.isLoading ||
+          currentWorkspace.hasError ||
+          currentWorkspace.value != workspaceId) {
+        return;
+      }
+      SlateNote? match;
+      for (final record in current.value ?? <SlateNote>[]) {
+        if (record.id == id) {
+          match = record;
+          break;
+        }
+      }
+      _didHandleInitialNote = true;
+      if (match == null) {
+        setState(() => _initialRecordMissing = true);
+      } else {
+        _openEditor(note: match);
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 }
 
@@ -304,6 +402,7 @@ class _NotesList extends StatelessWidget {
       color: AppColors.accentPrimary,
       onRefresh: onRefresh,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(
           AppSpacing.pageX,
           0,
@@ -313,7 +412,7 @@ class _NotesList extends StatelessWidget {
         children: [
           if (notes.isEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 42),
+              padding: const EdgeInsets.only(top: AppSpacing.lg),
               child: Column(
                 children: [
                   WorkloopEmptyState(
@@ -537,7 +636,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
         if (!didPop && !_saving) _saveAndClose();
       },
       child: Scaffold(
-        backgroundColor: AppColors.bg,
+        backgroundColor: Colors.transparent,
         extendBody: true,
         body: Stack(
           children: [
@@ -548,7 +647,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.pageX,
-                      AppSpacing.lg,
+                      AppSpacing.screenTop,
                       AppSpacing.pageX,
                       0,
                     ),
@@ -677,10 +776,8 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
 
   Future<void> _showNoteActions() async {
     if (_saving) return;
-    await showModalBottomSheet<void>(
+    await showWorkloopBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: AppColors.t1.withValues(alpha: 0.20),
       builder: (sheetContext) => SlateSheetFrame(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.lg,
@@ -809,6 +906,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
     try {
       final repository = ref.read(notesRepositoryProvider);
       final workspaceId = await ref.read(workspaceIdProvider.future);
+      if (!mounted) return false;
       if (workspaceId == null) {
         setState(() => _error = 'Workspace is not ready yet.');
         return false;
@@ -832,6 +930,7 @@ class _NoteEditorScreenState extends ConsumerState<_NoteEditorScreen> {
           pinned: _pinned,
         );
       }
+      if (!mounted) return false;
       ref.invalidate(allNotesProvider);
       return true;
     } catch (_) {

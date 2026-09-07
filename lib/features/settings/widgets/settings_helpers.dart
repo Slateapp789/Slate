@@ -1,27 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/slate_ui.dart';
 
-Widget settingsHandle() => Center(
-  child: Container(
-    width: 40,
-    height: 4,
-    decoration: BoxDecoration(
-      color: AppColors.border,
-      borderRadius: BorderRadius.circular(2),
-    ),
-  ),
-);
-
-Widget sectionLabel(String text) => Text(
-  text.toUpperCase(),
-  style: const TextStyle(
-    fontSize: 10,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0,
-    color: AppColors.t3,
-  ),
-);
+Widget sectionLabel(String text) => WorkloopCaption(text);
 
 Widget infoRow(String label, String value) => Padding(
   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
@@ -54,7 +36,7 @@ Widget tappableRow({
   color: Colors.transparent,
   child: InkWell(
     onTap: onTap,
-    borderRadius: BorderRadius.circular(16),
+    borderRadius: BorderRadius.circular(AppRadius.md),
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       child: Row(
@@ -84,7 +66,7 @@ Widget skeletonBox(double height) => Container(
   height: height,
   decoration: BoxDecoration(
     color: AppColors.t1.withValues(alpha: 0.035),
-    borderRadius: BorderRadius.circular(16),
+    borderRadius: BorderRadius.circular(AppRadius.md),
   ),
 );
 
@@ -104,7 +86,9 @@ Widget saveBtn({
       foregroundColor: color == AppColors.accentPrimaryStrong
           ? AppColors.onBrandAccent
           : AppColors.bg,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
       elevation: 0,
     ),
     child: loading

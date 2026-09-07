@@ -146,6 +146,7 @@ class _WorkingHoursEditorState extends ConsumerState<WorkingHoursEditor> {
     setState(() => _saving = true);
     try {
       final workspaceId = await ref.read(workspaceIdProvider.future);
+      if (!mounted) return;
       if (workspaceId == null) return;
       final nextHours = <String, dynamic>{};
       for (final day in workingHourDays) {
@@ -167,8 +168,8 @@ class _WorkingHoursEditorState extends ConsumerState<WorkingHoursEditor> {
       await ref.read(workspaceSettingsRepositoryProvider).update(workspaceId, {
         'working_hours': nextHours,
       });
-      ref.invalidate(settingsWorkspaceSettingsProvider);
       if (!mounted) return;
+      ref.invalidate(settingsWorkspaceSettingsProvider);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Working hours updated')));
@@ -325,36 +326,56 @@ class _DayHoursEditor extends StatelessWidget {
         if (enabled) ...[
           const SizedBox(height: AppSpacing.sm),
           for (var index = 0; index < blocks.length; index++) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: _TimeButton(
-                    label: 'Start',
-                    time: blocks[index].start,
-                    onTap: () => onPickStart(index),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final stackTimes =
+                    constraints.maxWidth < 360 &&
+                    MediaQuery.textScalerOf(context).scale(15) > 19;
+                final start = _TimeButton(
+                  label: 'Start',
+                  semanticLabel: '$day start time, block ${index + 1}',
+                  time: blocks[index].start,
+                  onTap: () => onPickStart(index),
+                );
+                final end = _TimeButton(
+                  label: 'End',
+                  semanticLabel: '$day end time, block ${index + 1}',
+                  time: blocks[index].end,
+                  onTap: () => onPickEnd(index),
+                );
+                final remove = Tooltip(
+                  message: 'Remove $day time block ${index + 1}',
+                  child: WorkloopIconButton(
+                    icon: LucideIcons.x,
+                    semanticLabel: 'Remove $day time block ${index + 1}',
+                    size: AppSpacing.minTouch,
+                    onTap: () => onRemoveBlock(index),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _TimeButton(
-                    label: 'End',
-                    time: blocks[index].end,
-                    onTap: () => onPickEnd(index),
-                  ),
-                ),
-                if (blocks.length > 1) ...[
-                  const SizedBox(width: AppSpacing.xs),
-                  Tooltip(
-                    message: 'Remove $day time block ${index + 1}',
-                    child: WorkloopIconButton(
-                      icon: LucideIcons.x,
-                      semanticLabel: 'Remove $day time block ${index + 1}',
-                      size: AppSpacing.minTouch,
-                      onTap: () => onRemoveBlock(index),
-                    ),
-                  ),
-                ],
-              ],
+                );
+                if (stackTimes) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      start,
+                      const SizedBox(height: AppSpacing.sm),
+                      end,
+                      if (blocks.length > 1)
+                        Align(alignment: Alignment.centerRight, child: remove),
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: start),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(child: end),
+                    if (blocks.length > 1) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      remove,
+                    ],
+                  ],
+                );
+              },
             ),
             if (index != blocks.length - 1)
               const SizedBox(height: AppSpacing.sm),
@@ -369,57 +390,71 @@ class _DayHoursEditor extends StatelessWidget {
 
 class _TimeButton extends StatelessWidget {
   final String label;
+  final String semanticLabel;
   final TimeOfDay time;
   final VoidCallback onTap;
 
   const _TimeButton({
     required this.label,
+    required this.semanticLabel,
     required this.time,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      value: time.format(context),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.sm),
-      child: Container(
-        height: 54,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: AppColors.bgRaised.withValues(alpha: 0.82),
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: AppColors.t3,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    time.format(context),
-                    style: const TextStyle(
-                      color: AppColors.t1,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 54),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
             ),
-            const Icon(LucideIcons.clock3, color: AppColors.t3, size: 16),
-          ],
+            decoration: BoxDecoration(
+              color: AppColors.bgRaised.withValues(alpha: 0.82),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        time.format(context),
+                        style: const TextStyle(
+                          color: AppColors.t1,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(LucideIcons.clock3, color: AppColors.t3, size: 16),
+              ],
+            ),
+          ),
         ),
       ),
     );

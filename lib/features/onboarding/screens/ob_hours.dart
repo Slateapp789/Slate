@@ -98,7 +98,7 @@ class _ObHoursState extends ConsumerState<ObHours> {
           Container(
             decoration: BoxDecoration(
               color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(color: AppColors.border),
             ),
             child: Column(

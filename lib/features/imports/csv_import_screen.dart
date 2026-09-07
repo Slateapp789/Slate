@@ -156,11 +156,10 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
     setState(() => _reviewing = true);
     bool? confirmed;
     try {
-      confirmed = await showModalBottomSheet<bool>(
+      confirmed = await showWorkloopBottomSheet<bool>(
         context: context,
-        backgroundColor: Colors.transparent,
-        barrierColor: SlateTheme.of(context).scrim,
         builder: (context) => SlateSheetFrame(
+          scrollable: true,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,6 +471,7 @@ class _CsvImportScreenState extends ConsumerState<CsvImportScreen> {
                     index++
                   )
                     WorkloopListRow(
+                      flat: true,
                       showDivider: index != _candidates().take(5).length - 1,
                       leading: const Icon(
                         LucideIcons.user,

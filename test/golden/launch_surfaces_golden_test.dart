@@ -46,6 +46,7 @@ void main() {
 
   testWidgets('authentication login surface', (tester) async {
     await _pumpSurface(tester, const AuthScreen());
+    await _settleAuthBrandIcon(tester);
 
     await expectLater(
       find.byKey(const ValueKey('golden-surface')),
@@ -55,8 +56,8 @@ void main() {
 
   testWidgets('authentication registration surface', (tester) async {
     await _pumpSurface(tester, const AuthScreen());
+    await _settleAuthBrandIcon(tester);
     final modeToggle = find.byKey(const ValueKey('auth-mode-toggle'));
-    await tester.ensureVisible(modeToggle);
     await tester.tap(modeToggle);
     await tester.pumpAndSettle();
 
@@ -96,38 +97,40 @@ void main() {
   testWidgets('shell navigation stays quiet in both appearances', (
     tester,
   ) async {
-    final screen = Scaffold(
-      body: const WorkloopTexturedBackdrop(),
-      bottomNavigationBar: WorkloopBottomNav(
-        currentIndex: 1,
-        items: const [
-          WorkloopNavItem(
-            label: 'Today',
-            icon: LucideIcons.home,
-            color: AppColors.accentPrimary,
-          ),
-          WorkloopNavItem(
-            label: 'Clients',
-            icon: LucideIcons.users,
-            color: AppColors.accentPrimary,
-          ),
-          WorkloopNavItem(
-            label: 'Work',
-            icon: LucideIcons.briefcase,
-            color: AppColors.accentPrimary,
-          ),
-          WorkloopNavItem(
-            label: 'Money',
-            icon: LucideIcons.circlePoundSterling,
-            color: AppColors.accentPrimary,
-          ),
-          WorkloopNavItem(
-            label: 'Business',
-            icon: LucideIcons.store,
-            color: AppColors.accentPrimary,
-          ),
-        ],
-        onTap: (_) {},
+    final screen = WorkloopAppCanvas(
+      child: Scaffold(
+        body: const WorkloopTexturedBackdrop(),
+        bottomNavigationBar: WorkloopBottomNav(
+          currentIndex: 1,
+          items: const [
+            WorkloopNavItem(
+              label: 'Today',
+              icon: LucideIcons.home,
+              color: AppColors.accentPrimary,
+            ),
+            WorkloopNavItem(
+              label: 'Clients',
+              icon: LucideIcons.users,
+              color: AppColors.accentPrimary,
+            ),
+            WorkloopNavItem(
+              label: 'Work',
+              icon: LucideIcons.briefcase,
+              color: AppColors.accentPrimary,
+            ),
+            WorkloopNavItem(
+              label: 'Money',
+              icon: LucideIcons.circlePoundSterling,
+              color: AppColors.accentPrimary,
+            ),
+            WorkloopNavItem(
+              label: 'Business',
+              icon: LucideIcons.store,
+              color: AppColors.accentPrimary,
+            ),
+          ],
+          onTap: (_) {},
+        ),
       ),
     );
 
@@ -297,7 +300,7 @@ void main() {
               type: 'booking',
               title: 'New booking request',
               body: 'Maya wants a signature appointment on Friday.',
-              deepLink: '/booking-requests',
+              deepLink: '/booking-requests/a1111111-1111-4111-8111-111111111111',
               createdAt: now,
             ),
             SlateNotification(
@@ -306,6 +309,7 @@ void main() {
               type: 'payment_received',
               title: 'Payment received',
               body: '£85 was recorded for Samira Khan.',
+              deepLink: '/payments/b1111111-1111-4111-8111-111111111111',
               read: true,
               createdAt: now.subtract(const Duration(days: 2)),
             ),
@@ -406,9 +410,15 @@ void main() {
         (ref) async => [
           DashboardAttentionItem(
             type: DashboardAttentionType.bookingRequest,
-            title: 'Review 2 booking requests',
-            detail: 'Waiting for your response',
-            source: 2,
+            title: 'Review Alex’s request',
+            detail: 'Window clean · Awaiting decision',
+            source: const BookingRequest(
+              id: 'request-focus-1',
+              workspaceId: 'workspace-1',
+              name: 'Alex',
+              phone: '07000000000',
+              serviceName: 'Window clean',
+            ),
             sortTime: now,
           ),
         ],
@@ -673,10 +683,14 @@ void main() {
 
   testWidgets('Work workspace schedule surface', (tester) async {
     final now = DateTime.now();
+    final noteReferenceDate = DateTime(2026, 8, 15, 9);
     final start = DateTime(now.year, now.month, now.day, 9, 30);
     await _pumpSurface(
       tester,
-      _marketingSurface(const WorkScreen(), currentIndex: 2),
+      _marketingSurface(
+        WorkScreen(referenceDate: noteReferenceDate),
+        currentIndex: 2,
+      ),
       theme: AppTheme.light,
       overrides: [
         appointmentsProvider.overrideWith(
@@ -756,16 +770,16 @@ void main() {
               workspaceId: 'workspace-1',
               title: 'Maya’s appointment preferences',
               body: 'Prefers a quiet appointment.',
-              createdAt: now,
-              updatedAt: now,
+              createdAt: noteReferenceDate,
+              updatedAt: noteReferenceDate,
             ),
             SlateNote(
               id: 'work-note-2',
               workspaceId: 'workspace-1',
               title: 'August supply list',
               body: 'Consultation packs and aftercare cards.',
-              createdAt: now,
-              updatedAt: now,
+              createdAt: noteReferenceDate,
+              updatedAt: noteReferenceDate,
             ),
             SlateNote(
               id: 'work-note-3',
@@ -773,8 +787,8 @@ void main() {
               title: 'Jordan’s first appointment',
               body: 'Allow ten minutes for the initial consultation.',
               clientName: 'Jordan Ellis',
-              createdAt: now,
-              updatedAt: now,
+              createdAt: noteReferenceDate,
+              updatedAt: noteReferenceDate,
             ),
           ],
         ),
@@ -1541,6 +1555,12 @@ void main() {
   });
 }
 
+Future<void> _settleAuthBrandIcon(WidgetTester tester) async {
+  await tester.pumpAndSettle();
+  // The native vector illustration paints synchronously; no raster decode wait.
+  expect(find.byKey(const ValueKey('auth-brand-icon')), findsOneWidget);
+}
+
 List<Override> _bookingCalendarOverrides() {
   final firstStart = DateTime(2026, 8, 8, 10);
   final secondStart = DateTime(2026, 8, 11, 14, 30);
@@ -1662,9 +1682,16 @@ Future<void> _loadDeterministicFonts() async {
   // Flutter's test binding uses the block-glyph Ahem font for any style that
   // relies on a platform fallback. Map that fallback to Workloop's bundled
   // typeface so golden images represent the shipped UI rather than test boxes.
+  final mono = FontLoader('WorkloopMono')
+    ..addFont(rootBundle.load('assets/fonts/WorkloopMono-Regular.ttf'));
   final platformFallback = FontLoader('Ahem')
     ..addFont(rootBundle.load('assets/fonts/Manrope-Variable.ttf'));
   final lucide = FontLoader('packages/lucide_flutter/LucideIcons')
     ..addFont(rootBundle.load('packages/lucide_flutter/assets/lucide.ttf'));
-  await Future.wait([manrope.load(), platformFallback.load(), lucide.load()]);
+  await Future.wait([
+    manrope.load(),
+    mono.load(),
+    platformFallback.load(),
+    lucide.load(),
+  ]);
 }

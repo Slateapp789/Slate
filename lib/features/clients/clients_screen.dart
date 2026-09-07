@@ -4,6 +4,9 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
+import '../../shared/providers/appointments_provider.dart';
+import '../../shared/providers/finance_provider.dart';
+import '../../shared/providers/tasks_provider.dart';
 import '../../shared/widgets/slate_ui.dart';
 import '../imports/contacts_import_screen.dart';
 import 'add_client_screen.dart';
@@ -33,12 +36,25 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
     super.dispose();
   }
 
+  Future<void> _refreshClients() async {
+    ref.invalidate(clientsProvider);
+    ref.invalidate(appointmentsProvider);
+    ref.invalidate(invoicesProvider);
+    ref.invalidate(allTasksProvider);
+    ref.invalidate(clientCrmRecordsProvider);
+    try {
+      await ref.read(clientCrmRecordsProvider.future);
+    } catch (_) {
+      // Keep refresh errors in the list's existing retry state.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final records = ref.watch(clientCrmRecordsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -68,11 +84,9 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                       _lastPointerPosition = event.position,
                   child: RefreshIndicator(
                     color: AppColors.accentPrimary,
-                    onRefresh: () async {
-                      ref.invalidate(clientsProvider);
-                      ref.invalidate(clientCrmRecordsProvider);
-                    },
+                    onRefresh: _refreshClients,
                     child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       controller: _scrollController,
                       slivers: [
                         SliverToBoxAdapter(
@@ -87,7 +101,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                               children: [
                                 _Header(onAdd: _openAddClient),
                                 if (data.isNotEmpty) ...[
-                                  const SizedBox(height: AppSpacing.lg),
+                                  const SizedBox(height: AppSpacing.sm),
                                   _SearchAndSort(
                                     controller: _searchController,
                                     onQueryChanged: (value) =>
@@ -103,7 +117,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                             child: Padding(
                               padding: const EdgeInsets.fromLTRB(
                                 AppSpacing.pageX,
-                                AppSpacing.lg,
+                                AppSpacing.sm,
                                 AppSpacing.pageX,
                                 0,
                               ),
@@ -118,7 +132,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
                             child: Padding(
                               padding: const EdgeInsets.fromLTRB(
                                 AppSpacing.pageX,
-                                AppSpacing.md,
+                                AppSpacing.xs,
                                 AppSpacing.pageX,
                                 0,
                               ),
@@ -246,10 +260,8 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
   }
 
   Future<void> _showSortPicker() async {
-    final selected = await showModalBottomSheet<ClientSortOrder>(
+    final selected = await showWorkloopBottomSheet<ClientSortOrder>(
       context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.32),
       builder: (context) => _ClientSortSheet(selected: _sortOrder),
     );
     if (selected != null && mounted) {
@@ -262,6 +274,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
       context,
       MaterialPageRoute(builder: (_) => const AddClientScreen()),
     );
+    if (!mounted) return;
     ref.invalidate(clientsProvider);
     ref.invalidate(clientCrmRecordsProvider);
   }
@@ -271,6 +284,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
       context,
       MaterialPageRoute(builder: (_) => const ContactsImportScreen()),
     );
+    if (!mounted) return;
     ref.invalidate(clientsProvider);
     ref.invalidate(clientCrmRecordsProvider);
   }
@@ -282,6 +296,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen> {
         builder: (_) => ClientDetailScreen(client: record.client.toMap()),
       ),
     );
+    if (!mounted) return;
     ref.invalidate(clientsProvider);
     ref.invalidate(clientCrmRecordsProvider);
   }
@@ -294,15 +309,20 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return WorkloopPageHeader(
-      title: 'Clients',
-      subtitle: 'Know who needs attention next.',
-      color: AppColors.modClients,
-      trailing: WorkloopTopAction(
-        label: 'New client',
-        semanticLabel: 'New client',
-        onTap: onAdd,
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        WorkloopPageHeader(
+          title: 'Clients',
+          subtitle: 'Know who needs attention next.',
+          color: AppColors.modClients,
+          trailing: WorkloopTopAction(
+            label: 'New client',
+            semanticLabel: 'New client',
+            onTap: onAdd,
+          ),
+        ),
+      ],
     );
   }
 }

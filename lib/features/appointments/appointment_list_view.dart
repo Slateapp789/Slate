@@ -6,7 +6,7 @@ class _AppointmentListView extends StatelessWidget {
   final String emptyTitle;
   final String emptySubtitle;
   final Function(Map<String, dynamic>) onTap;
-  final VoidCallback onRefresh;
+  final RefreshCallback onRefresh;
   final bool groupByDate;
   final bool showStatusBadge;
 
@@ -25,7 +25,7 @@ class _AppointmentListView extends StatelessWidget {
   Widget build(BuildContext context) {
     if (appointments.isEmpty) {
       return RefreshIndicator(
-        onRefresh: () async => onRefresh(),
+        onRefresh: onRefresh,
         color: AppColors.accentPrimary,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -60,9 +60,10 @@ class _AppointmentListView extends StatelessWidget {
 
     if (!groupByDate) {
       return RefreshIndicator(
-        onRefresh: () async => onRefresh(),
+        onRefresh: onRefresh,
         color: AppColors.accentPrimary,
         child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.fromLTRB(
             AppSpacing.pageX,
             0,
@@ -94,9 +95,10 @@ class _AppointmentListView extends StatelessWidget {
     final keys = grouped.keys.toList();
 
     return RefreshIndicator(
-      onRefresh: () async => onRefresh(),
+      onRefresh: onRefresh,
       color: AppColors.accentPrimary,
       child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(
           AppSpacing.pageX,
           0,
@@ -177,7 +179,7 @@ class _BookingCalendarView extends StatelessWidget {
   final List<Map<String, dynamic>> selectedDayAppointments;
   final ValueChanged<DateTime> onDateSelected;
   final Function(Map<String, dynamic>) onTap;
-  final VoidCallback onRefresh;
+  final RefreshCallback onRefresh;
   final VoidCallback onEmptyAction;
 
   const _BookingCalendarView({
@@ -201,9 +203,10 @@ class _BookingCalendarView extends StatelessWidget {
         return aStart.compareTo(bStart);
       });
     return RefreshIndicator(
-      onRefresh: () async => onRefresh(),
+      onRefresh: onRefresh,
       color: AppColors.accentPrimary,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(
           0,
           0,
@@ -583,7 +586,7 @@ class _DayAgendaHeader extends StatelessWidget {
           height: 48,
           alignment: Alignment.center,
           decoration: const BoxDecoration(
-            color: AppColors.violetDim,
+            color: AppColors.modBg,
             shape: BoxShape.circle,
           ),
           child: Text(

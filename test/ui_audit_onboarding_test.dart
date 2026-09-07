@@ -103,6 +103,33 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('service editor scrolls and stacks fields on a compact phone', (
+    tester,
+  ) async {
+    await _pumpOnboardingScreen(
+      tester,
+      ObServices(onNext: () {}, onBack: () {}),
+    );
+
+    final add = find.widgetWithText(OutlinedButton, 'Add a service');
+    await tester.scrollUntilVisible(add, 140);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add your service'), findsOneWidget);
+    final hours = find.widgetWithText(TextField, 'Hours');
+    final minutes = find.widgetWithText(TextField, 'Minutes');
+    expect(hours, findsOneWidget);
+    expect(minutes, findsOneWidget);
+    expect(
+      tester.getTopLeft(hours).dx,
+      closeTo(tester.getTopLeft(minutes).dx, 1),
+    );
+    await tester.ensureVisible(find.widgetWithText(TextField, 'Price'));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('first-booking date and time fields are labelled and resilient', (
     tester,
   ) async {

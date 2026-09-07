@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/notifications/local_reminder_plan.dart';
 import '../../shared/notifications/local_reminder_service.dart';
+import '../../shared/notifications/notification_route.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/tasks_provider.dart';
@@ -13,6 +14,7 @@ import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/workflow_idempotency.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../../shared/widgets/record_link_unavailable.dart';
 import 'task_filters.dart';
 import '../imports/text_import_screen.dart';
 import '../work/work_workspace_switcher.dart';
@@ -27,6 +29,8 @@ class TasksScreen extends ConsumerStatefulWidget {
   final VoidCallback? onOpenSchedule;
   final VoidCallback? onOpenNotes;
   final bool embedded;
+  final String? initialTaskId;
+  final bool showBackButton;
 
   const TasksScreen({
     super.key,
@@ -34,6 +38,8 @@ class TasksScreen extends ConsumerStatefulWidget {
     this.onOpenSchedule,
     this.onOpenNotes,
     this.embedded = false,
+    this.initialTaskId,
+    this.showBackButton = false,
   });
 
   @override
@@ -42,6 +48,9 @@ class TasksScreen extends ConsumerStatefulWidget {
 
 class _TasksScreenState extends ConsumerState<TasksScreen> {
   _TaskView _view = _TaskView.now;
+  bool _didHandleInitialTask = false;
+  String? _scheduledInitialId;
+  bool _initialRecordMissing = false;
 
   @override
   void initState() {
@@ -56,6 +65,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   @override
   void didUpdateWidget(covariant TasksScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.initialTaskId != oldWidget.initialTaskId) {
+      _didHandleInitialTask = false;
+      _scheduledInitialId = null;
+      _initialRecordMissing = false;
+    }
     if (widget.createRequest == oldWidget.createRequest ||
         widget.createRequest == 0) {
       return;
@@ -66,9 +80,31 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     });
   }
 
+  Future<void> _refreshTaskList() async {
+    ref.invalidate(allTasksProvider);
+    try {
+      await ref.read(allTasksProvider.future);
+    } catch (_) {
+      // The provider's visible error state offers retry.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.initialTaskId != null) ref.watch(workspaceIdProvider);
     final tasks = ref.watch(allTasksProvider);
+    if (_initialRecordMissing) {
+      return WorkloopRecordLinkUnavailable(
+        recordName: 'Task',
+        onRetry: () {
+          setState(() {
+            _didHandleInitialTask = false;
+            _initialRecordMissing = false;
+          });
+          ref.invalidate(allTasksProvider);
+        },
+      );
+    }
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -80,21 +116,37 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               AppSpacing.pageX,
               0,
             ),
-            child: WorkloopPageHeader(
-              title: widget.onOpenSchedule == null ? 'Tasks' : 'Work',
-              subtitle: widget.onOpenSchedule == null
-                  ? 'Know what needs doing next.'
-                  : 'Plan the day, do the work, keep the context.',
-              color: AppColors.accentPrimary,
-              trailing: WorkloopTopAction(
-                label: 'New task',
-                semanticLabel: 'New task',
-                onTap: () => _showTaskEditor(context),
-              ),
-            ),
+            child: widget.showBackButton
+                ? WorkloopRouteHeader(
+                    title: 'Tasks',
+                    backSemanticLabel: 'Back to tasks',
+                    onBack: () =>
+                        workloopGoBack(context, fallbackLocation: '/tasks'),
+                    trailing: WorkloopTopAction(
+                      label: 'New task',
+                      semanticLabel: 'New task',
+                      onTap: () => _showTaskEditor(context),
+                    ),
+                  )
+                : WorkloopPageHeader(
+                    title: widget.onOpenSchedule == null ? 'Tasks' : 'Work',
+                    subtitle: MediaQuery.textScalerOf(context).scale(1) >= 1.4
+                        ? ''
+                        : widget.onOpenSchedule == null
+                        ? 'Know what needs doing next.'
+                        : 'Your schedule, tasks and notes.',
+                    color: widget.onOpenSchedule == null
+                        ? AppColors.modTasks
+                        : AppColors.modCalendar,
+                    trailing: WorkloopTopAction(
+                      label: 'New task',
+                      semanticLabel: 'New task',
+                      onTap: () => _showTaskEditor(context),
+                    ),
+                  ),
           ),
           if (widget.onOpenSchedule != null && widget.onOpenNotes != null) ...[
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.sm),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageX),
               child: WorkWorkspaceSwitcher(
@@ -112,7 +164,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               ),
             ),
           ],
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.sm),
         ],
         Expanded(
           child: tasks.when(
@@ -125,14 +177,16 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               ),
             ),
             data: (data) {
+              _openInitialTask(data);
               final sorted = [...data]..sort(_taskSort);
               final sections = _sectionsForView(sorted, _view);
               final counts = _countsForTasks(sorted);
 
               return RefreshIndicator(
-                onRefresh: () async => ref.invalidate(allTasksProvider),
+                onRefresh: _refreshTaskList,
                 color: AppColors.accentPrimary,
                 child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(
                     AppSpacing.pageX,
                     0,
@@ -145,7 +199,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       counts: counts,
                       onChanged: (view) => setState(() => _view = view),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: AppSpacing.sm),
                     if (sections.every((section) => section.tasks.isEmpty))
                       _emptyState(context)
                     else
@@ -171,7 +225,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     if (widget.embedded) return content;
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -228,6 +282,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         const TextImportScreen(type: TextImportType.tasks),
                   ),
                 );
+                if (!mounted) return;
                 ref.invalidate(allTasksProvider);
               },
             ),
@@ -240,12 +295,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   Future<void> _showTaskDetails(SlateTask task) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
+        settings: RouteSettings(name: '/tasks/${task.id}'),
         builder: (ctx) => Consumer(
           builder: (context, ref, _) {
             final checklist = ref.watch(taskChecklistProvider(task.id));
 
             return Scaffold(
-              backgroundColor: AppColors.bg,
+              backgroundColor: Colors.transparent,
               body: Stack(
                 children: [
                   const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -255,7 +311,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(
                             AppSpacing.pageX,
-                            AppSpacing.lg,
+                            AppSpacing.screenTop,
                             AppSpacing.pageX,
                             0,
                           ),
@@ -377,6 +433,58 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     _refreshTasks();
   }
 
+  void _openInitialTask(List<SlateTask> records) {
+    final id = widget.initialTaskId?.trim();
+    final snapshot = ref.read(allTasksProvider);
+    final workspace = ref.read(workspaceIdProvider);
+    if (_didHandleInitialTask ||
+        id == null ||
+        id.isEmpty ||
+        _scheduledInitialId == id ||
+        snapshot.isLoading ||
+        snapshot.hasError ||
+        !snapshot.hasValue ||
+        workspace.isLoading ||
+        workspace.hasError ||
+        workspace.value == null) {
+      return;
+    }
+    final workspaceId = workspace.value;
+    _scheduledInitialId = id;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          _scheduledInitialId != id ||
+          widget.initialTaskId?.trim() != id) {
+        return;
+      }
+      _scheduledInitialId = null;
+      final current = ref.read(allTasksProvider);
+      final currentWorkspace = ref.read(workspaceIdProvider);
+      if (current.isLoading ||
+          current.hasError ||
+          !current.hasValue ||
+          currentWorkspace.isLoading ||
+          currentWorkspace.hasError ||
+          currentWorkspace.value != workspaceId) {
+        return;
+      }
+      SlateTask? match;
+      for (final record in current.value ?? <SlateTask>[]) {
+        if (record.id == id) {
+          match = record;
+          break;
+        }
+      }
+      _didHandleInitialTask = true;
+      if (match == null) {
+        setState(() => _initialRecordMissing = true);
+      } else {
+        _showTaskDetails(match);
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
   Future<void> _showTaskEditor(BuildContext context, {SlateTask? task}) async {
     final titleController = TextEditingController(text: task?.title ?? '');
     final checklistController = TextEditingController();
@@ -420,6 +528,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
+        settings: RouteSettings(
+          name: task == null ? null : '/tasks/${task.id}',
+        ),
         builder: (ctx) => StatefulBuilder(
           builder: (ctx, setModal) {
             final clients = ref.watch(clientsProvider);
@@ -531,7 +642,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 if (!didPop) handleBack();
               },
               child: Scaffold(
-                backgroundColor: AppColors.bg,
+                backgroundColor: Colors.transparent,
                 body: Stack(
                   children: [
                     const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -541,7 +652,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                           Padding(
                             padding: const EdgeInsets.fromLTRB(
                               AppSpacing.pageX,
-                              AppSpacing.lg,
+                              AppSpacing.screenTop,
                               AppSpacing.pageX,
                               0,
                             ),
@@ -830,20 +941,21 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         task == null ||
         task.reminderTiming != savedReminderTiming ||
         task.dueDate != dueDate;
-    if (task == null) {
-      await ref
-          .read(tasksRepositoryProvider)
-          .createWithChecklist(
-            workspaceId: workspaceId,
-            title: title,
-            priority: priority,
-            dueDate: dueDate,
-            contactId: clientId,
-            reminderTiming: savedReminderTiming,
-            checklistTitles: checklistTitles,
-            idempotencyKey: createIdempotencyKey!,
-          );
-    } else {
+    final taskId = task == null
+        ? await ref
+              .read(tasksRepositoryProvider)
+              .createWithChecklist(
+                workspaceId: workspaceId,
+                title: title,
+                priority: priority,
+                dueDate: dueDate,
+                contactId: clientId,
+                reminderTiming: savedReminderTiming,
+                checklistTitles: checklistTitles,
+                idempotencyKey: createIdempotencyKey!,
+              )
+        : task.id;
+    if (task != null) {
       await ref
           .read(tasksRepositoryProvider)
           .update(
@@ -858,6 +970,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     if (reminderChanged) {
       await _maybeCreateDueNotification(
         workspaceId,
+        taskId,
         title,
         dueDate,
         savedReminderTiming,
@@ -868,6 +981,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   Future<void> _maybeCreateDueNotification(
     String workspaceId,
+    String taskId,
     String title,
     DateTime? dueDate,
     String reminderTiming,
@@ -895,7 +1009,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               type: 'task_due',
               title: 'Task due soon',
               body: title.trim(),
-              deepLink: '/tasks',
+              deepLink: workloopNotificationEntityRoute(
+                WorkloopNotificationEntity.task,
+                taskId,
+              ),
             );
       } catch (_) {
         // The saved task is the source of truth. Notification support is
@@ -913,11 +1030,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     var saving = false;
     String? errorMessage;
 
-    showModalBottomSheet(
+    showWorkloopBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModal) {
           return SlateSheetFrame(
@@ -1042,8 +1157,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             itemId: item.id,
             completed: !item.completed,
           );
+      if (!mounted) return;
       ref.invalidate(taskChecklistProvider(task.id));
     } catch (_) {
+      if (!mounted) return;
       _showTaskFailure(
         'Could not update this checklist item. Nothing was changed.',
       );
@@ -1056,8 +1173,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   ) async {
     try {
       await ref.read(tasksRepositoryProvider).deleteChecklistItem(item.id);
+      if (!mounted) return;
       ref.invalidate(taskChecklistProvider(task.id));
     } catch (_) {
+      if (!mounted) return;
       _showTaskFailure(
         'Could not delete this checklist item. Nothing was removed.',
       );
@@ -1067,17 +1186,16 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   Future<bool> _confirmComplete(SlateTask task) async {
     var saving = false;
     String? errorMessage;
-    final completed = await showModalBottomSheet<bool>(
+    final completed = await showWorkloopBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
       isDismissible: false,
       enableDrag: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => PopScope(
           canPop: !saving,
           child: SlateSheetFrame(
+            scrollable: true,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1166,17 +1284,16 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   Future<bool> _confirmDelete(SlateTask task) async {
     var deleting = false;
     String? errorMessage;
-    final deleted = await showModalBottomSheet<bool>(
+    final deleted = await showWorkloopBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
       isDismissible: false,
       enableDrag: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => PopScope(
           canPop: !deleting,
           child: SlateSheetFrame(
+            scrollable: true,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [

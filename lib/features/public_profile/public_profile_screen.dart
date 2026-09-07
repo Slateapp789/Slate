@@ -5,11 +5,17 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/workloop_app_info.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/models/public_booking_availability.dart';
+import '../../shared/models/slate_models.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/currency_format.dart';
+import '../../shared/utils/duration_format.dart';
 import '../../shared/utils/workflow_idempotency.dart';
 import '../../shared/utils/working_hours.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../../shared/widgets/additional_services_picker.dart';
+import 'booking_request_time.dart';
+import 'public_booking_availability_provider.dart';
 
 final publicProfileProvider = FutureProvider.family<PublicProfile?, String>((
   ref,
@@ -37,12 +43,15 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
-  final _preferredTimeController = TextEditingController();
   final _messageController = TextEditingController();
   String? _selectedServiceId;
+  List<String> _selectedServiceIds = [];
+  final Set<String> _selectedAddOnIds = {};
+  DateTime? _requestedForUtc;
   String? _nameError;
   String? _phoneError;
   String? _emailError;
+  String? _requestedForError;
   String? _submitError;
   bool _sending = false;
   bool _sent = false;
@@ -53,7 +62,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
-    _preferredTimeController.dispose();
     _messageController.dispose();
     super.dispose();
   }
@@ -75,13 +83,20 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
         : !isValidBookingRequestEmail(email)
         ? 'Add a valid email address'
         : null;
+    final requestedForError = _requestedForUtc == null
+        ? 'Choose the date and time you would prefer'
+        : null;
     setState(() {
       _nameError = nameError;
       _phoneError = phoneError;
       _emailError = emailError;
+      _requestedForError = requestedForError;
       _submitError = null;
     });
-    if (nameError != null || phoneError != null || emailError != null) {
+    if (nameError != null ||
+        phoneError != null ||
+        emailError != null ||
+        requestedForError != null) {
       return;
     }
     setState(() => _sending = true);
@@ -95,9 +110,15 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             email: email,
             requestToken: _requestToken,
             serviceId: _selectedServiceId,
-            preferredTimeText: _preferredTimeController.text.trim().isEmpty
-                ? null
-                : _preferredTimeController.text.trim(),
+            serviceIds: _selectedServiceIds,
+            addOnIds: _selectedAddOnIds.toList(growable: false),
+            requestedFor: _requestedForUtc,
+            requestedTimezone: profile.timezone,
+            preferredTimeText: _requestedForLabel(
+              context,
+              requestedForUtc: _requestedForUtc!,
+              timezone: profile.timezone,
+            ),
             message: _messageController.text.trim().isEmpty
                 ? null
                 : _messageController.text.trim(),
@@ -131,6 +152,45 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
     if (_emailError != null) setState(() => _emailError = null);
   }
 
+  Future<void> _pickRequestedFor(PublicProfile profile) async {
+    final now = DateTime.now();
+    final currentWallClock = _requestedForUtc == null
+        ? now.add(const Duration(days: 1))
+        : bookingRequestWallClock(
+            requestedForUtc: _requestedForUtc!,
+            timezone: profile.timezone,
+          );
+    final date = await showWorkloopDatePicker(
+      context: context,
+      initialDate: currentWallClock,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 1, now.month, now.day),
+    );
+    if (date == null || !mounted) return;
+    final time = await showWorkloopTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(currentWallClock),
+    );
+    if (time == null || !mounted) return;
+    try {
+      final requestedForUtc = bookingRequestUtcFromWallClock(
+        date: date,
+        hour: time.hour,
+        minute: time.minute,
+        timezone: profile.timezone,
+      );
+      setState(() {
+        _requestedForUtc = requestedForUtc;
+        _requestedForError = null;
+      });
+    } on ArgumentError {
+      setState(() {
+        _requestedForError =
+            'That time is skipped by the clock change. Choose another time.';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final AsyncValue<PublicProfile?> profile = widget.previewProfile == null
@@ -138,7 +198,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
         : AsyncValue.data(widget.previewProfile);
     final canGoBack = Navigator.of(context).canPop();
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -160,45 +220,97 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                     body: 'This Workloop profile is not available.',
                   );
                 }
+                final availability = _selectedServiceId == null
+                    ? null
+                    : ref.watch(
+                        publicBookingAvailabilityProvider((
+                          handle: data.profile.handle,
+                          serviceId: _selectedServiceId!,
+                          serviceIdsKey: _selectedServiceIds.join(','),
+                          addOnIdsKey: (_selectedAddOnIds.toList()..sort())
+                              .join(','),
+                        )),
+                      );
                 return _ProfileContent(
                   profile: data,
+                  availability: availability,
                   selectedServiceId: _selectedServiceId,
+                  selectedServiceIds: _selectedServiceIds,
+                  selectedAddOnIds: _selectedAddOnIds,
                   nameController: _nameController,
                   phoneController: _phoneController,
                   emailController: _emailController,
-                  preferredTimeController: _preferredTimeController,
+                  requestedForUtc: _requestedForUtc,
                   messageController: _messageController,
                   sending: _sending,
                   sent: _sent,
                   nameError: _nameError,
                   phoneError: _phoneError,
                   emailError: _emailError,
+                  requestedForError: _requestedForError,
                   submitError: _submitError,
                   topInset: canGoBack ? 84 : 28,
                   onNameChanged: _clearNameError,
                   onPhoneChanged: _clearPhoneError,
                   onEmailChanged: _clearEmailError,
-                  onServiceChanged: (id) =>
-                      setState(() => _selectedServiceId = id),
-                  onPreferredTimePicked: (value) =>
-                      setState(() => _preferredTimeController.text = value),
+                  onServiceChanged: (id) => setState(() {
+                    _selectedServiceId = id;
+                    _selectedServiceIds = id == null ? [] : [id];
+                    _selectedAddOnIds.clear();
+                    _requestedForUtc = null;
+                    _requestedForError = null;
+                  }),
+                  onServicesChanged: (ids) => setState(() {
+                    _selectedServiceIds = List.of(ids);
+                    _selectedServiceId = ids.firstOrNull;
+                    final validExtras = data.services
+                        .where((service) => ids.contains(service.id))
+                        .expand((service) => service.addOns)
+                        .map((extra) => extra.id)
+                        .toSet();
+                    _selectedAddOnIds.removeWhere(
+                      (id) => !validExtras.contains(id),
+                    );
+                    _requestedForUtc = null;
+                    _requestedForError = null;
+                  }),
+                  onAddOnChanged: (id, selected) => setState(() {
+                    if (selected) {
+                      if (_selectedAddOnIds.length < 8) {
+                        _selectedAddOnIds.add(id);
+                      }
+                    } else {
+                      _selectedAddOnIds.remove(id);
+                    }
+                    _requestedForUtc = null;
+                    _requestedForError = null;
+                  }),
+                  onRequestedForTap: () => _pickRequestedFor(data),
+                  onSuggestedTimeSelected: (requestedForUtc) => setState(() {
+                    _requestedForUtc = requestedForUtc;
+                    _requestedForError = null;
+                  }),
                   onSubmit: () => _sendRequest(data),
                 );
               },
             ),
           ),
           if (canGoBack)
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.only(
-                  left: AppSpacing.pageX,
-                  top: AppSpacing.sm,
-                ),
-                child: WorkloopIconButton(
-                  icon: LucideIcons.chevronLeft,
-                  semanticLabel: 'Back to profile',
-                  backgroundColor: AppColors.bgCard.withValues(alpha: 0.94),
-                  onTap: () => workloopGoBack(context),
+            Positioned(
+              left: 0,
+              top: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    left: AppSpacing.pageX,
+                    top: AppSpacing.sm,
+                  ),
+                  child: WorkloopIconButton(
+                    icon: LucideIcons.chevronLeft,
+                    semanticLabel: 'Back to profile',
+                    backgroundColor: AppColors.bgCard.withValues(alpha: 0.94),
+                    onTap: () => workloopGoBack(context),
+                  ),
                 ),
               ),
             ),
@@ -210,46 +322,60 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
 
 class _ProfileContent extends StatelessWidget {
   final PublicProfile profile;
+  final AsyncValue<PublicBookingAvailability>? availability;
   final String? selectedServiceId;
+  final List<String> selectedServiceIds;
+  final Set<String> selectedAddOnIds;
   final TextEditingController nameController;
   final TextEditingController phoneController;
   final TextEditingController emailController;
-  final TextEditingController preferredTimeController;
+  final DateTime? requestedForUtc;
   final TextEditingController messageController;
   final bool sending;
   final bool sent;
   final String? nameError;
   final String? phoneError;
   final String? emailError;
+  final String? requestedForError;
   final String? submitError;
   final double topInset;
   final ValueChanged<String> onNameChanged;
   final ValueChanged<String> onPhoneChanged;
   final ValueChanged<String> onEmailChanged;
   final ValueChanged<String?> onServiceChanged;
-  final ValueChanged<String> onPreferredTimePicked;
+  final ValueChanged<List<String>> onServicesChanged;
+  final void Function(String id, bool selected) onAddOnChanged;
+  final VoidCallback onRequestedForTap;
+  final ValueChanged<DateTime> onSuggestedTimeSelected;
   final VoidCallback onSubmit;
 
   const _ProfileContent({
     required this.profile,
+    required this.availability,
     required this.selectedServiceId,
+    required this.selectedServiceIds,
+    required this.selectedAddOnIds,
     required this.nameController,
     required this.phoneController,
     required this.emailController,
-    required this.preferredTimeController,
+    required this.requestedForUtc,
     required this.messageController,
     required this.sending,
     required this.sent,
     required this.nameError,
     required this.phoneError,
     required this.emailError,
+    required this.requestedForError,
     required this.submitError,
     required this.topInset,
     required this.onNameChanged,
     required this.onPhoneChanged,
     required this.onEmailChanged,
     required this.onServiceChanged,
-    required this.onPreferredTimePicked,
+    required this.onServicesChanged,
+    required this.onAddOnChanged,
+    required this.onRequestedForTap,
+    required this.onSuggestedTimeSelected,
     required this.onSubmit,
   });
 
@@ -257,6 +383,33 @@ class _ProfileContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final bookingClosed = profile.profile.bookingMode != 'manual';
     final bookingSectionKey = GlobalKey();
+    final selectedServices = selectedServiceIds
+        .map(
+          (id) =>
+              profile.services.where((service) => service.id == id).firstOrNull,
+        )
+        .whereType<Service>()
+        .toList();
+    final selectedService = selectedServices.firstOrNull;
+    final selectedAddOns = selectedServices
+        .expand((service) => service.addOns)
+        .where((extra) => selectedAddOnIds.contains(extra.id));
+    final totalDurationMinutes = selectedService == null
+        ? null
+        : selectedServices.fold<int>(
+                0,
+                (total, service) => total + service.durationMins,
+              ) +
+              selectedAddOns.fold<int>(
+                0,
+                (total, extra) => total + extra.durationMins,
+              );
+    final totalPrice =
+        selectedServices.fold<double>(
+          0,
+          (total, service) => total + service.price,
+        ) +
+        selectedAddOns.fold<double>(0, (total, extra) => total + extra.price);
 
     return SafeArea(
       child: ListView(
@@ -311,6 +464,24 @@ class _ProfileContent extends StatelessWidget {
                             duration: service.durationMins,
                             price: service.price,
                             description: service.description,
+                            selected: selectedServiceIds.contains(service.id),
+                            onTap: bookingClosed
+                                ? null
+                                : () {
+                                    onServiceChanged(service.id);
+                                    final target =
+                                        bookingSectionKey.currentContext;
+                                    if (target == null) return;
+                                    Scrollable.ensureVisible(
+                                      target,
+                                      duration: AppMotion.responsive(
+                                        context,
+                                        AppMotion.standard,
+                                      ),
+                                      curve: AppMotion.curve,
+                                      alignment: 0.06,
+                                    );
+                                  },
                           ),
                         )
                         .toList(),
@@ -393,21 +564,51 @@ class _ProfileContent extends StatelessWidget {
                             ...profile.services.map(
                               (service) => WorkloopPickerOption<String?>(
                                 value: service.id,
-                                label: service.name,
+                                label:
+                                    '${service.name} · ${formatFriendlyDuration(service.durationMins)}',
                               ),
                             ),
                           ],
                           onChanged: onServiceChanged,
                         ),
                         const SizedBox(height: 10),
-                        _ProfileField(
-                          controller: preferredTimeController,
-                          label: 'Preferred day or time',
-                          hint: 'For example, Tuesday morning',
-                          maxLength: 160,
+                        AdditionalServicesPicker(
+                          services: profile.services,
+                          selectedIds: selectedServiceIds,
+                          onChanged: onServicesChanged,
                         ),
-                        const SizedBox(height: 8),
-                        _PreferredTimeChoices(onPick: onPreferredTimePicked),
+                        for (final service in selectedServices)
+                          if (service.addOns.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            _OptionalExtras(
+                              service: service,
+                              selectedIds: selectedAddOnIds,
+                              onChanged: onAddOnChanged,
+                            ),
+                          ],
+                        if (selectedServices.length > 1) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            'Combined total · ${formatFriendlyDuration(totalDurationMinutes!)} · ${formatPounds(totalPrice)}',
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        _SuggestedTimes(
+                          availability: availability,
+                          selectedServiceId: selectedServiceId,
+                          requestedForUtc: requestedForUtc,
+                          onSelected: onSuggestedTimeSelected,
+                          onRequestAnotherTime: onRequestedForTap,
+                        ),
+                        const SizedBox(height: 10),
+                        _RequestedForField(
+                          requestedForUtc: requestedForUtc,
+                          timezone: profile.timezone,
+                          workingHours: profile.workingHours,
+                          durationMinutes: totalDurationMinutes,
+                          errorText: requestedForError,
+                          onTap: onRequestedForTap,
+                        ),
                         const SizedBox(height: 10),
                         _ProfileField(
                           controller: messageController,
@@ -470,6 +671,257 @@ class _ProfileContent extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _OptionalExtras extends StatelessWidget {
+  final Service service;
+  final Set<String> selectedIds;
+  final void Function(String id, bool selected) onChanged;
+
+  const _OptionalExtras({
+    required this.service,
+    required this.selectedIds,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = service.addOns
+        .where((addOn) => selectedIds.contains(addOn.id))
+        .toList(growable: false);
+    final duration =
+        service.durationMins +
+        selected.fold<int>(0, (total, addOn) => total + addOn.durationMins);
+    final price =
+        service.price +
+        selected.fold<double>(0, (total, addOn) => total + addOn.price);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.bgInteract,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Optional extras · ${service.name}',
+              style: TextStyle(
+                color: AppColors.t1,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Choose any extras you would like included in your request.',
+              style: TextStyle(color: AppColors.t3, fontSize: 12, height: 1.35),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            for (final addOn in service.addOns)
+              Semantics(
+                checked: selectedIds.contains(addOn.id),
+                child: CheckboxListTile(
+                  value: selectedIds.contains(addOn.id),
+                  onChanged: (value) => onChanged(addOn.id, value ?? false),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text(
+                    addOn.name,
+                    style: const TextStyle(color: AppColors.t1, fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    [
+                      if (addOn.durationMins > 0)
+                        '+${formatFriendlyDuration(addOn.durationMins)}',
+                      if (addOn.price > 0) '+${formatPounds(addOn.price)}',
+                      if (addOn.description?.isNotEmpty == true)
+                        addOn.description!,
+                    ].join(' · '),
+                    style: const TextStyle(color: AppColors.t3, fontSize: 12),
+                  ),
+                ),
+              ),
+            const Divider(color: AppColors.border),
+            Text(
+              'Total · ${formatFriendlyDuration(duration)} · ${formatPounds(price)}',
+              style: const TextStyle(
+                color: AppColors.t1,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SuggestedTimes extends StatelessWidget {
+  final AsyncValue<PublicBookingAvailability>? availability;
+  final String? selectedServiceId;
+  final DateTime? requestedForUtc;
+  final ValueChanged<DateTime> onSelected;
+  final VoidCallback onRequestAnotherTime;
+
+  const _SuggestedTimes({
+    required this.availability,
+    required this.selectedServiceId,
+    required this.requestedForUtc,
+    required this.onSelected,
+    required this.onRequestAnotherTime,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = selectedServiceId == null
+        ? const Text(
+            'Choose a service to see suggested times.',
+            style: TextStyle(color: AppColors.t3, fontSize: 13),
+          )
+        : availability!.when(
+            loading: () => const Row(
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'Checking suggested times…',
+                    style: TextStyle(color: AppColors.t3, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+            error: (_, _) => const Text(
+              'Suggested times are unavailable right now. You can still request another time.',
+              style: TextStyle(color: AppColors.t3, fontSize: 13, height: 1.35),
+            ),
+            data: (data) => data.days.isEmpty
+                ? const Text(
+                    'No suggested times are showing right now. You can still request another time.',
+                    style: TextStyle(
+                      color: AppColors.t3,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final day in data.days) ...[
+                        Text(
+                          MaterialLocalizations.of(
+                            context,
+                          ).formatMediumDate(day.date),
+                          style: const TextStyle(
+                            color: AppColors.t2,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Wrap(
+                          spacing: AppSpacing.xs,
+                          runSpacing: AppSpacing.xs,
+                          children: [
+                            for (final slotUtc in day.slotsUtc)
+                              _SuggestedTimeChip(
+                                slotUtc: slotUtc,
+                                timezone: data.timezone,
+                                selected:
+                                    requestedForUtc?.toUtc() == slotUtc.toUtc(),
+                                onSelected: () => onSelected(slotUtc),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
+                    ],
+                  ),
+          );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.bgInteract,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Suggested times',
+            style: TextStyle(
+              color: AppColors.t1,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Looks open right now. These times are not held or confirmed until the business accepts your request.',
+            style: TextStyle(color: AppColors.t3, fontSize: 12, height: 1.35),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          content,
+          const SizedBox(height: AppSpacing.xs),
+          WorkloopTextButton(
+            label: 'Request another time',
+            onPressed: onRequestAnotherTime,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuggestedTimeChip extends StatelessWidget {
+  final DateTime slotUtc;
+  final String timezone;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  const _SuggestedTimeChip({
+    required this.slotUtc,
+    required this.timezone,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final wallClock = bookingRequestWallClock(
+      requestedForUtc: slotUtc,
+      timezone: timezone,
+    );
+    final label = MaterialLocalizations.of(
+      context,
+    ).formatTimeOfDay(TimeOfDay.fromDateTime(wallClock));
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'Suggested time $label',
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: AppSpacing.minTouch),
+        child: ChoiceChip(
+          label: Text(label),
+          selected: selected,
+          onSelected: (_) => onSelected(),
+        ),
       ),
     );
   }
@@ -621,7 +1073,7 @@ class _Notice extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.greenDim,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.green),
       ),
       child: Text(
@@ -664,57 +1116,89 @@ class _ServiceRow extends StatelessWidget {
   final int duration;
   final double price;
   final String? description;
+  final bool selected;
+  final VoidCallback? onTap;
   const _ServiceRow({
     required this.name,
     required this.duration,
     required this.price,
     this.description,
+    this.selected = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: AppColors.t1,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '$duration min',
-                  style: const TextStyle(color: AppColors.t3, fontSize: 12),
-                ),
-                if (description?.isNotEmpty == true) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    description!,
-                    style: const TextStyle(
-                      color: AppColors.t3,
-                      fontSize: 12,
-                      height: 1.25,
+    return Semantics(
+      button: onTap != null,
+      selected: selected,
+      label: '$name, ${formatFriendlyDuration(duration)}',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.modBg : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(
+              color: selected ? AppColors.accentInk : Colors.transparent,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: AppColors.t1,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 3),
+                    Text(
+                      formatFriendlyDuration(duration),
+                      style: const TextStyle(color: AppColors.t3, fontSize: 12),
+                    ),
+                    if (description?.isNotEmpty == true) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        description!,
+                        style: const TextStyle(
+                          color: AppColors.t3,
+                          fontSize: 12,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Text(
+                formatPounds(price),
+                style: const TextStyle(
+                  color: AppColors.t1,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (onTap != null) ...[
+                const SizedBox(width: AppSpacing.xs),
+                Icon(
+                  selected ? LucideIcons.circleCheck : LucideIcons.chevronRight,
+                  color: selected ? AppColors.accentInk : AppColors.t3,
+                  size: 18,
+                ),
               ],
-            ),
+            ],
           ),
-          Text(
-            formatPounds(price),
-            style: const TextStyle(
-              color: AppColors.t1,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -761,7 +1245,7 @@ class _PublishedHours extends StatelessWidget {
                 const SizedBox(width: AppSpacing.sm),
                 Flexible(
                   child: Text(
-                    formatWorkingHourValue(entry.hours),
+                    formatFriendlyWorkingHourValue(entry.hours),
                     textAlign: TextAlign.end,
                     style: const TextStyle(
                       color: AppColors.t1,
@@ -833,61 +1317,159 @@ class _ProfileField extends StatelessWidget {
   }
 }
 
-class _PreferredTimeChoices extends StatelessWidget {
-  final ValueChanged<String> onPick;
+class _RequestedForField extends StatelessWidget {
+  final DateTime? requestedForUtc;
+  final String timezone;
+  final Map<String, dynamic> workingHours;
+  final int? durationMinutes;
+  final String? errorText;
+  final VoidCallback onTap;
 
-  const _PreferredTimeChoices({required this.onPick});
-
-  Future<void> _pickDateAndTime(BuildContext context) async {
-    final now = DateTime.now();
-    final date = await showWorkloopDatePicker(
-      context: context,
-      initialDate: now.add(const Duration(days: 1)),
-      firstDate: DateTime(now.year, now.month, now.day),
-      lastDate: DateTime(now.year + 1),
-    );
-    if (date == null || !context.mounted) return;
-    final time = await showWorkloopTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 9, minute: 0),
-    );
-    if (!context.mounted) return;
-    final localizations = MaterialLocalizations.of(context);
-    final dateLabel = localizations.formatMediumDate(date);
-    onPick(
-      time == null
-          ? dateLabel
-          : '$dateLabel at ${localizations.formatTimeOfDay(time)}',
-    );
-  }
+  const _RequestedForField({
+    required this.requestedForUtc,
+    required this.timezone,
+    required this.workingHours,
+    required this.durationMinutes,
+    required this.errorText,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    const options = ['This week', 'Next week', 'Weekend', 'Evening'];
+    final hasPublishedHours = workingHours.values.any(
+      (value) => workingHourBlocks(value).isNotEmpty,
+    );
+    final hoursFit = requestedForUtc == null
+        ? null
+        : bookingRequestHoursFit(
+            requestedForUtc: requestedForUtc!,
+            timezone: timezone,
+            workingHours: workingHours,
+            durationMinutes: durationMinutes ?? 1,
+          );
+    final guidance = switch (hoursFit) {
+      BookingRequestHoursFit.withinPublishedHours =>
+        'This time is within the published hours. It is still a request until the business confirms it.',
+      BookingRequestHoursFit.outsidePublishedHours =>
+        'This time is outside the published hours. You can still request it and the business will let you know if it works.',
+      BookingRequestHoursFit.noPublishedHours =>
+        'Hours are not published for this day. You can still request it and the business will let you know if it works.',
+      null when hasPublishedHours =>
+        'Published hours are a guide. You can request any time; nothing is confirmed until the business contacts you.',
+      null =>
+        'Choose any preferred time. Nothing is confirmed until the business contacts you.',
+    };
+    final guidanceColor =
+        hoursFit == BookingRequestHoursFit.withinPublishedHours
+        ? AppColors.t3
+        : hoursFit == null
+        ? AppColors.t3
+        : AppColors.warning;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        WorkloopTextButton(
-          label: 'Choose a date and time',
-          onPressed: () => _pickDateAndTime(context),
-        ),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: options
-              .map(
-                (option) => WorkloopFilterChip(
-                  label: option,
-                  selected: false,
-                  onTap: () => onPick(option),
+        Semantics(
+          button: true,
+          label: 'Preferred date and time',
+          value: requestedForUtc == null
+              ? 'Not chosen'
+              : _requestedForLabel(
+                  context,
+                  requestedForUtc: requestedForUtc!,
+                  timezone: timezone,
                 ),
-              )
-              .toList(),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(minHeight: AppSpacing.minTouch),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.bgInteract,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: errorText == null ? AppColors.border : AppColors.error,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    LucideIcons.calendarClock,
+                    color: AppColors.t3,
+                    size: 18,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Preferred date and time',
+                          style: TextStyle(color: AppColors.t3, fontSize: 12),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          requestedForUtc == null
+                              ? 'Choose a date and time'
+                              : _requestedForLabel(
+                                  context,
+                                  requestedForUtc: requestedForUtc!,
+                                  timezone: timezone,
+                                ),
+                          style: const TextStyle(
+                            color: AppColors.t1,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    LucideIcons.chevronRight,
+                    color: AppColors.t3,
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (errorText != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            errorText!,
+            style: const TextStyle(color: AppColors.error, fontSize: 12),
+          ),
+        ],
+        const SizedBox(height: 6),
+        Semantics(
+          liveRegion: requestedForUtc != null,
+          child: Text(
+            guidance,
+            style: TextStyle(color: guidanceColor, fontSize: 12, height: 1.35),
+          ),
         ),
       ],
     );
   }
+}
+
+String _requestedForLabel(
+  BuildContext context, {
+  required DateTime requestedForUtc,
+  required String timezone,
+}) {
+  final wallClock = bookingRequestWallClock(
+    requestedForUtc: requestedForUtc,
+    timezone: timezone,
+  );
+  final localizations = MaterialLocalizations.of(context);
+  return '${localizations.formatMediumDate(wallClock)} at '
+      '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(wallClock))}';
 }
 
 InputDecoration _fieldDecoration(
@@ -974,7 +1556,7 @@ class _ClosedBookingState extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgInteract,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.border),
       ),
       child: const Column(

@@ -131,7 +131,7 @@ class PaymentsRepository {
     return rows.map<Payment>(Payment.fromMap).toList();
   }
 
-  Future<void> create({
+  Future<String> create({
     required String workspaceId,
     required double amount,
     required String status,
@@ -145,23 +145,28 @@ class PaymentsRepository {
     final dueDateString = (dueDate ?? date).toIso8601String().split('T').first;
     final isPaid = status == 'paid';
 
-    await _client.from('invoices').insert({
-      'workspace_id': workspaceId,
-      'contact_id': contactId,
-      'appointment_id': appointmentId,
-      'type': 'invoice',
-      'status': status,
-      'issue_date': dateString,
-      'due_date': dueDateString,
-      'subtotal': amount,
-      'tax_rate': 0,
-      'tax_amount': 0,
-      'discount_value': 0,
-      'total': amount,
-      'amount_paid': isPaid ? amount : 0,
-      'income_recorded_at': isPaid ? date.toUtc().toIso8601String() : null,
-      'notes': notes?.trim().isEmpty ?? true ? null : notes!.trim(),
-    });
+    final row = await _client
+        .from('invoices')
+        .insert({
+          'workspace_id': workspaceId,
+          'contact_id': contactId,
+          'appointment_id': appointmentId,
+          'type': 'invoice',
+          'status': status,
+          'issue_date': dateString,
+          'due_date': dueDateString,
+          'subtotal': amount,
+          'tax_rate': 0,
+          'tax_amount': 0,
+          'discount_value': 0,
+          'total': amount,
+          'amount_paid': isPaid ? amount : 0,
+          'income_recorded_at': isPaid ? date.toUtc().toIso8601String() : null,
+          'notes': notes?.trim().isEmpty ?? true ? null : notes!.trim(),
+        })
+        .select('id')
+        .single();
+    return row['id'] as String;
   }
 
   Future<void> markPaid(Payment payment) async {

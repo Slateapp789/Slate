@@ -16,12 +16,23 @@ import '../../shared/utils/workflow_idempotency.dart';
 import '../../shared/widgets/slate_ui.dart';
 
 String friendlyPaymentError(Object error) {
+  if (error is PostgrestException) {
+    return error.code == 'P0001'
+        ? (_safePaymentMessage(error.message) ??
+              'Could not send this payment email. Please try again.')
+        : 'Payments are temporarily unavailable. Please try again.';
+  }
   if (error is FunctionException) {
     final details = error.details;
     final payload = details is Map
         ? Map<String, dynamic>.from(details)
         : const <String, dynamic>{};
     final code = payload['code']?.toString();
+    if (code == 'collection_in_progress' &&
+        payload['error']?.toString() ==
+            'Payment request key was already used') {
+      return 'This payment has changed. Close this sheet and refresh Money before trying again.';
+    }
     if (code == 'platform_configuration_required') {
       return 'Payment setup is being finalised. Please try again shortly.';
     }
@@ -66,6 +77,17 @@ bool isValidReceiptEmail(String value) {
   return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
 }
 
+/// Parse pounds as decimal digits, avoiding floating-point rounding and NaN.
+int? parseRefundAmountMinor(String input, int refundableMinor) {
+  final match = RegExp(r'^(\d+)(?:\.(\d{1,2}))?$').firstMatch(input.trim());
+  if (match == null) return null;
+  final pounds = int.tryParse(match.group(1)!);
+  if (pounds == null || pounds > refundableMinor ~/ 100) return null;
+  final pennies = int.parse((match.group(2) ?? '').padRight(2, '0'));
+  final amount = pounds * 100 + pennies;
+  return amount > 0 && amount <= refundableMinor ? amount : null;
+}
+
 enum PaymentSetupAction { viewOwed }
 
 String contactlessUnavailableMessage(TargetPlatform platform) {
@@ -80,11 +102,9 @@ Future<bool> showPaymentCollectionSheet({
   required Payment payment,
 }) async {
   if (!WorkloopCapabilities.paymentCollectionEnabled) return false;
-  return await showModalBottomSheet<bool>(
+  return await showWorkloopBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        barrierColor: SlateTheme.of(context).scrim,
         builder: (_) => _PaymentCollectionSheet(payment: payment),
       ) ??
       false;
@@ -97,11 +117,9 @@ Future<PaymentSetupAction?> showPaymentSetupSheet({
   if (!WorkloopCapabilities.paymentCollectionEnabled) {
     return Future.value();
   }
-  return showModalBottomSheet<PaymentSetupAction>(
+  return showWorkloopBottomSheet<PaymentSetupAction>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: SlateTheme.of(context).scrim,
     builder: (_) => _PaymentCollectionSheet(workspaceId: workspaceId),
   );
 }
@@ -172,7 +190,6 @@ class _PaymentCollectionSheetState
   bool _working = false;
   bool _linkCopied = false;
   String? _error;
-  Uri? _paymentLink;
   late final TextEditingController _receiptEmailController;
   String? _paymentLinkIdempotencyKey;
   String? _terminalPaymentIdempotencyKey;
@@ -189,7 +206,7 @@ class _PaymentCollectionSheetState
     );
     _status = _repository.accountStatus(_workspaceId);
     _tapAvailability = tapToPayService.availability();
-    if ((widget.payment?.stripeAmountPaid ?? 0) > 0) {
+    if (widget.payment != null) {
       _transactions = _repository.transactionsForInvoice(
         _workspaceId,
         widget.payment!.id,
@@ -241,21 +258,74 @@ class _PaymentCollectionSheetState
     });
   }
 
-  Future<Uri> _loadPaymentLink() async {
+  Future<PaymentLinkResult> _loadPaymentLinkResult() async {
     final payment = widget.payment;
     if (payment == null) {
       throw StateError('Choose a payment to collect first.');
     }
-    final existing = _paymentLink;
-    if (existing != null) return existing;
     final result = await _repository.createPaymentLink(
       workspaceId: payment.workspaceId,
       invoiceId: payment.id,
       idempotencyKey: _paymentLinkIdempotencyKey ??=
           createWorkflowIdempotencyKey(),
     );
-    _paymentLink = result.url;
-    return result.url;
+    return result;
+  }
+
+  Future<Uri> _loadPaymentLink() async => (await _loadPaymentLinkResult()).url;
+
+  Future<void> _emailPaymentRequest() async {
+    await _run(() async {
+      final link = await _loadPaymentLinkResult();
+      final preview = await _repository.paymentRequestEmail(
+        link.transactionId,
+        send: false,
+      );
+      if (!mounted) return;
+      final email = preview['email'] as String;
+      final amount = (preview['amount_minor'] as num).toDouble() / 100;
+      final approved = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Email payment request?'),
+          content: Text(
+            'Send a request for ${formatPounds(amount)} to $email. The email includes a secure Stripe payment link.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Send email'),
+            ),
+          ],
+        ),
+      );
+      if (approved != true) return;
+      final result = await _repository.paymentRequestEmail(
+        link.transactionId,
+        send: true,
+        expectedEmail: email,
+      );
+      if (!mounted) return;
+      final status = result['status'];
+      if (status == 'failed' || status == 'cancelled') {
+        throw StateError(
+          'This payment email could not be sent. Create a fresh payment link or contact support.',
+        );
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            status == 'sent'
+                ? 'This payment request has already been emailed'
+                : 'Payment request queued for $email',
+          ),
+        ),
+      );
+    });
   }
 
   Future<void> _sharePaymentLink() async {
@@ -360,9 +430,8 @@ class _PaymentCollectionSheetState
           ),
           TextButton(
             onPressed: () {
-              final value = double.tryParse(controller.text.trim());
-              final minor = value == null ? 0 : (value * 100).round();
-              if (minor <= 0 || minor > refundable) return;
+              final minor = parseRefundAmountMinor(controller.text, refundable);
+              if (minor == null) return;
               Navigator.pop(dialogContext, minor);
             },
             child: const Text('Refund'),
@@ -468,7 +537,9 @@ class _PaymentCollectionSheetState
                         message: 'Could not check payment setup',
                         onRetry: _refreshStatus,
                       )
-                    else if (status == null || !status.ready)
+                    else if (status == null ||
+                        (!status.ready &&
+                            (payment?.stripeAmountPaid ?? 0) <= 0))
                       _buildSetup(status)
                     else
                       _buildReady(status),
@@ -580,7 +651,7 @@ class _PaymentCollectionSheetState
         ],
       );
     }
-    if (payment.stripeAmountPaid > 0 && payment.outstandingAmount <= 0) {
+    if (_transactions != null) {
       return FutureBuilder<List<Map<String, dynamic>>>(
         future: _transactions,
         builder: (context, snapshot) {
@@ -628,17 +699,13 @@ class _PaymentCollectionSheetState
                     'https',
                 orElse: () => null,
               );
-          if (completed.isEmpty) {
-            return const _PaymentStatusRow(
-              icon: LucideIcons.clock3,
-              iconColor: AppColors.t3,
-              title: 'Stripe is confirming this payment',
-              detail: 'Pull to refresh Money in a moment.',
-              status: 'Processing',
-            );
-          }
+          if (completed.isEmpty) return _buildCollectionOptions();
           return Column(
             children: [
+              if (status.ready && payment.outstandingAmount > 0) ...[
+                _buildCollectionOptions(),
+                const SizedBox(height: AppSpacing.lg),
+              ],
               _PaymentStatusRow(
                 icon: LucideIcons.circleCheck,
                 iconColor: AppColors.success,
@@ -677,6 +744,10 @@ class _PaymentCollectionSheetState
         },
       );
     }
+    return _buildCollectionOptions();
+  }
+
+  Widget _buildCollectionOptions() {
     return FutureBuilder<TapToPayAvailability>(
       future: _tapAvailability,
       builder: (context, snapshot) {
@@ -751,6 +822,10 @@ class _PaymentCollectionSheetState
           ),
         ],
         const SizedBox(height: AppSpacing.xs),
+        WorkloopTextButton(
+          label: 'Email payment request',
+          onPressed: _working ? null : _emailPaymentRequest,
+        ),
         WorkloopTextButton(
           label: _linkCopied ? 'Payment link copied' : 'Copy payment link',
           onPressed: _working ? null : _copyPaymentLink,

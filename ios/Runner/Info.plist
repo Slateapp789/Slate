@@ -2,8 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Enabled by the reviewed mobile build flag after Firebase initializes. -->
+	<key>FirebaseCrashlyticsCollectionEnabled</key>
+	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Workloop uses your location to securely accept in-person payments.</string>
+	<string>Workloop uses your location to show local weather when you enable it, and to securely accept in-person payments.</string>
+	<!-- The Swift Package version of geolocator links Apple's Always API.
+	     Workloop requests When In Use only and has no background location mode. -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Workloop uses your location while you are using the app to show local weather when you enable it, and for supported in-person payments. Workloop does not track your location in the background.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Workloop can connect to supported payment readers.</string>
 	<key>NSCameraUsageDescription</key>
@@ -43,6 +50,9 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Supabase/app_links handles OAuth and recovery before routing. -->
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
@@ -83,6 +93,11 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

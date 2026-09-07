@@ -54,7 +54,9 @@ alter table if exists workspace_members enable row level security;
 alter table if exists workspace_settings enable row level security;
 alter table if exists contacts enable row level security;
 alter table if exists services enable row level security;
+alter table if exists service_add_ons enable row level security;
 alter table if exists appointments enable row level security;
+alter table if exists appointment_items enable row level security;
 alter table if exists invoices enable row level security;
 alter table if exists notes enable row level security;
 alter table if exists invoice_line_items enable row level security;
@@ -63,6 +65,7 @@ alter table if exists tasks enable row level security;
 alter table if exists task_checklist_items enable row level security;
 alter table if exists business_profiles enable row level security;
 alter table if exists booking_requests enable row level security;
+alter table if exists booking_request_items enable row level security;
 alter table if exists notifications enable row level security;
 alter table if exists notification_preferences enable row level security;
 alter table if exists push_tokens enable row level security;
@@ -132,12 +135,25 @@ with check (app_private.is_workspace_member(workspace_id));
 drop policy if exists "Public can read visible services" on services;
 -- Public service reads are served by the get-public-profile Edge Function.
 
+drop policy if exists "Members can manage service add-ons" on service_add_ons;
+create policy "Members can manage service add-ons"
+on service_add_ons for all
+to authenticated
+using (app_private.is_workspace_member(workspace_id))
+with check (app_private.is_workspace_member(workspace_id));
+
 drop policy if exists "Members can manage appointments" on appointments;
 create policy "Members can manage appointments"
 on appointments for all
 to authenticated
 using (app_private.is_workspace_member(workspace_id))
 with check (app_private.is_workspace_member(workspace_id));
+
+drop policy if exists "Members can read appointment items" on appointment_items;
+create policy "Members can read appointment items"
+on appointment_items for select
+to authenticated
+using (app_private.is_workspace_member(workspace_id));
 
 drop policy if exists "Members can manage invoices" on invoices;
 create policy "Members can manage invoices"
@@ -200,6 +216,33 @@ with check (app_private.is_workspace_member(workspace_id));
 
 drop policy if exists "Public can create booking requests" on booking_requests;
 -- Public booking requests are created by the create-booking-request Edge Function.
+
+drop policy if exists "Members can read booking request items" on booking_request_items;
+create policy "Members can read booking request items"
+on booking_request_items for select
+to authenticated
+using (app_private.is_workspace_member(workspace_id));
+
+drop policy if exists "Verified MFA users require AAL2" on service_add_ons;
+create policy "Verified MFA users require AAL2"
+on service_add_ons as restrictive for all
+to authenticated
+using (app_private.current_user_meets_mfa_policy())
+with check (app_private.current_user_meets_mfa_policy());
+
+drop policy if exists "Verified MFA users require AAL2" on booking_request_items;
+create policy "Verified MFA users require AAL2"
+on booking_request_items as restrictive for all
+to authenticated
+using (app_private.current_user_meets_mfa_policy())
+with check (app_private.current_user_meets_mfa_policy());
+
+drop policy if exists "Verified MFA users require AAL2" on appointment_items;
+create policy "Verified MFA users require AAL2"
+on appointment_items as restrictive for all
+to authenticated
+using (app_private.current_user_meets_mfa_policy())
+with check (app_private.current_user_meets_mfa_policy());
 
 drop policy if exists "Members can manage notifications" on notifications;
 create policy "Members can manage notifications"

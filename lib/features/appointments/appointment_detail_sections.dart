@@ -18,133 +18,119 @@ Future<_PickedAppointmentDetailTime?> _showAppointmentDetailTimePicker({
   int tempHour = initialHour;
   int tempMinute = initialMinute;
 
-  return showModalBottomSheet<_PickedAppointmentDetailTime>(
+  return showWorkloopBottomSheet<_PickedAppointmentDetailTime>(
     context: context,
-    backgroundColor: AppColors.bgCard,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
     builder: (context) => StatefulBuilder(
-      builder: (context, setModal) => SizedBox(
-        height: 280,
-        child: Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.pageX,
-                vertical: AppSpacing.md,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Select time',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.t1,
-                    ),
-                  ),
-                  WorkloopTextButton(
-                    label: 'Done',
-                    onPressed: () => Navigator.pop(
-                      context,
-                      _PickedAppointmentDetailTime(
-                        hour: tempHour,
-                        minute: tempMinute,
+      builder: (context, setModal) => SlateSheetFrame(
+        child: SizedBox(
+          height: 240,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Select time',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.t1,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ListWheelScrollView.useDelegate(
-                      itemExtent: 48,
-                      perspective: 0.003,
-                      diameterRatio: 1.8,
-                      physics: const FixedExtentScrollPhysics(),
-                      controller: FixedExtentScrollController(
-                        initialItem: tempHour,
+                    WorkloopTextButton(
+                      label: 'Done',
+                      onPressed: () => Navigator.pop(
+                        context,
+                        _PickedAppointmentDetailTime(
+                          hour: tempHour,
+                          minute: tempMinute,
+                        ),
                       ),
-                      onSelectedItemChanged: (i) =>
-                          setModal(() => tempHour = i),
-                      childDelegate: ListWheelChildBuilderDelegate(
-                        childCount: 24,
-                        builder: (context, i) {
-                          final selected = i == tempHour;
-                          return Center(
-                            child: Text(
-                              i.toString().padLeft(2, '0'),
-                              style: TextStyle(
-                                fontSize: selected ? 24 : 18,
-                                fontWeight: selected
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                                color: selected ? AppColors.t1 : AppColors.t3,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ListWheelScrollView.useDelegate(
+                        itemExtent: 48,
+                        perspective: 0.003,
+                        diameterRatio: 1.8,
+                        physics: const FixedExtentScrollPhysics(),
+                        controller: FixedExtentScrollController(
+                          initialItem: tempHour,
+                        ),
+                        onSelectedItemChanged: (i) =>
+                            setModal(() => tempHour = i),
+                        childDelegate: ListWheelChildBuilderDelegate(
+                          childCount: 24,
+                          builder: (context, i) {
+                            final selected = i == tempHour;
+                            return Center(
+                              child: Text(
+                                i.toString().padLeft(2, '0'),
+                                style: TextStyle(
+                                  fontSize: selected ? 24 : 18,
+                                  fontWeight: selected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                  color: selected ? AppColors.t1 : AppColors.t3,
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                  const Text(
-                    ':',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.t1,
-                    ),
-                  ),
-                  Expanded(
-                    child: ListWheelScrollView.useDelegate(
-                      itemExtent: 48,
-                      perspective: 0.003,
-                      diameterRatio: 1.8,
-                      physics: const FixedExtentScrollPhysics(),
-                      controller: FixedExtentScrollController(
-                        initialItem: tempMinute ~/ 15,
+                    const Text(
+                      ':',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.t1,
                       ),
-                      onSelectedItemChanged: (i) =>
-                          setModal(() => tempMinute = i * 15),
-                      childDelegate: ListWheelChildBuilderDelegate(
-                        childCount: 4,
-                        builder: (context, i) {
-                          final min = i * 15;
-                          final selected = min == tempMinute;
-                          return Center(
-                            child: Text(
-                              min.toString().padLeft(2, '0'),
-                              style: TextStyle(
-                                fontSize: selected ? 24 : 18,
-                                fontWeight: selected
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                                color: selected ? AppColors.t1 : AppColors.t3,
+                    ),
+                    Expanded(
+                      child: ListWheelScrollView.useDelegate(
+                        itemExtent: 48,
+                        perspective: 0.003,
+                        diameterRatio: 1.8,
+                        physics: const FixedExtentScrollPhysics(),
+                        controller: FixedExtentScrollController(
+                          initialItem: tempMinute ~/ 15,
+                        ),
+                        onSelectedItemChanged: (i) =>
+                            setModal(() => tempMinute = i * 15),
+                        childDelegate: ListWheelChildBuilderDelegate(
+                          childCount: 4,
+                          builder: (context, i) {
+                            final min = i * 15;
+                            final selected = min == tempMinute;
+                            return Center(
+                              child: Text(
+                                min.toString().padLeft(2, '0'),
+                                style: TextStyle(
+                                  fontSize: selected ? 24 : 18,
+                                  fontWeight: selected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                  color: selected ? AppColors.t1 : AppColors.t3,
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),
@@ -178,7 +164,7 @@ class _BookingTasksCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -289,7 +275,7 @@ class _BookingPaymentCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(color: AppColors.border),
           ),
           child: Column(

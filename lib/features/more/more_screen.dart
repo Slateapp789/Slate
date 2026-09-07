@@ -70,7 +70,7 @@ class MoreScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      backgroundColor: tokens.background,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),

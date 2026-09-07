@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/models/slate_models.dart';
 import '../../../shared/utils/currency_format.dart';
+import '../../../shared/utils/duration_format.dart';
 import '../../../shared/widgets/slate_ui.dart';
 
 // ── Hero card (client + service) ──────────────────────────────────────────────
@@ -12,6 +14,7 @@ class AppointmentHeroCard extends StatelessWidget {
   // View mode
   final String clientName;
   final String serviceName;
+  final List<ServiceItemSnapshot> serviceItems;
   final num? price;
   final String initials;
   final String? contactId;
@@ -19,7 +22,7 @@ class AppointmentHeroCard extends StatelessWidget {
   final VoidCallback onOpenClient;
   // Edit mode
   final AsyncValue<List<Map<String, dynamic>>> clients;
-  final List<Map<String, dynamic>> services;
+  final AsyncValue<List<Map<String, dynamic>>> services;
   final String? selectedClientId;
   final String? selectedServiceId;
   final TextEditingController priceController;
@@ -27,12 +30,14 @@ class AppointmentHeroCard extends StatelessWidget {
   final ValueChanged<String?> onClientChanged;
   final ValueChanged<String?> onServiceChanged;
   final VoidCallback onRetryClients;
+  final VoidCallback? onRetryServices;
 
   const AppointmentHeroCard({
     super.key,
     required this.editing,
     required this.clientName,
     required this.serviceName,
+    this.serviceItems = const [],
     this.price,
     required this.initials,
     this.contactId,
@@ -47,6 +52,7 @@ class AppointmentHeroCard extends StatelessWidget {
     required this.onClientChanged,
     required this.onServiceChanged,
     required this.onRetryClients,
+    this.onRetryServices,
   });
 
   @override
@@ -161,61 +167,82 @@ class AppointmentHeroCard extends StatelessWidget {
       ),
     );
 
-    return Row(
+    final addOns = serviceItems.where((item) => item.isAddOn).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.modClients.withValues(alpha: 0.08),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              initials,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: AppColors.green,
+        Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.modClients.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
               ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: contactId == null
-              ? clientDetails
-              : Semantics(
-                  button: true,
-                  enabled: !openingClient,
-                  label: 'View client $clientName',
-                  value: openingClient ? 'Opening' : serviceName,
-                  onTap: openingClient ? null : onOpenClient,
-                  child: ExcludeSemantics(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: openingClient ? null : onOpenClient,
-                      child: clientDetails,
-                    ),
+              child: Center(
+                child: Text(
+                  initials,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.green,
                   ),
                 ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: contactId == null
+                  ? clientDetails
+                  : Semantics(
+                      button: true,
+                      enabled: !openingClient,
+                      label: 'View client $clientName',
+                      value: openingClient ? 'Opening' : serviceName,
+                      onTap: openingClient ? null : onOpenClient,
+                      child: ExcludeSemantics(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: openingClient ? null : onOpenClient,
+                          child: clientDetails,
+                        ),
+                      ),
+                    ),
+            ),
+            if (price != null)
+              Text(
+                formatPounds(price!),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.t1,
+                ),
+              ),
+          ],
         ),
-        if (price != null)
+        if (addOns.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.md),
+          const Divider(height: 1, color: AppColors.border),
+          const SizedBox(height: AppSpacing.sm),
           Text(
-            formatPounds(price!),
+            addOns.map((item) => '+ ${item.name}').join('  ·  '),
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: AppColors.t1,
+              color: AppColors.t2,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
           ),
+        ],
       ],
     );
   }
 
   Widget _buildEditMode() {
     final serviceValues = {
-      ...services.map((service) => service['id'] as String),
+      ...(services.value ?? const <Map<String, dynamic>>[]).map(
+        (service) => service['id'] as String,
+      ),
       '__custom__',
     };
     final serviceValue = serviceValues.contains(selectedServiceId)
@@ -259,29 +286,39 @@ class AppointmentHeroCard extends StatelessWidget {
         const SizedBox(height: 12),
         _fieldLabel('Service'),
         const SizedBox(height: 8),
-        WorkloopPickerField<String>(
-          value: serviceValue,
-          title: 'Choose a service',
-          hint: 'Select service',
-          searchHint: 'Search services',
-          leadingIcon: LucideIcons.briefcase,
-          options: [
-            ...services.map(
-              (s) => WorkloopPickerOption(
-                value: s['id'] as String,
-                label: s['name'] as String,
-                subtitle: s['duration_mins'] == null
-                    ? null
-                    : '${s['duration_mins']} min',
+        services.when(
+          loading: () =>
+              const SlateLoadingBlock(height: 58, radius: AppRadius.md),
+          error: (_, _) => SlateErrorState(
+            message:
+                'Could not load services. Your current booking details are kept.',
+            onRetry: onRetryServices,
+          ),
+          data: (items) => WorkloopPickerField<String>(
+            value: serviceValue,
+            title: 'Choose a service',
+            hint: 'Select service',
+            searchHint: 'Search services',
+            options: [
+              ...items.map(
+                (s) => WorkloopPickerOption(
+                  value: s['id'] as String,
+                  label: s['name'] as String,
+                  subtitle: s['duration_mins'] == null
+                      ? null
+                      : formatFriendlyDuration(
+                          (s['duration_mins'] as num).toInt(),
+                        ),
+                ),
               ),
-            ),
-            const WorkloopPickerOption(
-              value: '__custom__',
-              label: 'Custom service',
-              subtitle: 'Enter a one-off service',
-            ),
-          ],
-          onChanged: onServiceChanged,
+              const WorkloopPickerOption(
+                value: '__custom__',
+                label: 'Custom service',
+                subtitle: 'Enter a one-off service',
+              ),
+            ],
+            onChanged: onServiceChanged,
+          ),
         ),
         const SizedBox(height: 12),
         _fieldLabel('Service name'),
@@ -392,7 +429,7 @@ class AppointmentDateTimeCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppColors.bgCard.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: AppColors.border),
       ),
       child: editing ? _buildEditMode(context) : _buildViewMode(),
@@ -685,7 +722,7 @@ class AppointmentActionSection extends StatelessWidget {
                 foregroundColor: AppColors.error,
                 side: BorderSide(color: AppColors.error.withValues(alpha: 0.3)),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
               ),
               icon: const Icon(LucideIcons.x, size: 18),
@@ -705,7 +742,7 @@ class AppointmentActionSection extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.successDim,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
         ),
         child: const Row(
@@ -731,7 +768,7 @@ class AppointmentActionSection extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.errorDim,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
         ),
         child: Row(

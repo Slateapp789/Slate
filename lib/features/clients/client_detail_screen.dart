@@ -4,9 +4,13 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/providers/clients_provider.dart';
+import '../../shared/providers/booking_whatsapp_reminder_provider.dart';
+import '../../shared/providers/workspace_provider.dart';
 import '../../shared/providers/maps_preference_provider.dart';
+import '../../shared/providers/workspace_refresh.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/maps_launcher.dart';
+import '../../shared/utils/whatsapp_reminder.dart';
 import '../../shared/widgets/slate_ui.dart';
 import 'widgets/client_appointments_tab.dart';
 import 'widgets/client_form.dart';
@@ -43,6 +47,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   bool _saving = false;
   bool _moreDetailsExpanded = false;
   bool _allowPop = false;
+  bool _openingWhatsApp = false;
 
   @override
   void initState() {
@@ -253,8 +258,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
         _editing = false;
         _saving = false;
       });
-      ref.invalidate(clientsProvider);
-      ref.invalidate(clientCrmRecordsProvider);
+      refreshClientRelatedData(ref.invalidate);
       return true;
     } catch (_) {
       if (!mounted) return false;
@@ -268,99 +272,85 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     var deleting = false;
     String? deleteError;
 
-    await showModalBottomSheet<void>(
+    await showWorkloopBottomSheet<void>(
       context: context,
       isDismissible: false,
       enableDrag: false,
-      backgroundColor: AppColors.bgCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModal) => PopScope(
           canPop: !deleting,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.pageX,
-                AppSpacing.sm,
-                AppSpacing.pageX,
-                AppSpacing.xl,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _handle(),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Delete ${_client['name']}?',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.t1,
-                    ),
-                    textAlign: TextAlign.center,
+          child: SlateSheetFrame(
+            scrollable: true,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Delete ${_client['name']}?',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.t1,
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'This removes the client. Their bookings, money records, '
-                    'tasks and notes stay in Workloop without a client link.',
-                    style: TextStyle(fontSize: 14, color: AppColors.t3),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (deleteError != null) ...[
-                    const SizedBox(height: 16),
-                    Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        deleteError!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.error,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        textAlign: TextAlign.center,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'This removes the client. Their bookings, money records, '
+                  'tasks and notes stay in Workloop without a client link.',
+                  style: TextStyle(fontSize: 14, color: AppColors.t3),
+                  textAlign: TextAlign.center,
+                ),
+                if (deleteError != null) ...[
+                  const SizedBox(height: 16),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      deleteError!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w500,
                       ),
+                      textAlign: TextAlign.center,
                     ),
-                  ],
-                  const SizedBox(height: 24),
-                  _actionBtn(
-                    label: 'Delete Client',
-                    color: AppColors.error,
-                    loading: deleting,
-                    onTap: () async {
-                      if (deleting) return;
-                      setModal(() {
-                        deleting = true;
-                        deleteError = null;
-                      });
-                      try {
-                        await ref
-                            .read(clientsRepositoryProvider)
-                            .delete(_client['id'] as String);
-                      } catch (_) {
-                        if (!ctx.mounted) return;
-                        setModal(() {
-                          deleting = false;
-                          deleteError =
-                              'Couldn’t delete this client. Nothing was removed. Please try again.';
-                        });
-                        return;
-                      }
-                      ref.invalidate(clientsProvider);
-                      ref.invalidate(clientCrmRecordsProvider);
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      if (!mounted) return;
-                      setState(() => _allowPop = true);
-                      await WidgetsBinding.instance.endOfFrame;
-                      if (mounted) Navigator.pop(context);
-                    },
                   ),
-                  const SizedBox(height: 10),
-                  _cancelBtn(ctx, disabled: deleting),
                 ],
-              ),
+                const SizedBox(height: 24),
+                _actionBtn(
+                  label: 'Delete Client',
+                  color: AppColors.error,
+                  loading: deleting,
+                  onTap: () async {
+                    if (deleting) return;
+                    setModal(() {
+                      deleting = true;
+                      deleteError = null;
+                    });
+                    try {
+                      await ref
+                          .read(clientsRepositoryProvider)
+                          .delete(_client['id'] as String);
+                    } catch (_) {
+                      if (!ctx.mounted) return;
+                      setModal(() {
+                        deleting = false;
+                        deleteError =
+                            'Couldn’t delete this client. Nothing was removed. Please try again.';
+                      });
+                      return;
+                    }
+                    refreshClientRelatedData(ref.invalidate);
+                    if (!ctx.mounted) return;
+                    Navigator.pop(ctx);
+                    if (!mounted) return;
+                    setState(() => _allowPop = true);
+                    await WidgetsBinding.instance.endOfFrame;
+                    if (mounted) Navigator.pop(context);
+                  },
+                ),
+                const SizedBox(height: 10),
+                _cancelBtn(ctx, disabled: deleting),
+              ],
             ),
           ),
         ),
@@ -390,12 +380,61 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   Future<void> _sendText(String phone) async =>
       launchUrl(Uri(scheme: 'sms', path: phone.replaceAll(' ', '')));
 
-  Future<void> _openWhatsApp(String phone) async {
-    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    await launchUrl(
-      Uri.parse('https://wa.me/$digits'),
-      mode: LaunchMode.externalApplication,
-    );
+  Future<void> _openWhatsApp() async {
+    if (_openingWhatsApp) return;
+    final auth = ref.read(supabaseClientProvider).auth;
+    final userId = auth.currentUser?.id;
+    final clientId = _client['id'] as String;
+    final workspaceId = _client['workspace_id'] as String?;
+    bool current() =>
+        mounted &&
+        ModalRoute.of(context)?.isCurrent != false &&
+        userId != null &&
+        auth.currentUser?.id == userId &&
+        _client['id'] == clientId &&
+        ref.read(workspaceIdProvider).value == workspaceId;
+    if (!current()) return;
+    final repository = ref.read(clientsRepositoryProvider);
+    final launcher = ref.read(whatsAppUrlLauncherProvider);
+    setState(() => _openingWhatsApp = true);
+    try {
+      final latest = await repository
+          .getById(clientId)
+          .timeout(const Duration(seconds: 10));
+      if (!current()) return;
+      if (latest == null ||
+          latest.id != clientId ||
+          latest.workspaceId != workspaceId) {
+        _snack('This client is no longer available.', AppColors.error);
+        return;
+      }
+      final number = normaliseWhatsAppPhone(latest.phone);
+      if (number == null) {
+        _snack(
+          'Edit this client’s number: use a UK 07 mobile or include the international country code.',
+          AppColors.error,
+        );
+        return;
+      }
+      final opened = await launcher(
+        whatsAppChatUri(number),
+      ).timeout(const Duration(seconds: 10));
+      if (current() && !opened) {
+        _snack(
+          'WhatsApp didn’t open. You can use the client’s call or email action instead.',
+          AppColors.error,
+        );
+      }
+    } catch (_) {
+      if (current()) {
+        _snack(
+          'Could not open WhatsApp. Check your connection and try again.',
+          AppColors.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _openingWhatsApp = false);
+    }
   }
 
   Future<void> _openDirections(String address) async {
@@ -448,7 +487,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
         if (!didPop) _handleBack();
       },
       child: Scaffold(
-        backgroundColor: AppColors.bg,
+        backgroundColor: Colors.transparent,
         body: Stack(
           children: [
             const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -458,12 +497,12 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.pageX,
-                      AppSpacing.lg,
+                      AppSpacing.screenTop,
                       AppSpacing.pageX,
                       0,
                     ),
                     child: WorkloopRouteHeader(
-                      title: _editing ? 'Edit client' : name,
+                      title: _editing ? 'Edit client' : 'Clients',
                       backSemanticLabel: 'Back to clients',
                       onBack: _handleBack,
                       trailing: _HeaderAction(
@@ -507,6 +546,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                             sliver: SliverList.list(
                               children: [
                                 _ClientCompactHeader(
+                                  name: name,
                                   initials: initials,
                                   status:
                                       _client['status'] as String? ?? 'active',
@@ -529,9 +569,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                                           ? null
                                           : () => _sendText(phone),
                                     'whatsapp' =>
-                                      phone.isEmpty
-                                          ? null
-                                          : () => _openWhatsApp(phone),
+                                      phone.isEmpty ? null : _openWhatsApp,
                                     _ =>
                                       phone.isEmpty
                                           ? null
@@ -630,6 +668,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 }
 
 class _ClientCompactHeader extends StatelessWidget {
+  final String name;
   final String initials;
   final String status;
   final String preferredContact;
@@ -638,6 +677,7 @@ class _ClientCompactHeader extends StatelessWidget {
   final VoidCallback? onPreferred;
 
   const _ClientCompactHeader({
+    required this.name,
     required this.initials,
     required this.status,
     required this.preferredContact,
@@ -653,72 +693,76 @@ class _ClientCompactHeader extends StatelessWidget {
         : status == 'lead'
         ? AppColors.warning
         : AppColors.t3;
-    return WorkloopSurface(
-      color: AppColors.bgCard.withValues(alpha: 0.68),
-      borderColor: AppColors.border,
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.modClients.withValues(alpha: 0.09),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                initials.isEmpty ? '?' : initials,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.modClients,
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            SizedBox(
+              width: 64,
+              height: 64,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const WorkloopIllustration(
+                    kind: WorkloopIllustrationKind.folder,
+                    size: 64,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(
+                      initials.isEmpty ? '?' : initials,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.t1,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _statusLabel(status),
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    _statusLabel(status),
+                    style: TextStyle(color: statusColor, fontSize: 13),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Prefers $preferredContact',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.t2,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
+                  Text(
+                    'Prefers $preferredContact',
+                    style: const TextStyle(color: AppColors.t2, fontSize: 12),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          _CompactContactButton(
-            icon: LucideIcons.phone,
-            label: 'Call',
-            onTap: onCall,
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          _CompactContactButton(
-            icon: preferredIcon,
-            label: preferredContact,
-            onTap: onPreferred,
-          ),
-        ],
-      ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: _CompactContactButton(
+                icon: LucideIcons.phone,
+                label: 'Call',
+                onTap: onCall,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: _CompactContactButton(
+                icon: preferredIcon,
+                label: preferredContact,
+                onTap: onPreferred,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -736,25 +780,16 @@ class _CompactContactButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: label,
-      child: Material(
-        color: onTap == null
-            ? AppColors.bgInteract.withValues(alpha: 0.55)
-            : AppColors.modClients.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: InkWell(
-          onTap: onTap,
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label, textAlign: TextAlign.center),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, AppSpacing.minTouch),
+        foregroundColor: AppColors.t1,
+        side: const BorderSide(color: AppColors.border),
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          child: SizedBox(
-            width: AppSpacing.minTouch,
-            height: AppSpacing.minTouch,
-            child: Icon(
-              icon,
-              color: onTap == null ? AppColors.t4 : AppColors.modClients,
-              size: 17,
-            ),
-          ),
         ),
       ),
     );
@@ -843,18 +878,6 @@ class _ClientWorkspaceNavigation extends StatelessWidget {
   }
 }
 
-// ── Shared sheet helpers ──────────────────────────────────────────────────────
-Widget _handle() => Center(
-  child: Container(
-    width: 40,
-    height: 4,
-    decoration: BoxDecoration(
-      color: AppColors.border,
-      borderRadius: BorderRadius.circular(2),
-    ),
-  ),
-);
-
 Widget _actionBtn({
   required String label,
   required VoidCallback? onTap,
@@ -870,7 +893,9 @@ Widget _actionBtn({
       foregroundColor: color == AppColors.error
           ? AppColors.bg
           : AppColors.onBrandAccent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
       elevation: 0,
     ),
     child: loading

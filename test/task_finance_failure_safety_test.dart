@@ -93,10 +93,12 @@ class _ControlledExpensesRepository extends ExpensesRepository {
 
   final deletion = Completer<void>();
   int deleteCalls = 0;
+  String? lastDeletedId;
 
   @override
   Future<void> delete(String expenseId) {
     deleteCalls += 1;
+    lastDeletedId = expenseId;
     return deletion.future;
   }
 }
@@ -463,6 +465,7 @@ void main() {
       workspaceId: 'workspace-1',
       amount: 45,
       category: 'Materials',
+      notes: 'Window-cleaning materials',
       expenseDate: now,
     );
     await pumpFinance(
@@ -475,14 +478,16 @@ void main() {
 
     await tester.tap(find.text('Spent'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Materials').last);
+    final expenseRow = find.text('Window-cleaning materials');
+    await tester.ensureVisible(expenseRow);
     await tester.pumpAndSettle();
-    await tester.longPress(find.text('Materials').last);
+    await tester.longPress(expenseRow);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete Expense'));
     await tester.pump();
 
     expect(expensesRepository.deleteCalls, 1);
+    expect(expensesRepository.lastDeletedId, 'expense-1');
     expect(find.text('Delete expense?'), findsOneWidget);
     expect(find.text('Deleting...'), findsOneWidget);
 
@@ -499,6 +504,7 @@ void main() {
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
+    expect(expenseRow, findsOneWidget);
   });
 
   testWidgets('failed income deletion keeps confirmation open', (tester) async {

@@ -36,22 +36,27 @@ class ClientOverviewTab extends ConsumerWidget {
     final tasks = ref.watch(clientTasksProvider(clientId));
     final activityUnavailable =
         appointments.hasError || payments.hasError || tasks.hasError;
+    final activityLoading =
+        (!appointments.hasValue && appointments.isLoading) ||
+        (!payments.hasValue && payments.isLoading) ||
+        (!tasks.hasValue && tasks.isLoading);
     final appointmentRows = appointments.value ?? const [];
     final paymentRows = payments.value ?? const <Payment>[];
     final taskRows = tasks.value ?? const <SlateTask>[];
 
-    void retryActivity() {
-      ref.invalidate(clientAppointmentsProvider(clientId));
-      ref.invalidate(clientPaymentsProvider(clientId));
-      ref.invalidate(clientTasksProvider(clientId));
+    Future<void> retryActivity() async {
+      await Future.wait([
+        refreshClientAppointments(ref, clientId),
+        refreshClientPayments(ref, clientId),
+        refreshClientTasks(ref, clientId),
+      ]);
     }
 
     return RefreshIndicator(
       color: AppColors.accentPrimary,
-      onRefresh: () async {
-        retryActivity();
-      },
+      onRefresh: retryActivity,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.pageX,
           AppSpacing.xs,
@@ -65,6 +70,8 @@ class ClientOverviewTab extends ConsumerWidget {
                   'Some client activity could not be loaded. Try again before relying on this overview.',
               onRetry: retryActivity,
             )
+          else if (activityLoading)
+            const SlateLoadingBlock(height: 220)
           else ...[
             _NextBookingSection(
               appointments: appointmentRows,
@@ -95,7 +102,7 @@ class ClientOverviewTab extends ConsumerWidget {
             onEdit: onEdit,
             onOpenAddress: onOpenAddress,
           ),
-          if (!activityUnavailable) ...[
+          if (!activityUnavailable && !activityLoading) ...[
             const WorkloopDivider(margin: EdgeInsets.symmetric(vertical: 22)),
             _RecentActivity(
               appointments: appointmentRows,
@@ -131,43 +138,46 @@ class _NextBookingSection extends StatelessWidget {
         appointments.where((row) {
           final date = _appointmentDate(row);
           final status = row['status'] as String? ?? 'scheduled';
-          return date != null && date.isAfter(now) && status != 'cancelled';
+          return date != null && date.isAfter(now) && status == 'scheduled';
         }).toList()..sort(
           (a, b) => _appointmentDate(a)!.compareTo(_appointmentDate(b)!),
         );
     final next = upcoming.isEmpty ? null : upcoming.first;
     final laterCount = (upcoming.length - 1).clamp(0, upcoming.length);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionHeader(
-          title: 'Next booking',
-          action: 'View bookings',
-          onAction: onOpenBookings,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        if (next == null)
-          _QuietRow(
-            icon: LucideIcons.calendarPlus,
-            title: 'Nothing booked yet',
-            subtitle: 'Add the next piece of work when it is agreed.',
-            onTap: onOpenBookings,
-          )
-        else
-          _BookingPanel(
-            appointment: next,
-            laterCount: laterCount,
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AppointmentDetailScreen(appointment: next),
-                ),
-              );
-            },
-          ),
-      ],
+    return WorkloopPaperPanel(
+      title: 'Next booking',
+      padding: EdgeInsets.zero,
+      trailing: TextButton(
+        onPressed: onOpenBookings,
+        child: const Text('View bookings'),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (next == null)
+            _QuietRow(
+              flat: true,
+              icon: LucideIcons.calendarPlus,
+              title: 'Nothing booked yet',
+              subtitle: 'Add a booking when a time is agreed.',
+              onTap: onOpenBookings,
+            )
+          else
+            _BookingPanel(
+              appointment: next,
+              laterCount: laterCount,
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AppointmentDetailScreen(appointment: next),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
     );
   }
 }
@@ -189,7 +199,7 @@ class _BookingPanel extends StatelessWidget {
     final service = _appointmentTitle(appointment);
     final address = appointment['location'] as String? ?? '';
     return Material(
-      color: AppColors.panelSoft.withValues(alpha: 0.72),
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(AppRadius.lg),
       child: InkWell(
         onTap: onTap,
@@ -427,50 +437,53 @@ class _NotesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final notes = (client['notes'] as String? ?? '').trim();
     final important = (client['important_notes'] as String? ?? '').trim();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionHeader(title: 'Client notes', action: 'Edit', onAction: onEdit),
-        const SizedBox(height: AppSpacing.sm),
-        if (important.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  LucideIcons.bookmark,
-                  color: AppColors.modClients,
-                  size: 16,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    important,
-                    style: const TextStyle(
-                      color: AppColors.t1,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      height: 1.4,
+    return WorkloopPaperPanel(
+      title: 'Client notes',
+      tone: WorkloopPaperTone.warm,
+      trailing: TextButton(onPressed: onEdit, child: const Text('Edit')),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (important.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    LucideIcons.bookmark,
+                    color: AppColors.modClients,
+                    size: 16,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      important,
+                      style: const TextStyle(
+                        color: AppColors.t1,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
+            ),
+          Text(
+            notes.isEmpty && important.isEmpty
+                ? 'No client notes added yet.'
+                : notes.isEmpty
+                ? 'No additional notes.'
+                : notes,
+            style: TextStyle(
+              color: notes.isEmpty ? AppColors.t3 : AppColors.t2,
+              fontSize: 13,
+              height: 1.45,
             ),
           ),
-        Text(
-          notes.isEmpty && important.isEmpty
-              ? 'No client notes added yet.'
-              : notes.isEmpty
-              ? 'No additional notes.'
-              : notes,
-          style: TextStyle(
-            color: notes.isEmpty ? AppColors.t3 : AppColors.t2,
-            fontSize: 13,
-            height: 1.45,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -781,17 +794,21 @@ class _QuietRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final bool flat;
 
   const _QuietRow({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.flat = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return WorkloopListRow(
+      flat: flat,
+      showDivider: !flat,
       onTap: onTap,
       leading: Container(
         width: 38,
@@ -804,7 +821,7 @@ class _QuietRow extends StatelessWidget {
       ),
       title: Text(
         title,
-        maxLines: 1,
+        maxLines: flat ? 2 : 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
           color: AppColors.t1,
@@ -814,7 +831,7 @@ class _QuietRow extends StatelessWidget {
       ),
       subtitle: Text(
         subtitle,
-        maxLines: 1,
+        maxLines: flat ? 2 : 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
           color: AppColors.t3,

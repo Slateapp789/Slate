@@ -7,10 +7,8 @@ import '../../shared/models/slate_models.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
 import '../../shared/providers/finance_provider.dart';
-import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
-import '../../shared/utils/currency_format.dart';
 import '../../shared/widgets/slate_ui.dart';
 import 'widgets/money_editor_widgets.dart';
 
@@ -110,6 +108,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
       '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
   Future<void> _handleBack() async {
+    if (_saving) return;
     FocusManager.instance.primaryFocus?.unfocus();
     if (!_hasChanges) {
       await _leaveScreen();
@@ -183,32 +182,11 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
               appointmentId: widget.appointmentId,
               notes: description,
             );
-        try {
-          await ref
-              .read(notificationsRepositoryProvider)
-              .create(
-                workspaceId: workspaceId,
-                type: _status == 'paid'
-                    ? 'payment_received'
-                    : 'invoice_overdue',
-                title: _status == 'paid'
-                    ? 'Payment recorded'
-                    : 'Payment to collect',
-                body:
-                    '${formatPounds(amount)} ${_status == 'paid' ? 'was recorded' : 'is waiting to be collected'}.',
-                deepLink: '/payments',
-              );
-        } catch (_) {
-          // Recording Money is the primary workflow. A best-effort in-app
-          // notification must not make a committed entry look unsaved.
-        }
       }
 
       ref.invalidate(invoicesProvider);
       ref.invalidate(dashboardRevenueProvider);
       ref.invalidate(clientCrmRecordsProvider);
-      ref.invalidate(notificationsProvider);
-      ref.invalidate(unreadNotificationsProvider);
       if (mounted) await _leaveScreen();
       return true;
     } catch (error) {
@@ -277,7 +255,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
         if (!didPop) _handleBack();
       },
       child: Scaffold(
-        backgroundColor: AppColors.bg,
+        backgroundColor: Colors.transparent,
         body: Stack(
           children: [
             const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -287,7 +265,7 @@ class _AddPaymentScreenState extends ConsumerState<AddPaymentScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.pageX,
-                      AppSpacing.lg,
+                      AppSpacing.screenTop,
                       AppSpacing.pageX,
                       0,
                     ),

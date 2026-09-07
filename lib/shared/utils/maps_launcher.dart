@@ -46,12 +46,11 @@ Future<MapLaunchChoice?> showMapLaunchSheet(
   String address,
 ) {
   var remember = false;
-  return showModalBottomSheet<MapLaunchChoice>(
+  return showWorkloopBottomSheet<MapLaunchChoice>(
     context: context,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.32),
     builder: (sheetContext) => StatefulBuilder(
       builder: (context, setModalState) => SlateSheetFrame(
+        scrollable: true,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -136,44 +135,46 @@ Future<MapsAppPreference?> showMapsPreferenceSheet(
   BuildContext context, {
   required MapsAppPreference selected,
 }) {
-  return showModalBottomSheet<MapsAppPreference>(
+  return showWorkloopBottomSheet<MapsAppPreference>(
     context: context,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.32),
+    isScrollControlled: true,
     builder: (sheetContext) => SlateSheetFrame(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Default maps app',
-            style: TextStyle(
-              color: AppColors.t1,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Default maps app',
+              style: TextStyle(
+                color: AppColors.t1,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          const Text(
-            'Used when opening directions from a saved address.',
-            style: TextStyle(color: AppColors.t3, fontSize: 12),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          for (final preference in MapsAppPreference.values) ...[
-            _MapOptionRow(
-              icon: switch (preference) {
-                MapsAppPreference.askEveryTime => LucideIcons.mousePointerClick,
-                MapsAppPreference.appleMaps => LucideIcons.map,
-                MapsAppPreference.googleMaps => LucideIcons.navigation,
-              },
-              label: preference.label,
-              selected: preference == selected,
-              onTap: () => Navigator.pop(sheetContext, preference),
+            const SizedBox(height: AppSpacing.xs),
+            const Text(
+              'Used when opening directions from a saved address.',
+              style: TextStyle(color: AppColors.t3, fontSize: 12),
             ),
-            if (preference != MapsAppPreference.values.last)
-              const Divider(height: 1, color: AppColors.border),
+            const SizedBox(height: AppSpacing.lg),
+            for (final preference in MapsAppPreference.values) ...[
+              _MapOptionRow(
+                icon: switch (preference) {
+                  MapsAppPreference.askEveryTime =>
+                    LucideIcons.mousePointerClick,
+                  MapsAppPreference.appleMaps => LucideIcons.map,
+                  MapsAppPreference.googleMaps => LucideIcons.navigation,
+                },
+                label: preference.label,
+                selected: preference == selected,
+                onTap: () => Navigator.pop(sheetContext, preference),
+              ),
+              if (preference != MapsAppPreference.values.last)
+                const Divider(height: 1, color: AppColors.border),
+            ],
           ],
-        ],
+        ),
       ),
     ),
   );

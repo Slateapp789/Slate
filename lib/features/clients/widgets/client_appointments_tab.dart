@@ -45,7 +45,7 @@ class ClientAppointmentsTab extends ConsumerWidget {
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: SlateErrorState(
           message: 'Bookings could not be loaded.',
-          onRetry: () => ref.invalidate(clientAppointmentsProvider(clientId)),
+          onRetry: () => refreshClientAppointments(ref, clientId),
         ),
       ),
       data: (appts) => appts.isEmpty
@@ -62,6 +62,7 @@ class ClientAppointmentsTab extends ConsumerWidget {
                         AddAppointmentScreen(initialClientId: clientId),
                   ),
                 );
+                if (!context.mounted) return;
                 ref.invalidate(clientAppointmentsProvider(clientId));
               },
             )
@@ -77,13 +78,13 @@ class ClientAppointmentsTab extends ConsumerWidget {
                             AddAppointmentScreen(initialClientId: clientId),
                       ),
                     );
+                    if (!context.mounted) return;
                     ref.invalidate(clientAppointmentsProvider(clientId));
                   },
                 ),
                 Expanded(
                   child: RefreshIndicator(
-                    onRefresh: () async =>
-                        ref.invalidate(clientAppointmentsProvider(clientId)),
+                    onRefresh: () => refreshClientAppointments(ref, clientId),
                     color: AppColors.green,
                     child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(
@@ -116,6 +117,7 @@ class ClientAppointmentsTab extends ConsumerWidget {
                                     AppointmentDetailScreen(appointment: appt),
                               ),
                             );
+                            if (!context.mounted) return;
                             ref.invalidate(
                               clientAppointmentsProvider(clientId),
                             );

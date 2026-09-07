@@ -33,7 +33,7 @@ class ClientPaymentsTab extends ConsumerWidget {
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: SlateErrorState(
           message: 'Money activity could not be loaded.',
-          onRetry: () => ref.invalidate(clientPaymentsProvider(clientId)),
+          onRetry: () => refreshClientPayments(ref, clientId),
         ),
       ),
       data: (items) {
@@ -44,6 +44,7 @@ class ClientPaymentsTab extends ConsumerWidget {
               builder: (_) => AddPaymentScreen(initialClientId: clientId),
             ),
           );
+          if (!context.mounted) return;
           ref.invalidate(clientPaymentsProvider(clientId));
           ref.invalidate(invoicesProvider);
           ref.invalidate(dashboardRevenueProvider);
@@ -55,13 +56,11 @@ class ClientPaymentsTab extends ConsumerWidget {
         }
         final received = items.fold<double>(
           0,
-          (sum, payment) => sum + payment.amountPaid,
+          (sum, payment) => sum + payment.collectedAmount,
         );
         final remaining = items.fold<double>(
           0,
-          (sum, payment) =>
-              sum +
-              (payment.total - payment.amountPaid).clamp(0, double.infinity),
+          (sum, payment) => sum + payment.outstandingAmount,
         );
         return Column(
           children: [
@@ -73,8 +72,7 @@ class ClientPaymentsTab extends ConsumerWidget {
             Expanded(
               child: RefreshIndicator(
                 color: AppColors.green,
-                onRefresh: () async =>
-                    ref.invalidate(clientPaymentsProvider(clientId)),
+                onRefresh: () => refreshClientPayments(ref, clientId),
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.pageX,
@@ -95,6 +93,7 @@ class ClientPaymentsTab extends ConsumerWidget {
                             builder: (_) => AddPaymentScreen(payment: payment),
                           ),
                         );
+                        if (!context.mounted) return;
                         ref.invalidate(clientPaymentsProvider(clientId));
                         ref.invalidate(invoicesProvider);
                         ref.invalidate(dashboardRevenueProvider);
@@ -120,12 +119,9 @@ class _PaymentRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final amount = payment.total;
-    final remaining = (payment.total - payment.amountPaid).clamp(
-      0,
-      double.infinity,
-    );
+    final remaining = payment.outstandingAmount;
     final paid = remaining <= 0;
-    final partPaid = !paid && payment.amountPaid > 0;
+    final partPaid = !paid && payment.collectedAmount > 0;
     final color = paid ? AppColors.success : AppColors.t3;
     final label = paid
         ? 'Paid'

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/slate_models.dart';
 import '../repositories/slate_repositories.dart';
+import 'business_clock_provider.dart';
 import 'workspace_provider.dart';
 import 'workspace_settings_provider.dart';
 
@@ -18,22 +19,27 @@ final expensesProvider = FutureProvider<List<Expense>>((ref) async {
   return ref.watch(expensesRepositoryProvider).list(workspaceId);
 });
 
-final appointmentPaymentsProvider =
-    FutureProvider.family<List<Payment>, String>((ref, appointmentId) {
-      return ref
-          .watch(paymentsRepositoryProvider)
-          .forAppointment(appointmentId);
+final appointmentPaymentsProvider = FutureProvider.autoDispose
+    .family<List<Payment>, String>((ref, appointmentId) async {
+      final payments = await ref.watch(invoicesProvider.future);
+      return payments
+          .where((item) => item.appointmentId == appointmentId)
+          .toList();
     });
 
 final financeSummaryProvider = FutureProvider<FinanceSummary>((ref) async {
-  final payments = await ref.watch(invoicesProvider.future);
-  final expenses = await ref.watch(expensesProvider.future);
-  final settings = await ref.watch(workspaceSettingsProvider.future);
+  final today = ref.watch(businessTodayProvider);
+  final (payments, expenses, settings) = await (
+    ref.watch(invoicesProvider.future),
+    ref.watch(expensesProvider.future),
+    ref.watch(workspaceSettingsProvider.future),
+  ).wait;
   final monthlyTarget = (settings?['revenue_target'] as num?)?.toDouble() ?? 0;
   return FinanceSummary.from(
     payments: payments,
     expenses: expenses,
     monthlyTarget: monthlyTarget,
+    now: today,
   );
 });
 
@@ -76,6 +82,17 @@ MoneyStatus moneyStatusFor(Payment payment, {DateTime? now}) {
 
 double receivedAmountFor(Payment payment) {
   return payment.collectedAmount;
+}
+
+/// Calendar-month receipts shared by the dashboard and Money's target. A
+/// selected history period must not change progress towards a monthly goal.
+double receivedIncomeForMonth(Iterable<Payment> payments, DateTime date) {
+  final local = date.toLocal();
+  return _sumPaymentsInRange(
+    payments,
+    DateTime(local.year, local.month, 1),
+    DateTime(local.year, local.month + 1, 1),
+  );
 }
 
 double outstandingAmountFor(Payment payment) {
@@ -239,11 +256,7 @@ class FinanceSummary {
       lastWeekStart,
       thisWeekStart,
     );
-    final thisMonthPaid = _sumPaymentsInRange(
-      payments,
-      thisMonthStart,
-      nextMonthStart,
-    );
+    final thisMonthPaid = receivedIncomeForMonth(payments, current);
     final lastMonthPaid = _sumPaymentsInRange(
       payments,
       lastMonthStart,

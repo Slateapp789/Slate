@@ -1,12 +1,16 @@
 # Workloop UI Design System
 
-Last updated: 2026-08-10
+Last updated: 2026-09-05
 
-## Workloop Studio — Current Contract
+The current visual contract is [Quiet + Warm](brand/QUIET_WARM_IMPLEMENTATION.md)
+and the dated September amendments below. Earlier systems are retained as
+history, not current implementation instructions.
 
-Workloop Studio is the active app-wide visual system. It supersedes Loopline,
-the graphite-frame direction, lime-led navigation, and the previous Instrument
-Sans geometry. Those systems remain documented below only as product history.
+## Workloop Studio — Historical Contract
+
+Workloop Studio was the app-wide visual system before the approved 4 September
+Quiet + Warm reset. It superseded Loopline, the graphite-frame direction,
+lime-led navigation and the previous Instrument Sans geometry.
 
 The interface should feel calm, capable and crafted: a mobile business
 operating system with clear next actions, not a generic SaaS dashboard. Use
@@ -107,12 +111,12 @@ display and metric hierarchy. Keep labels direct and sentence case.
   the canonical primitives.
 - The root navigation is a floating five-destination dock: Today, Clients,
   Work, Money and Business. Its neutral outline remains visually quiet; a
-  two-pixel indigo line, accent icon and primary label identify the active
-  destination without a filled selection block. The dock respects safe areas
-  and content always reserves clearance beneath it.
-- Peer navigation has one renderer: an open text rail with a two-pixel indigo
-  active line. Compact rails may reduce height, but must not introduce a second
-  selected-state language. Feature-level creation and
+  compact tinted plate, accent icon and primary label identify the active
+  destination. The dock respects safe areas and content always reserves
+  clearance beneath it.
+- Peer navigation has one renderer: a quiet segmented rail with the same
+  compact tinted selected state. Compact rails may reduce height, but must not
+  introduce a second selected-state language. Feature-level creation and
   utility controls may be circular; explicit save, confirmation and destructive
   decisions remain labelled rounded rectangles.
 
@@ -559,8 +563,22 @@ The canonical interface is now geometry-led rather than card- or pill-led.
   row specifies vertical padding it must also preserve an explicit horizontal
   inset so its leading icon cannot touch the surface edge.
 - Bottom navigation keeps a compact floating surface with a 28-point outer
-  radius. Active destinations and peer selections use line-led emphasis rather
-  than filled pills; buttons retain the shared 14-to-18-point soft-corner scale.
+  radius. Active destinations and peer selections use a quiet tinted fill and
+  stronger foreground colour, never a loose underline or dash; buttons retain
+  the shared 14-to-18-point soft-corner scale.
+
+## 2026-09-01 Shared hierarchy refinement
+
+- Iconless root headers use one narrow module-colour marker. This is the small
+  hierarchy accent; body copy and ordinary rows remain neutral in both themes.
+- Root create actions use `WorkloopTopAction` at the header's top-right. Do not
+  repeat a second Add link underneath the same header.
+- Every modal bottom sheet uses the theme-owned drag handle and
+  `SlateSheetFrame` for radius, surface, margins and content padding. Feature
+  code must not draw a second handle or invent local sheet chrome.
+- Service rows are text-led. Do not infer a trade or industry icon from a
+  service name; a scissors, briefcase or similar guess can misrepresent the
+  business.
 
 ## 2026-07-07 Minimal Refoundation
 
@@ -632,3 +650,123 @@ Current scope:
 - This section records the 2026-07-07 implementation. As of 2026-07-31,
   System, Light, and Dark are supported again; new work must continue to use
   semantic theme tokens rather than local colours.
+
+## 2026-09-02 Persistent Canvas Contract
+
+- `WorkloopAppCanvas` is the only application-level owner of the textured
+  background and sits above the Navigator through `MaterialApp.builder`.
+- Route scaffolds and retained workspace transition layers are transparent.
+  They must not introduce a second opaque page canvas or repaint the texture.
+- `WorkloopTexturedBackdrop` remains valid for isolated tests and previews; it
+  automatically yields to the application canvas in the running app.
+- Small semantic module accents may identify an active destination or header
+  marker. Body copy, rows, cards and page backgrounds remain neutral so colour
+  communicates hierarchy rather than decoration.
+
+## 4 September 2026 — Approved Quiet + Warm direction
+
+The owner explicitly approved replacing Studio with the combination of Quiet retro and Warm desktop. The authoritative reference and token/interaction contract live in `docs/brand/QUIET_WARM_IMPLEMENTATION.md`. Cream paper, powder-blue headers, restrained yellow attention strips, brown outlines and original native illustrations apply across all app features. Manrope remains the body face; WorkloopMono (IBM Plex Mono) handles compact labels. Five full-width navigation destinations and existing workflows remain. Dark mode uses a warm charcoal counterpart and respects the stored System/Light/Dark setting.
+
+Current implementation and visual evidence supersede older colour, corner and floating-navigation examples in this document. Preserve historical entries as historical guidance rather than applying them over the approved reset.
+
+## 2026-09-05 — Quiet + Warm reliability and polish amendment
+
+This amendment supersedes earlier instructions for transparent route surfaces,
+animated peer-tab crossfades and vertical navigation separators. The approved
+cream/powder-blue/warm-outline identity remains defined by
+`docs/brand/QUIET_WARM_IMPLEMENTATION.md` and current theme tokens.
+
+- Each pushed page paints a complete opaque shared backdrop. The app-level
+  canvas is only a fallback; it must not suppress a page's own background.
+- Main tabs change immediately and preserve their state. Native page/back
+  gestures remain, with opaque incoming pages and no crossfade of readable text.
+- Bottom navigation is one full-width surface including the home-indicator
+  safe area. No vertical dividers between destinations. Use the blue top marker
+  and selected label. Content clearance counts the bar/safe area once.
+- Paper panels paint their 1.5-point frame above the title strip so curved
+  corners remain continuous. Segmented controls have a single complete outline,
+  a selected fill and no interior divider lines.
+- Today prioritizes the next booking, actionable attention and compact totals.
+  Its next-booking card reaches ahead when today is empty; the separate Coming
+  up and Business Feed sections are removed. Single bookings use natural height.
+- Weather is optional, sourced and independently loaded. A neutral location
+  marker indicates unavailable/disabled weather; never imply a sunny day from
+  missing data. Notifications remain a quiet chronological updates inbox.
+
+### Owner adjustment — compact divided bottom bar
+
+Later on 5 September the owner clarified that the vertical dividers were welcome;
+the problem was their unfinished ends and the bar's excessive height. The final
+bottom navigation restores dividers across the full bar INCLUDING its bottom
+safe area. The final interactive row is **52 points plus the device bottom safe
+area**, with **26-point icons**; this follows the interim 64-point revision of
+the original 76-point row. The row grows modestly for enlarged navigation labels,
+which are capped at 1.3× while body text retains the user's full scaling.
+The earlier removal of bottom-bar dividers in this dated amendment is superseded.
+Segmented controls retain their single uninterrupted outer frame. Preserve the
+blue active-tab marker/label and the device home-indicator clearance. Shell
+content clearance uses the actual bar/safe-area height once, with 18 points of
+breathing room and no floating offset.
+
+### Owner adjustment — one content frame per section
+
+The owner explicitly rejected cards inside boxes on 5 September. A framed
+content section uses plain text, flat rows and optional dividing rules inside
+its single outer frame. This includes empty states: do not put a rounded empty
+card inside an already framed Next booking panel or request summary. For shared
+list rows inside a `WorkloopSurface` or `WorkloopPaperPanel`, use `flat: true`
+and omit the divider after the final row.
+
+Standalone cards remain available when they provide the only content frame.
+Form fields, segmented controls, checkboxes, buttons, status badges and small
+illustrated icon fields retain their functional boundaries; they are not
+additional content cards. Do not remove shared component borders globally to
+repair a nested composition.
+
+### 2026-09-05 — Settings grouped by audience and purpose
+
+Settings uses compact flat rows and direct destinations. Keep **Your
+notifications**, **Customer reminders** and **Emails from Workloop** separate:
+they have different recipients, delivery paths and data dependencies. Account
+contains identity/security/sign-out; **Privacy & data** opens directly to
+export/deletion. Appearance, Maps & calendar, guide, support and import remain
+clear existing-workflow destinations.
+
+Permission, token registration and actual notification delivery are different
+states. Never label a granted phone permission as proved delivery. Business
+updates may disable their child choices while preserving them; personal task/
+booking reminders and emails remain independent. Skip Sunday overview depends
+only on the morning overview. Do not expose a switch with no active producer.
+
+Settings bodies retain full text scaling, wrap personal details and use
+scrollable forms/choosers with reachable controls. The maps chooser must work
+at 320 × 568 with 2× text; it cannot be a height-constrained unscrollable column.
+Use plain consequence-based account wording and preserve failed edits.
+See [settings and notification audit](releases/2026-09-05-settings-and-notifications.md)
+for the verification record and remaining device checks.
+
+### 2026-09-06 — Make the recipient and delivery channel explicit
+
+The Settings hub now groups **Your alerts** and **Emails to you** under **For
+you**, with **Customer messages** in a separate **For your customers** group.
+This supersedes the ambiguous notification destination names in the previous
+entry. The Business shortcut uses the same Customer messages name.
+
+Use one quiet/warm paper frame per group, with flat rows and no framed content
+inside it. The shared paper-panel body supplies a transparent Material surface
+so native switches and list tiles can paint their interaction feedback above
+the paper fill. Keep header-to-body spacing consistent and allow every helper,
+row and action to wrap at large text sizes.
+
+Owner alert sections state the actual channel: **Business activity** controls
+the in-app inbox and push together; **Phone reminders** are local scheduled
+alerts for the owner; **Quiet hours** affects only business push. Phone
+permission is not proof of successful remote delivery. Customer settings label
+booking reminders **Email · Automatic** and WhatsApp **Manual · You tap Send**.
+Account email settings distinguish a limited welcome series from the ongoing
+tips subscription, and present essential account messages separately.
+
+Save failures must be visible at the point of interaction, without a user
+having to discover an error beneath a long settings page. Preserve saved values,
+retry paths, independent preferences and existing recipients; clearer grouping
+must not silently enrol anyone or change their notification choices.

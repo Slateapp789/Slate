@@ -3,27 +3,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workloop/core/theme/app_theme.dart';
 
 void main() {
-  test('Studio indigo remains exact and readable in both appearances', () {
+  test('Quiet + Warm blue remains exact and readable in both appearances', () {
     WorkloopLegacyPalette.sync(Brightness.light);
-    expect(AppColors.brandAccent.toARGB32(), 0xFF4F46E5);
-    expect(WorkloopThemeTokens.light.accent.toARGB32(), 0xFF4F46E5);
+    expect(AppColors.brandAccent.toARGB32(), 0xFF91B4C8);
+    expect(WorkloopThemeTokens.light.accent.toARGB32(), 0xFF91B4C8);
     WorkloopLegacyPalette.sync(Brightness.dark);
-    expect(AppColors.brandAccent.toARGB32(), 0xFF9496E8);
-    expect(WorkloopThemeTokens.dark.accent.toARGB32(), 0xFF9496E8);
-    expect(WorkloopThemeTokens.dark.accentStrong.toARGB32(), 0xFF7D80D4);
+    expect(AppColors.brandAccent.toARGB32(), 0xFF91B4C8);
+    expect(WorkloopThemeTokens.dark.accent.toARGB32(), 0xFF91B4C8);
+    expect(WorkloopThemeTokens.dark.accentStrong.toARGB32(), 0xFFA5C5D8);
     expect(
       _contrastRatio(AppColors.onBrandAccent, AppColors.brandAccent),
       greaterThanOrEqualTo(4.5),
     );
   });
 
-  test('dark midnight layers stay distinct', () {
+  test('dark warm layers stay distinct', () {
     const tokens = WorkloopThemeTokens.dark;
 
-    expect(tokens.background.toARGB32(), 0xFF111318);
-    expect(tokens.surface.toARGB32(), 0xFF1C2027);
-    expect(tokens.surfaceRaised.toARGB32(), 0xFF252A33);
-    expect(tokens.surfaceSubtle.toARGB32(), 0xFF2E343F);
+    expect(tokens.background.toARGB32(), 0xFF24231F);
+    expect(tokens.surface.toARGB32(), 0xFF2F2D27);
+    expect(tokens.surfaceRaised.toARGB32(), 0xFF39372F);
+    expect(tokens.surfaceSubtle.toARGB32(), 0xFF434037);
     expect(
       tokens.background.computeLuminance(),
       lessThan(tokens.surface.computeLuminance()),
@@ -170,14 +170,14 @@ void main() {
     }
   });
 
-  test('focus indicators remain visible against Studio surfaces', () {
+  test('focus indicators remain visible against paper surfaces', () {
     for (final entry in [
       (AppTheme.light, WorkloopThemeTokens.light),
       (AppTheme.dark, WorkloopThemeTokens.dark),
     ]) {
       final border =
           entry.$1.inputDecorationTheme.focusedBorder as OutlineInputBorder;
-      expect(border.borderSide.color, entry.$2.accent);
+      expect(border.borderSide.color, entry.$2.accentInk);
       expect(
         _contrastRatio(border.borderSide.color, entry.$2.surface),
         greaterThanOrEqualTo(3),
@@ -198,9 +198,9 @@ void main() {
         {},
       );
       final filledSide = entry.$1.filledButtonTheme.style?.side?.resolve({});
-      expect(elevatedSide?.color, entry.$2.primaryAction);
+      expect(elevatedSide?.color, entry.$2.frame);
       expect(elevatedSide?.width, 1);
-      expect(filledSide?.color, entry.$2.primaryAction);
+      expect(filledSide?.color, entry.$2.frame);
       expect(filledSide?.width, 1);
     }
   });
@@ -238,7 +238,7 @@ void main() {
     addTearDown(() => WorkloopLegacyPalette.sync(Brightness.dark));
   });
 
-  test('Home hero roles remain readable across both gradient endpoints', () {
+  test('legacy hero roles remain readable on flat paper', () {
     for (final tokens in [
       WorkloopThemeTokens.light,
       WorkloopThemeTokens.dark,
@@ -262,7 +262,7 @@ void main() {
         }
       }
       expect(
-        _contrastRatio(tokens.heroActionForeground, tokens.onHeroPrimary),
+        _contrastRatio(tokens.heroActionForeground, tokens.heroControlSurface),
         greaterThanOrEqualTo(4.5),
       );
     }
@@ -275,7 +275,10 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: MediaQuery(
-            data: const MediaQueryData(padding: EdgeInsets.only(bottom: 34)),
+            data: const MediaQueryData(
+              padding: EdgeInsets.only(bottom: 34),
+              viewPadding: EdgeInsets.only(bottom: 34),
+            ),
             child: Builder(
               builder: (context) {
                 clearance = AppSpacing.shellBottomClearance(context);
@@ -286,7 +289,7 @@ void main() {
         ),
       );
 
-      expect(clearance, 128);
+      expect(clearance, 52 + 34 + 18);
     },
   );
 

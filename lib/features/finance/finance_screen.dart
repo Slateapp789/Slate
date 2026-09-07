@@ -8,18 +8,24 @@ import '../../core/workloop_capabilities.dart';
 import '../../shared/models/slate_models.dart';
 import '../../shared/providers/clients_provider.dart';
 import '../../shared/providers/finance_provider.dart';
+import '../../shared/providers/business_clock_provider.dart';
 import '../../shared/providers/dashboard_provider.dart';
-import '../../shared/providers/notifications_provider.dart';
 import '../../shared/providers/workspace_provider.dart';
 import '../../shared/providers/workspace_settings_provider.dart';
 import '../../shared/repositories/slate_repositories.dart';
 import '../../shared/utils/currency_format.dart';
 import '../../shared/widgets/slate_ui.dart';
+import '../../shared/widgets/income_target_indicator.dart';
+import '../../shared/widgets/record_link_unavailable.dart';
 import '../../shared/widgets/workloop_studio_graphics.dart';
 import 'add_payment_screen.dart';
 import 'expense_editor_screen.dart';
 import 'payment_collection_sheet.dart';
+import 'money_profit.dart';
+import 'money_timeline.dart';
+import 'widgets/money_timeline_widgets.dart';
 import 'widgets/money_summary_widgets.dart';
+import 'widgets/monthly_target_editor.dart';
 import 'widgets/payment_cards.dart';
 
 part 'finance_screen_widgets.dart';
@@ -32,12 +38,16 @@ class FinanceScreen extends ConsumerStatefulWidget {
   final FinanceInitialFocus initialFocus;
   final int createRequest;
   final DateTime? referenceDate;
+  final String? initialPaymentId;
+  final bool showBackButton;
 
   const FinanceScreen({
     super.key,
     this.initialFocus = FinanceInitialFocus.top,
     this.createRequest = 0,
     this.referenceDate,
+    this.initialPaymentId,
+    this.showBackButton = false,
   });
 
   @override
@@ -45,13 +55,25 @@ class FinanceScreen extends ConsumerStatefulWidget {
 }
 
 class _FinanceScreenState extends ConsumerState<FinanceScreen> {
+  static const _recentHistoryLimit = 5;
+  static const _searchHistoryLimit = 25;
+
   MoneySection _section = MoneySection.made;
   FinancePeriod _period = FinancePeriod.week;
+  bool _showAllIncome = false;
+  bool _showAllExpenses = false;
+  MoneyTimelineFilter _timelineFilter = MoneyTimelineFilter.all;
+  final _paymentsSearch = TextEditingController();
+  final _expensesSearch = TextEditingController();
+  final _owedSearch = TextEditingController();
   DateTime? _customStart;
   DateTime? _customEnd;
   final _scrollController = ScrollController();
   final _followUpsKey = GlobalKey();
   bool _didApplyInitialFocus = false;
+  bool _didHandleInitialPayment = false;
+  String? _scheduledInitialId;
+  bool _initialRecordMissing = false;
 
   DateTime get _now => widget.referenceDate ?? DateTime.now();
 
@@ -72,6 +94,11 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   @override
   void didUpdateWidget(covariant FinanceScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.initialPaymentId != oldWidget.initialPaymentId) {
+      _didHandleInitialPayment = false;
+      _scheduledInitialId = null;
+      _initialRecordMissing = false;
+    }
     if (widget.initialFocus != oldWidget.initialFocus &&
         widget.initialFocus == FinanceInitialFocus.followUps) {
       _didApplyInitialFocus = false;
@@ -88,6 +115,9 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 
   @override
   void dispose() {
+    _paymentsSearch.dispose();
+    _expensesSearch.dispose();
+    _owedSearch.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -117,6 +147,58 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     _showMoneyCreateSheet(context);
   }
 
+  void _openInitialPayment(List<Payment> records) {
+    final id = widget.initialPaymentId?.trim();
+    final snapshot = ref.read(invoicesProvider);
+    final workspace = ref.read(workspaceIdProvider);
+    if (_didHandleInitialPayment ||
+        id == null ||
+        id.isEmpty ||
+        _scheduledInitialId == id ||
+        snapshot.isLoading ||
+        snapshot.hasError ||
+        !snapshot.hasValue ||
+        workspace.isLoading ||
+        workspace.hasError ||
+        workspace.value == null) {
+      return;
+    }
+    final workspaceId = workspace.value;
+    _scheduledInitialId = id;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          _scheduledInitialId != id ||
+          widget.initialPaymentId?.trim() != id) {
+        return;
+      }
+      _scheduledInitialId = null;
+      final current = ref.read(invoicesProvider);
+      final currentWorkspace = ref.read(workspaceIdProvider);
+      if (current.isLoading ||
+          current.hasError ||
+          !current.hasValue ||
+          currentWorkspace.isLoading ||
+          currentWorkspace.hasError ||
+          currentWorkspace.value != workspaceId) {
+        return;
+      }
+      Payment? match;
+      for (final record in current.value ?? <Payment>[]) {
+        if (record.id == id) {
+          match = record;
+          break;
+        }
+      }
+      _didHandleInitialPayment = true;
+      if (match == null) {
+        setState(() => _initialRecordMissing = true);
+      } else {
+        _showPaymentActionsSheet(context, match);
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
   Future<void> _showPaymentSetup(String workspaceId) async {
     final action = await showPaymentSetupSheet(
       context: context,
@@ -136,16 +218,34 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Refresh the current-month goal when a retained Money tab crosses midnight.
+    ref.watch(businessTodayProvider);
+    if (widget.initialPaymentId != null) ref.watch(workspaceIdProvider);
     final tokens = SlateTheme.of(context);
     final paymentCollectionEnabled = ref.watch(
       paymentCollectionEnabledProvider,
     );
     final invoices = ref.watch(invoicesProvider);
+    if (_initialRecordMissing) {
+      return WorkloopRecordLinkUnavailable(
+        recordName: 'Payment',
+        onRetry: () {
+          setState(() {
+            _didHandleInitialPayment = false;
+            _initialRecordMissing = false;
+          });
+          ref.invalidate(invoicesProvider);
+        },
+      );
+    }
     final expenses = ref.watch(expensesProvider);
     final settings = ref.watch(workspaceSettingsProvider);
+    if (invoices.hasValue) {
+      _openInitialPayment(invoices.value ?? const []);
+    }
 
     return Scaffold(
-      backgroundColor: tokens.background,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           const Positioned.fill(child: WorkloopTexturedBackdrop()),
@@ -155,9 +255,19 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               onRefresh: () async {
                 SlateHaptics.action();
                 _refreshMoney();
+                try {
+                  await Future.wait<Object?>([
+                    ref.read(invoicesProvider.future),
+                    ref.read(expensesProvider.future),
+                    ref.read(financeSummaryProvider.future),
+                  ]);
+                } catch (_) {
+                  // Existing Money sections expose retry without false totals.
+                }
               },
               color: tokens.accent,
               child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 controller: _scrollController,
                 padding: EdgeInsets.fromLTRB(
                   AppSpacing.pageX,
@@ -168,24 +278,38 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 children: [
                   Column(
                     children: [
-                      WorkloopPageHeader(
-                        title: 'Money',
-                        subtitle:
-                            'Know what came in, went out, and needs following up.',
-                        color: tokens.accent,
-                        trailing: WorkloopTopAction(
-                          label: 'Record',
-                          semanticLabel: 'Add money',
-                          onTap: () => _showMoneyCreateSheet(context),
+                      if (widget.showBackButton)
+                        WorkloopRouteHeader(
+                          title: 'Money',
+                          backSemanticLabel: 'Back to money',
+                          onBack: () => workloopGoBack(
+                            context,
+                            fallbackLocation: '/payments',
+                          ),
+                          trailing: WorkloopTopAction(
+                            label: 'Record',
+                            semanticLabel: 'Add money',
+                            onTap: () => _showMoneyCreateSheet(context),
+                          ),
+                        )
+                      else
+                        WorkloopPageHeader(
+                          title: 'Money',
+                          subtitle: 'Income, spending and payments owed.',
+                          color: AppColors.modFinance,
+                          trailing: WorkloopTopAction(
+                            label: 'Record',
+                            semanticLabel: 'Add money',
+                            onTap: () => _showMoneyCreateSheet(context),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: AppSpacing.sm),
                       WorkloopNavigationControl<MoneySection>(
                         selected: _section,
                         segments: const [
                           WorkloopSegment(
                             value: MoneySection.made,
-                            label: 'Made',
+                            label: 'Overview',
                           ),
                           WorkloopSegment(
                             value: MoneySection.spent,
@@ -196,13 +320,13 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                             label: 'Owed',
                           ),
                         ],
-                        color: tokens.accent,
+                        color: AppColors.modFinance,
                         onChanged: (section) =>
                             setState(() => _section = section),
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.sm),
                   AnimatedSwitcher(
                     duration: AppMotion.responsive(context, AppMotion.standard),
                     switchInCurve: AppMotion.curve,
@@ -242,6 +366,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         ),
         data: (payments) => _incomeSection(
           payments: payments,
+          expenses: expenses,
           settings: settings,
           range: range,
           paymentCollectionEnabled: paymentCollectionEnabled,
@@ -288,13 +413,18 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           await _showCustomPeriodSheet(context);
           return;
         }
-        setState(() => _period = period);
+        setState(() {
+          _period = period;
+          _showAllIncome = false;
+          _showAllExpenses = false;
+        });
       },
     );
   }
 
   Widget _incomeSection({
     required List<Payment> payments,
+    required AsyncValue<List<Expense>> expenses,
     required AsyncValue<Map<String, dynamic>?> settings,
     required MoneyPeriodRange range,
     required PeriodMoneySummary periodSummary,
@@ -302,120 +432,196 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   }) {
     final income =
         payments
-            .where((payment) => moneyStatusFor(payment) == MoneyStatus.paid)
+            .where(
+              (payment) =>
+                  receivedAmountFor(payment) != 0 || payment.status == 'paid',
+            )
             .where((payment) => _inRange(payment.receivedDate, range))
             .toList()
           ..sort((a, b) => b.receivedDate.compareTo(a.receivedDate));
-    final cashMovement = _cashMovementData(income, range);
+    final monthlyIncome = receivedIncomeForMonth(payments, _now);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _periodSelector(range),
-        const SizedBox(height: AppSpacing.xl),
+        const SizedBox(height: AppSpacing.md),
         _MoneySectionHero(
-          label: 'Made ${range.label.toLowerCase()}',
+          label: 'Money received',
           value: periodSummary.paid,
           detail:
-              '${income.length} payment${income.length == 1 ? '' : 's'} received',
+              '${income.length} payment${income.length == 1 ? '' : 's'} ${range.label.toLowerCase()}',
         ),
         const SizedBox(height: AppSpacing.md),
-        _CashMovementGraphic(data: cashMovement, periodLabel: range.label),
-        if (_period != FinancePeriod.custom) ...[
-          const SizedBox(height: AppSpacing.xxl),
-          settings.when(
-            loading: () =>
-                const SlateLoadingBlock(height: 112, radius: AppRadius.md),
-            error: (_, _) => SlateErrorState(
-              message: 'Could not load your Money target',
-              onRetry: () => ref.invalidate(workspaceSettingsProvider),
-            ),
-            data: (values) {
-              final monthlyTarget =
-                  (values?['revenue_target'] as num?)?.toDouble() ?? 0;
-              final workspaceId = values?['workspace_id'] as String?;
-              return Column(
-                children: [
-                  _IncomeTargetProgress(
-                    label: _period == FinancePeriod.month
-                        ? 'Monthly target'
-                        : 'Weekly target',
-                    made: periodSummary.paid,
-                    target: _period == FinancePeriod.month
-                        ? monthlyTarget
-                        : monthlyTarget / 4.345,
-                    onEditTarget: () =>
-                        _showTargetSheet(context, monthlyTarget),
-                  ),
-                  if (paymentCollectionEnabled && workspaceId != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    PaymentSetupCard(
-                      onTap: () => _showPaymentSetup(workspaceId),
-                    ),
-                  ],
-                ],
-              );
-            },
+        expenses.when(
+          loading: () =>
+              const SlateLoadingBlock(height: 150, radius: AppRadius.md),
+          error: (_, _) => SlateErrorState(
+            message: 'Could not calculate net profit without your expenses.',
+            onRetry: () => ref.invalidate(expensesProvider),
           ),
-        ],
-        const SizedBox(height: AppSpacing.xxl),
-        WorkloopSectionHeader(
-          label: 'Payments received',
-          actionLabel: 'Add',
-          onAction: () => _recordPayment(context),
+          data: (rows) => _NetProfitGraphic(
+            data: buildMoneyProfitData(
+              payments: payments,
+              expenses: rows,
+              range: range,
+            ),
+            periodLabel: range.label,
+          ),
         ),
-        const SizedBox(height: AppSpacing.xs),
-        if (income.isEmpty)
-          const WorkloopEmptyState(
-            icon: LucideIcons.arrowDownToLine,
-            title: 'Nothing made in this period',
-            subtitle: 'Payments you receive will appear here.',
-          )
-        else
-          ...income.map(
-            (payment) => PaymentCard(
-              payment: payment,
-              onTap: () => _showPaymentActionsSheet(context, payment),
-              onDelete: () => _confirmDeletePayment(context, payment),
-            ),
+        const SizedBox(height: AppSpacing.md),
+        settings.when(
+          loading: () =>
+              const SlateLoadingBlock(height: 112, radius: AppRadius.md),
+          error: (_, _) => SlateErrorState(
+            message: 'Could not load your Money target',
+            onRetry: () => ref.invalidate(workspaceSettingsProvider),
           ),
+          data: (values) {
+            final monthlyTarget =
+                (values?['revenue_target'] as num?)?.toDouble() ?? 0;
+            final workspaceId = values?['workspace_id'] as String?;
+            return Column(
+              children: [
+                _IncomeTargetProgress(
+                  made: monthlyIncome,
+                  target: monthlyTarget,
+                  onEditTarget: () => _showTargetSheet(context, monthlyTarget),
+                ),
+                if (paymentCollectionEnabled && workspaceId != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  PaymentSetupCard(onTap: () => _showPaymentSetup(workspaceId)),
+                ],
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        _paymentsTimeline(payments: payments, expenses: expenses, range: range),
+        const SizedBox(height: AppSpacing.xxl),
       ],
     );
   }
 
-  List<WorkloopStudioBarDatum> _cashMovementData(
-    List<Payment> payments,
-    MoneyPeriodRange range,
-  ) {
-    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final totalDays = math.max(1, range.end.difference(range.start).inDays);
-    final bucketCount = math.min(7, totalDays);
-    final bucketDays = (totalDays / bucketCount).ceil();
-
-    return List.generate(bucketCount, (index) {
-      final start = range.start.add(Duration(days: index * bucketDays));
-      final end = index == bucketCount - 1
-          ? range.end
-          : range.start.add(Duration(days: (index + 1) * bucketDays));
-      final amount = payments
-          .where((payment) {
-            final date = payment.receivedDate;
-            return !date.isBefore(start) && date.isBefore(end);
-          })
-          .fold<double>(
-            0,
-            (total, payment) => total + receivedAmountFor(payment),
-          );
-      final label = totalDays <= 7
-          ? weekdays[start.weekday - 1]
-          : totalDays <= 31
-          ? '${start.day}'
-          : '${start.day}/${start.month}';
-      return WorkloopStudioBarDatum(
-        label: label,
-        value: amount,
-        valueLabel: amount <= 0 ? '—' : formatPounds(amount),
-      );
-    });
+  Widget _paymentsTimeline({
+    required List<Payment> payments,
+    required AsyncValue<List<Expense>> expenses,
+    required MoneyPeriodRange range,
+  }) {
+    final needsExpenses = _timelineFilter != MoneyTimelineFilter.income;
+    final waiting = needsExpenses && !expenses.hasValue && !expenses.hasError;
+    final failed = needsExpenses && expenses.hasError;
+    final query = _paymentsSearch.text.trim();
+    final entries = buildMoneyTimeline(
+      payments: payments,
+      expenses: expenses.value ?? const [],
+      range: range,
+      filter: _timelineFilter,
+      query: query,
+    );
+    final searching = query.isNotEmpty;
+    final previewLimit = searching ? _searchHistoryLimit : _recentHistoryLimit;
+    final visible = _showAllIncome ? entries : entries.take(previewLimit);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        WorkloopSectionHeader(
+          label: 'Payments',
+          actionLabel: 'Add',
+          onAction: () => _showMoneyCreateSheet(context),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Income and expenses · ${range.label} · Newest first',
+          style: const TextStyle(
+            color: AppColors.t3,
+            fontSize: 12,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        WorkloopSearchField(
+          key: const ValueKey('payments-search'),
+          controller: _paymentsSearch,
+          hintText: 'Search income and expenses',
+          semanticLabel:
+              'Search income and expenses in ${range.label.toLowerCase()}',
+          onChanged: (_) => setState(() => _showAllIncome = false),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        WorkloopSegmentedControl<MoneyTimelineFilter>(
+          selected: _timelineFilter,
+          segments: const [
+            WorkloopSegment(value: MoneyTimelineFilter.all, label: 'All'),
+            WorkloopSegment(value: MoneyTimelineFilter.income, label: 'Income'),
+            WorkloopSegment(
+              value: MoneyTimelineFilter.expenses,
+              label: 'Expenses',
+            ),
+          ],
+          onChanged: (filter) => setState(() {
+            _timelineFilter = filter;
+            _showAllIncome = false;
+          }),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        if (waiting)
+          const SlateLoadingBlock(height: 150, radius: AppRadius.md)
+        else if (failed)
+          const Text(
+            'Expenses are unavailable. Retry above, or choose Income to view received payments.',
+            style: TextStyle(color: AppColors.t2, fontSize: 13, height: 1.4),
+          )
+        else if (entries.isEmpty)
+          WorkloopEmptyState(
+            icon: searching ? LucideIcons.search : LucideIcons.arrowDownUp,
+            title: searching
+                ? 'No matching payments'
+                : 'No ${switch (_timelineFilter) {
+                    MoneyTimelineFilter.all => 'payments',
+                    MoneyTimelineFilter.income => 'income',
+                    MoneyTimelineFilter.expenses => 'expenses',
+                  }} in this period',
+            subtitle: searching
+                ? 'Try a name, description or amount, or change the dates or filter.'
+                : 'Recorded income and expenses appear here. Unpaid amounts stay in Owed.',
+          )
+        else ...[
+          if (searching)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+              child: Text(
+                '${entries.length} result${entries.length == 1 ? '' : 's'} · ${range.label}',
+                style: const TextStyle(color: AppColors.t3, fontSize: 12),
+              ),
+            ),
+          if (entries.length > previewLimit)
+            WorkloopTextButton(
+              label: _showAllIncome
+                  ? searching
+                        ? 'Show first $_searchHistoryLimit results'
+                        : 'Show recent payments'
+                  : 'View all ${entries.length} ${searching ? 'results' : 'payments'}',
+              onPressed: () => setState(() => _showAllIncome = !_showAllIncome),
+            ),
+          for (final entry in visible)
+            if (entry.payment case final payment?)
+              PaymentCard(
+                key: ValueKey('income-${payment.id}'),
+                payment: payment,
+                showReceivedEntry: true,
+                onTap: () => _showPaymentActionsSheet(context, payment),
+                onDelete: () => _confirmDeletePayment(context, payment),
+              )
+            else if (entry.expense case final expense?)
+              MoneyExpenseRow(
+                key: ValueKey('expense-${expense.id}'),
+                expense: expense,
+                onTap: () => _showExpenseSheet(context, expense: expense),
+                onDelete: () => _confirmDeleteExpense(context, expense),
+              ),
+        ],
+      ],
+    );
   }
 
   Widget _outgoingSection({
@@ -428,11 +634,15 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             .where((expense) => _inRange(expense.expenseDate, range))
             .toList()
           ..sort((a, b) => b.expenseDate.compareTo(a.expenseDate));
+    final query = _expensesSearch.text.trim();
+    final matches = outgoing
+        .where((expense) => expenseMatchesSearch(expense, query))
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _periodSelector(range),
-        const SizedBox(height: AppSpacing.xl),
+        const SizedBox(height: AppSpacing.md),
         _MoneySectionHero(
           label: 'Spent ${range.label.toLowerCase()}',
           value: periodSummary.expenses,
@@ -440,30 +650,71 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               '${outgoing.length} expense${outgoing.length == 1 ? '' : 's'} · ${range.label}',
         ),
         if (periodSummary.categoryTotals.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.xxl),
+          const SizedBox(height: AppSpacing.md),
           ExpenseCategorySummary(summary: periodSummary),
         ],
-        const SizedBox(height: AppSpacing.xxl),
+        const SizedBox(height: AppSpacing.lg),
         WorkloopSectionHeader(
           label: 'Expenses',
           actionLabel: 'Add',
           onAction: () => _showExpenseSheet(context),
         ),
         const SizedBox(height: AppSpacing.xs),
+        WorkloopSearchField(
+          key: const ValueKey('expense-search'),
+          controller: _expensesSearch,
+          hintText: 'Search expenses',
+          semanticLabel: 'Search expenses in ${range.label.toLowerCase()}',
+          onChanged: (_) => setState(() => _showAllExpenses = false),
+        ),
+        const SizedBox(height: AppSpacing.sm),
         if (outgoing.isEmpty)
           const WorkloopEmptyState(
             icon: LucideIcons.receipt,
             title: 'Nothing spent in this period',
             subtitle: 'Business expenses you record will appear here.',
           )
-        else
-          ...outgoing.map(
-            (expense) => _ExpenseRow(
-              expense: expense,
-              onTap: () => _showExpenseSheet(context, expense: expense),
-              onDelete: () => _confirmDeleteExpense(context, expense),
+        else if (matches.isEmpty)
+          const WorkloopEmptyState(
+            icon: LucideIcons.search,
+            title: 'No matching expenses',
+            subtitle:
+                'Try a category, description or amount, or change the dates.',
+          )
+        else ...[
+          if (query.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+              child: Text(
+                '${matches.length} result${matches.length == 1 ? '' : 's'} · ${range.label}',
+                style: const TextStyle(color: AppColors.t3, fontSize: 12),
+              ),
             ),
-          ),
+          if (matches.length >
+              (query.isEmpty ? _recentHistoryLimit : _searchHistoryLimit))
+            WorkloopTextButton(
+              label: _showAllExpenses
+                  ? query.isEmpty
+                        ? 'Show recent expenses'
+                        : 'Show first $_searchHistoryLimit results'
+                  : 'View all ${matches.length} ${query.isEmpty ? 'expenses' : 'results'}',
+              onPressed: () =>
+                  setState(() => _showAllExpenses = !_showAllExpenses),
+            ),
+          ...(_showAllExpenses
+                  ? matches
+                  : matches.take(
+                      query.isEmpty ? _recentHistoryLimit : _searchHistoryLimit,
+                    ))
+              .map(
+                (expense) => MoneyExpenseRow(
+                  key: ValueKey('expense-${expense.id}'),
+                  expense: expense,
+                  onTap: () => _showExpenseSheet(context, expense: expense),
+                  onDelete: () => _confirmDeleteExpense(context, expense),
+                ),
+              ),
+        ],
       ],
     );
   }
@@ -483,6 +734,9 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       0,
       (total, payment) => total + outstandingAmountFor(payment),
     );
+    final matches = owed
+        .where((payment) => paymentMatchesSearch(payment, _owedSearch.text))
+        .toList();
     return Column(
       key: _followUpsKey,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -493,13 +747,27 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           detail:
               '${owed.length} payment${owed.length == 1 ? '' : 's'} waiting to be paid',
         ),
-        const SizedBox(height: AppSpacing.xxl),
+        const SizedBox(height: AppSpacing.lg),
         const WorkloopSectionHeader(label: 'Payments owed'),
         const SizedBox(height: AppSpacing.xs),
+        WorkloopSearchField(
+          key: const ValueKey('owed-search'),
+          controller: _owedSearch,
+          hintText: 'Search payments owed',
+          semanticLabel: 'Search payments owed',
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: AppSpacing.sm),
         if (owed.isEmpty)
           const _QuietMoneyState()
+        else if (matches.isEmpty)
+          const WorkloopEmptyState(
+            icon: LucideIcons.search,
+            title: 'No matching payments owed',
+            subtitle: 'Try a client name, payment reference or amount.',
+          )
         else
-          ...owed.map(
+          ...matches.map(
             (payment) => PaymentCard(
               payment: payment,
               onTap: () => _showPaymentActionsSheet(context, payment),
@@ -523,11 +791,10 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   }
 
   Future<void> _showMoneyCreateSheet(BuildContext context) async {
-    final action = await showModalBottomSheet<_MoneyCreateAction>(
+    final action = await showWorkloopBottomSheet<_MoneyCreateAction>(
       context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: SlateTheme.of(context).scrim,
       builder: (sheetContext) => SlateSheetFrame(
+        scrollable: true,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -598,7 +865,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         final start = startOfWeek(now);
         return MoneyPeriodRange(
           start: start,
-          end: start.add(const Duration(days: 7)),
+          end: addBusinessCalendarDays(start, 7),
           label: 'This week',
         );
       case FinancePeriod.month:
@@ -613,11 +880,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         final end = _customEnd ?? now;
         return MoneyPeriodRange(
           start: DateTime(start.year, start.month, start.day),
-          end: DateTime(
-            end.year,
-            end.month,
-            end.day,
-          ).add(const Duration(days: 1)),
+          end: addBusinessCalendarDays(end, 1),
           label: '${_formatDate(start)} - ${_formatDate(end)}',
         );
     }
@@ -627,10 +890,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     var start = _customStart ?? _now.subtract(const Duration(days: 29));
     var end = _customEnd ?? _now;
 
-    await showModalBottomSheet(
+    await showWorkloopBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (ctx) => StatefulBuilder(
         builder: (context, setSheetState) {
           Future<void> pickStart() async {
@@ -654,6 +915,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           }
 
           return SlateSheetFrame(
+            scrollable: true,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -695,6 +957,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                       _period = FinancePeriod.custom;
                       _customStart = start;
                       _customEnd = end;
+                      _showAllIncome = false;
+                      _showAllExpenses = false;
                     });
                     Navigator.pop(ctx);
                   },
@@ -708,124 +972,25 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   }
 
   void _showTargetSheet(BuildContext context, double monthlyTarget) {
-    final monthlyController = TextEditingController(
-      text: monthlyTarget > 0 ? currencyInputValue(monthlyTarget) : '',
-    );
-    final weeklyTarget = monthlyTarget / 4.345;
-    final weeklyController = TextEditingController(
-      text: weeklyTarget > 0 ? currencyInputValue(weeklyTarget) : '',
-    );
-    var mode = 'monthly';
-    var saving = false;
-
-    showModalBottomSheet(
+    showWorkloopBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          Future<void> save() async {
-            final raw = mode == 'monthly'
-                ? monthlyController.text.trim()
-                : weeklyController.text.trim();
-            final value = double.tryParse(raw);
-            if (value == null || value < 0) return;
-            final monthlyTarget = mode == 'monthly' ? value : value * 4.345;
-            setSheetState(() => saving = true);
-            final workspaceId = await ref.read(workspaceIdProvider.future);
-            if (workspaceId == null) return;
-            try {
-              await ref.read(workspaceSettingsRepositoryProvider).update(
-                workspaceId,
-                {'revenue_target': monthlyTarget},
-              );
-              ref.invalidate(workspaceSettingsProvider);
-              ref.invalidate(financeSummaryProvider);
-              ref.invalidate(dashboardRevenueProvider);
-              if (context.mounted) Navigator.pop(ctx);
-            } catch (error) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('The target could not be updated.'),
-                    backgroundColor: AppColors.error,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
-            } finally {
-              if (context.mounted) setSheetState(() => saving = false);
-            }
+      builder: (_) => MonthlyTargetEditor(
+        initialTarget: monthlyTarget,
+        onSave: (target) async {
+          final repository = ref.read(workspaceSettingsRepositoryProvider);
+          final workspaceId = await ref.read(workspaceIdProvider.future);
+          if (!mounted || workspaceId == null) {
+            throw StateError('No active business');
           }
-
-          return SlateSheetFrame(
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Money target',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.t1,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  ModePills(
-                    selected: mode,
-                    options: const {'monthly': 'Monthly', 'weekly': 'Weekly'},
-                    onSelected: (value) => setSheetState(() => mode = value),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: mode == 'monthly'
-                        ? monthlyController
-                        : weeklyController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    style: const TextStyle(
-                      color: AppColors.t1,
-                      fontSize: 25,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    decoration: InputDecoration(
-                      prefixText: '£ ',
-                      hintText: '0',
-                      labelText: mode == 'monthly'
-                          ? 'Monthly target'
-                          : 'Weekly target',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    mode == 'monthly'
-                        ? 'Workloop will show a weekly target of roughly one quarter of this.'
-                        : 'Workloop will save this as a monthly target for the rest of the app.',
-                    style: const TextStyle(fontSize: 12, color: AppColors.t3),
-                  ),
-                  const SizedBox(height: 18),
-                  SlateButton(
-                    label: saving ? 'Saving...' : 'Save Target',
-                    icon: LucideIcons.target,
-                    onPressed: saving ? null : save,
-                  ),
-                ],
-              ),
-            ),
-          );
+          await repository.update(workspaceId, {'revenue_target': target});
+          if (!mounted) return;
+          ref.invalidate(workspaceSettingsProvider);
+          ref.invalidate(financeSummaryProvider);
+          ref.invalidate(dashboardRevenueProvider);
         },
       ),
-    ).whenComplete(() {
-      monthlyController.dispose();
-      weeklyController.dispose();
-    });
+    );
   }
 
   Future<void> _showExpenseSheet(
@@ -845,17 +1010,16 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   ) async {
     var deleting = false;
     String? errorMessage;
-    final deleted = await showModalBottomSheet<bool>(
+    final deleted = await showWorkloopBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
       isDismissible: false,
       enableDrag: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => PopScope(
           canPop: !deleting,
           child: SlateSheetFrame(
+            scrollable: true,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -932,20 +1096,25 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 
   void _showPaymentActionsSheet(BuildContext context, Payment payment) {
     final clientName = payment.clientName ?? 'Unknown client';
-    final amount = payment.total;
+    final received = receivedAmountFor(payment);
+    final outstanding = outstandingAmountFor(payment);
+    final partPaid = received > 0 && outstanding > 0;
+    final amount = received != 0 || payment.status == 'paid'
+        ? received
+        : outstanding;
     final description = payment.notes ?? '';
     final canMarkPaid =
-        payment.status == 'sent' ||
-        payment.status == 'pending' ||
-        payment.status == 'overdue';
+        outstanding > 0 &&
+        (payment.status == 'sent' ||
+            payment.status == 'pending' ||
+            payment.status == 'overdue');
     var updating = false;
     String? errorMessage;
 
-    showModalBottomSheet(
+    showWorkloopBottomSheet(
       context: context,
+      routeSettings: RouteSettings(name: '/payments/${payment.id}'),
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
       isDismissible: false,
       enableDrag: false,
       builder: (ctx) => StatefulBuilder(
@@ -964,7 +1133,11 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          payment.status == 'paid'
+                          received < 0
+                              ? 'Refund recorded'
+                              : partPaid
+                              ? 'Part-paid income'
+                              : outstanding <= 0
                               ? 'Income received'
                               : 'To collect',
                           style: const TextStyle(
@@ -975,7 +1148,9 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          formatPounds(amount),
+                          amount < 0
+                              ? '-${formatPounds(amount.abs())}'
+                              : formatPounds(amount),
                           style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w600,
@@ -983,6 +1158,17 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                             letterSpacing: 0,
                           ),
                         ),
+                        if (partPaid) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            '${formatPounds(received)} received · ${formatPounds(outstanding)} still to collect',
+                            style: const TextStyle(
+                              color: AppColors.t2,
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: AppSpacing.sm),
                         Text(
                           clientName,
@@ -1147,6 +1333,9 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                                   await Navigator.push(
                                     context,
                                     MaterialPageRoute(
+                                      settings: RouteSettings(
+                                        name: '/payments/${payment.id}',
+                                      ),
                                       builder: (_) =>
                                           AddPaymentScreen(payment: payment),
                                     ),
@@ -1186,26 +1375,9 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   }
 
   Future<void> _markPaymentPaid(BuildContext context, Payment payment) async {
-    final amount = payment.total;
+    final amount = outstandingAmountFor(payment);
     await ref.read(paymentsRepositoryProvider).markPaid(payment);
-    try {
-      await ref
-          .read(notificationsRepositoryProvider)
-          .create(
-            workspaceId: payment.workspaceId,
-            type: 'payment_received',
-            title: 'Payment received',
-            body:
-                '${formatPounds(amount)} from ${payment.clientName ?? 'a client'} is now paid.',
-            deepLink: '/payments',
-          );
-    } catch (_) {
-      // The confirmed payment update remains successful even if the optional
-      // notification feed is temporarily unavailable.
-    }
     _refreshPayment(payment);
-    ref.invalidate(notificationsProvider);
-    ref.invalidate(unreadNotificationsProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1232,17 +1404,16 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     var deleting = false;
     String? errorMessage;
 
-    final deleted = await showModalBottomSheet<bool>(
+    final deleted = await showWorkloopBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
       isDismissible: false,
       enableDrag: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => PopScope(
           canPop: !deleting,
           child: SlateSheetFrame(
+            scrollable: true,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1318,8 +1489,12 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   }
 
   String _paymentTiming(Payment payment) {
-    if (payment.status == 'paid') {
-      return 'Received ${_formatDate(payment.issueDate)}';
+    final received = receivedAmountFor(payment);
+    if (payment.status == 'paid' || received != 0) {
+      final due = outstandingAmountFor(payment) > 0 && payment.dueDate != null
+          ? ' · Due ${_formatDate(payment.dueDate!)}'
+          : '';
+      return '${received < 0 ? 'Recorded' : 'Received'} ${_formatDate(payment.receivedDate)}$due';
     }
     final dueDate = payment.dueDate;
     if (dueDate == null || dueDate.millisecondsSinceEpoch == 0) {

@@ -169,7 +169,7 @@ class _ObHandleState extends ConsumerState<ObHandle> {
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
               color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(color: AppColors.green.withValues(alpha: 0.3)),
             ),
             child: Column(
@@ -238,19 +238,19 @@ class _ObHandleState extends ConsumerState<ObHandle> {
               filled: true,
               fillColor: AppColors.bgCard,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(color: AppColors.border),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(color: AppColors.border),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(color: AppColors.green, width: 1.5),
               ),
               errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(color: AppColors.error, width: 1.5),
               ),
               contentPadding: const EdgeInsets.symmetric(

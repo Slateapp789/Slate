@@ -1,6 +1,14 @@
 # Workloop Store Submission Draft
 
-Last updated: 2026-08-13
+> **Current pack — 6 September 2026:** use
+> [the iPhone App Store submission pack](releases/2026-09-06-ios-store-submission.md).
+> It supersedes the historical copy below for the iPhone-only, Quiet + Warm,
+> free-app launch with hosted payment links, manual WhatsApp and no Tap to Pay
+> or SMS. It records the current empty public-submission fields, proposed
+> operator/legal identity gate, privacy worksheet and screenshot requirements.
+> The older payments-off/neon drafts and beta handoffs remain here as history.
+
+Last updated: 2026-09-05
 
 This copy is a launch draft, not a substitute for App Store Connect, Play
 Console, privacy, or trade-mark review.
@@ -111,9 +119,10 @@ legible copy, and no more than one claim per frame.
 | Contacts | Review and import selected contacts as clients | Manual client entry remains available |
 | Calendar | Review and import selected events as bookings. Android's calendar provider grants the package's required read/write permission pair, but Workloop's launch flow does not modify device events. | Manual booking entry and `.ics` export remain available |
 | Files | Select supported exports for reviewed import or save an export | Clipboard/manual entry remains available where offered |
-| Notifications | Schedule opted-in on-device task and booking reminders | Workloop remains usable; reminders stay visible in-app |
-| Location / Bluetooth / NFC | Connect to an eligible Stripe reader or Tap to Pay flow only in a payment-enabled build on supported hardware | Manual payment records remain available |
-| Internet | Secure authentication, workspace sync, public booking, and address lookup | Clear retry/error states are shown |
+| Notifications | Deliver opted-in business attention and schedule on-device task and booking reminders | Workloop remains usable; activity stays visible in-app |
+| Location | Optional current-location weather after the owner chooses Use my location; eligible Stripe collection also uses location in payment-enabled builds | Choose a UK area manually for weather, leave weather off, or keep manual payment records |
+| Bluetooth / NFC | Connect to an eligible Stripe reader or Tap to Pay flow only in a payment-enabled build on supported hardware | Manual payment records remain available |
+| Internet | Secure authentication, workspace sync, public booking, address lookup and optional local forecasts | Clear retry/error states are shown |
 
 Reviewer notes should explicitly say:
 
@@ -122,6 +131,11 @@ Reviewer notes should explicitly say:
   Workloop V1 only reads events the user reviews for import and does not modify
   the device calendar.
 - Google Places is optional; addresses can be entered manually.
+- Local weather starts off. Tap the weather beside the Today greeting, then
+  choose Use my location to request foreground location. Approximate permission
+  works; weather requests no background location. A UK area can instead be
+  selected with existing Places search, or weather can stay off. A failed
+  forecast must not block bookings or show invented conditions.
 - The iOS file-picker dependency links camera/photo chooser support, which is
   why the binary includes purpose strings. Workloop V1 exposes only reviewed
   CSV, text and Markdown imports plus ICS/JSON export; it does not expose a
@@ -132,7 +146,9 @@ Reviewer notes should explicitly say:
   for an eligible connected business and Workloop does not store full card
   numbers.
 - Calendar export is point-in-time `.ics`, not live two-way sync.
-- Any reminder delivered in V1 is on-device, not marketing or remote push.
+- Remote notifications are operational business attention requested through
+  the user's Workloop preferences; they are not advertising or marketing.
+  Task and booking reminders remain scheduled on-device.
 - Public booking is a request that the owner reviews and confirms; V1 does not
   advertise live slot selection or automatic confirmation. Payment collection
   must be described only if the submitted build and connected-account operation
@@ -153,10 +169,11 @@ Review the final App Store Connect definitions before submission.
 | Other financial info | Optional | Yes | No | User-entered income/expense tracking and payment status/provider references |
 | User ID | Yes | Yes | No | Authentication and security |
 | Calendar events | Optional | Yes | No | User-selected booking import |
+| Coarse location (weather) | Optional | Yes during the authenticated request | No | Local current-hour forecast; device or manually selected coordinates are reduced to two decimal places before leaving the device |
 | Diagnostics | Support-only, user initiated | Potentially | No | Troubleshooting |
 
 The current source has no advertising SDK and no cross-app tracking SDK.
-Supabase, Stripe, Resend, Google OAuth and Google Places are service providers;
+Supabase, Stripe, Resend, Google OAuth, Google Places and MET Norway are service providers;
 their actual processing must be reflected in the public privacy policy and
 store answers.
 
@@ -171,9 +188,31 @@ store answers.
   references, a public booking requester's email used for confirmation through
   Resend, and a customer email supplied for receipt delivery through Stripe.
 - Contacts, calendar, files, and notifications are optional.
+- Weather location is optional and used only for app functionality. The
+  Workloop proxy receives reduced-precision coordinates through an authenticated
+  request, then calls MET Norway without forwarding the owner's identity or
+  device IP. Manual UK area lookup sends the typed query to Google Places.
+  Weather is not used for advertising or cross-app tracking.
+- Do not assume Apple's Coarse Location classification maps directly to Play.
+  Apple defines precision using decimal places; Google defines Approximate
+  Location as an area of at least 3 km². Weather's two-decimal coordinate grid
+  can resolve a smaller area when the OS supplies a precise fix. Conservatively
+  include **Precise location** for Android weather as well as Approximate
+  Location where applicable, and separately audit Stripe's location processing
+  in the submitted payment-enabled build. The manifest already retains Stripe's
+  fine-location permission; weather accepts approximate permission.
+- Do not automatically claim purely ephemeral processing. Weather forecast
+  responses have a reusable warm-server cache, and MET Norway's request logs
+  can contain the reduced-precision coordinates. Confirm actual final provider
+  handling before selecting the ephemeral-only or not-shared options.
 - No data is sold and the current source has no advertising SDK.
 - Confirm Play’s current distinction between service-provider processing and
   “sharing” before answering the form.
+
+Source definitions checked 5 September 2026:
+[Apple App Privacy Details](https://developer.apple.com/app-store/app-privacy-details/),
+[Google Play Data safety](https://support.google.com/googleplay/android-developer/answer/10787469),
+[MET Norway privacy policy](https://www.met.no/en/About-us/privacy).
 
 ## Accessibility evidence to capture
 
@@ -247,12 +286,59 @@ Do not distribute Build 5 until the backend migration, three booking functions,
 Resend secrets and scheduled retry worker have passed the controlled-inbox
 staging gate.
 
+## TestFlight beta 6 handoff draft
+
+Build name: `Workloop 1.0.0 (6) - Business alerts`
+
+### Plain-English release notes
+
+This build adds optional push notifications for important Workloop activity,
+including booking requests, booking/payment updates, overdue-payment attention
+and the morning brief. Alert previews keep customer and payment detail private;
+tapping opens the relevant Workloop screen. Existing task and booking reminder
+choices continue to run on the device.
+
+### Additional What to Test
+
+- Update from Build 5 through TestFlight; confirm the same account, workspace
+  and business data remain available without reinstalling.
+- Turn notifications on, close Workloop, and confirm a controlled booking
+  request or payment update arrives once with privacy-safe preview text.
+- Tap the alert and confirm it opens the correct signed-in Workloop screen.
+- Repeat once while Workloop is open and confirm the in-app notification centre
+  refreshes without a duplicate foreground banner.
+- Sign out, use another test account on the same phone, and confirm no alert
+  from the previous account appears.
+
+Card collection, payment links and Tap to Pay remain disabled for this beta.
+Use the existing TestFlight groups and public link after the processed Build 6
+has passed the internal physical-iPhone push smoke.
+
+### 2026-08-31 live TestFlight handoff
+
+- Build 6 is uploaded, processed and marked `Testing` in both `Workloop
+  Internal Beta` and `Workloop Private Beta`.
+- The saved What to Test copy covers the Build 5 update path, privacy-safe
+  background alerts, alert routing, foreground duplicate suppression and
+  two-account token isolation.
+- The private group retains all 9 testers. Automatic tester notification is
+  enabled, so existing testers can install Build 6 as an in-place TestFlight
+  update; no new invitation or reinstall is required.
+- The controlled public link remains
+  `https://testflight.apple.com/join/1ycJPHWx`.
+- A physical iPhone registered a live token and visibly received a controlled
+  sandbox alert. Tap routing, quiet-hour behaviour, foreground suppression and
+  two-account reassignment remain tester checks rather than completed claims.
+- A separate Build 7 upload is `Ready to Submit` but is not attached to the
+  external group. Build 6 remains the selected beta.
+
 ### Known beta limitations
 
 - One-off booking creation only; historic recurring records remain readable.
 - Public booking is a request, not live availability or automatic confirmation.
 - Calendar export is point-in-time ICS, not live two-way sync.
-- Reminders are on-device; remote push is not a beta capability.
+- Task and booking reminders are on-device. Business-activity remote push is a
+  Build 6 beta capability and remains optional.
 - Card collection, payment links and Tap to Pay are disabled.
 - No bank feed, accounting replacement, staff/team operation or AI workflow.
 - iPhone portrait is the TestFlight layout promise; iPad and landscape are not.
@@ -289,3 +375,10 @@ staging gate.
   `https://testflight.apple.com/join/1ycJPHWx`. Share it with the intended
   tester cohort after Apple approves the build; Apple keeps it closed until
   then.
+
+
+## Subscription launch revision — 7 September 2026
+
+The earlier free-app submission draft is superseded by the requested subscription model: exact30-day server trial with no payment details, then native-store £14.99/month or £149.99/year; existing verified beta accounts retain lifetime access. The app remains free to download. Do not submit the older review notes claiming no paid Workloop plan. Use the current trial/lifetime flow, product IDs `workloop_monthly` and `workloop_yearly`, and the matching subscription/privacy/terms screens when completing review metadata. Products, receipt verification, notification lifecycle and first-subscription review must be completed before billing enforcement/public release. Current sales flags are off.
+
+App Privacy must include purchase history linked to the account for app functionality: store/platform, product, transaction IDs, expiry/refund status and app-account association. Card numbers remain with Apple/Google; Workloop does not receive store card details. Do not change the store questionnaire or certify its answers until the complete final data inventory is reviewed. No public-submission action occurred in this pass.

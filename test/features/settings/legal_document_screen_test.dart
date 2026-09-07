@@ -16,8 +16,14 @@ void main() {
     await tester.pumpWidget(buildScreen(WorkloopLegalDocument.privacy));
 
     expect(find.text('Privacy policy'), findsOneWidget);
-    expect(find.text('Last updated 13 August 2026'), findsOneWidget);
+    expect(find.text('Effective 6 September 2026'), findsOneWidget);
     expect(find.text('1. Who this policy covers'), findsOneWidget);
+    expect(find.textContaining('Haani Enterprise Limited'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('2. Data you provide'),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('2. Data you provide'), findsOneWidget);
     expect(find.textContaining('transaction references'), findsOneWidget);
     expect(
@@ -26,6 +32,23 @@ void main() {
     );
     expect(
       find.textContaining('does not receive or store full card'),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Optional local weather'),
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(
+      find.textContaining(
+        'weather does not track your device in the background',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'does not pass your Workloop identity or device IP address',
+      ),
       findsOneWidget,
     );
     await tester.scrollUntilVisible(

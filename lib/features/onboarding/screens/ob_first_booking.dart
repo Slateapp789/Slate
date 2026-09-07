@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/providers/onboarding_provider.dart';
+import '../../../shared/utils/duration_format.dart';
 import '../../../shared/widgets/slate_ui.dart';
 
 class ObFirstBooking extends ConsumerStatefulWidget {
@@ -26,7 +27,14 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
     final booking = ref.read(onboardingProvider).firstBooking;
     if (booking == null) return;
     _clientNameController.text = booking['clientName'] as String? ?? '';
-    _selectedService = booking['serviceName'] as String?;
+    final savedService = booking['serviceName'] as String?;
+    _selectedService =
+        ref
+            .read(onboardingProvider)
+            .services
+            .any((service) => service['name'] == savedService)
+        ? savedService
+        : null;
     _selectedDate =
         DateTime.tryParse(booking['date'] as String? ?? '') ?? DateTime.now();
     _selectedHour = (booking['hour'] as num?)?.toInt() ?? 9;
@@ -43,6 +51,7 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
       _clientNameController.text.trim().isNotEmpty && _selectedService != null;
 
   void _saveAndContinue() {
+    if (!_canContinue) return;
     ref.read(onboardingProvider.notifier).setFirstBooking({
       'clientName': _clientNameController.text.trim(),
       'serviceName': _selectedService,
@@ -54,10 +63,11 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
   }
 
   Future<void> _pickDate() async {
+    final today = DateUtils.dateOnly(DateTime.now());
     final picked = await showWorkloopDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now(),
+      initialDate: _selectedDate.isBefore(today) ? today : _selectedDate,
+      firstDate: today,
       lastDate: DateTime.now().add(const Duration(days: 365)),
       title: 'Choose booking date',
     );
@@ -95,7 +105,8 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
     ];
     final isToday =
         _selectedDate.day == DateTime.now().day &&
-        _selectedDate.month == DateTime.now().month;
+        _selectedDate.month == DateTime.now().month &&
+        _selectedDate.year == DateTime.now().year;
     if (isToday) return 'Today';
     return '${days[_selectedDate.weekday - 1]} ${_selectedDate.day} ${months[_selectedDate.month - 1]}';
   }
@@ -128,6 +139,17 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
             'Add your first booking to get started.',
             style: TextStyle(fontSize: 15, color: AppColors.t3),
           ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            services.isEmpty
+                ? 'You can skip this step. Add a service in Business when you are ready to book real work.'
+                : 'Use a real client and agreed time. Nothing is added until you finish setup.',
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.t3,
+              height: 1.4,
+            ),
+          ),
           const SizedBox(height: 32),
 
           // Client name
@@ -143,15 +165,15 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
               filled: true,
               fillColor: AppColors.bgCard,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(color: AppColors.border),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(color: AppColors.border),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide(color: AppColors.green, width: 1.5),
               ),
               contentPadding: const EdgeInsets.symmetric(
@@ -175,9 +197,11 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
                   (service) => WorkloopPickerOption(
                     value: service['name'] as String,
                     label: service['name'] as String,
-                    subtitle: service['duration_mins'] == null
+                    subtitle: service['duration'] == null
                         ? null
-                        : '${service['duration_mins']} min',
+                        : formatFriendlyDuration(
+                            (service['duration'] as num).toInt(),
+                          ),
                   ),
                 )
                 .toList(),
@@ -209,7 +233,7 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
                             padding: const EdgeInsets.symmetric(horizontal: 18),
                             decoration: BoxDecoration(
                               color: AppColors.bgCard,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                               border: Border.all(color: AppColors.border),
                             ),
                             child: Text(
@@ -251,7 +275,7 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
                             padding: const EdgeInsets.symmetric(horizontal: 18),
                             decoration: BoxDecoration(
                               color: AppColors.bgCard,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                               border: Border.all(color: AppColors.border),
                             ),
                             child: Text(
@@ -290,7 +314,10 @@ class _ObFirstBookingState extends ConsumerState<ObFirstBooking> {
           Center(
             child: WorkloopTextButton(
               label: 'Skip — I’ll do this later',
-              onPressed: widget.onNext,
+              onPressed: () {
+                ref.read(onboardingProvider.notifier).clearFirstBooking();
+                widget.onNext();
+              },
             ),
           ),
           const SizedBox(height: 32),

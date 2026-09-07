@@ -4,8 +4,8 @@ import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-  private var statusBarScrollBridge: WorkloopStatusBarScrollBridge?
   private var stripeTerminalBridge: WorkloopStripeTerminalBridge?
+  private var notificationSettingsChannel: FlutterMethodChannel?
 
   override func application(
     _ application: UIApplication,
@@ -20,38 +20,32 @@ import UserNotifications
       didFinishLaunchingWithOptions: launchOptions
     )
     if let controller = window?.rootViewController as? FlutterViewController {
-      statusBarScrollBridge = WorkloopStatusBarScrollBridge(controller: controller)
       stripeTerminalBridge = WorkloopStripeTerminalBridge(controller: controller)
+      let channel = FlutterMethodChannel(
+        name: "workloop/notifications",
+        binaryMessenger: controller.binaryMessenger
+      )
+      channel.setMethodCallHandler { call, result in
+        guard call.method == "openSettings" else {
+          result(FlutterMethodNotImplemented)
+          return
+        }
+        let settingsURL: String
+        if #available(iOS 16.0, *) {
+          settingsURL = UIApplication.openNotificationSettingsURLString
+        } else {
+          settingsURL = UIApplication.openSettingsURLString
+        }
+        guard let url = URL(string: settingsURL) else {
+          result(false)
+          return
+        }
+        UIApplication.shared.open(url, options: [:]) { opened in
+          result(opened)
+        }
+      }
+      notificationSettingsChannel = channel
     }
     return launched
-  }
-}
-
-private final class WorkloopStatusBarScrollBridge: NSObject, UIScrollViewDelegate {
-  private let channel: FlutterMethodChannel
-  private let detector = UIScrollView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
-
-  init(controller: FlutterViewController) {
-    channel = FlutterMethodChannel(
-      name: "com.ismaeel.workloop/navigation",
-      binaryMessenger: controller.binaryMessenger
-    )
-    super.init()
-    detector.delegate = self
-    detector.scrollsToTop = true
-    detector.contentSize = CGSize(width: 1, height: 2)
-    detector.contentOffset = CGPoint(x: 0, y: 1)
-    detector.backgroundColor = .clear
-    detector.showsVerticalScrollIndicator = false
-    detector.showsHorizontalScrollIndicator = false
-    detector.isScrollEnabled = true
-    detector.isUserInteractionEnabled = true
-    detector.accessibilityElementsHidden = true
-    controller.view.insertSubview(detector, at: 0)
-  }
-
-  func scrollViewShouldScrollToTop(_ scrollView: UIScrollView) -> Bool {
-    channel.invokeMethod("scrollToTop", arguments: nil)
-    return false
   }
 }
